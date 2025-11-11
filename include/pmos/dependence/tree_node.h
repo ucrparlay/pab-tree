@@ -28,23 +28,20 @@ struct Node {
   Node() : is_leaf{false}, size{0} {};
   Node(bool _is_leaf, size_t _size) : is_leaf{_is_leaf}, size{_size} {};
 
-  // Adding a virtual destructor makes Node polymorphic
-  virtual ~Node() = default;
-
   bool is_leaf;
   size_t size;
 };
 
-template <typename Point, typename Range, uint_fast8_t kDefaultWrap,
-          typename AugType = std::monostate,
-          typename PointAssignTag = parlay::move_assign_tag>
+template <typename TypeTrait, typename Range,
+          typename EleAssignTag = parlay::move_assign_tag>
 struct LeafNode : Node {
-  using Points = parlay::sequence<Point>;
-  using AT = AugType;
+  using Ele = typename TypeTrait::EleType;
+  using EleSeq = typename TypeTrait::EleSeq;
+  using AT = typename TypeTrait::LeafAug;
+  using TT = TypeTrait;
 
   // NOTE: default allocator
-  LeafNode()
-      : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(AugType()) {}
+  LeafNode() : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(AT()) {}
 
   LeafNode(AT const& _aug)
       : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(_aug) {}
@@ -53,11 +50,11 @@ struct LeafNode : Node {
   LeafNode(Range In, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(false),
-        pts(Points::uninitialized(kDefaultWrap)),
+        elements(EleSeq::uninitialized(TT::kBufUB)),
         aug(AT(In)) {
-    assert(In.size() <= kDefaultWrap);
+    assert(In.size() <= TT::kBufUB);
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
-      parlay::assign_dispatch(pts[i++], x, PointAssignTag());
+      parlay::assign_dispatch(elements[i++], x, EleAssignTag());
     });
   }
 
@@ -65,11 +62,11 @@ struct LeafNode : Node {
   LeafNode(Range In, size_t const alloc_size, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(false),
-        pts(Points::uninitialized(alloc_size)),
+        elements(EleSeq::uninitialized(alloc_size)),
         aug(AT(In)) {
     assert(In.size() <= alloc_size);
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
-      parlay::assign_dispatch(pts[i++], x, PointAssignTag());
+      parlay::assign_dispatch(elements[i++], x, EleAssignTag());
     });
   }
 
@@ -77,18 +74,18 @@ struct LeafNode : Node {
   LeafNode(Range In, AllocDummyLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(true),
-        pts(Points::uninitialized(1)),
+        elements(EleSeq::uninitialized(1)),
         aug(AT(In.cut(0, 1))) {
-    parlay::assign_dispatch(pts[0], In[0], PointAssignTag());
+    parlay::assign_dispatch(elements[0], In[0], EleAssignTag());
   }
 
-  bool CapacityFull() const { return this->size == kDefaultWrap; }
+  bool CapacityFull() const { return this->size >= TT::kBufUB; }
 
-  Points const GetPoints() const { return pts.substr(0, this->size); }
+  EleSeq const GetPoints() const { return elements.substr(0, this->size); }
 
-  AugType& GetAug() const { return aug; }
+  AT& GetAug() const { return aug; }
 
-  AugType const& GetSplit() const { return aug; }
+  AT const& GetSplit() const { return aug; }
 
   auto GetBox()
     requires(NodeHasNonTrivialAug<AT> && HasBox<AT>)
@@ -108,8 +105,8 @@ struct LeafNode : Node {
   auto ResetAug() { return aug.Reset(); }
 
   bool is_dummy;
-  Points pts;
-  AugType aug;
+  EleSeq elements;
+  AT aug;
 };
 
 template <typename NodeType, typename Range>
@@ -188,9 +185,6 @@ struct BinaryNode : Node {
         split(_split),
         aug(_aug) {}
 
-  // Adding a virtual destructor makes Node polymorphic
-  virtual ~BinaryNode() override = default;
-
   // NOTE: test whether we can fetch @depth levels from @T
   template <typename Interior>
   static inline bool TestDepth(Node* T, int cur_depth, int depth) {
@@ -214,36 +208,26 @@ struct BinaryNode : Node {
 };
 
 // NOTE: multi-way node whose children # is fixed
-template <typename Point, uint_fast8_t kMD, typename SplitType,
-          typename AugType>
+template <typename TypeTrait, typename SplitType, typename AugType>
 struct MultiNode : Node {
   using BucketType = uint_fast8_t;
-  using Coord = typename Point::Coord;
-  using Num = Num_Comparator<Coord>;
+  using TT = TypeTrait;
+  using Ele = typename TT::EleType;
+  using EleSeq = typename TT::EleSeq;
   using ST = SplitType;
   using AT = AugType;
 
-  static consteval auto GetRegions() { return 1 << kMD; }
-
-  static consteval auto GetLevels() { return kMD; }
-
-  static consteval auto GetSplitNums() { return kMD; }
-
-  // NOTE: whether we use same splitter for same level
-  // e.g., the horizontal in lavel is not the same
-  static consteval auto EqualSplit()
-    requires std::same_as<ST, std::array<typename ST::value_type, kMD>>
-  {
-    return true;  // every dimension one splitter
+  static consteval auto GetLevels() {
+    typename TT::BufferSizeType a = 0;
+    auto temp = TT::kBufUB;
+    while (temp > 1) {
+      temp >>= 1;  // divide by 2
+      a++;
+    }
+    return a;
   }
 
-  static consteval auto EqualSplit()
-    requires std::same_as<ST, std::array<typename ST::value_type, 1 << kMD>>
-  {
-    return false;  // the spliiter number mathes inter nodes num
-  }
-
-  using NodeArr = std::array<Node*, GetRegions()>;
+  using NodeArr = std::array<Node*, TT::kBufUB>;
 
   MultiNode(NodeArr const& _tree_nodes, const ST& _split, const AT& _aug)
       : Node{false,
@@ -253,56 +237,6 @@ struct MultiNode : Node {
         tree_nodes(_tree_nodes),
         split(_split),
         aug(_aug) {}
-
-  // Adding a virtual destructor makes Node polymorphic
-  // TODO: check whether it is possible to remove it then KNN-mix
-  virtual ~MultiNode() override = default;
-
-  inline size_t MergeSize(BucketType const idx) {
-    if (idx == 1) {
-      return this->size;
-    } else if (idx >= GetRegions()) {
-      return tree_nodes[idx - GetRegions()]->size;
-    } else {
-      return MergeSize(2 * idx) + MergeSize(2 * idx + 1);
-    }
-  }
-
-  ST const& GetSplit() const { return split; }
-
-  NodeArr tree_nodes;
-  ST split;
-  AT aug;
-};
-
-// NOTE: dynamic multi-way node whose children # is dynamic
-template <typename Point, typename SplitType, typename AugType>
-struct DynamicNode : Node {
-  using BucketType = uint_fast8_t;
-  using Coord = typename Point::Coord;
-  using Num = Num_Comparator<Coord>;
-  using ST = SplitType;
-  using AT = AugType;
-  using NodeArr = parlay::sequence<Node*>;
-
-  DynamicNode()
-      : Node{false, static_cast<size_t>(0)},
-        tree_nodes(NodeArr()),
-        split(ST()),
-        aug(AT()) {}
-
-  DynamicNode(NodeArr const& _tree_nodes, const ST& _split, const AT& _aug)
-      : Node{false,
-             std::accumulate(
-                 _tree_nodes.begin(), _tree_nodes.end(), static_cast<size_t>(0),
-                 [](size_t acc, Node* n) -> size_t { return acc + n->size; })},
-        tree_nodes(_tree_nodes),
-        split(_split),
-        aug(_aug) {}
-
-  // Adding a virtual destructor makes Node polymorphic
-  // TODO: check whether it is possible to remove it then KNN-mix
-  virtual ~DynamicNode() override = default;
 
   ST const& GetSplit() const { return split; }
 
@@ -364,9 +298,6 @@ concept IsBinaryNode = CheckBinaryNode<T, pmos::BinaryNode>;
 
 template <typename T>
 concept IsMultiNode = CheckMultiNode<T, pmos::MultiNode>;
-
-template <typename T>
-concept IsDynamicNode = CheckDynamicNode<T, pmos::DynamicNode>;
 
 // TODO: may remove below from inner tree
 template <typename T>
