@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(
-	PSI
+	PMOS
 	VERSION 0.1
-	DESCRIPTION "spatial partition tree"
+	DESCRIPTION "Parallel Multi-way Ordered Set"
 	HOMEPAGE_URL ""
 	LANGUAGES CXX
 )
@@ -21,7 +21,6 @@ option(CILKPLUS "" OFF)
 option(OPENCILK "" OFF)
 option(SERIAL "" OFF)
 option(STDALLOC "" OFF)
-option(CGAL "" ON)
 option(MEMCHECK "" OFF)
 option(JEMA "" ON)
 option(CCP "" OFF)
@@ -66,116 +65,57 @@ elseif(JEMA)
 	set(CMAKE_BUILD_RPATH "/usr/local/lib")
 endif()
 
-message(STATUS "\n\n---------------------------- PARLAY -----------------------------")
 add_subdirectory(include/parlaylib)
-message(STATUS "---------------------------- END PARLAY -----------------------------\n\n")
-
-# NOTE: set libmorton
-set(BUILD_TESTING OFF CACHE BOOL "Disable the libmorton test")
-add_subdirectory(include/libmorton)
 
 # NOTE: clear CMAKE_MODULE_PATH to avoid finding parlay's cmake files
 list(REMOVE_ITEM CMAKE_MODULE_PATH "${PARLAY_SOURCE_DIR}/cmake")
-list(APPEND CMAKE_MODULE_PATH "${PSI_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${PMOS_SOURCE_DIR}/cmake")
 
-# NOTE: begin of psi library
-message(STATUS "\n\n---------------------------- PSI -----------------------------")
 
-# NOTE: PSI
-add_library(PSI INTERFACE)
-set(PSI_INCLUDE_DIR "${PSI_SOURCE_DIR}/include/psi")
-target_link_libraries(PSI INTERFACE parlay libmorton)
-target_include_directories(PSI INTERFACE $<BUILD_INTERFACE:${PSI_INCLUDE_DIR}>
+# NOTE: PMOS
+add_library(PMOS INTERFACE)
+set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos")
+target_link_libraries(PMOS INTERFACE parlay)
+target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-add_subdirectory(static_analysis)
-message(STATUS "---------------------------- END PSI -----------------------------\n\n")
+add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
+target_link_libraries(b_test PUBLIC PMOS)
+target_include_directories(b_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
-add_executable(kd_test ${PROJECT_SOURCE_DIR}/tests/kd_test.cpp)
-target_link_libraries(kd_test PUBLIC PSI)
-target_include_directories(kd_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-add_executable(kd_array_test ${PROJECT_SOURCE_DIR}/tests/kd_array_test.cpp)
-target_link_libraries(kd_array_test PUBLIC PSI)
-target_include_directories(kd_array_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-add_executable(p_test ${PROJECT_SOURCE_DIR}/tests/p_test.cpp)
-target_link_libraries(p_test PUBLIC PSI)
-target_include_directories(p_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
-target_link_libraries(baselines PUBLIC PSI)
-target_include_directories(baselines PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-add_executable(testers ${PROJECT_SOURCE_DIR}/tests/testers.cpp)
-target_link_libraries(testers PUBLIC PSI)
-target_include_directories(testers PUBLIC ${PROJECT_SOURCE_DIR}/include)
+# add_executable(kd_array_test ${PROJECT_SOURCE_DIR}/tests/kd_array_test.cpp)
+# target_link_libraries(kd_array_test PUBLIC PMOS)
+# target_include_directories(kd_array_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
+#
+# add_executable(p_test ${PROJECT_SOURCE_DIR}/tests/p_test.cpp)
+# target_link_libraries(p_test PUBLIC PMOS)
+# target_include_directories(p_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
+#
+# add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
+# target_link_libraries(baselines PUBLIC PMOS)
+# target_include_directories(baselines PUBLIC ${PROJECT_SOURCE_DIR}/include)
+#
+# add_executable(testers ${PROJECT_SOURCE_DIR}/tests/testers.cpp)
+# target_link_libraries(testers PUBLIC PMOS)
+# target_include_directories(testers PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 if(JEMA)
-	target_link_libraries(kd_test PUBLIC libjemalloc.so)
-	target_link_libraries(p_test PUBLIC libjemalloc.so)
-	target_link_libraries(baselines PUBLIC libjemalloc.so)
+	target_link_libraries(b_test PUBLIC libjemalloc.so)
+	# target_link_libraries(p_test PUBLIC libjemalloc.so)
+	# target_link_libraries(baselines PUBLIC libjemalloc.so)
 endif()
 
-add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
-target_link_libraries(data_generator PUBLIC PSI)
-target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-
-add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
-target_link_libraries(data_washer PUBLIC PSI)
-target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-# CGAL
-if(CGAL)
-	message(STATUS "\n\n---------------------------- CGAL -----------------------------")
-	message(STATUS "To disable using -DCGAL=OFF")
-	find_package(CGAL REQUIRED)
-
-	# TBB
-	find_package(TBB)
-
-	# copied from CGAL default cmake
-	if(TBB_FOUND AND NOT TARGET CGAL::TBB_support)
-
-		if(NOT TARGET Threads::Threads)
-			find_package(Threads REQUIRED)
-		endif()
-
-		add_library(CGAL::TBB_support INTERFACE IMPORTED)
-		set_target_properties(CGAL::TBB_support PROPERTIES
-			INTERFACE_COMPILE_DEFINITIONS "CGAL_LINKED_WITH_TBB;NOMINMAX"
-			INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}"
-			INTERFACE_LINK_LIBRARIES "TBB::tbb;TBB::tbbmalloc;Threads::Threads")
-	endif()
-
-	list(APPEND CGAL_3RD_PARTY_LIBRARIES ${TBB_LIBRARIES})
-
-	# executables
-	# add_executable(cgal ${PROJECT_SOURCE_DIR}/tests/cgal.cpp)
-	# target_link_libraries(cgal PUBLIC PSI CGAL::CGAL CGAL::TBB_support)
-	# target_include_directories(cgal PUBLIC ${PROJECT_SOURCE_DIR}/include )
-
-
-	add_executable(kd_ccp ${PROJECT_SOURCE_DIR}/tests/kd_ccp.cpp)
-	target_link_libraries(kd_ccp PUBLIC PSI CGAL::CGAL CGAL::TBB_support)
-	target_include_directories(kd_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-	add_executable(p_ccp ${PROJECT_SOURCE_DIR}/tests/p_ccp.cpp)
-	target_link_libraries(p_ccp PUBLIC PSI CGAL::CGAL CGAL::TBB_support)
-	target_include_directories(p_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-	find_package(Boost REQUIRED)
-	add_executable(boost_rtree ${PROJECT_SOURCE_DIR}/tests/boost_rtree.cpp)
-	target_link_libraries(boost_rtree PUBLIC PSI ${Boost_LIBRARIES})
-	target_include_directories(boost_rtree PUBLIC ${PROJECT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
-	target_compile_options(boost_rtree PRIVATE -DBOOST_MATH_DISABLE_FLOAT128 -DBOOST_CSTDFLOAT_NO_LIBQUADMATH_SUPPORT)
-
-	message(STATUS "\n\n---------------------------- END CGAL -----------------------------")
-endif()
+# add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
+# target_link_libraries(data_generator PUBLIC PMOS)
+# target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
+#
+#
+# add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
+# target_link_libraries(data_washer PUBLIC PMOS)
+# target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 file(GLOB_RECURSE all_files
-  ${PROJECT_SOURCE_DIR}/include/psi/*
+  ${PROJECT_SOURCE_DIR}/include/pmos/*
 )
 
 

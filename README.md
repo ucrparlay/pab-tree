@@ -35,8 +35,8 @@ File structure:
 ├── benchmark
 ├── include
 │   ├── parlaylib
-│   └── psi
-│       ├── base_tree_impl
+│   └── pmos
+│       ├── b_tree_impl
 │       │   └── tree_op
 │       ├── cover_tree_impl
 │       ├── dependence
@@ -54,7 +54,7 @@ File structure:
 |    Name     |          Usage          |
 | :---------: | :---------------------: |
 | `benchmark` | Stores sample benchmark |
-|  `include/psi`  |  Source of `PSI`   |
+|  `include/pmos`  |  Source of `PMOS`   |
 | `include/parlaylib` |   Provide parallelism   |
 | `include/baselines` |   implmentation of baselines   |
 |  `scipts`   | Scripts for experiments |
@@ -123,7 +123,7 @@ To parse the output, see [ Test Framework Format ](#test-framework-format) below
 Implemented in `tests/test_framework.h`.
 
 ## Graph Generator
-PSI provides two types of parallel data generator: `Uniform` and `Varden`.
+PMOS provides two types of parallel data generator: `Uniform` and `Varden`.
 
 Usage:
 ```{bash}

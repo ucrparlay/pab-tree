@@ -15,8 +15,8 @@
 ///**********************************START*********************************///
 
 using Axis = int64_t;
-Axis const kValueUB = 1'000'000'000;
-// Axis const kValueUB = 1'000'000;
+// Axis const kValueUB = 1'000'000'000;
+Axis const kValueUB = 1'000'000;
 
 inline std::string toString(auto const& a) { return std::to_string(a); }
 
@@ -99,8 +99,7 @@ class DataLaundry {
   }
 
   static OutputPoints ShiftToFirstRegion(auto& wp) {
-    auto bb = psi::GeoBase<psi::TypeTrait<OutputPoint>>::GetBox(
-        parlay::make_slice(wp));
+    auto bb = psi::BaseTree<OutputPoint>::GetBox(parlay::make_slice(wp));
     return parlay::tabulate(wp.size(), [&](size_t i) {
       OutputPoint p;
       for (int j = 0; j < OutputPoint::GetDim(); j++) {
@@ -305,8 +304,7 @@ class VardenGenerator {
         }));
 
     // move the points to the first region of the space
-    auto bb = psi::GeoBase<psi::TypeTrait<Point>>::GetBox(
-        parlay::make_slice(cluster_seq));
+    auto bb = psi::BaseTree<Point>::GetBox(parlay::make_slice(cluster_seq));
     for (DimsType j = 0; j < Point::GetDim(); j++) {
       bb.first[j] = Num::Min(bb.first[j], static_cast<Axis>(0));
       bb.first[j] = Num::Abs(bb.first[j]);
