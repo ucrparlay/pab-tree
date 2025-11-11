@@ -11,6 +11,7 @@
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
 #include "dependence/concepts.h"
+#include "dependence/type_trait.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"
@@ -601,87 +602,91 @@ void BatchDeleteByStep(Tree& pkd, parlay::sequence<Point> const& WP,
   return;
 }
 
-template <typename Point, typename Tree, bool printHeight = 0,
-          bool printVisNode = 1>
-void queryKNN([[maybe_unused]] uint_fast8_t const& Dim,
-              parlay::sequence<Point> const& WP, int const& rounds, Tree& pkd,
-              Typename* kdknn, int const K, bool const flattenTreeTag) {
-  using Points = typename Tree::Points;
-  using Coord = typename Point::Coord;
-  using DisType = typename Point::DisType;
-  using nn_pair = std::pair<std::reference_wrapper<Point>, DisType>;
-  using Leaf = typename Tree::Leaf;
-  using Interior = typename Tree::Interior;
-  // using nn_pair = std::pair<Point, DisType>;
-  size_t n = WP.size();
-  // int LEAVE_WRAP = 32;
-  double loopLate = rounds > 1 ? 0.01 : -0.1;
-  auto* KDParallelRoot = pkd.GetRoot();
-
-  Points wp = WP;
-  // Points wp = parlay::random_shuffle(WP);
-
-  parlay::sequence<nn_pair> Out(
-      K * n, nn_pair(std::ref(wp[0]), static_cast<DisType>(0)));
-  // parlay::sequence<nn_pair> Out(K * n);
-  parlay::sequence<kBoundedQueue<Point, nn_pair>> bq =
-      parlay::sequence<kBoundedQueue<Point, nn_pair>>::uninitialized(n);
-  parlay::parallel_for(
-      0, n, [&](size_t i) { bq[i].resize(Out.cut(i * K, i * K + K)); });
-  parlay::sequence<size_t> vis_leaf(n), vis_inter(n), gen_box(n), check_box(n),
-      skip_box(n);
-
-  double aveQuery = time_loop(
-      rounds, loopLate,
-      [&]() { parlay::parallel_for(0, n, [&](size_t i) { bq[i].reset(); }); },
-      [&]() {
-        // if (!flattenTreeTag) {  // WARN: Need ensure pkd.size() == wp.size()
-        //   pkd.Flatten(parlay::make_slice(wp));
-        // }
-        parlay::parallel_for(0, n, [&](size_t i) {
-          // for (size_t i = 0; i < n; i++) {
-          auto [vis_leaf_num, vis_inter_num, gen_box_num, check_box_num,
-                skip_box_num] = pkd.KNN(KDParallelRoot, wp[i], bq[i]);
-          kdknn[i] = bq[i].top().second;
-          vis_leaf[i] = vis_leaf_num;
-          vis_inter[i] = vis_inter_num;
-          gen_box[i] = gen_box_num;
-          check_box[i] = check_box_num;
-          skip_box[i] = skip_box_num;
-          // }
-        });
-      },
-      [&]() {});
-
-  std::cout << aveQuery << " " << std::flush;
-  if (printHeight) {
-    // WARN: change when using multi-node
-    size_t max_deep = 0;
-    std::cout << pkd.template GetMaxTreeDepth<Leaf, Interior>(pkd.GetRoot(),
-                                                              max_deep)
-              << " " << pkd.template GetAveTreeHeight<Leaf, Interior>() << " "
-              << std::flush;
-  }
-  if (printVisNode) {
-    std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, n))) /
-                     static_cast<double>(n)
-              << " " << std::flush;
-    std::cout << static_cast<double>(parlay::reduce(vis_inter.cut(0, n))) /
-                     static_cast<double>(n)
-              << " " << std::flush;
-    std::cout << static_cast<double>(parlay::reduce(gen_box.cut(0, n))) /
-                     static_cast<double>(n)
-              << " " << std::flush;
-    std::cout << static_cast<double>(parlay::reduce(check_box.cut(0, n))) /
-                     static_cast<double>(n)
-              << " " << std::flush;
-    std::cout << static_cast<double>(parlay::reduce(skip_box.cut(0, n))) /
-                     static_cast<double>(n)
-              << " " << std::flush;
-  }
-
-  return;
-}
+// template <typename Point, typename Tree, bool printHeight = 0,
+//           bool printVisNode = 1>
+// void queryKNN([[maybe_unused]] uint_fast8_t const& Dim,
+//               parlay::sequence<Point> const& WP, int const& rounds, Tree&
+//               pkd, Typename* kdknn, int const K, bool const flattenTreeTag) {
+//   using Points = typename Tree::Points;
+//   using Coord = typename Point::Coord;
+//   using DisType = typename Point::DisType;
+//   using nn_pair = std::pair<std::reference_wrapper<Point>, DisType>;
+//   using Leaf = typename Tree::Leaf;
+//   using Interior = typename Tree::Interior;
+//   // using nn_pair = std::pair<Point, DisType>;
+//   size_t n = WP.size();
+//   // int LEAVE_WRAP = 32;
+//   double loopLate = rounds > 1 ? 0.01 : -0.1;
+//   auto* KDParallelRoot = pkd.GetRoot();
+//
+//   Points wp = WP;
+//   // Points wp = parlay::random_shuffle(WP);
+//
+//   parlay::sequence<nn_pair> Out(
+//       K * n, nn_pair(std::ref(wp[0]), static_cast<DisType>(0)));
+//   // parlay::sequence<nn_pair> Out(K * n);
+//   parlay::sequence<kBoundedQueue<Point, nn_pair>> bq =
+//       parlay::sequence<kBoundedQueue<Point, nn_pair>>::uninitialized(n);
+//   parlay::parallel_for(
+//       0, n, [&](size_t i) { bq[i].resize(Out.cut(i * K, i * K + K)); });
+//   parlay::sequence<size_t> vis_leaf(n), vis_inter(n), gen_box(n),
+//   check_box(n),
+//       skip_box(n);
+//
+//   double aveQuery = time_loop(
+//       rounds, loopLate,
+//       [&]() { parlay::parallel_for(0, n, [&](size_t i) { bq[i].reset(); });
+//       },
+//       [&]() {
+//         // if (!flattenTreeTag) {  // WARN: Need ensure pkd.size() ==
+//         wp.size()
+//         //   pkd.Flatten(parlay::make_slice(wp));
+//         // }
+//         parlay::parallel_for(0, n, [&](size_t i) {
+//           // for (size_t i = 0; i < n; i++) {
+//           auto [vis_leaf_num, vis_inter_num, gen_box_num, check_box_num,
+//                 skip_box_num] = pkd.KNN(KDParallelRoot, wp[i], bq[i]);
+//           kdknn[i] = bq[i].top().second;
+//           vis_leaf[i] = vis_leaf_num;
+//           vis_inter[i] = vis_inter_num;
+//           gen_box[i] = gen_box_num;
+//           check_box[i] = check_box_num;
+//           skip_box[i] = skip_box_num;
+//           // }
+//         });
+//       },
+//       [&]() {});
+//
+//   std::cout << aveQuery << " " << std::flush;
+//   if (printHeight) {
+//     // WARN: change when using multi-node
+//     size_t max_deep = 0;
+//     std::cout << pkd.template GetMaxTreeDepth<Leaf, Interior>(pkd.GetRoot(),
+//                                                               max_deep)
+//               << " " << pkd.template GetAveTreeHeight<Leaf, Interior>() << "
+//               "
+//               << std::flush;
+//   }
+//   if (printVisNode) {
+//     std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, n))) /
+//                      static_cast<double>(n)
+//               << " " << std::flush;
+//     std::cout << static_cast<double>(parlay::reduce(vis_inter.cut(0, n))) /
+//                      static_cast<double>(n)
+//               << " " << std::flush;
+//     std::cout << static_cast<double>(parlay::reduce(gen_box.cut(0, n))) /
+//                      static_cast<double>(n)
+//               << " " << std::flush;
+//     std::cout << static_cast<double>(parlay::reduce(check_box.cut(0, n))) /
+//                      static_cast<double>(n)
+//               << " " << std::flush;
+//     std::cout << static_cast<double>(parlay::reduce(skip_box.cut(0, n))) /
+//                      static_cast<double>(n)
+//               << " " << std::flush;
+//   }
+//
+//   return;
+// }
 
 // NOTE: run range count and check the correct
 template <typename Point, typename Tree>
@@ -1460,7 +1465,7 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename Point>(
 class Wrapper {
  public:
   // NOTE: determine the build depth once for the orth tree
-  static consteval uint8_t OrthGetBuildDepthOnce(uint8_t const dim) {
+  static consteval uint8_t BTreeGetBuildDepthOnce(uint8_t const dim) {
     if (dim == 2 || dim == 3) {
       return 6;
     } else if (dim == 4) {
@@ -1618,9 +1623,10 @@ class Wrapper {
   };
 
   // NOTE: Trees
-  template <typename EleType>
+  template <typename TypeTrait>
   struct BTreeWrapper {
-    using TreeType = typename pmos::BTree<EleType>;
+    static constexpr uint kBufSz = 16;
+    using TreeType = typename pmos::BTree<TypeTrait, 16>;
   };
 
   // template <class PointType, class SplitRuleType, class LeafAugType,
@@ -1781,6 +1787,8 @@ class Wrapper {
                               int const split_type, commandLine& params,
                               RunFunc test_func) {
     using EleType = std::pair<int, int>;
-    Run<BTreeWrapper<EleType>>(params, test_func);
+    using TypeTrait =
+        pmos::TypeTrait<EleType, std::monostate, std::monostate, 8>;
+    Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
 };

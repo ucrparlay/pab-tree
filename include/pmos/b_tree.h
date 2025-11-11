@@ -1,523 +1,357 @@
 #ifndef PMOS_B_TREE_H_
 #define PMOS_B_TREE_H_
 
-#include <sys/types.h>
-
 #include <cstdint>
-#include <cstdio>
-#include <type_traits>
 
 #include "dependence/comparator.h"
 #include "dependence/loggers.h"
-#include "dependence/search_container.h"
 #include "dependence/tree_node.h"
+#include "dependence/type_trait.h"
 
 namespace pmos {
 
 // NOTE: Basetree
-template <typename EleType>
+template <class TypeTrait, uint kBufferSize>
 class BTree {
  public:
-  //  using BasicPoint = Point::BP;
-  //  using TemplatePoint = Point;
+  using E = typename TypeTrait::EleType;
+  using K = typename E::KeyType;
+  using V = typename E::ValType;
+
+  using Num = Num_Comparator<K>;
+  using Slice = parlay::slice<E*, E*>;
+  using EleSeq = parlay::sequence<E>;
+  using EleIter = typename parlay::sequence<E>::iterator;
+  using LeafAug = typename TypeTrait::LeafAug;
+  using InteriorAug = typename TypeTrait::InteriorAug;
+
+  // NOTE: Const variables
+  // NOTE: uint32t handle up to 4e9 at least
+  // WARN: bucket num should smaller than 1<<8 to handle type overflow
+  using BucketType = typename TypeTrait::BucketType;
+  static constexpr BucketType const kBuildDepthOnce =
+      TypeTrait::kSkeletonHeight;
+  static constexpr BucketType const kPivotNum = TypeTrait::kPivotNum;
+  static constexpr BucketType const kBucketNum = TypeTrait::kBucketNum;
+  static constexpr uint_fast8_t const kLog2Base = TypeTrait::kLog2Base;
+  static constexpr uint_fast16_t const kBlockSize = TypeTrait::kBlockSize;
+
+  // NOTE: tree structure
+  static constexpr uint_fast8_t const kLeaveWrap = 32;
+  static constexpr uint_fast8_t const kThinLeaveWrap = 24;
+  static constexpr uint_fast8_t const kSlimLeaveWrap = 8;
+  static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
+
+  using BufferSizeType =
+      std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
+  static constexpr BufferSizeType kBuf = kBufferSize;
+  static constexpr BufferSizeType kBufLB = kBufferSize;
+  static constexpr BufferSizeType kBufUB = 4 * kBufferSize;
+
+  // NOTE: array based inner tree for batch insertion and deletion
+  template <typename Leaf, typename Interior>
+  struct InnerTree;
+
+  template <typename Range>
+  void Build(Range&& In);
+
+  void Build_(Slice In);
+
+  // NOTE: build tree
+  // static inline BucketType FindBucket(Point const& p,
+  //                                     HyperPlaneSeq const& pivots);
   //
-  //  // NOTE: when kSkHeight >= 8, the # bucket is 255, total skeleton nodes >=
-  //  // 255*2
+  // template <IsBinaryNode Interior, bool UpdateParFlag = true>
+  // static inline void UpdateInterior(Node* T, Node* L, Node* R);
   //
-  //  using BucketType =
-  //      std::conditional_t<(kSkHeight > 7), uint_fast16_t, uint_fast8_t>;
-  //  using BallsType = uint_fast32_t;
-  //  using DimsType = uint_fast8_t;
-  //  // using DepthType = uint_fast8_t;
-  //  // using DepthType = int_fast8_t;
-  //  using DepthType = int;
-  //  using BucketSeq = parlay::sequence<BucketType>;
-  //  using BallSeq = parlay::sequence<BallsType>;
+  // template <IsBinaryNode Interior, bool UpdateParFlag = true>
+  // static inline void UpdateInterior(Node* T, NodeBox const& L,
+  //                                   NodeBox const& R);
   //
-  //  using Coord = typename Point::Coord;
-  //  using Coords = typename Point::Coords;
-  //  using DisType = typename Point::DisType;
-  //  using Num = Num_Comparator<Coord>;
-  //  using Slice = parlay::slice<Point*, Point*>;
-  //  using Points = parlay::sequence<Point>;
-  //  using PointsIter = typename parlay::sequence<Point>::iterator;
-  //  using HyperPlane = std::pair<Coord, DimsType>;
-  //  using HyperPlaneSeq = parlay::sequence<HyperPlane>;
-  //  using Box = std::pair<BasicPoint, BasicPoint>;
-  //  using BoxSeq = parlay::sequence<Box>;
+  // template <IsMultiNode Interior, bool UpdateParFlag = true>
+  // static inline void UpdateInterior(
+  //     Node* T, typename Interior::NodeArr const& new_nodes);
   //
-  //  using NodeBoolean = std::pair<Node*, bool>;
-  //  using NodeBox = std::pair<Node*, Box>;
-  //  using NodeBoxSeq = parlay::sequence<NodeBox>;
-  //  using NodeTag = std::pair<Node*, uint_fast8_t>;
-  //  using NodeTagSeq = parlay::sequence<NodeTag>;
+  // template <typename Leaf, typename Interior, bool granularity = true>
+  // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);
   //
-  //  // TODO: use the one provided in aug
-  //  using IDType = uint_fast32_t;
+  // template <typename Leaf, typename Interior, bool granularity = true>
+  // static void PrepareRebuild(Node* T, Points& wx, Points& wo);
   //
-  //  // NOTE: Const variables
-  //  // NOTE: uint32t handle up to 4e9 at least
-  //  // WARN: bucket num should smaller than 1<<8 to handle type overflow
-  //  static constexpr DimsType const kDim = std::tuple_size_v<Coords>;
-  //  static constexpr BucketType const kBuildDepthOnce = kSkHeight;
-  //  static constexpr BucketType const kPivotNum = (1 << kBuildDepthOnce) - 1;
-  //  static constexpr BucketType const kBucketNum = 1 << kBuildDepthOnce;
+  // static void Partition(Slice A, Slice B, size_t const n,
+  //                       HyperPlaneSeq const& pivots,
+  //                       parlay::sequence<BallsType>& sums);
   //
-  //  // NOTE: tree structure
-  //  static constexpr uint_fast8_t const kLeaveWrap = 32;
-  //  static constexpr uint_fast8_t const kThinLeaveWrap = 24;
-  //  static constexpr uint_fast8_t const kSlimLeaveWrap = 8;
-  //  // static constexpr uint_fast8_t const kLeaveWrap = 8;
-  //  // static constexpr uint_fast8_t const kThinLeaveWrap = 4;
-  //  // static constexpr uint_fast8_t const kSlimLeaveWrap = 4;
-  //  static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
+  // // NOTE: batch insert
+  // template <typename Leaf>
+  // static Node* InsertPoints2Leaf(Node* T, Slice In);
   //
-  //  // NOTE: block param in Partition
-  //  static constexpr uint_fast8_t const kLog2Base = 10;
-  //  static constexpr uint_fast16_t const kBlockSize = 1 << kLog2Base;
+  // template <typename Leaf, typename RT>
+  // static RT DeletePoints4Leaf(Node* T, Slice In);
   //
-  //  // NOTE: reconstruct weight threshold
-  //  static constexpr uint_fast8_t const kInbalanceRatio = kImbaRatio;
+  // template <typename Leaf, typename RT>
+  // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
-  //  // NOTE: array based inner tree for batch insertion and deletion
-  //  template <typename Leaf, typename Interior>
-  //  struct InnerTree;
+  // template <IsBinaryNode Interior>
+  // static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
+  // tags);
   //
-  //  // NOTE: compute the bounding box on the fly
-  //  struct BoxCut;
+  // template <IsMultiNode Interior>
+  // static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
+  // tags);
   //
-  //  // NOTE: get the imbalance ratio
-  //  static inline size_t GetImbalanceRatio();
-  //  static inline bool ImbalanceNode(size_t const l, size_t const n);
-  //  static inline bool SparcyNode(size_t const l, size_t const n);
+  // template <typename Interior>
+  // static void SeievePoints(Slice A, Slice B, size_t const n,
+  //                          NodeTagSeq const& tags,
+  //                          parlay::sequence<BallsType>& sums,
+  //                          BucketType const tags_num);
   //
-  //  // NOTE: Box operations
-  //  static inline Coord GetBoxMid(DimsType const d, Box const& bx);
-  //  static inline bool LegalBox(Box const& bx);
-  //  static inline bool WithinBox(Box const& a, Box const& b);
-  //  static inline bool SameBox(Box const& a, Box const& b);
-  //  static inline bool WithinBox(Point const& p, Box const& bx);
-  //  static inline bool BoxIntersectBox(Box const& a, Box const& b);
-  //  static inline bool IsBoxLineInDimension(Box const& box, DimsType d);
-  //  static inline bool VerticalLineSplitBox(Coord const& l, Box const& box,
-  //                                          DimsType d);
-  //  static inline bool VerticalLineOnBoxLeftEdge(Coord const& l, Box const&
-  //  box,
-  //                                               DimsType d);
-  //  static inline bool VerticalLineOnBoxRightEdge(Coord const& l, Box const&
-  //  box,
-  //                                                DimsType d);
-  //  static inline bool VerticalLineOnBoxEdge(Coord const& l, Box const& box,
-  //                                           DimsType d);
-  //  static inline bool VerticalLineIntersectBox(Coord const& l, Box const&
-  //  box,
-  //                                              DimsType d);
-  //  static inline bool VerticalLineIntersectBoxExclude(Coord const& l,
-  //                                                     Box const& box,
-  //                                                     DimsType d);
-  //  template <typename Leaf, typename Interior>
-  //  static inline auto RetriveBox(Node const* T)
-  //    requires(HasBox<typename Leaf::AT> && HasBox<typename Interior::AT>);
+  // template <typename Leaf, typename Interior, typename PrepareFunc,
+  //           typename... Args>
+  // Node* RebuildWithInsert(Node* T, PrepareFunc prepare_func, Slice In,
+  //                         Args&&... args);
   //
-  //  static inline Box GetEmptyBox();
-  //  static inline Point GetBoxCenter(Box const& box);
-  //  static Box GetBox(Box const& x, Box const& y);
-  //  static Box GetBox(Slice V);
-  //  static Box GetBox(BoxSeq const& box_seq);
-  //  template <typename Leaf, typename Interior>
-  //  static Box GetBox(Node* T);
+  // template <typename Leaf, typename Interior, bool granularity,
+  //           typename... Args>
+  // Node* RebuildSingleTree(Node* T, Args&&... args);
   //
-  //  // NOTE: Circle operations
-  //  struct NormalCircle {
-  //    Point const& GetCenter() const { return center; }
+  // template <typename Leaf, IsBinaryNode Interior, bool granularity,
+  //           typename PrepareFunc, typename... Args>
+  // Node* RebuildTreeRecursive(Node* T, PrepareFunc&& prepare_func,
+  //                            bool const allow_rebuild, Args&&... args);
   //
-  //    Coord GetRadius() const { return radius; }
+  // template <typename Leaf, IsMultiNode Interior, bool granularity,
+  //           typename PrepareFunc, typename... Args>
+  // Node* RebuildTreeRecursive(Node* T, PrepareFunc&& prepare_func,
+  //                            bool const allow_rebuild, Args&&... args);
   //
-  //    Coord GetRadiusSquare() const { return radius * radius; }
+  // template <typename Leaf, IsBinaryNode Interior, typename Base>
+  // static Base BuildInnerTree(BucketType idx, HyperPlaneSeq const& pivots,
+  //                            parlay::sequence<Base> const& tree_nodes);
   //
-  //    static Coord ComputeRadius(double const& r) {
-  //      return static_cast<Coord>(r);
-  //    }
+  // template <IsMultiNode Interior>
+  // static Node* BuildInnerTree(BucketType idx, HyperPlaneSeq const& pivots,
+  //                             parlay::sequence<Node*> const& tree_nodes);
   //
-  //    friend std::ostream& operator<<(std::ostream& o, NormalCircle const& cl)
-  //    {
-  //      o << "{ " << cl.center << ", " << cl.radius << "}";
-  //      return o;
-  //    }
+  // static PointsIter SerialPartition(Slice In, DimsType d);
   //
-  //    Point center;
-  //    Coord radius;
-  //  };
+  // // NOTE: delete tree
+  // template <SupportsForceParallel Interior, bool granularity>
+  // inline static bool ForceParallelRecursion(Interior const* T);
   //
-  //  struct CoverCircle {
-  //    Point const& GetCenter() const { return center; }
+  // constexpr virtual void DeleteTree() = 0;
   //
-  //    Coord GetRadius() const { return static_cast<Coord>(1 << level); }
+  // template <typename Leaf, typename Interior>
+  // void DeleteTreeWrapper();
   //
-  //    Coord GetRadiusSquare() const { return GetRadius() * GetRadius(); }
+  // template <typename Leaf, IsBinaryNode Interior, bool granularity = true>
+  // static void DeleteTreeRecursive(Node* T);
   //
-  //    static DepthType ComputeRadius(auto const& r) {
-  //      // TODO: hard to represent the radius with length 0
-  //      return Num_Comparator<decltype(r)>::IsZero(r)
-  //                 ? -1
-  //                 : static_cast<DepthType>(std::ceil(std::log2(r)));
-  //    }
+  // template <typename Leaf, IsMultiNode Interior, bool granularity = true>
+  // static void DeleteTreeRecursive(Node* T);
   //
-  //    bool operator==(CoverCircle const& cl) const {
-  //      return center == cl.center && level == cl.level;
-  //    }
+  // template <typename Leaf, IsDynamicNode Interior, bool granularity = true>
+  // static void DeleteTreeRecursive(Node* T);
   //
-  //    friend std::ostream& operator<<(std::ostream& o, CoverCircle const& cl)
-  //    {
-  //      o << "{ " << cl.center << ", " << cl.level << "}";
-  //      return o;
-  //    }
+  // // NOTE: KNN query stuffs
+  // static inline DisType P2PDistanceSquare(Point const& p, Point const& q);
   //
-  //    Point center;
-  //    DepthType level;
-  //  };
+  // static inline DisType P2BMinDistanceSquare(Point const& p, Box const& a);
   //
-  //  template <typename CircleType>
-  //  static bool LegalCircle(CircleType const& cl);
+  // static inline DisType P2BMaxDistanceSquare(Point const& p, Box const& a);
   //
-  //  template <typename CircleType>
-  //  static inline bool WithinCircle(Point const& p, CircleType const& cl);
+  // static inline double P2CMinDistance(Point const& p, Point const& center,
+  //                                     DisType const r);
   //
-  //  template <typename CircleType>
-  //  static inline bool WithinCircle(Box const& box, CircleType const& cl);
+  // template <typename CircleType>
+  // static inline double P2CMinDistance(Point const& p, CircleType const& cl);
   //
-  //  template <typename CircleType1, typename CircleType2>
-  //  static inline bool CircleWithinCircle(CircleType1 const& a,
-  //                                        CircleType2 const& b);
+  // static inline DisType InterruptibleDistance(Point const& p, Point const& q,
+  //                                             DisType up);
   //
-  //  template <typename CircleType>
-  //  static inline bool CircleIntersectBox(CircleType const& cl, Box const&
-  //  box);
+  // // NOTE: get the split for a node
+  // template <typename Leaf, typename Interior>
+  // static inline typename Interior::ST const& GetSplit(Node const* node)
+  //   requires std::same_as<typename BTree::Box, typename Interior::ST>;
   //
-  //  template <typename CircleType>
-  //  static inline bool CircleIntersectCircle(CircleType const& a,
-  //                                           CircleType const& b);
+  // // NOTE: searech knn in the leaf
+  // template <typename Leaf, typename Range>
+  // static void KNNLeaf(Node* T, Point const& q, kBoundedQueue<Point, Range>&
+  // bq);
   //
-  //  template <typename CircleType>
-  //  static inline CircleType GetCircle(Box const& box);
+  // // NOTE: search knn in the binary node
+  // template <typename Leaf, IsBinaryNode Interior, typename Range>
+  // static void KNNBinary(Node* T, Point const& q,
+  //                       kBoundedQueue<Point, Range>& bq, Box const& node_box,
+  //                       KNNLogger& logger)
+  //   requires std::same_as<typename Interior::ST, HyperPlane>;
   //
-  //  template <typename CircleType>
-  //  static inline CircleType GetCircle(Slice V);
+  // template <typename Leaf, IsBinaryNode Interior, typename Range>
+  // static void KNNBinaryBox(Node* T, Point const& q,
+  //                          kBoundedQueue<Point, Range>& bq, KNNLogger&
+  //                          logger);
   //
-  //  template <typename CircleType>
-  //  static inline CircleType GetCircle(CircleType const& a, CircleType const&
-  //  b);
+  // // NOTE: search knn in the expanded multi node
+  // template <typename Leaf, IsMultiNode Interior, typename Range>
+  // static void KNNMultiExpand(Node* T, Point const& q, DimsType dim,
+  //                            BucketType idx, kBoundedQueue<Point, Range>& bq,
+  //                            Box const& node_box, KNNLogger& logger);
   //
-  //  template <typename CircleType>
-  //  static inline CircleType GetCircle(Point const& p, CircleType const& cl);
+  // // NOTE: search knn in the expanded multi node
+  // template <typename Leaf, IsMultiNode Interior, typename Range>
+  // static void KNNMultiExpandBox(Node* T, Point const& q, DimsType dim,
+  //                               BucketType idx, kBoundedQueue<Point, Range>&
+  //                               bq, KNNLogger& logger);
   //
-  //  template <typename CircleType>
-  //  static inline CircleType GetCircle(
-  //      parlay::sequence<CircleType> const& circle_seq);
+  // // NOTE: search knn in the multi node
+  // template <typename Leaf, IsMultiNode Interior, typename Range>
+  // static void KNNMulti(Node* T, Point const& q, kBoundedQueue<Point, Range>&
+  // bq,
+  //                      KNNLogger& logger);
   //
-  //  // NOTE: build tree
-  //  static inline void SamplePoints(Slice In, Points& arr);
+  // // NOTE: search knn in the mix of binary and multi node
+  // template <typename Leaf, IsBinaryNode BN, IsMultiNode MN, typename Range>
+  // static void KNNMix(Node* T, Point const& q, DimsType dim, BucketType idx,
+  //                    kBoundedQueue<Point, Range>& bq, Box const& node_box,
+  //                    KNNLogger& logger);
   //
-  //  static inline BucketType FindBucket(Point const& p,
-  //                                      HyperPlaneSeq const& pivots);
+  // // NOTE: search knn in the cover node
+  // // TODO: change type of interior
+  // template <typename Leaf, IsDynamicNode Interior, typename Range>
+  // static void KNNCover(Node* T, Point const& q, kBoundedQueue<Point, Range>&
+  // bq,
+  //                      KNNLogger& logger);
   //
-  //  template <IsBinaryNode Interior, bool UpdateParFlag = true>
-  //  static inline void UpdateInterior(Node* T, Node* L, Node* R);
+  // // NOTE: range count stuffs
+  // template <typename Leaf>
+  // static size_t RangeCountRectangleLeaf(Node* T, Box const& query_box);
   //
-  //  template <IsBinaryNode Interior, bool UpdateParFlag = true>
-  //  static inline void UpdateInterior(Node* T, NodeBox const& L,
-  //                                    NodeBox const& R);
+  // template <typename Leaf, IsBinaryNode Interior>
+  // static size_t RangeCountRectangle(Node* T, Box const& query_box,
+  //                                   Box const& node_box,
+  //                                   RangeQueryLogger& logger);
   //
-  //  template <IsMultiNode Interior, bool UpdateParFlag = true>
-  //  static inline void UpdateInterior(
-  //      Node* T, typename Interior::NodeArr const& new_nodes);
+  // template <typename Leaf, IsMultiNode Interior>
+  // static size_t RangeCountRectangle(Node* T, Box const& query_box,
+  //                                   Box const& node_box, DimsType dim,
+  //                                   BucketType idx, RangeQueryLogger&
+  //                                   logger);
   //
-  //  template <typename Leaf, typename Interior, bool granularity = true>
-  //  static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);
+  // // template <typename Leaf, IsBinaryNode Interior>
+  // // static size_t RangeCountRadius(Node* T, NormalCircle const& cl,
+  // //                                Box const& node_box);
   //
-  //  template <typename Leaf, typename Interior, bool granularity = true>
-  //  static void PrepareRebuild(Node* T, Points& wx, Points& wo);
+  // // NOTE: range query stuffs
+  // template <typename Leaf, typename Range>
+  // static void RangeQueryLeaf(Node* T, Range Out, size_t& s,
+  //                            Box const& query_box);
   //
-  //  static void Partition(Slice A, Slice B, size_t const n,
-  //                        HyperPlaneSeq const& pivots,
-  //                        parlay::sequence<BallsType>& sums);
+  // template <typename Leaf, IsBinaryNode Interior, typename Range>
+  // static void RangeQuerySerialRecursive(Node* T, Range Out, size_t& s,
+  //                                       Box const& query_box,
+  //                                       Box const& node_box,
+  //                                       RangeQueryLogger& logger);
   //
-  //  // NOTE: batch insert
-  //  template <typename Leaf>
-  //  static Node* InsertPoints2Leaf(Node* T, Slice In);
+  // // template <typename Leaf, IsMultiNode Interior>
+  // // static size_t RangeCountRadius(Node* T, NormalCircle const& cl,
+  // //                                Box const& node_box);
   //
-  //  template <typename Leaf, typename RT>
-  //  static RT DeletePoints4Leaf(Node* T, Slice In);
+  // // NOTE: range query stuffs
+  // template <typename Leaf, IsMultiNode Interior, typename Range>
+  // static void RangeQuerySerialRecursive(Node* T, Range Out, size_t& s,
+  //                                       Box const& query_box,
+  //                                       Box const& node_box, DimsType dim,
+  //                                       BucketType idx,
+  //                                       RangeQueryLogger& logger);
   //
-  //  template <typename Leaf, typename RT>
-  //  static RT DiffPoints4Leaf(Node* T, Slice In);
+  // // NOTE: utility
+  // // TODO: better evaluate the parallel recursion function
+  // template <typename Leaf, IsBinaryNode Interior, typename Range,
+  //           bool granularity = true>
+  // static void FlattenRec(Node* T, Range Out);
   //
-  //  template <IsBinaryNode Interior>
-  //  static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
-  //  tags);
+  // template <typename Leaf, typename Interior, typename Range,
+  //           bool granularity = true>
+  // static void FlattenRec(Node* T, Range Out)
+  //   requires(!IsBinaryNode<Interior>);
   //
-  //  template <IsMultiNode Interior>
-  //  static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
-  //  tags);
+  // template <typename Leaf, typename Range>
+  // static void ExtractPointsInLeaf(Node* T, Range Out);
   //
-  //  template <typename Interior>
-  //  static void SeievePoints(Slice A, Slice B, size_t const n,
-  //                           NodeTagSeq const& tags,
-  //                           parlay::sequence<BallsType>& sums,
-  //                           BucketType const tags_num);
+  // template <typename Leaf, IsMultiNode Interior, typename Range,
+  //           bool granularity = true>
+  // static void PartialFlatten(Node* T, Range Out, BucketType idx);
   //
-  //  template <typename Leaf, typename Interior, typename PrepareFunc,
-  //            typename... Args>
-  //  Node* RebuildWithInsert(Node* T, PrepareFunc prepare_func, Slice In,
-  //                          Args&&... args);
-  //
-  //  template <typename Leaf, typename Interior, bool granularity,
-  //            typename... Args>
-  //  Node* RebuildSingleTree(Node* T, Args&&... args);
-  //
-  //  template <typename Leaf, IsBinaryNode Interior, bool granularity,
-  //            typename PrepareFunc, typename... Args>
-  //  Node* RebuildTreeRecursive(Node* T, PrepareFunc&& prepare_func,
-  //                             bool const allow_rebuild, Args&&... args);
-  //
-  //  template <typename Leaf, IsMultiNode Interior, bool granularity,
-  //            typename PrepareFunc, typename... Args>
-  //  Node* RebuildTreeRecursive(Node* T, PrepareFunc&& prepare_func,
-  //                             bool const allow_rebuild, Args&&... args);
-  //
-  //  template <typename Leaf, IsBinaryNode Interior, typename Base>
-  //  static Base BuildInnerTree(BucketType idx, HyperPlaneSeq const& pivots,
-  //                             parlay::sequence<Base> const& tree_nodes);
-  //
-  //  template <IsMultiNode Interior>
-  //  static Node* BuildInnerTree(BucketType idx, HyperPlaneSeq const& pivots,
+  // // NOTE: expand a multi node into a binary node
+  // template <IsBinaryNode BN, IsMultiNode MN>
+  // static Node* ExpandMultiNode(typename MN::ST const& split, BucketType idx,
+  //                              BucketType deep,
   //                              parlay::sequence<Node*> const& tree_nodes);
   //
-  //  static PointsIter SerialPartition(Slice In, DimsType d);
+  // // NOTE: expand a multi-way tree into a binary tree
+  // template <IsBinaryNode BN, IsMultiNode MN>
+  // static Node* Expand2Binary(Node* T)
+  //   requires std::same_as<typename BN::ST, typename MN::ST::value_type>;
   //
-  //  // NOTE: delete tree
-  //  template <SupportsForceParallel Interior, bool granularity>
-  //  inline static bool ForceParallelRecursion(Interior const* T);
+  // // NOTE: compress several level of bianry node into a multi node
+  // template <IsBinaryNode BN, IsMultiNode MN>
+  // static void CompressBinaryNode(Node* bn_proto,
+  //                                typename MN::NodeArr& tree_nodes,
+  //                                typename MN::ST& split, BucketType idx);
   //
-  //  constexpr virtual void DeleteTree() = 0;
+  // // NOTE: compress a binary tree into a multi-way tree
+  // template <IsBinaryNode BN, IsMultiNode MN>
+  // static Node* Compress2Multi(Node* T)
+  //   requires std::same_as<typename BN::ST, typename MN::ST::value_type>;
   //
-  //  template <typename Leaf, typename Interior>
-  //  void DeleteTreeWrapper();
+  // // NOTE: validations
+  // template <typename Leaf, typename Interior>
+  // Box CheckBox(Node* T, Box const& box);
   //
-  //  template <typename Leaf, IsBinaryNode Interior, bool granularity = true>
-  //  static void DeleteTreeRecursive(Node* T);
+  // template <typename Leaf, typename Interior>
+  // Points CheckCover(Node* T,
+  //                   typename Interior::CircleType const& level_cover_circle);
   //
-  //  template <typename Leaf, IsMultiNode Interior, bool granularity = true>
-  //  static void DeleteTreeRecursive(Node* T);
+  // template <typename Leaf, typename Interior>
+  // static size_t CheckSize(Node* T);
   //
-  //  template <typename Leaf, IsDynamicNode Interior, bool granularity = true>
-  //  static void DeleteTreeRecursive(Node* T);
+  // template <typename Leaf, typename Interior>
+  // void CheckTreeSameSequential(Node* T, int dim);
   //
-  //  // NOTE: KNN query stuffs
-  //  static inline DisType P2PDistanceSquare(Point const& p, Point const& q);
+  // template <typename Leaf, typename Interior, typename SplitRule>
+  // void Validate();
   //
-  //  static inline DisType P2BMinDistanceSquare(Point const& p, Box const& a);
+  // template <typename Leaf, typename Interior>
+  // size_t GetTreeHeight();
   //
-  //  static inline DisType P2BMaxDistanceSquare(Point const& p, Box const& a);
+  // template <typename Leaf, typename Interior>
+  // size_t GetMaxTreeDepth(Node* T, size_t deep);
   //
-  //  static inline double P2CMinDistance(Point const& p, Point const& center,
-  //                                      DisType const r);
+  // template <typename Leaf, typename Interior>
+  // double GetAveTreeHeight();
   //
-  //  template <typename CircleType>
-  //  static inline double P2CMinDistance(Point const& p, CircleType const& cl);
+  // template <typename Leaf, typename Interior>
+  // size_t CountTreeNodesNum(Node* T);
   //
-  //  static inline DisType InterruptibleDistance(Point const& p, Point const&
-  //  q,
-  //                                              DisType up);
+  // template <typename Leaf, typename Interior>
+  // void CountTreeHeights(Node* T, size_t deep, size_t& idx,
+  //                       parlay::sequence<size_t>& heights);
   //
-  //  // NOTE: get the split for a node
-  //  template <typename Leaf, typename Interior>
-  //  static inline typename Interior::ST const& GetSplit(Node const* node)
-  //    requires std::same_as<typename BTree::Box, typename Interior::ST>;
+  // // NOTE: param interfaces
+  // void SetRoot(Node* root) { this->root_ = root; }
   //
-  //  // NOTE: searech knn in the leaf
-  //  template <typename Leaf, typename Range>
-  //  static void KNNLeaf(Node* T, Point const& q, kBoundedQueue<Point, Range>&
-  //  bq);
+  // Node* GetRoot() { return this->root_; }
   //
-  //  // NOTE: search knn in the binary node
-  //  template <typename Leaf, IsBinaryNode Interior, typename Range>
-  //  static void KNNBinary(Node* T, Point const& q,
-  //                        kBoundedQueue<Point, Range>& bq, Box const&
-  //                        node_box, KNNLogger& logger)
-  //    requires std::same_as<typename Interior::ST, HyperPlane>;
+  // size_t GetSize() { return this->root_ ? this->root_->size : 0; }
   //
-  //  template <typename Leaf, IsBinaryNode Interior, typename Range>
-  //  static void KNNBinaryBox(Node* T, Point const& q,
-  //                           kBoundedQueue<Point, Range>& bq, KNNLogger&
-  //                           logger);
+  // Box GetRootBox() { return this->tree_box_; }
   //
-  //  // NOTE: search knn in the expanded multi node
-  //  template <typename Leaf, IsMultiNode Interior, typename Range>
-  //  static void KNNMultiExpand(Node* T, Point const& q, DimsType dim,
-  //                             BucketType idx, kBoundedQueue<Point, Range>&
-  //                             bq, Box const& node_box, KNNLogger& logger);
-  //
-  //  // NOTE: search knn in the expanded multi node
-  //  template <typename Leaf, IsMultiNode Interior, typename Range>
-  //  static void KNNMultiExpandBox(Node* T, Point const& q, DimsType dim,
-  //                                BucketType idx, kBoundedQueue<Point, Range>&
-  //                                bq, KNNLogger& logger);
-  //
-  //  // NOTE: search knn in the multi node
-  //  template <typename Leaf, IsMultiNode Interior, typename Range>
-  //  static void KNNMulti(Node* T, Point const& q, kBoundedQueue<Point, Range>&
-  //  bq,
-  //                       KNNLogger& logger);
-  //
-  //  // NOTE: search knn in the mix of binary and multi node
-  //  template <typename Leaf, IsBinaryNode BN, IsMultiNode MN, typename Range>
-  //  static void KNNMix(Node* T, Point const& q, DimsType dim, BucketType idx,
-  //                     kBoundedQueue<Point, Range>& bq, Box const& node_box,
-  //                     KNNLogger& logger);
-  //
-  //  // NOTE: search knn in the cover node
-  //  // TODO: change type of interior
-  //  template <typename Leaf, IsDynamicNode Interior, typename Range>
-  //  static void KNNCover(Node* T, Point const& q, kBoundedQueue<Point, Range>&
-  //  bq,
-  //                       KNNLogger& logger);
-  //
-  //  // NOTE: range count stuffs
-  //  template <typename Leaf>
-  //  static size_t RangeCountRectangleLeaf(Node* T, Box const& query_box);
-  //
-  //  template <typename Leaf, IsBinaryNode Interior>
-  //  static size_t RangeCountRectangle(Node* T, Box const& query_box,
-  //                                    Box const& node_box,
-  //                                    RangeQueryLogger& logger);
-  //
-  //  template <typename Leaf, IsMultiNode Interior>
-  //  static size_t RangeCountRectangle(Node* T, Box const& query_box,
-  //                                    Box const& node_box, DimsType dim,
-  //                                    BucketType idx, RangeQueryLogger&
-  //                                    logger);
-  //
-  //  // template <typename Leaf, IsBinaryNode Interior>
-  //  // static size_t RangeCountRadius(Node* T, NormalCircle const& cl,
-  //  //                                Box const& node_box);
-  //
-  //  // NOTE: range query stuffs
-  //  template <typename Leaf, typename Range>
-  //  static void RangeQueryLeaf(Node* T, Range Out, size_t& s,
-  //                             Box const& query_box);
-  //
-  //  template <typename Leaf, IsBinaryNode Interior, typename Range>
-  //  static void RangeQuerySerialRecursive(Node* T, Range Out, size_t& s,
-  //                                        Box const& query_box,
-  //                                        Box const& node_box,
-  //                                        RangeQueryLogger& logger);
-  //
-  //  // template <typename Leaf, IsMultiNode Interior>
-  //  // static size_t RangeCountRadius(Node* T, NormalCircle const& cl,
-  //  //                                Box const& node_box);
-  //
-  //  // NOTE: range query stuffs
-  //  template <typename Leaf, IsMultiNode Interior, typename Range>
-  //  static void RangeQuerySerialRecursive(Node* T, Range Out, size_t& s,
-  //                                        Box const& query_box,
-  //                                        Box const& node_box, DimsType dim,
-  //                                        BucketType idx,
-  //                                        RangeQueryLogger& logger);
-  //
-  //  // NOTE: utility
-  //  // TODO: better evaluate the parallel recursion function
-  //  template <typename Leaf, IsBinaryNode Interior, typename Range,
-  //            bool granularity = true>
-  //  static void FlattenRec(Node* T, Range Out);
-  //
-  //  template <typename Leaf, typename Interior, typename Range,
-  //            bool granularity = true>
-  //  static void FlattenRec(Node* T, Range Out)
-  //    requires(!IsBinaryNode<Interior>);
-  //
-  //  template <typename Leaf, typename Range>
-  //  static void ExtractPointsInLeaf(Node* T, Range Out);
-  //
-  //  template <typename Leaf, IsMultiNode Interior, typename Range,
-  //            bool granularity = true>
-  //  static void PartialFlatten(Node* T, Range Out, BucketType idx);
-  //
-  //  // NOTE: expand a multi node into a binary node
-  //  template <IsBinaryNode BN, IsMultiNode MN>
-  //  static Node* ExpandMultiNode(typename MN::ST const& split, BucketType idx,
-  //                               BucketType deep,
-  //                               parlay::sequence<Node*> const& tree_nodes);
-  //
-  //  // NOTE: expand a multi-way tree into a binary tree
-  //  template <IsBinaryNode BN, IsMultiNode MN>
-  //  static Node* Expand2Binary(Node* T)
-  //    requires std::same_as<typename BN::ST, typename MN::ST::value_type>;
-  //
-  //  // NOTE: compress several level of bianry node into a multi node
-  //  template <IsBinaryNode BN, IsMultiNode MN>
-  //  static void CompressBinaryNode(Node* bn_proto,
-  //                                 typename MN::NodeArr& tree_nodes,
-  //                                 typename MN::ST& split, BucketType idx);
-  //
-  //  // NOTE: compress a binary tree into a multi-way tree
-  //  template <IsBinaryNode BN, IsMultiNode MN>
-  //  static Node* Compress2Multi(Node* T)
-  //    requires std::same_as<typename BN::ST, typename MN::ST::value_type>;
-  //
-  //  // NOTE: validations
-  //  template <typename Leaf, typename Interior>
-  //  Box CheckBox(Node* T, Box const& box);
-  //
-  //  template <typename Leaf, typename Interior>
-  //  Points CheckCover(Node* T,
-  //                    typename Interior::CircleType const&
-  //                    level_cover_circle);
-  //
-  //  template <typename Leaf, typename Interior>
-  //  static size_t CheckSize(Node* T);
-  //
-  //  template <typename Leaf, typename Interior>
-  //  void CheckTreeSameSequential(Node* T, int dim);
-  //
-  //  template <typename Leaf, typename Interior, typename SplitRule>
-  //  void Validate();
-  //
-  //  template <typename Leaf, typename Interior>
-  //  size_t GetTreeHeight();
-  //
-  //  template <typename Leaf, typename Interior>
-  //  size_t GetMaxTreeDepth(Node* T, size_t deep);
-  //
-  //  template <typename Leaf, typename Interior>
-  //  double GetAveTreeHeight();
-  //
-  //  template <typename Leaf, typename Interior>
-  //  size_t CountTreeNodesNum(Node* T);
-  //
-  //  template <typename Leaf, typename Interior>
-  //  void CountTreeHeights(Node* T, size_t deep, size_t& idx,
-  //                        parlay::sequence<size_t>& heights);
-  //
-  //  // NOTE: param interfaces
-  //  void SetRoot(Node* root) { this->root_ = root; }
-  //
-  //  Node* GetRoot() { return this->root_; }
-  //
-  //  size_t GetSize() { return this->root_ ? this->root_->size : 0; }
-  //
-  //  Box GetRootBox() { return this->tree_box_; }
-  //
-  //  consteval static auto GetBuildDepthOnce() {
-  //    return static_cast<int>(kBuildDepthOnce);
-  //  }
-  //
-  // protected:
-  //  Node* root_ = nullptr;
-  //  parlay::internal::timer timer;
-  //  Box tree_box_;
-  //  size_t delete_node_num_ = 0;
-  //  size_t alloc_node_num_ = 0;
+  // consteval static auto GetBuildDepthOnce() {
+  //   return static_cast<int>(kBuildDepthOnce);
+  // }
+
+ protected:
+  Node* root_ = nullptr;
 };
 
 }  // namespace pmos
