@@ -1625,8 +1625,7 @@ class Wrapper {
   // NOTE: Trees
   template <typename TypeTrait>
   struct BTreeWrapper {
-    static constexpr uint kBufSz = 16;
-    using TreeType = typename pmos::BTree<TypeTrait, 16>;
+    using TreeType = typename pmos::BTree<TypeTrait>;
   };
 
   // template <class PointType, class SplitRuleType, class LeafAugType,
@@ -1788,7 +1787,7 @@ class Wrapper {
                               RunFunc test_func) {
     using EleType = std::pair<int, int>;
     using TypeTrait =
-        pmos::TypeTrait<EleType, std::monostate, std::monostate, 8>;
+        pmos::BTreeTypeTrait<EleType, 16, std::monostate, std::monostate, 8>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
 };

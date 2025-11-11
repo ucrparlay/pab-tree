@@ -9,9 +9,9 @@
 #include "pmos/dependence/tree_node.h"
 
 namespace pmos {
-template <typename TT, uint kBS>
+template <typename TT>
 template <typename Range>
-void BTree<TT, kBS>::Build(Range&& In) {
+void BTree<TT>::Build(Range&& In) {
   static_assert(parlay::is_random_access_range_v<Range>);
   static_assert(
       parlay::is_less_than_comparable_v<parlay::range_reference_type_t<Range>>);
@@ -22,17 +22,16 @@ void BTree<TT, kBS>::Build(Range&& In) {
   Build_(A);
 }
 
-template <typename TT, uint kBS>
-void BTree<TT, kBS>::Build_(Slice In) {
+template <typename TT>
+void BTree<TT>::Build_(Slice In) {
   // this->root_ = BuildRecursive(A);
+  auto sort_seq = parlay::sort(In);
   assert(this->root_ != nullptr);
   return;
 }
 
-template <typename TT, uint kBS>
-Node* BTree<TT, kBS>::BuildRecursive(Slice In) {
-  assert(In.size() == 0 || BT::WithinBox(BT::GetBox(In), bx));
-
+template <typename TT>
+Node* BTree<TT>::BuildRecursive(Slice In) {
   // if (In.size()) {
   if (In.size() <= BT::kSerialBuildCutoff) {
     return SerialBuildRecursive(In, Out, dim, bx);

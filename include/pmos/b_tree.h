@@ -11,7 +11,7 @@
 namespace pmos {
 
 // NOTE: Basetree
-template <class TypeTrait, uint kBufferSize>
+template <class TypeTrait>
 class BTree {
  public:
   using E = typename TypeTrait::EleType;
@@ -36,28 +36,28 @@ class BTree {
   static constexpr uint_fast8_t const kLog2Base = TypeTrait::kLog2Base;
   static constexpr uint_fast16_t const kBlockSize = TypeTrait::kBlockSize;
 
+  using BufferSizeType = TypeTrait::BufferSizeType;
+
+  static constexpr BufferSizeType kBuf = TypeTrait::kBuf;
+  static constexpr BufferSizeType kBufLB = TypeTrait::kBufLB;
+  static constexpr BufferSizeType kBufUB = 4 * TypeTrait::kBuf;
+
   // NOTE: tree structure
   static constexpr uint_fast8_t const kLeaveWrap = 32;
   static constexpr uint_fast8_t const kThinLeaveWrap = 24;
   static constexpr uint_fast8_t const kSlimLeaveWrap = 8;
   static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
 
-  using BufferSizeType =
-      std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
-  static constexpr BufferSizeType kBuf = kBufferSize;
-  static constexpr BufferSizeType kBufLB = kBufferSize;
-  static constexpr BufferSizeType kBufUB = 4 * kBufferSize;
-
   // NOTE: array based inner tree for batch insertion and deletion
   template <typename Leaf, typename Interior>
   struct InnerTree;
 
+  // NOTE: build tree
   template <typename Range>
   void Build(Range&& In);
 
   void Build_(Slice In);
 
-  // NOTE: build tree
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);
   //

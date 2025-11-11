@@ -11,11 +11,12 @@
 
 namespace pmos {
 
-template <typename EleType, typename LeafAugType, typename InteriorAugType,
-          uint_fast8_t kSkHeightVal>
+template <typename EleType, uint kBufferSize, typename LeafAugType,
+          typename InteriorAugType, uint_fast8_t kSkHeightVal>
 class TypeTrait {
  public:
   using E = EleType;
+  using Ele = EleType;
   using K = typename E::KeyType;
   using V = typename E::ValType;
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
@@ -41,6 +42,17 @@ class TypeTrait {
 
   using BucketSeq = parlay::sequence<BucketType>;
   using BallSeq = parlay::sequence<BallsType>;
+};
+
+template <typename EleType, uint kBufferSize, typename LeafAugType,
+          typename InteriorAugType, uint_fast8_t kSkHeightVal>
+class BTreeTypeTrait : public TypeTrait<EleType, kBufferSize, LeafAugType,
+                                        InteriorAugType, kSkHeightVal> {
+  using BufferSizeType =
+      std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
+  static constexpr BufferSizeType kBuf = kBufferSize;
+  static constexpr BufferSizeType kBufLB = kBufferSize;
+  static constexpr BufferSizeType kBufUB = 4 * kBufferSize;
 };
 
 }  // namespace pmos
