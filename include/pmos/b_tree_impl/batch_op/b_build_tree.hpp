@@ -5,7 +5,7 @@
 #include <parlay/slice.h>
 #include <parlay/type_traits.h>
 
-#include "b_tree.h"
+#include "pmos/b_tree.h"
 #include "pmos/dependence/tree_node.h"
 
 namespace pmos {
@@ -26,65 +26,43 @@ template <typename TT>
 void BTree<TT>::Build_(Slice In) {
   // this->root_ = BuildRecursive(A);
   auto sort_seq = parlay::sort(In);
+  this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;
 }
 
 template <typename TT>
 Node* BTree<TT>::BuildRecursive(Slice In) {
-  // if (In.size()) {
-  if (In.size() <= BT::kSerialBuildCutoff) {
-    return SerialBuildRecursive(In, Out, dim, bx);
+  size_t n = In.size();
+
+  assert(n >= kBufLB || n == 0);
+
+  if (n == 0) {
+    return AllocEmptyLeafNode<Slice, Leaf>(In);
   }
 
-  auto pivots = SplitterSeq::uninitialized(BT::kPivotNum + BT::kBucketNum + 1);
-  auto box_seq = BoxSeq::uninitialized(BT::kBucketNum);
-  parlay::sequence<BallsType> sums;
-
-  PickPivots(In, In.size(), pivots, dim, box_seq, bx);
-  BT::Partition(In, Out, In.size(), pivots, sums);
-
-  // NOTE: if random sampling failed to split points, re-partitions using
-  // serail approach
-  auto tree_nodes = parlay::sequence<Node*>::uninitialized(BT::kBucketNum);
-  auto nodes_map = BucketSeq::uninitialized(BT::kBucketNum);
-  BucketType zeros = std::ranges::count(sums, 0), cnt = 0;
-
-  if (zeros == BT::kBucketNum - 1) {  // NOTE: switch to seral
-    // TODO: add parallelsim within this call
-    // see parallel kth element
-    return SerialBuildRecursive(In, Out, dim, bx);
+  if (kBufLB <= n && n <= kBufUB) {
+    return AllocNormalLeafNode<Slice, Leaf>(In);
   }
 
-  // NOTE: alloc empty leaf beforehand to avoid spawn threads
-  for (BucketType i = 0; i < BT::kBucketNum; ++i) {
-    if (!sums[i]) {
-      tree_nodes[i] = AllocEmptyLeafNode<Slice, Leaf>();
-    } else {
-      nodes_map[cnt++] = i;
-    }
-  }
-
-  for (BucketType i = 0; i < BT::kBuildDepthOnce; ++i) {
-    dim = split_rule_.NextDimension(dim);
-  }
-
+  auto tree_nodes = NodeSeq::uninitialized(TT::kBufUB);
+  auto split_seq = SplitSeq::uninitialized(TT::kBufUB - 1);
+  // BUG: what happens if n = 8 and B = 7?
   parlay::parallel_for(
-      0, BT::kBucketNum - zeros,
-      [&](BucketType i) {
-        size_t start = 0;
-        for (BucketType j = 0; j < nodes_map[i]; ++j) {
-          start += sums[j];
+      0, TT::kBufUB,
+      [&](size_t i) {
+        size_t start = i * (n / TT::kBufUB);
+        size_t end = (i + 1) * (n / TT::kBufUB);
+        // WARN: no handling of the duplicates here
+        if (i == TT::kBufUB - 1) {
+          end = n;
+        } else {
+          split_seq[i] = TT::GetKey(In[end]);
         }
-
-        tree_nodes[nodes_map[i]] =
-            BuildRecursive(Out.cut(start, start + sums[nodes_map[i]]),
-                           In.cut(start, start + sums[nodes_map[i]]), dim,
-                           box_seq[nodes_map[i]]);
+        tree_nodes[i] = BuildRecursive(In.cut(start, end));
       },
-      1);
-
-  return BT::template BuildInnerTree<Leaf, Interior>(1, pivots, tree_nodes);
+      n >= kSerialBuildCutoff);
+  return AllocInteriorNode<Interior>(tree_nodes, split_seq);
 }
 
 }  // namespace pmos

@@ -14,14 +14,22 @@ namespace pmos {
 template <class TypeTrait>
 class BTree {
  public:
-  using E = typename TypeTrait::EleType;
+  using TT = TypeTrait;
+
+  using E = typename TypeTrait::Ele;
+  using Ele = typename TypeTrait::Ele;
   using K = typename E::KeyType;
   using V = typename E::ValType;
 
-  using Num = Num_Comparator<K>;
-  using Slice = parlay::slice<E*, E*>;
-  using EleSeq = parlay::sequence<E>;
-  using EleIter = typename parlay::sequence<E>::iterator;
+  using Num = typename TypeTrait::Num;
+  using Slice = typename TypeTrait::Slice;
+  using EleSeq = typename TypeTrait::EleSeq;
+  using EleIter = typename TypeTrait::EleIter;
+  using Split = typename TypeTrait::Split;
+  using SplitSeq = typename TypeTrait::SplitSeq;
+  using NodeSeq =
+      parlay::sequence<Node*>;  // TODO:may add this to type trait as well
+
   using LeafAug = typename TypeTrait::LeafAug;
   using InteriorAug = typename TypeTrait::InteriorAug;
 
@@ -48,6 +56,44 @@ class BTree {
   static constexpr uint_fast8_t const kSlimLeaveWrap = 8;
   static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
 
+  struct BTreeInteriorNode : MultiNode<TypeTrait> {
+    using BaseNode = MultiNode<TypeTrait>;
+    using BTreeNodeArr = typename BaseNode::NodeArr;
+    using TT = TypeTrait;
+    using Ele = typename TT::Ele;
+    using EleSeq = typename TT::EleSeq;
+    using ST = TT::SplitSeq;
+    using AT = TT::InteriorAug;
+
+    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes, const ST& _split)
+        : BaseNode(_tree_nodes, _split, AT()) {}  // TODO:finish AT
+
+    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes, const ST& _split,
+                      const AT& _aug)
+        : BaseNode(_tree_nodes, _split, _aug) {}
+
+    inline void SetParallelFlag(bool const flag) {
+      this->aug.SetParallelFlag(flag);
+    }
+
+    inline void ResetParallelFlag() { this->aug.ResetParallelFlag(); }
+
+    inline bool GetParallelFlagIniStatus() {
+      return this->aug.GetParallelFlagIniStatus();
+    }
+
+    inline bool ForceParallel() const {
+      return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
+    }
+
+    // auto UpdateAug(BTreeNodeArr const& tree_nodes) {
+    //   return this->aug.template Update<Leaf, Interior>(tree_nodes);
+    // }
+  };
+
+  using Leaf = LeafNode<TypeTrait, parlay::move_assign_tag>;
+  using Interior = BTreeInteriorNode;
+
   // NOTE: array based inner tree for batch insertion and deletion
   template <typename Leaf, typename Interior>
   struct InnerTree;
@@ -57,6 +103,8 @@ class BTree {
   void Build(Range&& In);
 
   void Build_(Slice In);
+
+  Node* BuildRecursive(Slice In);
 
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);
@@ -137,22 +185,14 @@ class BTree {
   //
   // // NOTE: delete tree
   // template <SupportsForceParallel Interior, bool granularity>
-  // inline static bool ForceParallelRecursion(Interior const* T);
-  //
-  // constexpr virtual void DeleteTree() = 0;
-  //
-  // template <typename Leaf, typename Interior>
-  // void DeleteTreeWrapper();
-  //
-  // template <typename Leaf, IsBinaryNode Interior, bool granularity = true>
-  // static void DeleteTreeRecursive(Node* T);
-  //
-  // template <typename Leaf, IsMultiNode Interior, bool granularity = true>
-  // static void DeleteTreeRecursive(Node* T);
-  //
-  // template <typename Leaf, IsDynamicNode Interior, bool granularity = true>
-  // static void DeleteTreeRecursive(Node* T);
-  //
+  template <bool granularity>
+  inline static bool ForceParallelRecursion(Interior const* T);
+
+  void DeleteTree();
+
+  template <bool granularity = true>
+  static void DeleteTreeRecursive(Node* T);
+
   // // NOTE: KNN query stuffs
   // static inline DisType P2PDistanceSquare(Point const& p, Point const& q);
   //
@@ -264,23 +304,17 @@ class BTree {
   //                                       BucketType idx,
   //                                       RangeQueryLogger& logger);
   //
-  // // NOTE: utility
-  // // TODO: better evaluate the parallel recursion function
-  // template <typename Leaf, IsBinaryNode Interior, typename Range,
-  //           bool granularity = true>
-  // static void FlattenRec(Node* T, Range Out);
-  //
-  // template <typename Leaf, typename Interior, typename Range,
-  //           bool granularity = true>
-  // static void FlattenRec(Node* T, Range Out)
-  //   requires(!IsBinaryNode<Interior>);
-  //
-  // template <typename Leaf, typename Range>
-  // static void ExtractPointsInLeaf(Node* T, Range Out);
-  //
-  // template <typename Leaf, IsMultiNode Interior, typename Range,
-  //           bool granularity = true>
-  // static void PartialFlatten(Node* T, Range Out, BucketType idx);
+  // NOTE: utility
+  // TODO: better evaluate the parallel recursion function
+  template <typename Range, bool granularity = true>
+  static void FlattenRec(Node* T, Range Out);
+
+  template <typename Range>
+  static void ExtractPointsInLeaf(Node* T, Range Out);
+
+  template <typename Leaf, IsMultiNode Interior, typename Range,
+            bool granularity = true>
+  static void PartialFlatten(Node* T, Range Out, BucketType idx);
   //
   // // NOTE: expand a multi node into a binary node
   // template <IsBinaryNode BN, IsMultiNode MN>
@@ -355,5 +389,9 @@ class BTree {
 };
 
 }  // namespace pmos
+
+#include "b_tree_impl/batch_op/b_build_tree.hpp"
+#include "b_tree_impl/batch_op/b_delete_tree.hpp"
+#include "b_tree_impl/tree_op/flatten.hpp"
 
 #endif  // PMOS_B_TREE_H_
