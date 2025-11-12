@@ -94,10 +94,8 @@ concept CheckBinaryNode = std::is_base_of_v<
     BinaryNodeT<typename T::PT, typename T::ST, typename T::AT>, T>;
 
 // NOTE: define the what is a multi-way node
-template <typename T,
-          template <typename, typename, typename> typename MultiNodeT>
-concept CheckMultiNode = std::is_base_of_v<
-    MultiNodeT<typename T::TT, typename T::ST, typename T::AT>, T>;
+template <typename T, template <typename> typename MultiNodeT>
+concept CheckMultiNode = std::is_base_of_v<MultiNodeT<typename T::TT>, T>;
 
 // NOTE: define the what is a dynamic node
 template <typename T,
