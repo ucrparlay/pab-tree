@@ -59,6 +59,7 @@ class BTreeTypeTrait : public TypeTrait<EleType, kBufferSize, LeafAugType,
       std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
   static constexpr BufferSizeType kBuf = kBufferSize;
   static constexpr BufferSizeType kBufLB = kBufferSize;
+  static constexpr BufferSizeType kBufMD = 2 * kBufferSize;
   static constexpr BufferSizeType kBufUB = 4 * kBufferSize;
 
   using Split = BT::K;

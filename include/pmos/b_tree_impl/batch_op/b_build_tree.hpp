@@ -49,12 +49,12 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
   auto split_seq = SplitSeq::uninitialized(TT::kBufUB - 1);
   // BUG: what happens if n = 8 and B = 7?
   parlay::parallel_for(
-      0, TT::kBufUB,
+      0, TT::kBufMD,
       [&](size_t i) {
-        size_t start = i * (n / TT::kBufUB);
-        size_t end = (i + 1) * (n / TT::kBufUB);
+        size_t start = i * (n / TT::kBufMD);
+        size_t end = (i + 1) * (n / TT::kBufMD);
         // WARN: no handling of the duplicates here
-        if (i == TT::kBufUB - 1) {
+        if (i == TT::kBufMD - 1) {
           end = n;
         } else {
           split_seq[i] = TT::GetKey(In[end]);
