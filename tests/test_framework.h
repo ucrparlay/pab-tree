@@ -190,17 +190,19 @@ auto gen_rectangles(int rec_num, int const type,
   return std::make_pair(box_seq, max_size);
 }
 
-template <typename Point, typename Tree, bool kTestTime = true, int kPrint = 1>
-void BuildTree(parlay::sequence<Point> const& WP, int const& rounds, Tree& pkd,
-               int remaining_frac = 1) {
-  using Points = typename Tree::Points;
+template <typename TypeTrait, typename Tree, bool kTestTime = true,
+          int kPrint = 1>
+void BuildTree(typename TypeTrait::EleSeq const& WP, int const& rounds,
+               Tree& pkd, int remaining_frac = 1) {
+  using TT = TypeTrait;
+  using EleSeq = typename TT::EleSeq;
   using Leaf = typename Tree::Leaf;
   using Interior = typename Tree::Interior;
 
   double loop_late = rounds > 1 ? 0.01 : -100;
   size_t n = WP.size();
   // size_t n = 100;
-  Points wp = Points::uninitialized(n);
+  EleSeq wp = EleSeq::uninitialized(n);
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -214,44 +216,43 @@ void BuildTree(parlay::sequence<Point> const& WP, int const& rounds, Tree& pkd,
 
     if constexpr (kPrint == 0) {
       std::cout << aveBuild << " " << std::flush;
-    } else if constexpr (kPrint == 1) {
-      std::cout << aveBuild << " " << std::flush;
-      if constexpr (IsKdTree<Tree> || IsOrthTree<Tree>) {
-        auto deep = pkd.template GetAveTreeHeight<Leaf, Interior>();
-        std::cout << deep << " " << std::flush;
-      } else {
-        std::cout << "-1"
-                  << " " << std::flush;
-      }
-    } else if constexpr (kPrint == 2) {
-      size_t max_deep = 0;
-      std::cout << aveBuild << " ";
-      if constexpr (IsKdTree<Tree> || IsOrthTree<Tree>) {
-        std::cout << pkd.template GetMaxTreeDepth<Leaf, Interior>(pkd.GetRoot(),
-                                                                  max_deep)
-                  << " " << pkd.template GetAveTreeHeight<Leaf, Interior>()
-                  << " " << std::flush;
-      } else {
-        std::cout << "-1 -1"
-                  << " " << std::flush;
-      }
-    } else if constexpr (kPrint == 3) {  // for incre insert directly
-      puts("# Insert");
-      std::cout << "## " << 1 << std::endl;
-      std::cout << "median: (1, " << aveBuild << ")-> min: (1, " << aveBuild
-                << ")-> max: (1, " << aveBuild << ")-> tot: " << aveBuild
-                << "-> avg: " << aveBuild << std::endl;
     }
-
+    //   else if constexpr (kPrint == 1) {
+    //     std::cout << aveBuild << " " << std::flush;
+    //     if constexpr (IsKdTree<Tree> || IsOrthTree<Tree>) {
+    //       auto deep = pkd.template GetAveTreeHeight<Leaf, Interior>();
+    //       std::cout << deep << " " << std::flush;
+    //     } else {
+    //       std::cout << "-1"
+    //                 << " " << std::flush;
+    //     }
+    //   } else if constexpr (kPrint == 2) {
+    //     size_t max_deep = 0;
+    //     std::cout << aveBuild << " ";
+    //     if constexpr (IsKdTree<Tree> || IsOrthTree<Tree>) {
+    //       std::cout << pkd.template GetMaxTreeDepth<Leaf,
+    //       Interior>(pkd.GetRoot(),
+    //                                                                 max_deep)
+    //                 << " " << pkd.template GetAveTreeHeight<Leaf, Interior>()
+    //                 << " " << std::flush;
+    //     } else {
+    //       std::cout << "-1 -1"
+    //                 << " " << std::flush;
+    //     }
+    //   } else if constexpr (kPrint == 3) {  // for incre insert directly
+    //     puts("# Insert");
+    //     std::cout << "## " << 1 << std::endl;
+    //     std::cout << "median: (1, " << aveBuild << ")-> min: (1, " <<
+    //     aveBuild
+    //               << ")-> max: (1, " << aveBuild << ")-> tot: " << aveBuild
+    //               << "-> avg: " << aveBuild << std::endl;
+    //   }
+    //
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
     parlay::copy(WP.cut(0, n / remaining_frac), wp.cut(0, n / remaining_frac));
     pkd.Build(wp.cut(0, n / remaining_frac));
-    // pkd.Flatten(wp);
-    // Points wp2 = WP;
-    // assert(parlay::sort(wp) == parlay::sort(wp2));
-    // std::cout << "same points" << "\n";
   }
 
   return;
@@ -491,10 +492,10 @@ void BatchInsertByStep(Tree& pkd, parlay::sequence<Point> const& WP,
   incre_build(slice_num / remain_divide_ratio);
   // auto original_box = Tree::GetBox(wp.cut(0, n / remain_divide_ratio));
   // auto tree_box = pkd.GetRootBox();
-  // std::cout << original_box.first << ' ' << original_box.second << std::endl;
-  // std::cout << tree_box.first << ' ' << tree_box.second << std::endl;
-  // auto root = pkd.cpam_aug_map_;
-  // std::cout << "root size: " << root.size() << std::endl;
+  // std::cout << original_box.first << ' ' << original_box.second <<
+  // std::endl; std::cout << tree_box.first << ' ' << tree_box.second <<
+  // std::endl; auto root = pkd.cpam_aug_map_; std::cout << "root size: " <<
+  // root.size() << std::endl;
 
   return;
 }
@@ -509,7 +510,8 @@ void BatchDeleteByStep(Tree& pkd, parlay::sequence<Point> const& WP,
   size_t n = wp.size();
   size_t step = static_cast<size_t>(insert_ratio * n);
   size_t slice_num = n / step;
-  // std::cout << "n: " << n << " step: " << step << " slice_num: " << slice_num
+  // std::cout << "n: " << n << " step: " << step << " slice_num: " <<
+  // slice_num
   // << std::endl;
   parlay::sequence<parlay::sequence<double>> time_table(
       rounds + 2, parlay::sequence<double>(slice_num, 0.0));
@@ -606,7 +608,8 @@ void BatchDeleteByStep(Tree& pkd, parlay::sequence<Point> const& WP,
 //           bool printVisNode = 1>
 // void queryKNN([[maybe_unused]] uint_fast8_t const& Dim,
 //               parlay::sequence<Point> const& WP, int const& rounds, Tree&
-//               pkd, Typename* kdknn, int const K, bool const flattenTreeTag) {
+//               pkd, Typename* kdknn, int const K, bool const flattenTreeTag)
+//               {
 //   using Points = typename Tree::Points;
 //   using Coord = typename Point::Coord;
 //   using DisType = typename Point::DisType;
@@ -661,9 +664,11 @@ void BatchDeleteByStep(Tree& pkd, parlay::sequence<Point> const& WP,
 //   if (printHeight) {
 //     // WARN: change when using multi-node
 //     size_t max_deep = 0;
-//     std::cout << pkd.template GetMaxTreeDepth<Leaf, Interior>(pkd.GetRoot(),
+//     std::cout << pkd.template GetMaxTreeDepth<Leaf,
+//     Interior>(pkd.GetRoot(),
 //                                                               max_deep)
-//               << " " << pkd.template GetAveTreeHeight<Leaf, Interior>() << "
+//               << " " << pkd.template GetAveTreeHeight<Leaf, Interior>() <<
+//               "
 //               "
 //               << std::flush;
 //   }
@@ -895,8 +900,8 @@ void rangeCountFix(Tree& pkd, Typename* kdknn, int const& rounds, int rec_type,
 }
 //
 // template<typename Point>
-// void rangeCountFixWithLog(const parlay::sequence<Point>& WP, BaseTree<Point>&
-// pkd, Typename* kdknn, const int& rounds,
+// void rangeCountFixWithLog(const parlay::sequence<Point>& WP,
+// BaseTree<Point>& pkd, Typename* kdknn, const int& rounds,
 //                           int rec_type, int rec_num, int DIM) {
 //     using Tree = BaseTree<Point>;
 //     using Points = typename Tree::Points;
@@ -1092,41 +1097,29 @@ void generate_random_points(parlay::sequence<Point>& wp, Coord _box_size,
   return;
 }
 
-template <typename Point>
-std::pair<size_t, int> read_points(char const* iFile,
-                                   parlay::sequence<Point>& wp,
+template <typename E>
+std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
                                    [[maybe_unused]] int id_offset = 0) {
-  using Coord = typename Point::Coord;
-  using Coords = typename Point::Coords;
-  static Coords a_sample_point;
+  using K = E::KeyType;
+  using V = E::ValType;
+
   parlay::sequence<char> S = readStringFromFile(iFile);
   parlay::sequence<char*> W = stringToWords(S);
   size_t N = std::stoul(W[0], nullptr, 10);
-  int Dim = atoi(W[1]);
-  assert(N > 0 && Dim >= 1);
+  int dim = atoi(W[1]);
+  assert(N > 0 && dim >= 1);
 
   auto pts = W.cut(2, W.size());
-  assert(pts.size() % Dim == 0);
-  size_t n = pts.size() / Dim;
-  auto a = parlay::tabulate(Dim * n, [&](size_t i) -> Coord {
-    if constexpr (std::is_integral_v<Coord>)
-      return std::stol(pts[i]);
-    else if (std::is_floating_point_v<Coord>)
-      return std::stod(pts[i]);
-  });
+  assert(pts.size() % dim == 0);
+  size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) {
-    for (int j = 0; j < Dim; j++) {
-      wp[i][j] = a[i * Dim + j];
-      if constexpr (std::is_same_v<Point,
-                                   BasicPoint<Coord, a_sample_point.size()>>) {
-        ;
-      } else {
-        wp[i].aug.id = i + id_offset;
-      }
+    wp[i].ReadKey(pts[i]);
+    for (int j = 1; j < dim; j++) {
+      wp[i].ReadVal(pts.cut(i * dim + 1, (i + 1) * dim));
     }
   });
-  return std::make_pair(N, Dim);
+  return std::make_pair(N, dim);
 }
 
 template <typename TreeWrapper>
@@ -1149,318 +1142,334 @@ void PrintTreeParam() {
 }
 
 // NOTE: default test functions for all custom tree
-static auto constexpr DefaultTestFunc = []<class TreeDesc, typename Point>(
-                                            int const& kDim,
-                                            parlay::sequence<Point> const& wp,
-                                            parlay::sequence<Point> const& wi,
-                                            size_t const& N, int const& K,
-                                            int const& kRounds,
-                                            string const& kInsertFile,
-                                            int const& kTag,
-                                            int const& kQueryType,
-                                            int const kSummary) {
-  using Tree = TreeDesc::TreeType;
-  using Points = typename Tree::Points;
+static auto constexpr DefaultTestFunc =
+    []<class TreeDesc, typename TypeTrait>(
+        TypeTrait::EleSeq const& wp, TypeTrait::EleSeq const& wi,
+        size_t const& N, int const& K, int const& kRounds,
+        string const& kInsertFile, int const& kTag, int const& kQueryType,
+        int const kSummary) {
+      using Tree = TreeDesc::TreeType;
+      using TT = TypeTrait;
 
-  Tree tree;
-  constexpr bool kTestTime = true;
+      Tree tree;
+      constexpr bool kTestTime = true;
 
-  // std::cout << "Called Build" << std::endl;
-  // BuildTree<Point, Tree, kTestTime, 2>(wp, kRounds, tree);
-  // std::cout << "Build Finished" << std::endl;
+      // std::cout << "Called Build" << std::endl;
+      BuildTree<TT, Tree, kTestTime, 2>(wp, kRounds, tree);
+      // std::cout << "Build Finished" << std::endl;
 
-  // NOTE: batch insert
-  if (kTag & (1 << 0)) {
-    if (kSummary) {
-      parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
-      for (size_t i = 0; i < ratios.size(); i++) {
-        BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds, ratios[i]);
-      }
-    } else {
-      BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds, 0.1);
-    }
-  }
+      // // NOTE: batch insert
+      // if (kTag & (1 << 0)) {
+      //   if (kSummary) {
+      //     parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01,
+      //     0.1}; for (size_t i = 0; i < ratios.size(); i++) {
+      //       BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
+      //       ratios[i]);
+      //     }
+      //   } else {
+      //     BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds, 0.1);
+      //   }
+      // }
+      //
+      // // NOTE: batch delete
+      // if (kTag & (1 << 1)) {
+      //   if (kSummary) {
+      //     parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01,
+      //     0.1}; for (size_t i = 0; i < ratios.size(); i++) {
+      //       BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
+      //       ratios[i]);
+      //     }
+      //   } else {
+      //     BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
+      //                                         kBatchInsertRatio);
+      //   }
+      // }
+      //
+      // Typename* kdknn = nullptr;
+      // auto run_batch_knn = [&](Points const& query_pts, int kth) {
+      //   kdknn = new Typename[query_pts.size()];
+      //   queryKNN<Point>(kDim, query_pts, kRounds, tree, kdknn, kth, true);
+      //   delete[] kdknn;
+      // };
+      //
+      // auto generate_query_box = [&](int rec_num, int rec_total_type,
+      //                               Points const& wp) {
+      //   // NOTE: generate rectangles for the first half of the points
+      //   parlay::sequence<parlay::sequence<std::pair<typename Tree::Box,
+      //   size_t>>>
+      //       query_box_seq(rec_total_type);
+      //   parlay::sequence<size_t> query_max_size(rec_total_type);
+      //   for (int i = 0; i < rec_total_type; i++) {
+      //     auto [query_box, max_size] =
+      //         gen_rectangles<Point, Tree, false, true>(rec_num, i, wp,
+      //         kDim);
+      //     query_box_seq[i] = query_box;
+      //     query_max_size[i] = max_size;
+      //   }
+      //   return std::make_pair(query_box_seq, query_max_size);
+      // };
+      //
+      // auto incre_update_test_bundle = [&](auto const& query_box_seq,
+      //                                     auto const& query_max_size) {
+      //   // NOTE: knn query
+      //   {
+      //     int k[3] = {1, 10, 100};
+      //
+      //     std::cout << "in-dis-skewed knn time: ";
+      //     size_t batch_size = static_cast<size_t>(wp.size() *
+      //     kBatchQueryRatio); for (int i = 0; i < 3; i++) {
+      //       run_batch_knn(wp.subseq(0, batch_size), k[i]);
+      //     }
+      //     puts("");
+      //
+      //     std ::cout << "out-dis-skewed knn time: ";
+      //     for (int i = 0; i < 3; i++) {
+      //       run_batch_knn(wp.subseq(wp.size() - batch_size, wp.size()),
+      //       k[i]);
+      //     }
+      //     puts("");
+      //
+      //     // NOTE: sample points within the whole input datasets
+      //     auto query_pts =
+      //         parlay::pack(wp, parlay::tabulate(wp.size(), [&](size_t i) ->
+      //         bool {
+      //                        return i % (wp.size() / (batch_size * 2)) ==
+      //                        0;
+      //                      }));
+      //
+      //     std::cout << "in-dis-uniform knn time: ";
+      //     for (int i = 0; i < 3; i++) {
+      //       run_batch_knn(parlay::random_shuffle(query_pts.subseq(0,
+      //       batch_size)),
+      //                     k[i]);
+      //     }
+      //     puts("");
+      //
+      //     std::cout << "out-dis-uniform knn time: ";
+      //     for (int i = 0; i < 3; i++) {
+      //       run_batch_knn(parlay::random_shuffle(
+      //                         query_pts.subseq(batch_size,
+      //                         query_pts.size())),
+      //                     k[i]);
+      //     }
+      //     puts("");
+      //   }
+      //
+      //   // NOTE: range count
+      //   {
+      //     int rec_num = query_box_seq[0].size();
+      //     kdknn = new Typename[rec_num];
+      //
+      //     std::cout << "range count time: ";
+      //     for (int i = 0; i < 3; i++) {
+      //       rangeCountFix<Point>(tree, kdknn, kRounds, i, rec_num, kDim,
+      //                            query_box_seq[i], query_max_size[i]);
+      //     }
+      //     delete[] kdknn;
+      //     puts("");
+      //   }
+      //
+      //   // NOTE: range query
+      //   {
+      //     int rec_num = query_box_seq[0].size();
+      //     kdknn = new Typename[rec_num];
+      //
+      //     std::cout << "range query time: ";
+      //     for (int i = 0; i < 3; i++) {
+      //       Points Out;
+      //       rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, rec_num,
+      //       kDim,
+      //                            query_box_seq[i], query_max_size[i]);
+      //     }
+      //     delete[] kdknn;
+      //     puts("");
+      //   }
+      // };
+      //
+      // // NOTE: scalability
+      // if (kTag & (1 << 2)) {
+      //   puts("");
+      //   BuildTree<Point, Tree, kTestTime, 0>(wp, kRounds, tree);
+      //   BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
+      //                                       kBatchInsertRatio);
+      //   BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
+      //                                       kBatchInsertRatio);
+      // }
+      //
+      // // NOTE: batch insert by step
+      // if (kTag & (1 << 3)) {
+      //   puts("");
+      //   BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
+      //
+      //   auto [query_box_seq, query_max_size] =
+      //       generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() /
+      //       2));
+      //
+      //   incre_update_test_bundle(query_box_seq, query_max_size);
+      //
+      //   parlay::sequence<double> const ratios = {0.1, 0.01, 0.001, 0.0001};
+      //   for (auto rat : ratios) {
+      //     BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, rat);
+      //     incre_update_test_bundle(query_box_seq, query_max_size);
+      //   }
+      // }
+      //
+      // // NOTE: batch delete by step
+      // if (kTag & (1 << 4)) {
+      //   puts("");
+      //   auto [query_box_seq, query_max_size] =
+      //       generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() /
+      //       2));
+      //   BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
+      //   incre_update_test_bundle(query_box_seq, query_max_size);
+      //
+      //   parlay::sequence<double> const ratios = {0.1, 0.01, 0.001, 0.0001};
+      //   // parlay::sequence<double> const ratios = {0.001};
+      //   for (auto rat : ratios) {
+      //     BatchDeleteByStep<Point, Tree, true>(tree, wp, kRounds, rat);
+      //     incre_update_test_bundle(query_box_seq, query_max_size);
+      //     // incre_update_test_bundle(wp.subseq(0, wp.size() / 2));
+      //   }
+      // }
+      //
+      // // real world
+      // if (kTag & (1 << 5)) {
+      //   puts("");
+      //   auto [query_box_seq, query_max_size] =
+      //       generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() /
+      //       2));
+      //
+      //   BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
+      //   incre_update_test_bundle(query_box_seq, query_max_size);
+      //
+      //   BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
+      //   incre_update_test_bundle(query_box_seq, query_max_size);
+      //
+      //   BatchDeleteByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
+      //   incre_update_test_bundle(query_box_seq, query_max_size);
+      // }
+      //
+      // // range query with log
+      // if (kTag & (1 << 6)) {
+      //   puts("");
+      //   BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
+      //
+      //   auto [query_box_seq, query_max_size] = generate_query_box(
+      //       kSingleQueryLogRepeatNum, 3, wp.subseq(0, wp.size() / 2));
+      //
+      //   // NOTE: range query
+      //   {
+      //     int rec_num = kSingleQueryLogRepeatNum;
+      //     kdknn = new Typename[rec_num];
+      //
+      //     std::cout << "range query time: " << std::endl;
+      //     for (int i = 0; i < 3; i++) {
+      //       // std::cout << "range query time: " << std::endl;
+      //       Points Out;
+      //       // rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, rec_num,
+      //       kDim,
+      //       //                      query_box_seq[i], query_max_size[i]);
+      //       RangeQuerySerialWithLog<Point>(tree, kdknn, kRounds, Out, i,
+      //       rec_num,
+      //                                      kDim, query_box_seq[i],
+      //                                      query_max_size[i]);
+      //     }
+      //     delete[] kdknn;
+      //     puts("");
+      //   }
+      // }
+      //
+      // // range query with log
+      // if (kTag & (1 << 7)) {
+      //   puts("");
+      //   parlay::sequence<double> const ratios = {
+      //       0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+      //       0.02,   0.05,   0.1,    0.2,   0.5,   1.0};
+      //   std::cout << "Insert: ";
+      //   for (size_t i = 0; i < ratios.size(); i++) {
+      //     BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
+      //     ratios[i]);
+      //   }
+      //   std::cout << std::endl;
+      //   std::cout << "Delete: ";
+      //   for (size_t i = 0; i < ratios.size(); i++) {
+      //     BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
+      //     ratios[i]);
+      //   }
+      //   puts("");
+      // }
+      // // WARN: compress the kdnode to MultiNode, should remove except for
+      // // exp if constexpr (IsKdTree<Tree>) {
+      // //   tree.Compress2Multi();
+      // // }
+      //
+      // // BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds,
+      // 0.000000001); if (kQueryType & (1 << 0)) {  // NOTE: KNN
+      //   size_t batch_size = static_cast<size_t>(wp.size() *
+      //   kBatchQueryRatio);
+      //
+      //   if (kSummary == 0) {
+      //     int k[3] = {1, 10, 100};
+      //     for (int i = 0; i < 3; i++) {
+      //       run_batch_knn(wp.subseq(0, batch_size), k[i]);
+      //     }
+      //   } else {  // test kSummary
+      //     run_batch_knn(wp.subseq(0, batch_size), K);
+      //   }
+      // }
+      //
+      // if (kQueryType & (1 << 1)) {  // NOTE: range count
+      //   auto [query_box_seq, query_max_size] =
+      //       generate_query_box(kRangeQueryNum, 3, wp);
+      //
+      //   if (!kSummary) {
+      //     int recNum = kRangeQueryNum;
+      //     kdknn = new Typename[recNum];
+      //
+      //     // std::cout << std::endl;
+      //     for (int i = 0; i < 3; i++) {
+      //       rangeCountFix<Point>(tree, kdknn, kRounds, i, recNum, kDim,
+      //                            query_box_seq[i], query_max_size[i]);
+      //     }
+      //
+      //     delete[] kdknn;
+      //   }
+      // }
+      //
+      // if (kQueryType & (1 << 2)) {  // NOTE: range query
+      //   if (kSummary == 0) {
+      //     auto [query_box_seq, query_max_size] =
+      //         generate_query_box(kRangeQueryNum, 3, wp);
+      //
+      //     int recNum = kRangeQueryNum;
+      //     kdknn = new Typename[recNum];
+      //
+      //     for (int i = 0; i < 3; i++) {
+      //       Points Out;
+      //       rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, recNum,
+      //       kDim,
+      //                            query_box_seq[i], query_max_size[i]);
+      //     }
+      //     delete[] kdknn;
+      //   } else if (kSummary == 1) {  // NOTE: for kSummary
+      //     auto [query_box_seq, query_max_size] =
+      //         generate_query_box(kSummaryRangeQueryNum, 3, wp);
+      //
+      //     kdknn = new Typename[kSummaryRangeQueryNum];
+      //     Points Out;
+      //     rangeQueryFix<Point>(tree, kdknn, kRounds, Out, 2,
+      //     kSummaryRangeQueryNum,
+      //                          kDim, query_box_seq[2], query_max_size[2]);
+      //     delete[] kdknn;
+      //   }
+      // }
 
-  // NOTE: batch delete
-  if (kTag & (1 << 1)) {
-    if (kSummary) {
-      parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
-      for (size_t i = 0; i < ratios.size(); i++) {
-        BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds, ratios[i]);
-      }
-    } else {
-      BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
-                                          kBatchInsertRatio);
-    }
-  }
+      std::cout << "\n" << std::flush;
 
-  Typename* kdknn = nullptr;
-  auto run_batch_knn = [&](Points const& query_pts, int kth) {
-    kdknn = new Typename[query_pts.size()];
-    queryKNN<Point>(kDim, query_pts, kRounds, tree, kdknn, kth, true);
-    delete[] kdknn;
-  };
+      tree.DeleteTree();
 
-  auto generate_query_box = [&](int rec_num, int rec_total_type,
-                                Points const& wp) {
-    // NOTE: generate rectangles for the first half of the points
-    parlay::sequence<parlay::sequence<std::pair<typename Tree::Box, size_t>>>
-        query_box_seq(rec_total_type);
-    parlay::sequence<size_t> query_max_size(rec_total_type);
-    for (int i = 0; i < rec_total_type; i++) {
-      auto [query_box, max_size] =
-          gen_rectangles<Point, Tree, false, true>(rec_num, i, wp, kDim);
-      query_box_seq[i] = query_box;
-      query_max_size[i] = max_size;
-    }
-    return std::make_pair(query_box_seq, query_max_size);
-  };
-
-  auto incre_update_test_bundle = [&](auto const& query_box_seq,
-                                      auto const& query_max_size) {
-    // NOTE: knn query
-    {
-      int k[3] = {1, 10, 100};
-
-      std::cout << "in-dis-skewed knn time: ";
-      size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
-      for (int i = 0; i < 3; i++) {
-        run_batch_knn(wp.subseq(0, batch_size), k[i]);
-      }
-      puts("");
-
-      std ::cout << "out-dis-skewed knn time: ";
-      for (int i = 0; i < 3; i++) {
-        run_batch_knn(wp.subseq(wp.size() - batch_size, wp.size()), k[i]);
-      }
-      puts("");
-
-      // NOTE: sample points within the whole input datasets
-      auto query_pts =
-          parlay::pack(wp, parlay::tabulate(wp.size(), [&](size_t i) -> bool {
-                         return i % (wp.size() / (batch_size * 2)) == 0;
-                       }));
-
-      std::cout << "in-dis-uniform knn time: ";
-      for (int i = 0; i < 3; i++) {
-        run_batch_knn(parlay::random_shuffle(query_pts.subseq(0, batch_size)),
-                      k[i]);
-      }
-      puts("");
-
-      std::cout << "out-dis-uniform knn time: ";
-      for (int i = 0; i < 3; i++) {
-        run_batch_knn(parlay::random_shuffle(
-                          query_pts.subseq(batch_size, query_pts.size())),
-                      k[i]);
-      }
-      puts("");
-    }
-
-    // NOTE: range count
-    {
-      int rec_num = query_box_seq[0].size();
-      kdknn = new Typename[rec_num];
-
-      std::cout << "range count time: ";
-      for (int i = 0; i < 3; i++) {
-        rangeCountFix<Point>(tree, kdknn, kRounds, i, rec_num, kDim,
-                             query_box_seq[i], query_max_size[i]);
-      }
-      delete[] kdknn;
-      puts("");
-    }
-
-    // NOTE: range query
-    {
-      int rec_num = query_box_seq[0].size();
-      kdknn = new Typename[rec_num];
-
-      std::cout << "range query time: ";
-      for (int i = 0; i < 3; i++) {
-        Points Out;
-        rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, rec_num, kDim,
-                             query_box_seq[i], query_max_size[i]);
-      }
-      delete[] kdknn;
-      puts("");
-    }
-  };
-
-  // NOTE: scalability
-  if (kTag & (1 << 2)) {
-    puts("");
-    BuildTree<Point, Tree, kTestTime, 0>(wp, kRounds, tree);
-    BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
-                                        kBatchInsertRatio);
-    BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
-                                        kBatchInsertRatio);
-  }
-
-  // NOTE: batch insert by step
-  if (kTag & (1 << 3)) {
-    puts("");
-    BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
-
-    auto [query_box_seq, query_max_size] =
-        generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() / 2));
-
-    incre_update_test_bundle(query_box_seq, query_max_size);
-
-    parlay::sequence<double> const ratios = {0.1, 0.01, 0.001, 0.0001};
-    for (auto rat : ratios) {
-      BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, rat);
-      incre_update_test_bundle(query_box_seq, query_max_size);
-    }
-  }
-
-  // NOTE: batch delete by step
-  if (kTag & (1 << 4)) {
-    puts("");
-    auto [query_box_seq, query_max_size] =
-        generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() / 2));
-    BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
-    incre_update_test_bundle(query_box_seq, query_max_size);
-
-    parlay::sequence<double> const ratios = {0.1, 0.01, 0.001, 0.0001};
-    // parlay::sequence<double> const ratios = {0.001};
-    for (auto rat : ratios) {
-      BatchDeleteByStep<Point, Tree, true>(tree, wp, kRounds, rat);
-      incre_update_test_bundle(query_box_seq, query_max_size);
-      // incre_update_test_bundle(wp.subseq(0, wp.size() / 2));
-    }
-  }
-
-  // real world
-  if (kTag & (1 << 5)) {
-    puts("");
-    auto [query_box_seq, query_max_size] =
-        generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() / 2));
-
-    BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
-    incre_update_test_bundle(query_box_seq, query_max_size);
-
-    BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
-    incre_update_test_bundle(query_box_seq, query_max_size);
-
-    BatchDeleteByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
-    incre_update_test_bundle(query_box_seq, query_max_size);
-  }
-
-  // range query with log
-  if (kTag & (1 << 6)) {
-    puts("");
-    BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
-
-    auto [query_box_seq, query_max_size] = generate_query_box(
-        kSingleQueryLogRepeatNum, 3, wp.subseq(0, wp.size() / 2));
-
-    // NOTE: range query
-    {
-      int rec_num = kSingleQueryLogRepeatNum;
-      kdknn = new Typename[rec_num];
-
-      std::cout << "range query time: " << std::endl;
-      for (int i = 0; i < 3; i++) {
-        // std::cout << "range query time: " << std::endl;
-        Points Out;
-        // rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, rec_num, kDim,
-        //                      query_box_seq[i], query_max_size[i]);
-        RangeQuerySerialWithLog<Point>(tree, kdknn, kRounds, Out, i, rec_num,
-                                       kDim, query_box_seq[i],
-                                       query_max_size[i]);
-      }
-      delete[] kdknn;
-      puts("");
-    }
-  }
-
-  // range query with log
-  if (kTag & (1 << 7)) {
-    puts("");
-    parlay::sequence<double> const ratios = {
-        0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
-        0.02,   0.05,   0.1,    0.2,   0.5,   1.0};
-    std::cout << "Insert: ";
-    for (size_t i = 0; i < ratios.size(); i++) {
-      BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds, ratios[i]);
-    }
-    std::cout << std::endl;
-    std::cout << "Delete: ";
-    for (size_t i = 0; i < ratios.size(); i++) {
-      BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds, ratios[i]);
-    }
-    puts("");
-  }
-  // WARN: compress the kdnode to MultiNode, should remove except for
-  // exp if constexpr (IsKdTree<Tree>) {
-  //   tree.Compress2Multi();
-  // }
-
-  // BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.000000001);
-  if (kQueryType & (1 << 0)) {  // NOTE: KNN
-    size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
-
-    if (kSummary == 0) {
-      int k[3] = {1, 10, 100};
-      for (int i = 0; i < 3; i++) {
-        run_batch_knn(wp.subseq(0, batch_size), k[i]);
-      }
-    } else {  // test kSummary
-      run_batch_knn(wp.subseq(0, batch_size), K);
-    }
-  }
-
-  if (kQueryType & (1 << 1)) {  // NOTE: range count
-    auto [query_box_seq, query_max_size] =
-        generate_query_box(kRangeQueryNum, 3, wp);
-
-    if (!kSummary) {
-      int recNum = kRangeQueryNum;
-      kdknn = new Typename[recNum];
-
-      // std::cout << std::endl;
-      for (int i = 0; i < 3; i++) {
-        rangeCountFix<Point>(tree, kdknn, kRounds, i, recNum, kDim,
-                             query_box_seq[i], query_max_size[i]);
-      }
-
-      delete[] kdknn;
-    }
-  }
-
-  if (kQueryType & (1 << 2)) {  // NOTE: range query
-    if (kSummary == 0) {
-      auto [query_box_seq, query_max_size] =
-          generate_query_box(kRangeQueryNum, 3, wp);
-
-      int recNum = kRangeQueryNum;
-      kdknn = new Typename[recNum];
-
-      for (int i = 0; i < 3; i++) {
-        Points Out;
-        rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, recNum, kDim,
-                             query_box_seq[i], query_max_size[i]);
-      }
-      delete[] kdknn;
-    } else if (kSummary == 1) {  // NOTE: for kSummary
-      auto [query_box_seq, query_max_size] =
-          generate_query_box(kSummaryRangeQueryNum, 3, wp);
-
-      kdknn = new Typename[kSummaryRangeQueryNum];
-      Points Out;
-      rangeQueryFix<Point>(tree, kdknn, kRounds, Out, 2, kSummaryRangeQueryNum,
-                           kDim, query_box_seq[2], query_max_size[2]);
-      delete[] kdknn;
-    }
-  }
-
-  std::cout << "\n" << std::flush;
-
-  tree.DeleteTree();
-
-  return;
-};
+      return;
+    };
 
 class Wrapper {
  public:
@@ -1478,49 +1487,21 @@ class Wrapper {
     }
   }
 
-  template <class BaseTree>
   struct LeafAugEmpty {
-    using BT = BaseTree;
-    using Box = BT::Box;
-    using Slice = BT::Slice;
-
     LeafAugEmpty() {};
-    LeafAugEmpty(Box const& _box) {};
-    LeafAugEmpty(Slice In) {};
-    void UpdateAug(Slice In) { return; }
+
+    template <typename Slice>
+    LeafAugEmpty(Slice In){};
+
+    template <typename Slice>
+    void UpdateAug(Slice In) {
+      return;
+    }
+
     void Reset() { return; }
   };
 
-  template <class BaseTree>
-  struct LeafAugBox {
-    using BT = BaseTree;
-    using Box = BT::Box;
-    using Slice = BT::Slice;
-
-    LeafAugBox() : box(BT::GetEmptyBox()) {};
-    LeafAugBox(Box const& _box) : box(_box) {};
-    LeafAugBox(Slice In) : box(BT::GetBox(In)) {};
-
-    Box& GetBox() { return this->box; }
-    Box const& GetBox() const { return this->box; }
-
-    void UpdateAug(Slice In) {
-      this->box = BT::GetBox(In);
-      return;
-    }
-
-    void Reset() {
-      this->box = BT::GetEmptyBox();
-      return;
-    }
-
-    Box box;
-  };
-
-  template <class BaseTree>
   struct InteriorAugEmpty {
-    using BT = BaseTree;
-
     InteriorAugEmpty() { force_par_indicator.reset(); }
     InteriorAugEmpty(bool) { force_par_indicator.reset(); }
 
@@ -1545,10 +1526,10 @@ class Wrapper {
       return this->force_par_indicator.has_value();
     }
 
-    bool ForceParallel(size_t sz) const {
+    bool ForceParallel(size_t sz, size_t granularity) const {
       return this->force_par_indicator.has_value()
                  ? this->force_par_indicator.value()
-                 : sz > BT::kSerialBuildCutoff;
+                 : sz > granularity;
     }
 
     template <typename Leaf, typename Interior>
@@ -1570,111 +1551,11 @@ class Wrapper {
     std::optional<bool> force_par_indicator;
   };
 
-  template <class BaseTree>
-  struct InteriorAugBox : public InteriorAugEmpty<BaseTree> {
-    using BT = BaseTree;
-    using Box = BT::Box;
-    using Slice = BT::Slice;
-    using BaseAug = InteriorAugEmpty<BT>;
-
-    InteriorAugBox() : BaseAug(), box(BT::GetEmptyBox()) {}
-    InteriorAugBox(Box const& _box) : BaseAug(), box(_box) {}
-
-    // binary create
-    template <typename Leaf, typename Interior>
-    static Box Create(Node* l, Node* r) {
-      return BT::GetBox(BT::template RetriveBox<Leaf, Interior>(l),
-                        BT::template RetriveBox<Leaf, Interior>(r));
-    }
-
-    // multi create
-    template <typename Leaf, typename Interior, typename TreeNodes>
-    static Box Create(TreeNodes const& nodes) {
-      Box box = BT::GetEmptyBox();
-      for (auto t : nodes) {
-        box = BT::GetBox(box, BT::template RetriveBox<Leaf, Interior>(t));
-      }
-      return box;
-    }
-
-    Box& GetBox() { return this->box; }
-    Box const& GetBox() const { return this->box; }
-
-    // binary update
-    template <typename Leaf, typename Interior>
-    void Update(Node* l, Node* r) {
-      this->box = this->Create<Leaf, Interior>(l, r);
-      return;
-    }
-
-    // multi update
-    template <typename Leaf, typename Interior, typename TreeNodes>
-    void Update(TreeNodes const& nodes) {
-      this->box = this->Create<Leaf, Interior>(nodes);
-      return;
-    }
-
-    void Reset() {
-      BaseAug::Reset();
-      this->force_par_indicator.reset();
-    }
-
-    Box box;
-  };
-
   // NOTE: Trees
   template <typename TypeTrait>
   struct BTreeWrapper {
     using TreeType = typename pmos::BTree<TypeTrait>;
   };
-
-  // template <class PointType, class SplitRuleType, class LeafAugType,
-  //           class InteriorAugType>
-  // struct OrthTreeWrapper {
-  //   using Point = PointType;
-  //   using SplitRule = SplitRuleType;
-  //   using TreeType =
-  //       typename pmos::OrthTree<Point, SplitRule, LeafAugType,
-  //       InteriorAugType,
-  //                              Point::GetDim(),
-  //                              OrthGetBuildDepthOnce(Point::GetDim())>;
-  // };
-  //
-  // template <class PointType, class SplitRuleType>
-  // struct PTreeWrapper {
-  //   using Point = PointType;
-  //   using SplitRule = SplitRuleType;
-  //   using TreeType = typename pmos::PTree<Point, SplitRule>;
-  // };
-  //
-  // template <class PointType, class SplitRuleType>
-  // struct CpamRawWrapper {
-  //   using Point = PointType;
-  //   using SplitRule = SplitRuleType;
-  //   using TreeType = typename CPAMTree::CpamRaw<Point, SplitRule>;
-  // };
-  //
-  // /* Zdtree Wrapper */
-  // template <class PointType, class SplitRuleType>
-  // struct ZdTreeWrapper {
-  //   using Point = PointType;
-  //   using SplitRule = SplitRuleType;
-  //   using TreeType = typename ZD::Zdtree<Point, SplitRule>;
-  // };
-  //
-  // template <class PointType, class SplitRuleType>
-  // struct CoverTreeWrapper {
-  //   using Point = PointType;
-  //   using SplitRule = SplitRuleType;
-  //   using TreeType = typename pmos::CoverTree<Point, SplitRule>;
-  // };
-  //
-  // template <class PointType, class SplitRuleType>
-  // struct RTreeWrapper {
-  //   using Point = PointType;
-  //   using SplitRule = SplitRuleType;
-  //   using TreeType = typename pmos::RTree<Point, SplitRule>;
-  // };
 
   // NOTE: Apply the dim and split rule
   struct AugId {
@@ -1735,49 +1616,71 @@ class Wrapper {
     int tree_type = P.getOptionIntValue("-T", 0);
     int split_type = P.getOptionIntValue("-l", 0);
 
-    //     using Point = typename TreeWrapper::Point;
-    //     using Points = parlay::sequence<Point>;
-    //     constexpr auto kDim = Point::GetDim();
-    //
-    //     PrintTreeParam<TreeWrapper>();
-    //
-    //     std::string name, insert_file_path = "";
-    //     Points wp, wi;
-    //
-    //     if (input_file_path != NULL) {  // NOTE: read main Points
-    //       name = std::string(input_file_path);
-    //       name = name.substr(name.rfind('/') + 1);
-    //       std::cout << name << " ";
-    //       auto [n, d] = read_points<Point>(input_file_path, wp, 0);
-    //       N = n;
-    //       assert(d == kDim);
-    //     }
-    //
-    //     if (read_insert_file == 1) {           // NOTE: read points to be
-    //     inserted
-    //       if (insert_file_path_cml != NULL) {  // given in commadnline
-    //         insert_file_path = std::string(insert_file_path_cml);
-    //         // std::cout << insert_file_path << std::endl;
-    //       } else {  // determine the name otherwise
-    //         int id = std::stoi(name.substr(0, name.find_first_of('.')));
-    // #ifdef CCP
-    //         id = (id + 1) % 10;  // WARN: MOD graph number used to test
-    // #else
-    //         id = (id + 1) % 3;
-    // #endif  // CCP
-    //         if (!id) id++;
-    //         auto pos = std::string(input_file_path).rfind('/') + 1;
-    //         insert_file_path = std::string(input_file_path).substr(0, pos) +
-    //                            std::to_string(id) + ".in";
-    //       }
-    //       auto [n, d] = read_points<Point>(insert_file_path.c_str(), wi, N);
-    //       assert(d == kDim);
-    //     }
-    //
-    //     // Apply the test function
-    //     test_func.template operator()<TreeWrapper, Point>(
-    //         kDim, wp, wi, N, K, rounds, insert_file_path, tag, query_type,
-    //         summary);
+    using TT = typename TreeWrapper::TreeType::TT;
+    using Ele = typename TT::E;
+    using EleSeq = typename TT::EleSeq;
+
+    // PrintTreeParam<TreeWrapper>();
+
+    std::string name, insert_file_path = "";
+    EleSeq wp, wi;
+
+    if (input_file_path != NULL) {  // NOTE: read main Points
+      name = std::string(input_file_path);
+      name = name.substr(name.rfind('/') + 1);
+      std::cout << name << " ";
+      auto [n, d] = read_points<Ele>(input_file_path, wp, 0);
+      N = n;
+    }
+
+    if (read_insert_file == 1) {
+      if (insert_file_path_cml != NULL) {  // given in commadnline
+        insert_file_path = std::string(insert_file_path_cml);
+        // std::cout << insert_file_path << std::endl;
+      } else {  // determine the name otherwise
+        int id = std::stoi(name.substr(0, name.find_first_of('.')));
+#ifdef CCP
+        id = (id + 1) % 10;  // WARN: MOD graph number used to test
+#else
+        id = (id + 1) % 3;
+#endif  // CCP
+        if (!id) id++;
+        auto pos = std::string(input_file_path).rfind('/') + 1;
+        insert_file_path = std::string(input_file_path).substr(0, pos) +
+                           std::to_string(id) + ".in";
+      }
+      auto [n, d] = read_points<Ele>(insert_file_path.c_str(), wi, N);
+    }
+
+    // Apply the test function
+    test_func.template operator()<TreeWrapper, TT>(
+        wp, wi, N, K, rounds, insert_file_path, tag, query_type, summary);
+  };
+
+  struct Element {
+    using KeyType = uint32_t;
+    using ValType = uint32_t;
+
+    KeyType const GetKey() const { return key; }
+    ValType const GetVal() const { return val; }
+
+    void ReadKey(char* str) {
+      this->key = std::stol(str);
+      return;
+    }
+
+    template <typename StrRange>
+    void ReadVal(StrRange In) {
+      this->val = std::stol(In[0]);
+      return;
+    }
+
+    bool const operator<(Element const& rhs) const {
+      return this->key < rhs.key;
+    }
+
+    KeyType key;
+    ValType val;
   };
 
   // NOTE: For kd tree and orth tree
@@ -1785,9 +1688,9 @@ class Wrapper {
   static void ApplyOrthogonal(int const tree_type, int const dim,
                               int const split_type, commandLine& params,
                               RunFunc test_func) {
-    using EleType = std::pair<int, int>;
+    using EleType = Element;
     using TypeTrait =
-        pmos::BTreeTypeTrait<EleType, 16, std::monostate, std::monostate, 8>;
+        pmos::BTreeTypeTrait<EleType, 16, LeafAugEmpty, InteriorAugEmpty, 8>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
 };
