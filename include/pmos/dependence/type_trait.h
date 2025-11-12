@@ -15,12 +15,15 @@ template <typename EleType, uint kBufferSize, typename LeafAugType,
           typename InteriorAugType, uint_fast8_t kSkHeightVal>
 class TypeTrait {
  public:
+  // NOTE: element type
   using E = EleType;
   using Ele = EleType;
   using K = typename E::KeyType;
   using V = typename E::ValType;
-  static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
+  static inline K GetKey(E const& e) { return e.GetKey(); }
+  static inline V GetVal(E const& e) { return e.GetVal(); }
 
+  // NOTE: general type
   using Num = Num_Comparator<K>;
   using Slice = parlay::slice<E*, E*>;
   using ConstSlice = parlay::slice<E const*, E const*>;
@@ -32,6 +35,7 @@ class TypeTrait {
   using InteriorAug = InteriorAugType;
 
   // NOTE: block param in point sieving
+  static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
   using BucketType =
       std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
   using BallsType = uint_fast32_t;
@@ -48,11 +52,17 @@ template <typename EleType, uint kBufferSize, typename LeafAugType,
           typename InteriorAugType, uint_fast8_t kSkHeightVal>
 class BTreeTypeTrait : public TypeTrait<EleType, kBufferSize, LeafAugType,
                                         InteriorAugType, kSkHeightVal> {
+ public:
+  using BT = TypeTrait<EleType, kBufferSize, LeafAugType, InteriorAugType,
+                       kSkHeightVal>;
   using BufferSizeType =
       std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
   static constexpr BufferSizeType kBuf = kBufferSize;
   static constexpr BufferSizeType kBufLB = kBufferSize;
   static constexpr BufferSizeType kBufUB = 4 * kBufferSize;
+
+  using Split = BT::K;
+  using SplitSeq = parlay::sequence<Split>;
 };
 
 }  // namespace pmos
