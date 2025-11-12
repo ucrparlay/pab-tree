@@ -32,10 +32,9 @@ struct Node {
   size_t size;
 };
 
-template <typename TypeTrait, typename Range,
-          typename EleAssignTag = parlay::move_assign_tag>
+template <typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
 struct LeafNode : Node {
-  using Ele = typename TypeTrait::EleType;
+  using Ele = typename TypeTrait::Ele;
   using EleSeq = typename TypeTrait::EleSeq;
   using AT = typename TypeTrait::LeafAug;
   using TT = TypeTrait;
@@ -47,6 +46,7 @@ struct LeafNode : Node {
       : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(_aug) {}
 
   // NOTE: alloc a leaf with default size
+  template <typename Range>
   LeafNode(Range In, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(false),
@@ -59,6 +59,7 @@ struct LeafNode : Node {
   }
 
   // NOTE: alloc a leaf with specific size
+  template <typename Range>
   LeafNode(Range In, size_t const alloc_size, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(false),
@@ -71,6 +72,7 @@ struct LeafNode : Node {
   }
 
   // NOTE: alloc a dummy leaf
+  template <typename Range>
   LeafNode(Range In, AllocDummyLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(true),
@@ -87,20 +89,11 @@ struct LeafNode : Node {
 
   AT const& GetSplit() const { return aug; }
 
-  auto GetBox()
-    requires(NodeHasNonTrivialAug<AT> && HasBox<AT>)
-  {
-    return aug.GetBox();
-  }
-
-  auto GetBox() const
-    requires(NodeHasNonTrivialAug<AT> && HasBox<AT>)
-  {
-    return aug.GetBox();
-  }
-
   // TODO: should put this one in the aug as well and don't use the monostate
-  auto UpdateAug(Range In) { return aug.UpdateAug(In); }
+  template <typename Range>
+  auto UpdateAug(Range In) {
+    return aug.UpdateAug(In);
+  }
 
   auto ResetAug() { return aug.Reset(); }
 
@@ -208,14 +201,14 @@ struct BinaryNode : Node {
 };
 
 // NOTE: multi-way node whose children # is fixed
-template <typename TypeTrait, typename SplitType, typename AugType>
+template <typename TypeTrait>
 struct MultiNode : Node {
   using BucketType = uint_fast8_t;
   using TT = TypeTrait;
-  using Ele = typename TT::EleType;
+  using Ele = typename TT::Ele;
   using EleSeq = typename TT::EleSeq;
-  using ST = SplitType;
-  using AT = AugType;
+  using ST = TT::SplitSeq;
+  using AT = TT::InteriorAug;
 
   static consteval auto GetLevels() {
     typename TT::BufferSizeType a = 0;
@@ -227,7 +220,8 @@ struct MultiNode : Node {
     return a;
   }
 
-  using NodeArr = std::array<Node*, TT::kBufUB>;
+  // using NodeArr = std::array<Node*, TT::kBufUB>;
+  using NodeArr = parlay::sequence<Node*>;
 
   MultiNode(NodeArr const& _tree_nodes, const ST& _split, const AT& _aug)
       : Node{false,
