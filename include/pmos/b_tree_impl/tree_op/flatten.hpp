@@ -10,57 +10,20 @@
 #include <type_traits>
 #include <utility>
 
-#include "../../b_tree.h"
+#include "b_tree.h"
 
 namespace pmos {
 
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <SupportsForceParallel Interior, bool granularity>
-inline bool BTree<Point, DerivedTree, kSkHeight,
-                     kImbaRatio>::ForceParallelRecursion(Interior const* TI) {
+template <typename TT>
+template <bool granularity>
+inline bool BTree<TT>::ForceParallelRecursion(Interior const* TI) {
   return (granularity && TI->size > kSerialBuildCutoff) ||
          (!granularity && TI->ForceParallel());
 }
 
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, IsBinaryNode Interior, typename Range,
-          bool granularity>
-void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::FlattenRec(
-    Node* T, Range Out) {
-  assert(T->size == Out.size());
-
-  if (T->size == 0) return;
-
-  if (T->is_leaf) {
-    ExtractPointsInLeaf<Leaf>(T, Out);
-    return;
-  }
-
-  Interior* TI = static_cast<Interior*>(T);
-  assert(TI->size == TI->left->size + TI->right->size);
-  parlay::par_do_if(
-      // WARN: check parallelisim using node size can be biased
-      ForceParallelRecursion<Interior, granularity>(TI),
-      [&]() {
-        FlattenRec<Leaf, Interior>(TI->left, Out.cut(0, TI->left->size));
-      },
-      [&]() {
-        FlattenRec<Leaf, Interior>(TI->right,
-                                   Out.cut(TI->left->size, TI->size));
-      });
-
-  return;
-}
-
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, typename Interior, typename Range, bool granularity>
-void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::FlattenRec(Node* T,
-                                                                     Range Out)
-  requires(!IsBinaryNode<Interior>)
-{
+template <typename TT>
+template <typename Range, bool granularity>
+void BTree<TT>::FlattenRec(Node* T, Range Out) {
   assert(T->size == Out.size());
 
   if (T->size == 0) return;
@@ -85,21 +48,19 @@ void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::FlattenRec(Node* T,
         for (BucketType j = 0; j < i; ++j) {
           start += TI->tree_nodes[j]->size;
         }
-        FlattenRec<Leaf, Interior, Range>(
-            TI->tree_nodes[i], Out.cut(start, start + TI->tree_nodes[i]->size));
+        FlattenRec<Range>(TI->tree_nodes[i],
+                          Out.cut(start, start + TI->tree_nodes[i]->size));
       },
-      ForceParallelRecursion<Interior, granularity>(TI) ? 1
-                                                        : TI->GetSubTreeNum());
+      // WARN: the granularity control may not work well here
+      ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBuf);
 
   return;
 }
 
 // NOTE: for multi node @T, it only flatten the subtree with id @idx to @Out
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
+template <typename TT>
 template <typename Leaf, IsMultiNode Interior, typename Range, bool granularity>
-void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::PartialFlatten(
-    Node* T, Range Out, BucketType idx) {
+void BTree<TT>::PartialFlatten(Node* T, Range Out, BucketType idx) {
   if (idx == 1) {
     assert(T->size == Out.size());
     FlattenRec<Leaf, Interior>(T, Out.cut(0, T->size));
