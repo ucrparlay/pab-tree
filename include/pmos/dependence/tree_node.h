@@ -34,10 +34,10 @@ struct Node {
 
 template <typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
 struct LeafNode : Node {
-  using Ele = typename TypeTrait::Ele;
-  using EleSeq = typename TypeTrait::EleSeq;
-  using AT = typename TypeTrait::LeafAug;
   using TT = TypeTrait;
+  using Ele = typename TT::Ele;
+  using EleSeq = typename TT::EleSeq;
+  using AT = typename TT::LeafAug;
 
   // NOTE: default allocator
   LeafNode() : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(AT()) {}
@@ -83,7 +83,7 @@ struct LeafNode : Node {
 
   bool CapacityFull() const { return this->size >= TT::kBufUB; }
 
-  EleSeq const GetPoints() const { return elements.substr(0, this->size); }
+  EleSeq const GetEle() const { return elements.substr(0, this->size); }
 
   AT& GetAug() const { return aug; }
 
@@ -170,11 +170,6 @@ template <typename TypeTrait>
 struct MultiNode : Node {
   using BucketType = uint_fast8_t;
   using TT = TypeTrait;
-  using Ele = typename TT::Ele;
-  using EleSeq = typename TT::EleSeq;
-  using ST = TT::SplitSeq;
-  using AT = TT::InteriorAug;
-  using STSlice = TT::SplitSeqSlice;
 
   static consteval auto GetLevels() {
     typename TT::BufferSizeType a = 0;
@@ -190,7 +185,8 @@ struct MultiNode : Node {
   using NodeArr = parlay::sequence<Node*>;
   using NodeArrSlice = parlay::slice<Node**, Node**>;
 
-  MultiNode(NodeArr const& _tree_nodes, const ST& _split, const AT& _aug)
+  MultiNode(NodeArr const& _tree_nodes, TT::SplitSeq const& _split,
+            TT::InteriorAug const& _aug)
       : Node{false,
              std::accumulate(
                  _tree_nodes.begin(), _tree_nodes.end(), static_cast<size_t>(0),
@@ -199,8 +195,8 @@ struct MultiNode : Node {
         split(_split),
         aug(_aug) {}
 
-  MultiNode(NodeArrSlice _tree_nodes_slice, STSlice _split_slice,
-            const AT& _aug)
+  MultiNode(NodeArrSlice _tree_nodes_slice, TT::SplitSeqSlice _split_slice,
+            TT::InteriorAug const& _aug)
       : Node{false,
              std::accumulate(
                  _tree_nodes_slice.begin(), _tree_nodes_slice.end(),
@@ -210,39 +206,41 @@ struct MultiNode : Node {
         split(parlay::to_sequence(_split_slice)),
         aug(_aug) {}
 
-  ST const& GetSplit() const { return split; }
+  TT::SplitSeq const& GetSplit() const { return split; }
 
   NodeArr tree_nodes;
-  ST split;
-  AT aug;
+  TT::SplitSeq split;
+  TT::InteriorAug aug;
 };
 
-template <typename Interior>
+template <typename Interior, typename TT>
 static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
-                                   typename Interior::ST const& split) {
+                                   typename TT::SplitSeq const& split) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes, split);
   return o;
 }
-template <typename Interior>
-static Interior* AllocInteriorNode(typename Interior::NodeArrSlice tree_nodes,
-                                   typename Interior::STSlice split) {
+
+template <typename Interior, typename TT>
+static Interior* AllocInteriorNode(
+    typename Interior::NodeArrSlice tree_nodes_slice,
+    typename TT::SplitSeqSlice split_slice) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
-  new (o) Interior(tree_nodes, split);
+  new (o) Interior(tree_nodes_slice, split_slice);
   return o;
 }
 
 // TODO: maybe replace the NodeArr, ST, and AT with template parameters
-template <typename Interior>
+template <typename Interior, typename TT>
 static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
-                                   typename Interior::ST const& split,
-                                   typename Interior::AT const& aug) {
+                                   typename TT::SplitSeq const& split,
+                                   typename TT::InteriorAug const& aug) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes, split, aug);
   return o;
 }
 
-template <typename Interior>
+template <typename Interior, typename TT>
 static Interior* AllocInteriorNode() {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior();

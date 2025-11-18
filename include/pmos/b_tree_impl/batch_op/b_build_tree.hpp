@@ -97,12 +97,12 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
       size_t node_r = (i == bucket_num - 1) ? node_num : idx_to_pack[i + 1];
       size_t key_l = idx_to_pack[i];
       size_t key_r = (i == bucket_num - 1) ? key_num : idx_to_pack[i + 1] - 1;
-      node_out[i] = AllocInteriorNode<Interior>(node_in.cut(node_l, node_r),
-                                                key_in.cut(key_l, key_r));
+      node_out[i] = AllocInteriorNode<Interior, TT>(node_in.cut(node_l, node_r),
+                                                    key_in.cut(key_l, key_r));
     });
   }
 
-  this->root_ = AllocInteriorNode<Interior>(node_in, key_in);
+  this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
   return this->root_;
 }
 

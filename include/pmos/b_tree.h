@@ -58,24 +58,23 @@ class BTree {
   static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
 
   struct BTreeInteriorNode : MultiNode<TypeTrait> {
-    using BaseNode = MultiNode<TypeTrait>;
+    using TT = TypeTrait;
+    using BaseNode = MultiNode<TT>;
     using BTreeNodeArr = typename BaseNode::NodeArr;
     using BTreeNodeArrSlice = typename BaseNode::NodeArrSlice;
-    using TT = TypeTrait;
-    using Ele = typename TT::Ele;
-    using EleSeq = typename TT::EleSeq;
-    using ST = TT::SplitSeq;
-    using STSlice = TT::SplitSeqSlice;
-    using AT = TT::InteriorAug;
 
-    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes, const ST& _split)
-        : BaseNode(_tree_nodes, _split, AT()) {}  // TODO:finish AT
+    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes,
+                      TT::SplitSeq const& _split)
+        : BaseNode(_tree_nodes, _split, typename TT::InteriorAug()) {
+    }  // TODO:finish AT
 
-    BTreeInteriorNode(BTreeNodeArrSlice _tree_nodes_slice, STSlice _split_slice)
-        : BaseNode(_tree_nodes_slice, _split_slice, AT()) {}  // TODO:finish AT
+    BTreeInteriorNode(BTreeNodeArrSlice _tree_nodes_slice,
+                      TT::SplitSeqSlice _split_slice)
+        : BaseNode(_tree_nodes_slice, _split_slice,
+                   typename TT::InteriorAug()) {}  // TODO:finish AT
 
-    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes, const ST& _split,
-                      const AT& _aug)
+    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes,
+                      TT::SplitSeq const& _split, TT::InteriorAug const& _aug)
         : BaseNode(_tree_nodes, _split, _aug) {}
 
     inline void SetParallelFlag(bool const flag) {
@@ -344,9 +343,15 @@ class BTree {
   // static Node* Compress2Multi(Node* T)
   //   requires std::same_as<typename BN::ST, typename MN::ST::value_type>;
   //
-  // // NOTE: validations
-  // template <typename Leaf, typename Interior>
-  // Box CheckBox(Node* T, Box const& box);
+  // NOTE: validations
+  TT::Box GetBox(TT::Box const& a, TT::Box const& b);
+
+  TT::Box GetBox(TT::EleSeq const& ele_seq);
+
+  TT::Box GetEmptyBox();
+
+  template <typename Leaf, typename Interior>
+  TT::Box CheckBox(Node* T);
   //
   // template <typename Leaf, typename Interior>
   // Points CheckCover(Node* T,
@@ -358,8 +363,8 @@ class BTree {
   // template <typename Leaf, typename Interior>
   // void CheckTreeSameSequential(Node* T, int dim);
   //
-  // template <typename Leaf, typename Interior, typename SplitRule>
-  // void Validate();
+  template <typename Leaf, typename Interior>
+  void Validate();
   //
   // template <typename Leaf, typename Interior>
   // size_t GetTreeHeight();
