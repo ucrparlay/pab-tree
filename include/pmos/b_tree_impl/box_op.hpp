@@ -7,14 +7,14 @@
 namespace pmos {
 template <typename TT>
 TT::Box BTree<TT>::GetBox(TT::Box const& a, TT::Box const& b) {
-  return TT::Box(TT::Num::Min(a.first, b.first),
-                 TT::Num::Max(a.second, b.second));
+  return typename TT::Box(TT::Num::Min(a.first, b.first),
+                          TT::Num::Max(a.second, b.second));
 }
 
 template <typename TT>
 TT::Box BTree<TT>::GetEmptyBox() {
-  return TT::Box(std::numeric_limits<typename TT::K>::max(),
-                 std::numeric_limits<typename TT::K>::lowest());
+  return typename TT::Box(std::numeric_limits<typename TT::K>::max(),
+                          std::numeric_limits<typename TT::K>::lowest());
 }
 
 template <typename TT>
@@ -28,6 +28,15 @@ TT::Box BTree<TT>::GetBox(TT::EleSeq const& ele_seq) {
   return box;
 }
 
+template <typename TT>
+TT::Box BTree<TT>::GetBox(TT::BoxSeq const& box_seq) {
+  auto box = GetEmptyBox();
+  parlay::parallel_for(0, box_seq.size(), [&](size_t i) {
+    box.first = TT::Num::Min(box.first, box_seq[i].first);
+    box.second = TT::Num::Max(box.second, box_seq[i].second);
+  });
+  return box;
+}
 }  // namespace pmos
 
 #endif  // PMOS_B_TREE_IMPL_BOX_OP_HPP_

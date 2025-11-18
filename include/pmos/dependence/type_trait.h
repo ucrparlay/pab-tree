@@ -31,6 +31,7 @@ class TypeTrait {
   using ConstEleSeq = parlay::sequence<E> const;
   using EleIter = typename parlay::sequence<E>::iterator;
   using Box = std::pair<K, K>;
+  using BoxSeq = parlay::sequence<Box>;
 
   using LeafAug = LeafAugType;
   using InteriorAug = InteriorAugType;

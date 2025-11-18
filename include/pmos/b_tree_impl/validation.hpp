@@ -20,18 +20,40 @@ TT::Box BTree<TT>::CheckBox(Node* T) {
 
   Interior* TI = static_cast<Interior*>(T);
   assert(TI->tree_nodes.size() == TI->split.size() + 1);
+  parlay::sequence<typename TT::Box> box_seq(TI->tree_nodes.size());
   parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
-    auto [mn, mx] = CheckBox<Leaf, Interior>(TI->tree_nodes[i]);
+    box_seq[i] = CheckBox<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
-      assert(mx < TI->split[0]);
+      assert(box_seq[i].second < TI->split[0]);
     } else if (i == TI->tree_nodes.size() - 1) {
-      assert(mn >= TI->split[i - 1]);
+      assert(box_seq[i].first >= TI->split[i - 1]);
     } else {
-      assert(mn >= TI->split[i - 1] && mx < TI->split[i]);
+      assert(box_seq[i].first >= TI->split[i - 1] &&
+             box_seq[i].second < TI->split[i]);
     }
   });
 
-  return;
+  return GetBox(box_seq);
+}
+
+template <typename TT>
+template <typename Leaf, typename Interior>
+int BTree<TT>::CheckHeight(Node* T) {
+  if (T->is_leaf) {
+    return 0;
+  }
+
+  Interior* TI = static_cast<Interior*>(T);
+  assert(TI->tree_nodes.size() == TI->split.size() + 1);
+  parlay::sequence<int> heights(TI->tree_nodes.size());
+
+  parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
+    heights[i] = CheckHeight<Leaf, Interior>(TI->tree_nodes[i]);
+  });
+
+  assert(parlay::all_of(heights, [&](int h) { return h == heights[0]; }));
+
+  return heights[0] + 1;
 }
 
 template <typename TT>

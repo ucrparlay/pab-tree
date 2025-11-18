@@ -348,10 +348,15 @@ class BTree {
 
   TT::Box GetBox(TT::EleSeq const& ele_seq);
 
+  TT::Box GetBox(TT::BoxSeq const& box_seq);
+
   TT::Box GetEmptyBox();
 
   template <typename Leaf, typename Interior>
   TT::Box CheckBox(Node* T);
+
+  template <typename Leaf, typename Interior>
+  int CheckHeight(Node* T);
   //
   // template <typename Leaf, typename Interior>
   // Points CheckCover(Node* T,
@@ -403,6 +408,8 @@ class BTree {
 
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
+#include "b_tree_impl/box_op.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
+#include "b_tree_impl/validation.hpp"
 
 #endif  // PMOS_B_TREE_H_
