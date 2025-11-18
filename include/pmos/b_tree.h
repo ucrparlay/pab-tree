@@ -15,6 +15,7 @@ template <class TypeTrait>
 class BTree {
  public:
   using TT = TypeTrait;
+  // TODO: Do we really need to define these types again?
 
   using E = typename TypeTrait::Ele;
   using Ele = typename TypeTrait::Ele;
@@ -59,14 +60,19 @@ class BTree {
   struct BTreeInteriorNode : MultiNode<TypeTrait> {
     using BaseNode = MultiNode<TypeTrait>;
     using BTreeNodeArr = typename BaseNode::NodeArr;
+    using BTreeNodeArrSlice = typename BaseNode::NodeArrSlice;
     using TT = TypeTrait;
     using Ele = typename TT::Ele;
     using EleSeq = typename TT::EleSeq;
     using ST = TT::SplitSeq;
+    using STSlice = TT::SplitSeqSlice;
     using AT = TT::InteriorAug;
 
     BTreeInteriorNode(BTreeNodeArr const& _tree_nodes, const ST& _split)
         : BaseNode(_tree_nodes, _split, AT()) {}  // TODO:finish AT
+
+    BTreeInteriorNode(BTreeNodeArrSlice _tree_nodes_slice, STSlice _split_slice)
+        : BaseNode(_tree_nodes_slice, _split_slice, AT()) {}  // TODO:finish AT
 
     BTreeInteriorNode(BTreeNodeArr const& _tree_nodes, const ST& _split,
                       const AT& _aug)

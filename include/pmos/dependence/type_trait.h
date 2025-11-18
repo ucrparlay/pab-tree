@@ -64,6 +64,7 @@ class BTreeTypeTrait : public TypeTrait<EleType, kBufferSize, LeafAugType,
 
   using Split = BT::K;
   using SplitSeq = parlay::sequence<Split>;
+  using SplitSeqSlice = parlay::slice<Split*, Split*>;
 };
 
 }  // namespace pmos

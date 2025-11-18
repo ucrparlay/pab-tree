@@ -165,41 +165,6 @@ static Leaf* AllocDummyLeafNode(Range In) {
   return o;
 }
 
-template <typename Point, typename SplitType, typename AugType>
-struct BinaryNode : Node {
-  using PT = Point;
-  using ST = SplitType;
-  using AT = AugType;
-
-  BinaryNode(Node* _left, Node* _right, const ST& _split, const AT& _aug)
-      : Node{false, _left->size + _right->size},
-        left(_left),
-        right(_right),
-        split(_split),
-        aug(_aug) {}
-
-  // NOTE: test whether we can fetch @depth levels from @T
-  template <typename Interior>
-  static inline bool TestDepth(Node* T, int cur_depth, int depth) {
-    if (cur_depth == depth) {
-      return true;
-    }
-    if (T->is_leaf) {
-      return false;
-    }
-    auto TI = static_cast<Interior*>(T);
-    return TestDepth<Interior>(TI->left, cur_depth + 1, depth) &&
-           TestDepth<Interior>(TI->right, cur_depth + 1, depth);
-  }
-
-  ST const& GetSplit() const { return split; }
-
-  Node* left;
-  Node* right;
-  ST split;
-  AT aug;
-};
-
 // NOTE: multi-way node whose children # is fixed
 template <typename TypeTrait>
 struct MultiNode : Node {
@@ -209,6 +174,7 @@ struct MultiNode : Node {
   using EleSeq = typename TT::EleSeq;
   using ST = TT::SplitSeq;
   using AT = TT::InteriorAug;
+  using STSlice = TT::SplitSeqSlice;
 
   static consteval auto GetLevels() {
     typename TT::BufferSizeType a = 0;
@@ -222,6 +188,7 @@ struct MultiNode : Node {
 
   // using NodeArr = std::array<Node*, TT::kBufUB>;
   using NodeArr = parlay::sequence<Node*>;
+  using NodeArrSlice = parlay::slice<Node**, Node**>;
 
   MultiNode(NodeArr const& _tree_nodes, const ST& _split, const AT& _aug)
       : Node{false,
@@ -232,6 +199,17 @@ struct MultiNode : Node {
         split(_split),
         aug(_aug) {}
 
+  MultiNode(NodeArrSlice _tree_nodes_slice, STSlice _split_slice,
+            const AT& _aug)
+      : Node{false,
+             std::accumulate(
+                 _tree_nodes_slice.begin(), _tree_nodes_slice.end(),
+                 static_cast<size_t>(0),
+                 [](size_t acc, Node* n) -> size_t { return acc + n->size; })},
+        tree_nodes(parlay::to_sequence(_tree_nodes_slice)),
+        split(parlay::to_sequence(_split_slice)),
+        aug(_aug) {}
+
   ST const& GetSplit() const { return split; }
 
   NodeArr tree_nodes;
@@ -240,25 +218,15 @@ struct MultiNode : Node {
 };
 
 template <typename Interior>
-static Interior* AllocInteriorNode(Node* L, Node* R,
-                                   typename Interior::ST const& split) {
-  Interior* o = parlay::type_allocator<Interior>::alloc();
-  new (o) Interior(L, R, split);
-  return o;
-}
-
-template <typename Interior>
-static Interior* AllocInteriorNode(Node* L, Node* R,
-                                   typename Interior::ST const& split,
-                                   typename Interior::AT const& aug) {
-  Interior* o = parlay::type_allocator<Interior>::alloc();
-  new (o) Interior(L, R, split, aug);
-  return o;
-}
-
-template <typename Interior>
 static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
                                    typename Interior::ST const& split) {
+  Interior* o = parlay::type_allocator<Interior>::alloc();
+  new (o) Interior(tree_nodes, split);
+  return o;
+}
+template <typename Interior>
+static Interior* AllocInteriorNode(typename Interior::NodeArrSlice tree_nodes,
+                                   typename Interior::STSlice split) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes, split);
   return o;
@@ -287,8 +255,8 @@ static void FreeNode(Node* T) {
 }
 
 // Define some alias for concept check
-template <typename T>
-concept IsBinaryNode = CheckBinaryNode<T, pmos::BinaryNode>;
+// template <typename T>
+// concept IsBinaryNode = CheckBinaryNode<T, pmos::BinaryNode>;
 
 template <typename T>
 concept IsMultiNode = CheckMultiNode<T, pmos::MultiNode>;
