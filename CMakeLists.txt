@@ -83,9 +83,9 @@ add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
 target_link_libraries(b_test PUBLIC PMOS)
 target_include_directories(b_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
-# add_executable(kd_array_test ${PROJECT_SOURCE_DIR}/tests/kd_array_test.cpp)
-# target_link_libraries(kd_array_test PUBLIC PMOS)
-# target_include_directories(kd_array_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
+add_executable(b_ccp ${PROJECT_SOURCE_DIR}/tests/b_ccp.cpp)
+target_link_libraries(b_ccp PUBLIC PMOS)
+target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 #
 # add_executable(p_test ${PROJECT_SOURCE_DIR}/tests/p_test.cpp)
 # target_link_libraries(p_test PUBLIC PMOS)

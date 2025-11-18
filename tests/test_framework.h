@@ -217,37 +217,6 @@ void BuildTree(typename TypeTrait::EleSeq const& WP, int const& rounds,
     if constexpr (kPrint == 0) {
       std::cout << aveBuild << " " << std::flush;
     }
-    //   else if constexpr (kPrint == 1) {
-    //     std::cout << aveBuild << " " << std::flush;
-    //     if constexpr (IsKdTree<Tree> || IsOrthTree<Tree>) {
-    //       auto deep = pkd.template GetAveTreeHeight<Leaf, Interior>();
-    //       std::cout << deep << " " << std::flush;
-    //     } else {
-    //       std::cout << "-1"
-    //                 << " " << std::flush;
-    //     }
-    //   } else if constexpr (kPrint == 2) {
-    //     size_t max_deep = 0;
-    //     std::cout << aveBuild << " ";
-    //     if constexpr (IsKdTree<Tree> || IsOrthTree<Tree>) {
-    //       std::cout << pkd.template GetMaxTreeDepth<Leaf,
-    //       Interior>(pkd.GetRoot(),
-    //                                                                 max_deep)
-    //                 << " " << pkd.template GetAveTreeHeight<Leaf, Interior>()
-    //                 << " " << std::flush;
-    //     } else {
-    //       std::cout << "-1 -1"
-    //                 << " " << std::flush;
-    //     }
-    //   } else if constexpr (kPrint == 3) {  // for incre insert directly
-    //     puts("# Insert");
-    //     std::cout << "## " << 1 << std::endl;
-    //     std::cout << "median: (1, " << aveBuild << ")-> min: (1, " <<
-    //     aveBuild
-    //               << ")-> max: (1, " << aveBuild << ")-> tot: " << aveBuild
-    //               << "-> avg: " << aveBuild << std::endl;
-    //   }
-    //
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
