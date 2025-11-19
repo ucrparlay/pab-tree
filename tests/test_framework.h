@@ -1649,6 +1649,13 @@ class Wrapper {
       return this->key < rhs.key;
     }
 
+    friend std::ostream& operator<<(std::ostream& o, Element const& a) {
+      o << "(";
+      o << a.key << " " << a.val;
+      o << ") " << std::flush;
+      return o;
+    }
+
     KeyType key;
     ValType val;
   };
@@ -1656,8 +1663,7 @@ class Wrapper {
   // NOTE: For kd tree and orth tree
   template <typename RunFunc>
   static void ApplyOrthogonal(int const tree_type, int const dim,
-                              int const split_type, commandLine& params,
-                              RunFunc test_func) {
+                              commandLine& params, RunFunc test_func) {
     using EleType = Element<uint32_t, uint32_t>;
     using TypeTrait =
         pmos::BTreeTypeTrait<EleType, 16, LeafAugEmpty, InteriorAugEmpty, 8>;
