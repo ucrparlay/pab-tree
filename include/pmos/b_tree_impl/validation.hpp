@@ -30,6 +30,17 @@ TT::Box BTree<TT>::CheckBox(Node* T) {
     } else {
       assert(box_seq[i].first >= TI->split[i - 1] &&
              box_seq[i].second < TI->split[i]);
+      // if (box_seq[i].first < TI->split[i - 1] ||
+      //     box_seq[i].second >= TI->split[i]) {
+      //   std::cout << "Validation failed at interior node split check."
+      //             << std::endl;
+      //   std::cout << "Box: [" << box_seq[i].first << ", " <<
+      //   box_seq[i].second
+      //             << "], Splits: [" << TI->split[i - 1] << ", " <<
+      //             TI->split[i]
+      //             << "]" << std::endl;
+      //   assert(false);
+      // }
     }
   });
 

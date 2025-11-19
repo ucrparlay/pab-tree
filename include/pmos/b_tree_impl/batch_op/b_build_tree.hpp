@@ -30,7 +30,8 @@ template <typename TT>
 void BTree<TT>::Build_(Slice In) {
   // this->root_ = BuildRecursive(A);
   auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
-  auto aux_seq = decltype(sort_seq)::uninitialized(sort_seq.size());
+  sort_seq = parlay::remove_duplicates_ordered(sort_seq);
+  std::cout << sort_seq.size() << std::endl;
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;
@@ -65,9 +66,19 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
 
     parlay::parallel_for(0, bucket_num,
                          [&](size_t i) { build_node_func(i, idx_to_pack); });
+    for (int i = 0; i < bucket_num - 1 - 1; i++) {
+      assert(key_out[i] <= key_out[i + 1]);
+    }
 
-    key_in = key_out.cut(0, bucket_num - 1);
-    node_in = node_out.cut(0, bucket_num);
+    // swap the input slice
+    key_in = key_in.cut(0, bucket_num - 1);
+    key_out = key_out.cut(0, bucket_num - 1);
+    node_in = node_in.cut(0, bucket_num);
+    node_out = node_out.cut(0, bucket_num);
+    std::ranges::swap(key_in, key_out);
+    std::ranges::swap(node_in, node_out);
+
+    assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
   };
 
   // NOTE: build leaf
