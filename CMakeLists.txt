@@ -105,11 +105,11 @@ if(JEMA)
 	# target_link_libraries(baselines PUBLIC libjemalloc.so)
 endif()
 
-# add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
-# target_link_libraries(data_generator PUBLIC PMOS)
-# target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
-#
-#
+add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
+target_link_libraries(data_generator PUBLIC PMOS)
+target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
+
+
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
 # target_link_libraries(data_washer PUBLIC PMOS)
 # target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)

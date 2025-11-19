@@ -17,16 +17,18 @@ int main(int argc, char* argv[]) {
             << " file_num: " << file_num << " varden: " << varden << std::endl;
 
   // NOTE: ../kdtree/
-  path += std::string(*path.rbegin() == '/' ? "" : "/") +
-          // std::string(varden ? "ss_varden_bigint/" : "uniform_bigint/") +
-          std::string(varden ? "ss_varden/" : "uniform/") + toString(pts_num) +
-          "_" + toString(pts_dim) + "/";
+  path += std::string(*path.rbegin() == '/' ? "" : "/");
+  std::filesystem::create_directory(path);
+
+  path += std::string(varden ? "ss_varden_bigint/" : "uniform_bigint/");
+  std::filesystem::create_directory(path);
+
+  path += toString(pts_num) + "_" + toString(pts_dim) + "/";
   std::filesystem::create_directory(path);
 
   auto generate = [&]<typename Point>(std::string const& new_path) {
     std::cout << "Generating... " << std::endl;
-    auto wp = varden ? VardenGenerator<Point, false>().Apply(pts_num)
-                     : UniformGenerator<Point>::WithinBox(pts_num);
+    auto wp = UniformGenerator<Point>::WithinBox(pts_num);
     std::cout << "Writing... " << std::endl;
     PrintToFile(new_path, wp);
   };
@@ -35,22 +37,23 @@ int main(int argc, char* argv[]) {
     std::string newpath = path + toString(i + 1) + ".in";
     std::cout << newpath << std::endl;
     if (pts_dim == 2) {
-      generate.operator()<psi::BasicPoint<Axis, 2>>(newpath);
-    } else if (pts_dim == 3) {
-      generate.operator()<psi::BasicPoint<Axis, 3>>(newpath);
-    } else if (pts_dim == 5) {
-      generate.operator()<psi::BasicPoint<Axis, 5>>(newpath);
-    } else if (pts_dim == 7) {
-      generate.operator()<psi::BasicPoint<Axis, 7>>(newpath);
-    } else if (pts_dim == 9) {
-      generate.operator()<psi::BasicPoint<Axis, 9>>(newpath);
-    } else if (pts_dim == 12) {
-      generate.operator()<psi::BasicPoint<Axis, 12>>(newpath);
-    } else if (pts_dim == 16) {
-      generate.operator()<psi::BasicPoint<Axis, 16>>(newpath);
-    } else {
-      throw std::runtime_error("Invalid dimension");
+      generate.operator()<Wrapper::Element<Axis, std::tuple<Axis>>>(newpath);
     }
+    // else if (pts_dim == 3) {
+    //   generate.operator()<psi::BasicPoint<Axis, 3>>(newpath);
+    // } else if (pts_dim == 5) {
+    //   generate.operator()<psi::BasicPoint<Axis, 5>>(newpath);
+    // } else if (pts_dim == 7) {
+    //   generate.operator()<psi::BasicPoint<Axis, 7>>(newpath);
+    // } else if (pts_dim == 9) {
+    //   generate.operator()<psi::BasicPoint<Axis, 9>>(newpath);
+    // } else if (pts_dim == 12) {
+    //   generate.operator()<psi::BasicPoint<Axis, 12>>(newpath);
+    // } else if (pts_dim == 16) {
+    //   generate.operator()<psi::BasicPoint<Axis, 16>>(newpath);
+    // } else {
+    //   throw std::runtime_error("Invalid dimension");
+    // }
   }
   return 0;
 }

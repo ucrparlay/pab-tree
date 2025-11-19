@@ -1626,9 +1626,10 @@ class Wrapper {
         wp, wi, N, K, rounds, insert_file_path, tag, query_type, summary);
   };
 
+  template <typename K, typename V>
   struct Element {
-    using KeyType = uint32_t;
-    using ValType = uint32_t;
+    using KeyType = K;
+    using ValType = V;
 
     KeyType const GetKey() const { return key; }
     ValType const GetVal() const { return val; }
@@ -1657,7 +1658,7 @@ class Wrapper {
   static void ApplyOrthogonal(int const tree_type, int const dim,
                               int const split_type, commandLine& params,
                               RunFunc test_func) {
-    using EleType = Element;
+    using EleType = Element<uint32_t, uint32_t>;
     using TypeTrait =
         pmos::BTreeTypeTrait<EleType, 16, LeafAugEmpty, InteriorAugEmpty, 8>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
