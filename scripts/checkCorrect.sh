@@ -40,7 +40,7 @@ for queryType in "${queryTypes[@]}"; do
 
 					for file in "${files_path}/"*.in; do
 						echo "------->${file}"
-						../build/${tester} -p "${file}" -i "${read_file}" -s 0 -d "${dim}" -k ${K} -t ${tag} -r 2 -T "${tree}" -q ${queryType} >>${dest}
+						../build/${tester} -p "${file}" -i "${read_file}" -s 0 -d "${dim}" -k ${K} -t ${tag} -r 2 -T "${tree}" -q ${queryType} 2>&1 | tee -a "${dest}"
 
 						nc=$(grep -i -o "ok" ${dest} | wc -l)
 						if [[ ${nc} -ne ${count} ]]; then

@@ -12,17 +12,30 @@
 namespace pmos {
 template <typename TT>
 template <typename Leaf, typename Interior>
-TT::Box BTree<TT>::CheckBox(Node* T) {
+TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
   if (T->is_leaf) {
     Leaf const* TL = static_cast<Leaf const*>(T);
+    assert(T == this->root_ || (TL->GetEle().size() > TT::kBufLB &&
+                                TL->GetEle().size() <= TT::kBufUB));
     return GetBox(TL->GetEle());
   }
 
-  Interior* TI = static_cast<Interior*>(T);
+  Interior const* TI = static_cast<Interior const*>(T);
+
+  // ensure the split number is 1 less than the child number
   assert(TI->tree_nodes.size() == TI->split.size() + 1);
+
+  // ensure the split number is 1 less than the child number
+  assert(T == this->root_ || (TI->tree_nodes.size() >= TT::kBufLB &&
+                              TI->tree_nodes.size() <= TT::kBufUB));
+
+  // ensure the split is increasing
+  assert(parlay::is_sorted(TI->split, [&](TT::K a, TT::K b) { return a < b; }));
+
+  // check the box of each child node falls within the split between
   parlay::sequence<typename TT::Box> box_seq(TI->tree_nodes.size());
   parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
-    box_seq[i] = CheckBox<Leaf, Interior>(TI->tree_nodes[i]);
+    box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
       assert(box_seq[i].second < TI->split[0]);
     } else if (i == TI->tree_nodes.size() - 1) {
@@ -49,12 +62,12 @@ TT::Box BTree<TT>::CheckBox(Node* T) {
 
 template <typename TT>
 template <typename Leaf, typename Interior>
-int BTree<TT>::CheckHeight(Node* T) {
+int BTree<TT>::CheckHeight(Node const* T) {
   if (T->is_leaf) {
     return 0;
   }
 
-  Interior* TI = static_cast<Interior*>(T);
+  Interior const* TI = static_cast<Interior const*>(T);
   assert(TI->tree_nodes.size() == TI->split.size() + 1);
   parlay::sequence<int> heights(TI->tree_nodes.size());
 
@@ -71,8 +84,12 @@ template <typename TT>
 template <typename Leaf, typename Interior>
 void BTree<TT>::Validate() {
   std::cout << ">>> begin validate tree\n" << std::flush;
-  CheckBox<Leaf, Interior>(this->root_);
+
+  VerifyTreeProperty<Leaf, Interior>(this->root_);
   std::cout << "Tree box validated.\n" << std::flush;
+
+  CheckHeight<Leaf, Interior>(this->root_);
+  std::cout << "Tree height validated.\n" << std::flush;
 
   std::cout << "<<< end validate tree\n" << std::flush;
   return;

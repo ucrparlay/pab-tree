@@ -353,10 +353,10 @@ class BTree {
   TT::Box GetEmptyBox();
 
   template <typename Leaf, typename Interior>
-  TT::Box CheckBox(Node* T);
+  TT::Box VerifyTreeProperty(Node const* T);
 
   template <typename Leaf, typename Interior>
-  int CheckHeight(Node* T);
+  int CheckHeight(Node const* T);
   //
   // template <typename Leaf, typename Interior>
   // Points CheckCover(Node* T,
