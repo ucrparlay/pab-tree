@@ -8,6 +8,7 @@
 #include <cstddef>
 
 #include "parlay/delayed_sequence.h"
+#include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "pmos/b_tree.h"
 #include "pmos/dependence/tree_node.h"
@@ -32,6 +33,9 @@ void BTree<TT>::Build_(Slice In) {
   auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
   sort_seq = parlay::remove_duplicates_ordered(sort_seq);
   std::cout << sort_seq.size() << std::endl;
+  parlay::parallel_for(1, sort_seq.size(), [&](size_t i) {
+    assert(TT::GetKey(sort_seq[i]) != TT::GetKey(sort_seq[i - 1]));
+  });
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;
@@ -53,11 +57,16 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
   auto key_in = parlay::make_slice(key_seq_in);
   auto key_out = parlay::make_slice(key_seq_out);
 
-  auto build_level = [&](size_t input_size, auto build_node_func) {
+  auto build_level = [&](size_t const input_size, auto build_node_func) {
     size_t bucket_num = input_size / TT::kBufMD;
+    size_t reminder = input_size % TT::kBufMD;
+    assert(bucket_num > 0);
     auto items_per_bucket =
         parlay::delayed_seq<typename TT::BallsType>(bucket_num, [&](size_t i) {
-          return i < (input_size % TT::kBufMD) ? TT ::kBufMD + 1 : TT::kBufMD;
+          return TT::kBufMD + (reminder <= bucket_num
+                                   ? (i < reminder ? 1 : 0)
+                                   : (reminder / bucket_num +
+                                      (i < reminder % bucket_num ? 1 : 0)));
         });
     auto [idx_to_pack, node_sum] =
         parlay::scan(items_per_bucket, parlay::plus<typename TT::BallsType>());
