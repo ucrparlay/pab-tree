@@ -179,7 +179,6 @@ int main(int argc, char* argv[]) {
   int query_type = params.getOptionIntValue("-q", 0);
   int read_insert_file = params.getOptionIntValue("-i", 1);
   int tree_type = params.getOptionIntValue("-T", 0);
-  int split_type = params.getOptionIntValue("-l", 0);
 
   auto run = [&]<typename TreeWrapper, typename TypeTrait>(
                  TypeTrait::EleSeq const& wp, TypeTrait::EleSeq const& wi,
@@ -191,7 +190,7 @@ int main(int argc, char* argv[]) {
                                           tag, kRounds);
   };
 
-  Wrapper::ApplyOrthogonal(tree_type, dim, split_type, params, run);
+  Wrapper::ApplyOrthogonal(tree_type, dim, params, run);
 
   puts("\nok");
   return 0;
