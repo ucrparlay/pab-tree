@@ -33,9 +33,6 @@ void BTree<TT>::Build_(Slice In) {
   auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
   sort_seq = parlay::remove_duplicates_ordered(sort_seq);
   std::cout << sort_seq.size() << std::endl;
-  parlay::parallel_for(1, sort_seq.size(), [&](size_t i) {
-    assert(TT::GetKey(sort_seq[i]) != TT::GetKey(sort_seq[i - 1]));
-  });
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;
@@ -43,6 +40,14 @@ void BTree<TT>::Build_(Slice In) {
 
 template <typename TT>
 Node* BTree<TT>::BuildRecursive(Slice In) {
+  if (In.size() == 0) {
+    return AllocEmptyLeafNode<Slice, Leaf>();
+  }
+
+  if (In.size() < TT::kBufUB) {
+    return AllocNormalLeafNode<Slice, Leaf>(In);
+  }
+
   auto tree_node_seq_in =
       parlay::sequence<Node*>::uninitialized(In.size() / TT::kBufMD + 1);
   auto tree_node_seq_out =
@@ -57,69 +62,61 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
   auto key_in = parlay::make_slice(key_seq_in);
   auto key_out = parlay::make_slice(key_seq_out);
 
-  auto build_level = [&](size_t const input_size, auto build_node_func) {
-    size_t bucket_num = input_size / TT::kBufMD;
-    size_t reminder = input_size % TT::kBufMD;
-    assert(bucket_num > 0);
-    auto items_per_bucket =
-        parlay::delayed_seq<typename TT::BallsType>(bucket_num, [&](size_t i) {
-          return TT::kBufMD + (reminder <= bucket_num
-                                   ? (i < reminder ? 1 : 0)
-                                   : (reminder / bucket_num +
-                                      (i < reminder % bucket_num ? 1 : 0)));
-        });
-    auto [idx_to_pack, node_sum] =
-        parlay::scan(items_per_bucket, parlay::plus<typename TT::BallsType>());
-    assert(node_sum == input_size);
-    assert(idx_to_pack.size() == bucket_num);
-
-    parlay::parallel_for(0, bucket_num,
-                         [&](size_t i) { build_node_func(i, idx_to_pack); });
-    for (int i = 0; i < bucket_num - 1 - 1; i++) {
-      assert(key_out[i] <= key_out[i + 1]);
-    }
-
-    // swap the input slice
-    key_in = key_in.cut(0, bucket_num - 1);
-    key_out = key_out.cut(0, bucket_num - 1);
-    node_in = node_in.cut(0, bucket_num);
-    node_out = node_out.cut(0, bucket_num);
+  auto swap_key_node = [&](size_t bkt_n) {
+    key_in = key_in.cut(0, bkt_n - 1);
+    key_out = key_out.cut(0, bkt_n - 1);
+    node_in = node_in.cut(0, bkt_n);
+    node_out = node_out.cut(0, bkt_n);
     std::ranges::swap(key_in, key_out);
     std::ranges::swap(node_in, node_out);
+  };
 
-    assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
+  auto get_bucket_start = [](size_t i, size_t bkt_n, size_t n) -> size_t {
+    return (n * i) / bkt_n;
+  };
+  auto get_bucket_end = [](size_t i, size_t bkt_n, size_t n) -> size_t {
+    return (n * (i + 1)) / bkt_n;
   };
 
   // NOTE: build leaf
-  size_t item_num = In.size();
-  build_level(item_num, [&](size_t i, auto const& idx_to_pack) {
-    size_t bucket_num = idx_to_pack.size();
-    if (i < bucket_num - 1) {
-      key_out[i] = TT::GetKey(In[idx_to_pack[i + 1]]);
+  size_t item_n = In.size();
+  size_t bkt_n = item_n / TT::kBufMD;
+  assert(bkt_n > 0);
+  parlay::parallel_for(0, bkt_n, [&](size_t i) {
+    if (i < bkt_n - 1) {
+      // key_out[i] = TT::GetKey(In[idx_to_pack[i + 1]]);
+      key_out[i] = TT::GetKey(In[get_bucket_end(i, bkt_n, item_n)]);
     }
-    size_t ele_l = idx_to_pack[i];
-    size_t ele_r = (i == bucket_num - 1) ? item_num : idx_to_pack[i + 1];
+    size_t ele_l = get_bucket_start(i, bkt_n, item_n);
+    size_t ele_r = (i == bkt_n - 1) ? item_n : get_bucket_end(i, bkt_n, item_n);
     node_out[i] = AllocNormalLeafNode<Slice, Leaf>(In.cut(ele_l, ele_r));
   });
+  swap_key_node(bkt_n);
+  assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
 
   // NOTE: build Interior
   while (node_in.size() >= TT::kBufUB) {
     assert(key_in.size() == node_in.size() - 1);
-    size_t node_num = node_in.size();
-    size_t key_num = key_in.size();
+    item_n = node_in.size();
+    bkt_n = item_n / TT::kBufMD;
+    assert(bkt_n > 0);
 
-    build_level(node_num, [&](size_t i, auto const& idx_to_pack) {
-      size_t bucket_num = idx_to_pack.size();
-      if (i < bucket_num - 1) {
-        key_out[i] = key_in[idx_to_pack[i + 1] - 1];
+    parlay::parallel_for(0, bkt_n, [&](size_t i) {
+      if (i < bkt_n - 1) {
+        key_out[i] = key_in[get_bucket_end(i, bkt_n, item_n) - 1];
       }
-      size_t node_l = idx_to_pack[i];
-      size_t node_r = (i == bucket_num - 1) ? node_num : idx_to_pack[i + 1];
-      size_t key_l = idx_to_pack[i];
-      size_t key_r = (i == bucket_num - 1) ? key_num : idx_to_pack[i + 1] - 1;
+
+      size_t node_l = get_bucket_start(i, bkt_n, item_n);
+      size_t node_r =
+          (i == bkt_n - 1) ? item_n : get_bucket_end(i, bkt_n, item_n);
+      size_t key_l = get_bucket_start(i, bkt_n, item_n);
+      size_t key_r = (i == bkt_n - 1) ? key_in.size()
+                                      : get_bucket_end(i, bkt_n, item_n) - 1;
       node_out[i] = AllocInteriorNode<Interior, TT>(node_in.cut(node_l, node_r),
                                                     key_in.cut(key_l, key_r));
     });
+    swap_key_node(bkt_n);
+    assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
   }
 
   this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
