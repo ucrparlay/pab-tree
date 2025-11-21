@@ -34,28 +34,28 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
 
   // check the box of each child node falls within the split between
   parlay::sequence<typename TT::Box> box_seq(TI->tree_nodes.size());
-  parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
+  // parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
+  for (size_t i = 0; i < TI->tree_nodes.size(); i++) {
     box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
       assert(box_seq[i].second < TI->split[0]);
     } else if (i == TI->tree_nodes.size() - 1) {
       assert(box_seq[i].first >= TI->split[i - 1]);
     } else {
-      assert(box_seq[i].first >= TI->split[i - 1] &&
-             box_seq[i].second < TI->split[i]);
-      // if (box_seq[i].first < TI->split[i - 1] ||
-      //     box_seq[i].second >= TI->split[i]) {
-      //   std::cout << "Validation failed at interior node split check."
-      //             << std::endl;
-      //   std::cout << "Box: [" << box_seq[i].first << ", " <<
-      //   box_seq[i].second
-      //             << "], Splits: [" << TI->split[i - 1] << ", " <<
-      //             TI->split[i]
-      //             << "]" << std::endl;
-      //   assert(false);
-      // }
+      // assert(box_seq[i].first >= TI->split[i - 1] &&
+      //        box_seq[i].second < TI->split[i]);
+      if (box_seq[i].first < TI->split[i - 1] ||
+          box_seq[i].second >= TI->split[i]) {
+        std::cout << "Validation failed at interior node split check."
+                  << std::endl;
+        std::cout << "Box: [" << box_seq[i].first << ", " << box_seq[i].second
+                  << "], Splits: [" << TI->split[i - 1] << ", " << TI->split[i]
+                  << "]" << std::endl;
+        assert(false);
+      }
     }
-  });
+    // });
+  }
 
   return GetBox(box_seq);
 }

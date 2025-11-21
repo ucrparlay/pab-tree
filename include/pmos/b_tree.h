@@ -9,6 +9,12 @@
 #include "dependence/type_trait.h"
 
 namespace pmos {
+// Template definition for the operator
+template <typename T1, typename T2>
+std::ostream& operator<<(std::ostream& os, std::pair<T1, T2> const& p) {
+  os << "(" << p.first << ", " << p.second << ")";
+  return os;
+}
 
 // NOTE: Basetree
 template <class TypeTrait>

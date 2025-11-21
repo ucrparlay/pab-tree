@@ -11,17 +11,28 @@
 
 namespace pmos {
 
+template <class EleType>
+struct EleWrapper : EleType {
+  using KeyType = typename EleType::KeyType;
+  using ValType = typename EleType::ValType;
+  // using Entry = std::tuple<KeyType, ValType>;
+  using Entry = EleType::Entry;
+
+  static inline auto GetKey(Entry const e) { return EleType::GetKey(e); }
+  static inline auto GetVal(Entry const e) { return EleType::GetVal(e); }
+  static inline Entry ToEntry(KeyType const& k, ValType const& v) {
+    return EleType::ToEntry(k, v);
+  };
+};
+
 template <typename EleType, uint kBufferSize, typename LeafAugType,
           typename InteriorAugType, uint_fast8_t kSkHeightVal>
 class TypeTrait {
  public:
   // NOTE: element type
-  using E = EleType;
-  using Ele = EleType;
+  using E = EleType::Entry;
   using K = typename E::KeyType;
   using V = typename E::ValType;
-  static inline K GetKey(E const& e) { return e.GetKey(); }
-  static inline V GetVal(E const& e) { return e.GetVal(); }
 
   // NOTE: general type
   using Num = Num_Comparator<K>;
@@ -52,11 +63,12 @@ class TypeTrait {
 
 template <typename EleType, uint kBufferSize, typename LeafAugType,
           typename InteriorAugType, uint_fast8_t kSkHeightVal>
-class BTreeTypeTrait : public TypeTrait<EleType, kBufferSize, LeafAugType,
-                                        InteriorAugType, kSkHeightVal> {
+class BTreeTypeTrait
+    : public TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
+                       InteriorAugType, kSkHeightVal> {
  public:
-  using BT = TypeTrait<EleType, kBufferSize, LeafAugType, InteriorAugType,
-                       kSkHeightVal>;
+  using BT = TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
+                       InteriorAugType, kSkHeightVal>;
   using BufferSizeType =
       std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
   static constexpr BufferSizeType kBuf = kBufferSize;

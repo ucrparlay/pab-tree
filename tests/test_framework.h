@@ -1083,10 +1083,9 @@ std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) {
-    wp[i].ReadKey(pts[i]);
-    for (int j = 1; j < dim; j++) {
-      wp[i].ReadVal(pts.cut(i * dim + 1, (i + 1) * dim));
-    }
+    wp[i].ReadKey(pts[i], i);
+    // wp[i].ReadKey(pts[i]);
+    wp[i].ReadVal(pts.cut(i * dim + 1, (i + 1) * dim));
   });
   return std::make_pair(N, dim);
 }
@@ -1626,6 +1625,7 @@ class Wrapper {
         wp, wi, N, K, rounds, insert_file_path, tag, query_type, summary);
   };
 
+  // NOTE: the element we use
   template <typename K, typename V>
   struct Element {
     using KeyType = K;
@@ -1634,8 +1634,10 @@ class Wrapper {
     KeyType const GetKey() const { return key; }
     ValType const GetVal() const { return val; }
 
-    void ReadKey(char* str) {
-      this->key = std::stol(str);
+    void ReadKey(char* str, size_t i) {
+      this->key = {std::stol(str), i};
+      // void ReadKey(char* str) {
+      //   this->key = std::stol(str);
       return;
     }
 
@@ -1660,13 +1662,31 @@ class Wrapper {
     ValType val;
   };
 
+  // NOTE: user needs to add a layer to expose API to b_tree
+  template <typename EntryType>
+  struct ElementWrapper {
+    using Entry = EntryType;
+    using KeyType = typename Entry::KeyType;
+    using ValType = typename Entry::ValType;
+
+    // differs from different entry, interface for pmos structure
+    static inline auto GetKey(Entry const e) { return e.GetKey(); }
+    static inline auto GetVal(Entry const e) { return e.GetVal(); }
+    static inline Entry ToEntry(KeyType const& k, ValType const& v) {
+      return Entry{.key = k, .val = v};
+    };
+  };
+
   // NOTE: For kd tree and orth tree
   template <typename RunFunc>
   static void ApplyOrthogonal(int const tree_type, int const dim,
                               commandLine& params, RunFunc test_func) {
-    using EleType = Element<uint32_t, uint32_t>;
-    using TypeTrait =
-        pmos::BTreeTypeTrait<EleType, 16, LeafAugEmpty, InteriorAugEmpty, 8>;
+    using K = std::pair<uint32_t, uint32_t>;
+    using V = uint32_t;
+    using E = Element<K, uint32_t>;
+    // using EleType = Element<uint32_t, uint32_t>;
+    using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
+                                           InteriorAugEmpty, 8>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
 };

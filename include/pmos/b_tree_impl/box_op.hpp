@@ -19,8 +19,8 @@ TT::Box BTree<TT>::GetEmptyBox() {
 
 template <typename TT>
 TT::Box BTree<TT>::GetBox(TT::EleSeq const& ele_seq) {
-  auto box = GetEmptyBox();
-  parlay::parallel_for(0, ele_seq.size(), [&](size_t i) {
+  auto box = std::make_pair(TT::GetKey(ele_seq[0]), TT::GetKey(ele_seq[0]));
+  parlay::parallel_for(1, ele_seq.size(), [&](size_t i) {
     auto key = TT::GetKey(ele_seq[i]);
     box.first = TT::Num::Min(box.first, key);
     box.second = TT::Num::Max(box.second, key);
@@ -30,8 +30,8 @@ TT::Box BTree<TT>::GetBox(TT::EleSeq const& ele_seq) {
 
 template <typename TT>
 TT::Box BTree<TT>::GetBox(TT::BoxSeq const& box_seq) {
-  auto box = GetEmptyBox();
-  parlay::parallel_for(0, box_seq.size(), [&](size_t i) {
+  auto box = box_seq[0];
+  parlay::parallel_for(1, box_seq.size(), [&](size_t i) {
     box.first = TT::Num::Min(box.first, box_seq[i].first);
     box.second = TT::Num::Max(box.second, box_seq[i].second);
   });
