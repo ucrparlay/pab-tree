@@ -35,8 +35,8 @@ struct Node {
 template <typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
 struct LeafNode : Node {
   using TT = TypeTrait;
-  using Ele = typename TT::Ele;
-  using EleSeq = typename TT::EleSeq;
+  using E = typename TT::E;
+  using EntrySeq = typename TT::EntrySeq;
   using AT = typename TT::LeafAug;
 
   // NOTE: default allocator
@@ -50,7 +50,7 @@ struct LeafNode : Node {
   LeafNode(Range In, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(false),
-        elements(EleSeq::uninitialized(TT::kBufUB)),
+        elements(EntrySeq::uninitialized(TT::kBufUB)),
         aug(AT(In)) {
     assert(In.size() <= TT::kBufUB);
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
@@ -63,7 +63,7 @@ struct LeafNode : Node {
   LeafNode(Range In, size_t const alloc_size, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(false),
-        elements(EleSeq::uninitialized(alloc_size)),
+        elements(EntrySeq::uninitialized(alloc_size)),
         aug(AT(In)) {
     assert(In.size() <= alloc_size);
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
@@ -76,14 +76,14 @@ struct LeafNode : Node {
   LeafNode(Range In, AllocDummyLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
         is_dummy(true),
-        elements(EleSeq::uninitialized(1)),
+        elements(EntrySeq::uninitialized(1)),
         aug(AT(In.cut(0, 1))) {
     parlay::assign_dispatch(elements[0], In[0], EleAssignTag());
   }
 
   bool CapacityFull() const { return this->size >= TT::kBufUB; }
 
-  EleSeq const GetEle() const { return elements.substr(0, this->size); }
+  EntrySeq const GetEle() const { return elements.substr(0, this->size); }
 
   AT& GetAug() const { return aug; }
 
@@ -98,7 +98,7 @@ struct LeafNode : Node {
   auto ResetAug() { return aug.Reset(); }
 
   bool is_dummy;
-  EleSeq elements;
+  EntrySeq elements;
   AT aug;
 };
 

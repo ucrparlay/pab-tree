@@ -23,15 +23,13 @@ class BTree {
   using TT = TypeTrait;
   // TODO: Do we really need to define these types again?
 
-  using E = typename TypeTrait::Ele;
-  using Ele = typename TypeTrait::Ele;
-  using K = typename E::KeyType;
-  using V = typename E::ValType;
+  using E = typename TT::E;
+  using K = typename TT::K;
+  using V = typename TT::V;
+  using Entry = TT::Entry;
 
   using Num = typename TypeTrait::Num;
   using Slice = typename TypeTrait::Slice;
-  using EleSeq = typename TypeTrait::EleSeq;
-  using EleIter = typename TypeTrait::EleIter;
   using Split = typename TypeTrait::Split;
   using SplitSeq = typename TypeTrait::SplitSeq;
   using NodeSeq =
@@ -352,7 +350,7 @@ class BTree {
   // NOTE: validations
   TT::Box GetBox(TT::Box const& a, TT::Box const& b);
 
-  TT::Box GetBox(TT::EleSeq const& ele_seq);
+  TT::Box GetBox(TT::EntrySeq const& ele_seq);
 
   TT::Box GetBox(TT::BoxSeq const& box_seq);
 

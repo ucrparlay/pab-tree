@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
   int tree_type = params.getOptionIntValue("-T", 0);
 
   auto run = [&]<typename TreeWrapper, typename TypeTrait>(
-                 TypeTrait::EleSeq const& wp, TypeTrait::EleSeq const& wi,
+                 TypeTrait::EntrySeq const& wp, TypeTrait::EntrySeq const& wi,
                  size_t const& N, int const& K, int const& kRounds,
                  string const& kInsertFile, int const& kTag,
                  int const& kQueryType, int const kSummary) -> void {

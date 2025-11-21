@@ -27,10 +27,10 @@ void PrintPoints(auto const& wp) {
 }
 
 void PrintToFile(std::string const& path, auto const& wp) {
-  using Ele = typename std::remove_reference_t<decltype(wp)>::value_type;
+  using E = typename std::remove_reference_t<decltype(wp)>::value_type;
 
   size_t const gen_num = wp.size();
-  auto constexpr gen_dim = 1 + std::tuple_size_v<typename Ele::ValType>;
+  auto constexpr gen_dim = 1 + std::tuple_size_v<typename E::V>;
 
   auto header = toString(gen_num) + " " + toString(gen_dim);
   // NOTE: create a parlay::sequence<char> in order to call the writeSeqToFile
@@ -38,7 +38,7 @@ void PrintToFile(std::string const& path, auto const& wp) {
     std::string str;
     str += std::to_string(wp[i].key) + " ";
     if constexpr (std::tuple_size<typename std::remove_reference_t<
-                      decltype(wp)>::value_type::ValType>::value == 1) {
+                      decltype(wp)>::value_type::V>::value == 1) {
       str += std::to_string(std::get<0>(wp[i].val)) + " ";
     }
     // for (int j = 0; std::cmp_less(j, gen_dim); j++) {
@@ -122,10 +122,10 @@ void PrintToFile(std::string const& path, auto const& wp) {
 //   }
 // };
 
-template <typename Ele>
+template <typename E>
 class UniformGenerator {
  public:
-  using Points = parlay::sequence<Ele>;
+  using Points = parlay::sequence<E>;
 
   static Points WithinBox(size_t const gen_num) {
     Points wp(gen_num);
@@ -142,7 +142,7 @@ class UniformGenerator {
     parlay::parallel_for(0, gen_num, [&](size_t i) {
       auto r = gen[i];
       wp[i].key = dis(r);
-      if constexpr (std::tuple_size<typename Ele::ValType>::value == 1) {
+      if constexpr (std::tuple_size<typename E::V>::value == 1) {
         std::get<0>(wp[i].val) = dis(r);
       }
     });

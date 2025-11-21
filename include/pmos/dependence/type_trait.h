@@ -13,14 +13,14 @@ namespace pmos {
 
 template <class EleType>
 struct EleWrapper : EleType {
-  using KeyType = typename EleType::KeyType;
-  using ValType = typename EleType::ValType;
+  using E = typename EleType::E;
+  using K = typename EleType::K;
+  using V = typename EleType::V;
   // using Entry = std::tuple<KeyType, ValType>;
-  using Entry = EleType::Entry;
 
-  static inline auto GetKey(Entry const e) { return EleType::GetKey(e); }
-  static inline auto GetVal(Entry const e) { return EleType::GetVal(e); }
-  static inline Entry ToEntry(KeyType const& k, ValType const& v) {
+  static inline auto GetKey(E const e) { return EleType::GetKey(e); }
+  static inline auto GetVal(E const e) { return EleType::GetVal(e); }
+  static inline E ToEntry(K const& k, V const& v) {
     return EleType::ToEntry(k, v);
   };
 };
@@ -30,17 +30,18 @@ template <typename EleType, uint kBufferSize, typename LeafAugType,
 class TypeTrait {
  public:
   // NOTE: element type
-  using E = EleType::Entry;
-  using K = typename E::KeyType;
-  using V = typename E::ValType;
+  using E = EleType::E;
+  using K = typename EleType::K;
+  using V = typename EleType::V;
+  using Entry = EleType;
 
   // NOTE: general type
   using Num = Num_Comparator<K>;
   using Slice = parlay::slice<E*, E*>;
   using ConstSlice = parlay::slice<E const*, E const*>;
-  using EleSeq = parlay::sequence<E>;
-  using ConstEleSeq = parlay::sequence<E> const;
-  using EleIter = typename parlay::sequence<E>::iterator;
+  using EntrySeq = parlay::sequence<E>;
+  using ConstEntrySeq = parlay::sequence<E> const;
+  using EntryIter = typename parlay::sequence<E>::iterator;
   using Box = std::pair<K, K>;
   using BoxSeq = parlay::sequence<Box>;
 

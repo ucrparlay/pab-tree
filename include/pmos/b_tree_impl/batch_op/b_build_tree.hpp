@@ -29,16 +29,12 @@ void BTree<TT>::Build(Range&& In) {
 
 template <typename TT>
 void BTree<TT>::Build_(Slice In) {
-  // this->root_ = BuildRecursive(A);
-  for (int i = 0; i < 10; i++) {
-    std::cout << TT::GetKey(In[i]) << " ";
-  }
   puts("-----");
   auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
   // sort_seq = parlay::remove_duplicates_ordered(sort_seq);
-  for (int i = 0; i < 10; i++) {
-    std::cout << TT::GetKey(sort_seq[i]) << " ";
-  }
+  // for (int i = 0; i < 10; i++) {
+  //   std::cout << TT::GetKey(sort_seq[i]) << " ";
+  // }
   std::cout << sort_seq.size() << std::endl;
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
@@ -92,7 +88,7 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
   parlay::parallel_for(0, bkt_n, [&](size_t i) {
     if (i < bkt_n - 1) {
       // key_out[i] = TT::GetKey(In[idx_to_pack[i + 1]]);
-      key_out[i] = TT::GetKey(In[get_bucket_end(i, bkt_n, item_n)]);
+      key_out[i] = Entry::GetKey(In[get_bucket_end(i, bkt_n, item_n)]);
     }
     size_t ele_l = get_bucket_start(i, bkt_n, item_n);
     size_t ele_r = (i == bkt_n - 1) ? item_n : get_bucket_end(i, bkt_n, item_n);

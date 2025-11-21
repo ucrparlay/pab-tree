@@ -192,17 +192,17 @@ auto gen_rectangles(int rec_num, int const type,
 
 template <typename TypeTrait, typename Tree, bool kTestTime = true,
           int kPrint = 1>
-void BuildTree(typename TypeTrait::EleSeq const& WP, int const& rounds,
+void BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds,
                Tree& pkd, int remaining_frac = 1) {
   using TT = TypeTrait;
-  using EleSeq = typename TT::EleSeq;
+  using EntrySeq = typename TT::EntrySeq;
   using Leaf = typename Tree::Leaf;
   using Interior = typename Tree::Interior;
 
   double loop_late = rounds > 1 ? 0.01 : -100;
   size_t n = WP.size();
   // size_t n = 100;
-  EleSeq wp = EleSeq::uninitialized(n);
+  EntrySeq wp = EntrySeq::uninitialized(n);
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -1069,8 +1069,8 @@ void generate_random_points(parlay::sequence<Point>& wp, Coord _box_size,
 template <typename E>
 std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
                                    [[maybe_unused]] int id_offset = 0) {
-  using K = E::KeyType;
-  using V = E::ValType;
+  using K = E::K;
+  using V = E::V;
 
   parlay::sequence<char> S = readStringFromFile(iFile);
   parlay::sequence<char*> W = stringToWords(S);
@@ -1112,7 +1112,7 @@ void PrintTreeParam() {
 // NOTE: default test functions for all custom tree
 static auto constexpr DefaultTestFunc =
     []<class TreeDesc, typename TypeTrait>(
-        TypeTrait::EleSeq const& wp, TypeTrait::EleSeq const& wi,
+        TypeTrait::EntrySeq const& wp, TypeTrait::EntrySeq const& wi,
         size_t const& N, int const& K, int const& kRounds,
         string const& kInsertFile, int const& kTag, int const& kQueryType,
         int const kSummary) {
@@ -1585,19 +1585,19 @@ class Wrapper {
     int split_type = P.getOptionIntValue("-l", 0);
 
     using TT = typename TreeWrapper::TreeType::TT;
-    using Ele = typename TT::E;
-    using EleSeq = typename TT::EleSeq;
+    using E = typename TT::E;
+    using EntrySeq = typename TT::EntrySeq;
 
     // PrintTreeParam<TreeWrapper>();
 
     std::string name, insert_file_path = "";
-    EleSeq wp, wi;
+    EntrySeq wp, wi;
 
     if (input_file_path != NULL) {  // NOTE: read main Points
       name = std::string(input_file_path);
       name = name.substr(name.rfind('/') + 1);
       std::cout << name << " ";
-      auto [n, d] = read_points<Ele>(input_file_path, wp, 0);
+      auto [n, d] = read_points<E>(input_file_path, wp, 0);
       N = n;
     }
 
@@ -1617,7 +1617,7 @@ class Wrapper {
         insert_file_path = std::string(input_file_path).substr(0, pos) +
                            std::to_string(id) + ".in";
       }
-      auto [n, d] = read_points<Ele>(insert_file_path.c_str(), wi, N);
+      auto [n, d] = read_points<E>(insert_file_path.c_str(), wi, N);
     }
 
     // Apply the test function
@@ -1626,13 +1626,13 @@ class Wrapper {
   };
 
   // NOTE: the element we use
-  template <typename K, typename V>
+  template <typename KeyType, typename ValType>
   struct Element {
-    using KeyType = K;
-    using ValType = V;
+    using K = KeyType;
+    using V = ValType;
 
-    KeyType const GetKey() const { return key; }
-    ValType const GetVal() const { return val; }
+    K GetKey() const { return key; }
+    V GetVal() const { return val; }
 
     void ReadKey(char* str, size_t i) {
       this->key = {std::stol(str), i};
@@ -1658,22 +1658,22 @@ class Wrapper {
       return o;
     }
 
-    KeyType key;
-    ValType val;
+    K key;
+    V val;
   };
 
   // NOTE: user needs to add a layer to expose API to b_tree
   template <typename EntryType>
   struct ElementWrapper {
-    using Entry = EntryType;
-    using KeyType = typename Entry::KeyType;
-    using ValType = typename Entry::ValType;
+    using E = EntryType;
+    using K = typename E::K;
+    using V = typename E::V;
 
     // differs from different entry, interface for pmos structure
-    static inline auto GetKey(Entry const e) { return e.GetKey(); }
-    static inline auto GetVal(Entry const e) { return e.GetVal(); }
-    static inline Entry ToEntry(KeyType const& k, ValType const& v) {
-      return Entry{.key = k, .val = v};
+    static inline auto GetKey(E const e) { return e.GetKey(); }
+    static inline auto GetVal(E const e) { return e.GetVal(); }
+    static inline E ToEntry(K const& k, V const& v) {
+      return E{.key = k, .val = v};
     };
   };
 
@@ -1683,7 +1683,7 @@ class Wrapper {
                               commandLine& params, RunFunc test_func) {
     using K = std::pair<uint32_t, uint32_t>;
     using V = uint32_t;
-    using E = Element<K, uint32_t>;
+    using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
     using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
                                            InteriorAugEmpty, 8>;
