@@ -17,7 +17,6 @@ int main(int argc, char* argv[]) {
   int read_insert_file = params.getOptionIntValue("-i", 1);
   int summary = params.getOptionIntValue("-s", 0);
   int tree_type = params.getOptionIntValue("-T", 0);
-  int split_type = params.getOptionIntValue("-l", 0);
 
   auto test_func = []<class TreeDesc, typename Point>(
                        int const& kDim, parlay::sequence<Point> const& wp,
@@ -28,7 +27,7 @@ int main(int argc, char* argv[]) {
 
   };
 
-  Wrapper::ApplyBaselines(tree_type, dims, split_type, params, DefaultTestFunc);
+  Wrapper::ApplyBaselines(tree_type, dims, params, DefaultTestFunc);
 
   return 0;
 }

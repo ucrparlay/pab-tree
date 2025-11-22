@@ -7,6 +7,7 @@
 #include <ios>
 #include <iostream>
 
+#include "baselines/cpam.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"

@@ -91,9 +91,9 @@ target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 # target_link_libraries(p_test PUBLIC PMOS)
 # target_include_directories(p_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
 #
-# add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
-# target_link_libraries(baselines PUBLIC PMOS)
-# target_include_directories(baselines PUBLIC ${PROJECT_SOURCE_DIR}/include)
+add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
+target_link_libraries(baselines PUBLIC PMOS)
+target_include_directories(baselines PUBLIC ${PROJECT_SOURCE_DIR}/include)
 #
 # add_executable(testers ${PROJECT_SOURCE_DIR}/tests/testers.cpp)
 # target_link_libraries(testers PUBLIC PMOS)
