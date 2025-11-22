@@ -18,23 +18,21 @@ class CpamRaw {
   using TT = TypeTrait;
   // TODO: Do we really need to define these types again?
 
-  using E = typename TypeTrait::Ele;
-  using Ele = typename TypeTrait::Ele;
-  using K = typename E::KeyType;
-  using V = typename E::ValType;
+  using E = typename TT::E;
+  using K = typename TT::K;
+  using V = typename TT::V;
+  using Entry = TT::Entry;
 
-  using Num = typename TypeTrait::Num;
-  using Slice = typename TypeTrait::Slice;
-  using EleSeq = typename TypeTrait::EleSeq;
-  using EleIter = typename TypeTrait::EleIter;
-  using Split = typename TypeTrait::Split;
-  using SplitSeq = typename TypeTrait::SplitSeq;
+  using Num = typename TT::Num;
+  using Slice = typename TT::Slice;
+  using Split = typename TT::Split;
+  using SplitSeq = typename TT::SplitSeq;
 
  public:
   // begin of CPAM_RAW definition
   using key_type = K;
   using val_type = V;
-  using aug_type = size_t;  // size of the tree
+  using aug_type = size_t;  // aug size of the tree
 
   //	CPAM entry
   struct entry {
@@ -48,7 +46,7 @@ class CpamRaw {
     static aug_t combine(aug_t a, aug_t b) { return a + b; }
   };
 
-  using zmap = cpam::aug_map<entry, 40>;
+  using zmap = cpam::aug_map<entry, 32>;
   using par = std::tuple<typename entry::key_t, typename entry::val_t>;
 
   using Leaf = zmap::Tree::node;

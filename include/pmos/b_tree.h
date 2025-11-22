@@ -28,32 +28,31 @@ class BTree {
   using V = typename TT::V;
   using Entry = TT::Entry;
 
-  using Num = typename TypeTrait::Num;
-  using Slice = typename TypeTrait::Slice;
-  using Split = typename TypeTrait::Split;
-  using SplitSeq = typename TypeTrait::SplitSeq;
+  using Num = typename TT::Num;
+  using Slice = typename TT::Slice;
+  using Split = typename TT::Split;
+  using SplitSeq = typename TT::SplitSeq;
   using NodeSeq =
       parlay::sequence<Node*>;  // TODO:may add this to type trait as well
 
-  using LeafAug = typename TypeTrait::LeafAug;
-  using InteriorAug = typename TypeTrait::InteriorAug;
+  using LeafAug = typename TT::LeafAug;
+  using InteriorAug = typename TT::InteriorAug;
 
   // NOTE: Const variables
   // NOTE: uint32t handle up to 4e9 at least
   // WARN: bucket num should smaller than 1<<8 to handle type overflow
-  using BucketType = typename TypeTrait::BucketType;
-  static constexpr BucketType const kBuildDepthOnce =
-      TypeTrait::kSkeletonHeight;
-  static constexpr BucketType const kPivotNum = TypeTrait::kPivotNum;
-  static constexpr BucketType const kBucketNum = TypeTrait::kBucketNum;
-  static constexpr uint_fast8_t const kLog2Base = TypeTrait::kLog2Base;
-  static constexpr uint_fast16_t const kBlockSize = TypeTrait::kBlockSize;
+  using BucketType = typename TT::BucketType;
+  static constexpr BucketType const kBuildDepthOnce = TT::kSkeletonHeight;
+  static constexpr BucketType const kPivotNum = TT::kPivotNum;
+  static constexpr BucketType const kBucketNum = TT::kBucketNum;
+  static constexpr uint_fast8_t const kLog2Base = TT::kLog2Base;
+  static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
-  using BufferSizeType = TypeTrait::BufferSizeType;
+  using BufferSizeType = TT::BufferSizeType;
 
-  static constexpr BufferSizeType kBuf = TypeTrait::kBuf;
-  static constexpr BufferSizeType kBufLB = TypeTrait::kBufLB;
-  static constexpr BufferSizeType kBufUB = 4 * TypeTrait::kBuf;
+  static constexpr BufferSizeType kBuf = TT::kBuf;
+  static constexpr BufferSizeType kBufLB = TT::kBufLB;
+  static constexpr BufferSizeType kBufUB = 4 * TT::kBuf;
 
   // NOTE: tree structure
   static constexpr uint_fast8_t const kLeaveWrap = 32;
@@ -61,8 +60,8 @@ class BTree {
   static constexpr uint_fast8_t const kSlimLeaveWrap = 8;
   static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
 
-  struct BTreeInteriorNode : MultiNode<TypeTrait> {
-    using TT = TypeTrait;
+  struct BTreeInteriorNode : MultiNode<TT> {
+    using TT = TT;
     using BaseNode = MultiNode<TT>;
     using BTreeNodeArr = typename BaseNode::NodeArr;
     using BTreeNodeArrSlice = typename BaseNode::NodeArrSlice;
@@ -100,7 +99,7 @@ class BTree {
     // }
   };
 
-  using Leaf = LeafNode<TypeTrait, parlay::move_assign_tag>;
+  using Leaf = LeafNode<TT, parlay::move_assign_tag>;
   using Interior = BTreeInteriorNode;
 
   // NOTE: array based inner tree for batch insertion and deletion

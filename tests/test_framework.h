@@ -1690,4 +1690,16 @@ class Wrapper {
                                            InteriorAugEmpty, 8>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
+
+  template <typename RunFunc>
+  static void ApplyBaselines(int const tree_type, int const dim,
+                             commandLine& params, RunFunc test_func) {
+    using K = std::pair<uint32_t, uint32_t>;
+    using V = uint32_t;
+    using E = Element<K, V>;
+    // using EleType = Element<uint32_t, uint32_t>;
+    using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
+                                           InteriorAugEmpty, 8>;
+    Run<BTreeWrapper<TypeTrait>>(params, test_func);
+  }
 };
