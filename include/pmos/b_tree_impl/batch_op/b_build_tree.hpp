@@ -29,13 +29,13 @@ void BTree<TT>::Build(Range&& In) {
 
 template <typename TT>
 void BTree<TT>::Build_(Slice In) {
-  puts("-----");
+  // puts("-----");
   auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
   // sort_seq = parlay::remove_duplicates_ordered(sort_seq);
   // for (int i = 0; i < 10; i++) {
   //   std::cout << TT::GetKey(sort_seq[i]) << " ";
   // }
-  std::cout << sort_seq.size() << std::endl;
+  // std::cout << sort_seq.size() << std::endl;
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;

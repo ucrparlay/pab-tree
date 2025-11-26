@@ -215,9 +215,7 @@ void BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds,
     parlay::copy(WP.cut(0, n / remaining_frac), wp.cut(0, n / remaining_frac));
     pkd.Build(wp.cut(0, n / remaining_frac));
 
-    if constexpr (kPrint == 0) {
-      std::cout << aveBuild << " " << std::flush;
-    }
+    std::cout << aveBuild << " " << std::flush;
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
@@ -1525,6 +1523,10 @@ class Wrapper {
   struct BTreeWrapper {
     using TreeType = typename pmos::BTree<TypeTrait>;
   };
+  template <typename TypeTrait>
+  struct CpamWrapper {
+    using TreeType = typename CPAMTree::CpamRaw<TypeTrait>;
+  };
 
   // NOTE: Apply the dim and split rule
   struct AugId {
@@ -1700,6 +1702,6 @@ class Wrapper {
     // using EleType = Element<uint32_t, uint32_t>;
     using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
                                            InteriorAugEmpty, 8>;
-    Run<BTreeWrapper<TypeTrait>>(params, test_func);
+    Run<CpamWrapper<TypeTrait>>(params, test_func);
   }
 };

@@ -15,6 +15,7 @@ using parlay::sequence;
 
 template <class TypeTrait>
 class CpamRaw {
+ public:
   using TT = TypeTrait;
   // TODO: Do we really need to define these types again?
 
@@ -28,7 +29,6 @@ class CpamRaw {
   using Split = typename TT::Split;
   using SplitSeq = typename TT::SplitSeq;
 
- public:
   // begin of CPAM_RAW definition
   using key_type = K;
   using val_type = V;
@@ -72,10 +72,14 @@ class CpamRaw {
   template <class PT>
   auto map_init(PT& P) {
     size_t n = P.size();
+    // parlay::internal::timer t("map_init");
     parlay::sequence<par> entries(n);
-    parlay::parallel_for(
-        0, n, [&](int i) { entries[i] = {E::GetKey(P[i]), E::GetVal(P[i])}; });
+    parlay::parallel_for(0, n, [&](int i) {
+      entries[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
+    });
+    // t.next("map_init: prepare entries");
     zmap m1(entries);
+    // t.next("map_init: build map");
     return std::move(m1);
   }
 
