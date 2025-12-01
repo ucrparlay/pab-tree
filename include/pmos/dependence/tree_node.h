@@ -21,7 +21,6 @@
 namespace pmos {
 
 struct AllocNormalLeafTag {};
-struct AllocDummyLeafTag {};
 struct AllocEmptyLeafTag {};
 
 struct Node {
@@ -40,16 +39,14 @@ struct LeafNode : Node {
   using AT = typename TT::LeafAug;
 
   // NOTE: default allocator
-  LeafNode() : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(AT()) {}
+  LeafNode() : Node{true, static_cast<size_t>(0)}, aug(AT()) {}
 
-  LeafNode(AT const& _aug)
-      : Node{true, static_cast<size_t>(0)}, is_dummy(false), aug(_aug) {}
+  LeafNode(AT const& _aug) : Node{true, static_cast<size_t>(0)}, aug(_aug) {}
 
   // NOTE: alloc a leaf with default size
   template <typename Range>
   LeafNode(Range In, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
-        is_dummy(false),
         elements(EntrySeq::uninitialized(TT::kBufUB)),
         aug(AT(In)) {
     assert(In.size() <= TT::kBufUB);
@@ -62,23 +59,12 @@ struct LeafNode : Node {
   template <typename Range>
   LeafNode(Range In, size_t const alloc_size, AllocNormalLeafTag)
       : Node{true, static_cast<size_t>(In.size())},
-        is_dummy(false),
         elements(EntrySeq::uninitialized(alloc_size)),
         aug(AT(In)) {
     assert(In.size() <= alloc_size);
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
       parlay::assign_dispatch(elements[i++], x, EleAssignTag());
     });
-  }
-
-  // NOTE: alloc a dummy leaf
-  template <typename Range>
-  LeafNode(Range In, AllocDummyLeafTag)
-      : Node{true, static_cast<size_t>(In.size())},
-        is_dummy(true),
-        elements(EntrySeq::uninitialized(1)),
-        aug(AT(In.cut(0, 1))) {
-    parlay::assign_dispatch(elements[0], In[0], EleAssignTag());
   }
 
   bool CapacityFull() const { return this->size >= TT::kBufUB; }
@@ -97,7 +83,6 @@ struct LeafNode : Node {
 
   auto ResetAug() { return aug.Reset(); }
 
-  bool is_dummy;
   EntrySeq elements;
   AT aug;
 };
@@ -126,7 +111,6 @@ template <typename Range, typename Leaf>
 static Leaf* AllocFixSizeLeafNode(Range In, size_t const alloc_size) {
   Leaf* o = parlay::type_allocator<Leaf>::alloc();
   new (o) Leaf(In, alloc_size, AllocNormalLeafTag());
-  assert(o->is_dummy == false);
   return o;
 }
 
@@ -135,7 +119,6 @@ template <typename Range, typename Leaf>
 static Leaf* AllocNormalLeafNode(Range In) {
   Leaf* o = parlay::type_allocator<Leaf>::alloc();
   new (o) Leaf(In, AllocNormalLeafTag());
-  assert(o->is_dummy == false);
   return o;
 }
 
@@ -152,16 +135,6 @@ template <typename Range, typename Leaf>
 static Leaf* AllocEmptyLeafNode(typename Leaf::AT const& aug) {
   Leaf* o = parlay::type_allocator<Leaf>::alloc();
   new (o) Leaf(aug);
-  return o;
-}
-
-// NOTE: Alloc a dummy leaf
-template <typename Range, typename Leaf>
-static Leaf* AllocDummyLeafNode(Range In) {
-  Leaf* o = parlay::type_allocator<Leaf>::alloc();
-  new (o) Leaf(In, AllocDummyLeafTag());
-  assert(o->is_dummy == true);
-  assert(o->pts.size() == 1);
   return o;
 }
 
