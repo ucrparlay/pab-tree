@@ -1689,7 +1689,7 @@ class Wrapper {
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
     using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
-                                           InteriorAugEmpty, 8>;
+                                           InteriorAugEmpty, 8, pmos::Node>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
 
@@ -1701,7 +1701,7 @@ class Wrapper {
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
     using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
-                                           InteriorAugEmpty, 8>;
+                                           InteriorAugEmpty, 8, pmos::Node>;
     Run<CpamWrapper<TypeTrait>>(params, test_func);
   }
 };

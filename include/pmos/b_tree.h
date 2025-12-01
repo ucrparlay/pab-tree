@@ -31,9 +31,6 @@ class BTree {
   using Num = typename TT::Num;
   using Slice = typename TT::Slice;
   using Split = typename TT::Split;
-  using SplitSeq = typename TT::SplitSeq;
-  using NodeSeq =
-      parlay::sequence<Node*>;  // TODO:may add this to type trait as well
 
   using LeafAug = typename TT::LeafAug;
   using InteriorAug = typename TT::InteriorAug;
@@ -113,6 +110,15 @@ class BTree {
   void Build_(Slice In);
 
   Node* BuildRecursive(Slice In);
+
+  // template <typename Range>
+  // void BatchInsert(Range&& In);
+  //
+  // void BatchInsert_(Slice In);
+  //
+  // std::pair<typename TT::NodeSeq, typename TT::SplitSeq>
+  // BatchInsertRecursive(
+  //     Node* T, Slice In, Slice Out);
 
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);
@@ -409,6 +415,7 @@ class BTree {
 
 }  // namespace pmos
 
+// #include "b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "b_tree_impl/box_op.hpp"

@@ -26,7 +26,7 @@ struct EleWrapper : EleType {
 };
 
 template <typename EleType, uint kBufferSize, typename LeafAugType,
-          typename InteriorAugType, uint_fast8_t kSkHeightVal>
+          typename InteriorAugType, uint_fast8_t kSkHeightVal, typename Node>
 class TypeTrait {
  public:
   // NOTE: element type
@@ -48,6 +48,8 @@ class TypeTrait {
   using LeafAug = LeafAugType;
   using InteriorAug = InteriorAugType;
 
+  using NodeSeq = parlay::sequence<Node*>;
+
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
   using BucketType =
@@ -63,13 +65,13 @@ class TypeTrait {
 };
 
 template <typename EleType, uint kBufferSize, typename LeafAugType,
-          typename InteriorAugType, uint_fast8_t kSkHeightVal>
+          typename InteriorAugType, uint_fast8_t kSkHeightVal, typename Node>
 class BTreeTypeTrait
     : public TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
-                       InteriorAugType, kSkHeightVal> {
+                       InteriorAugType, kSkHeightVal, Node> {
  public:
   using BT = TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
-                       InteriorAugType, kSkHeightVal>;
+                       InteriorAugType, kSkHeightVal, Node>;
   using BufferSizeType =
       std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
   static constexpr BufferSizeType kBuf = kBufferSize;
