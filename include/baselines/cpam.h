@@ -25,7 +25,7 @@ class CpamRaw {
   using Entry = TT::Entry;
 
   using Num = typename TT::Num;
-  using Slice = typename TT::Slice;
+  using EntrySlice = typename TT::EntrySlice;
   using Split = typename TT::Split;
   using SplitSeq = typename TT::SplitSeq;
 
@@ -90,21 +90,19 @@ class CpamRaw {
   //   return make_tuple(add, remove);
   // }
   //
-  // template <typename PT, typename M>
-  // auto map_insert(PT P, M&& mmp) {
-  //   size_t n = P.size();
-  //
-  //   parlay::parallel_for(
-  //       0, n, [&](int i) { P[i].aug.code = SplitRule::Encode(P[i]); });
-  //
-  //   parlay::sequence<par> insert_pts(n);
-  //   parlay::parallel_for(0, n, [&](int i) {
-  //     insert_pts[i] = {{P[i].aug.code, P[i].aug.id}, P[i]};
-  //     // insert_pts[i] = {P[i]->id, P[i]};
-  //   });
-  //
-  //   return std::move(zmap::multi_insert(std::forward<M>(mmp), insert_pts));
-  // }
+  template <typename PT, typename M>
+  auto map_insert(PT& P, M&& mmp) {
+    size_t n = P.size();
+
+    parlay::sequence<par> insert_pts(n);
+    parlay::parallel_for(0, n, [&](int i) {
+      // entries[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
+      insert_pts[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
+      // insert_pts[i] = {P[i]->id, P[i]};
+    });
+
+    return std::move(zmap::multi_insert(std::forward<M>(mmp), insert_pts));
+  }
   //
   // template <typename PT, typename M>
   // auto map_delete(PT P, M&& mmp) {
@@ -162,16 +160,16 @@ class CpamRaw {
   // APIs
   template <typename Range>
   void Build(Range In) {
-    Slice A = parlay::make_slice(In);
+    EntrySlice A = parlay::make_slice(In);
     cpam_aug_map_ = std::move(map_init(A));
   }
 
-  // void BatchInsert(Slice In) {
-  //   if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
-  //     return Build(std::forward<Slice>(In));
-  //   }
-  //   cpam_aug_map_ = map_insert(In, std::move(cpam_aug_map_));
-  // }
+  void BatchInsert(EntrySlice In) {
+    if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
+      return Build(std::forward<EntrySlice>(In));
+    }
+    cpam_aug_map_ = map_insert(In, std::move(cpam_aug_map_));
+  }
   //
   // void BatchDelete(Slice In) {
   //   if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {

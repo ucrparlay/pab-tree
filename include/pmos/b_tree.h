@@ -29,7 +29,7 @@ class BTree {
   using Entry = TT::Entry;
 
   using Num = typename TT::Num;
-  using Slice = typename TT::Slice;
+  using EntrySlice = typename TT::EntrySlice;
   using Split = typename TT::Split;
   using NodeSplitSeqPair =
       std::pair<typename TT::NodeSeq, typename TT::SplitSeq>;
@@ -70,7 +70,7 @@ class BTree {
     }  // TODO:finish AT
 
     BTreeInteriorNode(BTreeNodeArrSlice _tree_nodes_slice,
-                      TT::SplitSeqSlice _split_slice)
+                      TT::SplitSlice _split_slice)
         : BaseNode(_tree_nodes_slice, _split_slice,
                    typename TT::InteriorAug()) {}  // TODO:finish AT
 
@@ -92,9 +92,9 @@ class BTree {
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
-    // auto UpdateAug(BTreeNodeArr const& tree_nodes) {
-    //   return this->aug.template Update<Leaf, Interior>(tree_nodes);
-    // }
+    auto UpdateAug(BTreeNodeArr const& tree_nodes, TT::SplitSeq const& splits) {
+      return this->aug.Update(tree_nodes, splits);
+    }
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
@@ -104,11 +104,15 @@ class BTree {
   template <typename Leaf, typename Interior>
   struct InnerTree;
 
-  static size_t GetBktSt(size_t i, size_t bkt_n, size_t n) {
+  static size_t GetBktNum(size_t const item_n) { return item_n / TT::kBufMD; }
+
+  static size_t GetBktStIdx(size_t const i, size_t const bkt_n,
+                            size_t const n) {
     return (n * i) / bkt_n;
   };
 
-  static size_t GetBktEnd(size_t i, size_t bkt_n, size_t n) {
+  static size_t GetBktEndIdx(size_t const i, size_t const bkt_n,
+                             size_t const n) {
     return (n * (i + 1)) / bkt_n;
   };
 
@@ -116,16 +120,16 @@ class BTree {
   template <typename Range>
   void Build(Range&& In);
 
-  void Build_(Slice In);
+  void Build_(EntrySlice In);
 
-  Node* BuildRecursive(Slice In);
+  Node* BuildRecursive(EntrySlice In);
 
   template <typename Range>
   void BatchInsert(Range&& In);
 
-  void BatchInsert_(Slice In);
+  void BatchInsert_(EntrySlice In);
 
-  NodeSplitSeqPair BatchInsertRecursive(Node* T, Slice In, Slice Out);
+  NodeSplitSeqPair BatchInsertRecursive(Node* T, EntrySlice In, EntrySlice Out);
 
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);
@@ -138,7 +142,16 @@ class BTree {
   //                                   NodeBox const& R);
   //
   static inline Node* UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                                     SplitSeqList const& split_seq_list);
+                                     SplitSeqList const& split_seq_list,
+                                     size_t new_node_n);
+
+  static size_t GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
+                                  TT::NodeSlice node_out);
+
+  static size_t GenerateInteriorNodes(TT::NodeSlice node_in,
+                                      TT::NodeSlice node_out,
+                                      TT::SplitSlice key_in,
+                                      TT::SplitSlice key_out);
   //
   // template <typename Leaf, typename Interior, bool granularity = true>
   // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);
@@ -151,9 +164,9 @@ class BTree {
   //                       parlay::sequence<BallsType>& sums);
   //
   // // NOTE: batch insert
-  static Node* InsertPoints2Leaf(Node* T, Slice In);
+  static Node* InsertPoints2Leaf(Node* T, EntrySlice In);
 
-  static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, Slice In);
+  static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, EntrySlice In);
 
   static NodeSplitSeqPair HandlingInteriorSplitOverflow(
       Node* T, NodeSeqList const& node_seq_list,
@@ -433,6 +446,7 @@ class BTree {
 #include "b_tree_impl/box_op.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
 #include "b_tree_impl/tree_op/leaf_op.hpp"
+#include "b_tree_impl/tree_op/node_op.hpp"
 #include "b_tree_impl/validation.hpp"
 
 #endif  // PMOS_B_TREE_H_

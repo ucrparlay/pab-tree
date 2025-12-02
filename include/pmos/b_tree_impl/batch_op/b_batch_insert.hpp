@@ -17,13 +17,13 @@ void BTree<TT>::BatchInsert(Range&& In) {
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
-  Slice A = parlay::make_slice(In);
+  EntrySlice A = parlay::make_slice(In);
   BatchInsert_(A);
   return;
 }
 
 template <typename TT>
-void BTree<TT>::BatchInsert_(Slice In) {
+void BTree<TT>::BatchInsert_(EntrySlice In) {
   if (this->root_ == nullptr) {  // TODO: may check using explicity tag
     return Build_(In);
   }
@@ -42,8 +42,9 @@ void BTree<TT>::BatchInsert_(Slice In) {
 
 // NOTE: return the updated Node and the split sequence
 template <typename TT>
-BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T, Slice In,
-                                                            Slice Out) {
+BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
+                                                            EntrySlice In,
+                                                            EntrySlice Out) {
   size_t n = In.size();
 
   if (n == 0) return {{T}, typename TT::SplitSeq()};
@@ -85,7 +86,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T, Slice In,
                         });
 
     if (new_node_n <= TT::kBufUB) {
-      return {{UpdateInterior(T, node_seq_list, split_seq_list)},
+      return {{UpdateInterior(T, node_seq_list, split_seq_list, new_node_n)},
               typename TT::SplitSeq()};
     } else {
       return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);

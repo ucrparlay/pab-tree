@@ -1480,8 +1480,8 @@ class Wrapper {
       return;
     }
 
-    template <typename TreeNodes>
-    void Update(TreeNodes const& /*nodes*/) {
+    template <typename TreeNodes, typename SplitSeq>
+    void Update(TreeNodes const& /*nodes*/, SplitSeq const& /*splits*/) {
       return;
     }
 

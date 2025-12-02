@@ -37,8 +37,8 @@ class TypeTrait {
 
   // NOTE: general type
   using Num = Num_Comparator<K>;
-  using Slice = parlay::slice<E*, E*>;
-  using ConstSlice = parlay::slice<E const*, E const*>;
+  using EntrySlice = parlay::slice<E*, E*>;
+  using ConstEntrySlice = parlay::slice<E const*, E const*>;
   using EntrySeq = parlay::sequence<E>;
   using ConstEntrySeq = parlay::sequence<E> const;
   using EntryIter = typename parlay::sequence<E>::iterator;
@@ -49,6 +49,7 @@ class TypeTrait {
   using InteriorAug = InteriorAugType;
 
   using NodeSeq = parlay::sequence<Node*>;
+  using NodeSlice = parlay::slice<Node**, Node**>;
 
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
@@ -81,7 +82,7 @@ class BTreeTypeTrait
 
   using Split = BT::K;
   using SplitSeq = parlay::sequence<Split>;
-  using SplitSeqSlice = parlay::slice<Split*, Split*>;
+  using SplitSlice = parlay::slice<Split*, Split*>;
 };
 
 }  // namespace pmos

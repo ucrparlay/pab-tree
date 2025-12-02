@@ -31,7 +31,7 @@ namespace pmos {
 // }
 
 template <typename TT>
-Node* BTree<TT>::InsertPoints2Leaf(Node* T, Slice In) {
+Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
   Leaf* TL = static_cast<Leaf*>(T);
 
   assert(T->size + In.size() <= TT::kBufUB);
@@ -51,8 +51,8 @@ Node* BTree<TT>::InsertPoints2Leaf(Node* T, Slice In) {
 }
 
 template <typename TT>
-BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(Node* T,
-                                                                 Slice In) {
+BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(
+    Node* T, EntrySlice In) {
   auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
   Leaf* TL = static_cast<Leaf*>(T);
 
@@ -64,23 +64,18 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(Node* T,
   FreeNode<Leaf>(T);
 
   // NOTE: split
-  entry_seq =
-      parlay::sort(entry_seq);  // BUG: we don't need this as In is sorted
-  size_t item_n = In.size();
-  size_t bkt_n = item_n / TT::kBufMD;
-  auto key_seq = parlay::sequence<typename TT::K>::uninitialized(bkt_n - 1);
-  auto node_seq = parlay::sequence<Node*>::uninitialized(bkt_n);
-  // TODO: can merge below with build
-  parlay::parallel_for(0, bkt_n, [&](size_t i) {
-    if (i < bkt_n - 1) {
-      key_seq[i] = Entry::GetKey(In[GetBktEnd(i, bkt_n, item_n)]);
-    }
-    size_t ele_l = GetBktSt(i, bkt_n, item_n);
-    size_t ele_r = (i == bkt_n - 1) ? item_n : GetBktEnd(i, bkt_n, item_n);
-    node_seq[i] = AllocNormalLeafNode<Slice, Leaf>(In.cut(ele_l, ele_r));
-  });
+  entry_seq = parlay::sort(entry_seq);  // PERF: we need sort as In is unsorted
+  size_t bkt_n = GetBktNum(entry_seq.size());
+  auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
+  auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
-  return {node_seq, key_seq};
+  [[maybe_unused]] size_t rt_bkt_n = GenerateLeafNodes(
+      parlay::make_slice(entry_seq), parlay::make_slice(split_seq),
+      parlay::make_slice(node_seq));
+
+  assert(rt_bkt_n == bkt_n);
+
+  return {node_seq, split_seq};
 }
 
 // template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,

@@ -71,22 +71,113 @@ namespace pmos {
 //   TI->UpdateAug(L.first, R.first);
 //   return;
 // }
+template <typename TT>
+size_t BTree<TT>::GenerateLeafNodes(TT::EntrySlice In, TT::SplitSlice key_out,
+                                    TT::NodeSlice node_out) {
+  size_t item_n = In.size();
+  size_t bkt_n = GetBktNum(item_n);
+  assert(bkt_n > 0);
+  assert(key_out.size() >= bkt_n - 1);
+  assert(node_out.size() >= bkt_n);
+
+  parlay::parallel_for(0, bkt_n, [&](size_t i) {
+    if (i < bkt_n - 1) {
+      // key_out[i] = TT::GetKey(In[idx_to_pack[i + 1]]);
+      key_out[i] = Entry::GetKey(In[GetBktEndIdx(i, bkt_n, item_n)]);
+    }
+    size_t ele_l = GetBktStIdx(i, bkt_n, item_n);
+    size_t ele_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
+    node_out[i] = AllocNormalLeafNode<EntrySlice, Leaf>(In.cut(ele_l, ele_r));
+  });
+  return bkt_n;
+}
+
+template <typename TT>
+size_t BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
+                                        TT::NodeSlice node_out,
+                                        TT::SplitSlice key_in,
+                                        TT::SplitSlice key_out) {
+  assert(key_in.size() == node_in.size() - 1);
+  size_t item_n = node_in.size();
+  size_t bkt_n = GetBktNum(item_n);
+  assert(bkt_n > 0);
+  assert(key_out.size() >= bkt_n - 1);
+  assert(node_out.size() >= bkt_n);
+
+  parlay::parallel_for(0, bkt_n, [&](size_t i) {
+    if (i < bkt_n - 1) {
+      key_out[i] = key_in[GetBktEndIdx(i, bkt_n, item_n) - 1];
+    }
+
+    size_t node_l = GetBktStIdx(i, bkt_n, item_n);
+    size_t node_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
+    size_t key_l = GetBktStIdx(i, bkt_n, item_n);
+    size_t key_r =
+        (i == bkt_n - 1) ? key_in.size() : GetBktEndIdx(i, bkt_n, item_n) - 1;
+    node_out[i] = AllocInteriorNode<Interior, TT>(node_in.cut(node_l, node_r),
+                                                  key_in.cut(key_l, key_r));
+  });
+  return bkt_n;
+}
 
 template <typename TT>
 Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                                SplitSeqList const& split_seq_list) {
+                                SplitSeqList const& split_seq_list,
+                                size_t new_node_n) {
   assert(!T->is_leaf);
+  assert(new_node_n <= TT::kBufUB);
+
   Interior* TI = static_cast<Interior*>(T);
-  // if constexpr (UpdateParFlag) {
-  //   TI->ResetParallelFlag();
-  // }
-  // TI->size = std::accumulate(
-  //     new_nodes.begin(), new_nodes.end(), 0,
-  //     [](size_t acc, Node* n) -> size_t { return acc + n->size; });
-  // TI->tree_nodes = new_nodes;
-  // TI->UpdateAug(new_nodes);
+  typename TT::NodeSeq new_nodes(new_node_n);
+  typename TT::SplitSeq new_splits(new_node_n - 1);
+  int node_idx = 0, split_idx = 0;
+
+  // merge node
+  for (int i = 0; i < node_seq_list.size(); i++) {
+    for (int j = 0; j < node_seq_list[i].size(); j++) {
+      new_nodes[node_idx++] = node_seq_list[i][j];
+    }
+  }
+
+  // merge split
+  for (int i = 0; i < split_seq_list.size(); i++) {
+    for (int j = 0; j < split_seq_list[i].size(); j++) {
+      new_splits[split_idx++] = split_seq_list[i][j];
+    }
+    new_splits[split_idx++] = TI->split[i];
+  }
+
+  // TODO: add check
+
+  TI->tree_nodes = std::move(new_nodes);
+  TI->split = std::move(new_splits);
+
+  TI->UpdateAug(new_nodes, new_splits);
   return T;
 }
+
+template <typename TT>
+BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
+    Node* T, NodeSeqList const& node_seq_list,
+    SplitSeqList const& split_seq_list) {
+  assert(!T->is_leaf);
+  Interior* TI = static_cast<Interior*>(T);
+  auto flatten_node_seq = parlay::flatten(node_seq_list);
+  auto flatten_split_seq = parlay::sort(
+      parlay::append(TI->GetSplit(), parlay::flatten(split_seq_list)));
+
+  size_t bkt_n = GetBktNum(flatten_node_seq.size());
+  auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
+  auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
+
+  [[maybe_unused]] size_t rt_bkt_n = GenerateInteriorNodes(
+      parlay::make_slice(flatten_node_seq), parlay::make_slice(node_seq),
+      parlay::make_slice(flatten_split_seq), parlay::make_slice(split_seq));
+
+  assert(rt_bkt_n == bkt_n);
+  return {node_seq, split_seq};
+}
+
 }  // namespace pmos
 
 #endif  // PMOS_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_

@@ -176,7 +176,7 @@ struct MultiNode : Node {
         split(_split),
         aug(_aug) {}
 
-  MultiNode(NodeArrSlice _tree_nodes_slice, TT::SplitSeqSlice _split_slice,
+  MultiNode(NodeArrSlice _tree_nodes_slice, TT::SplitSlice _split_slice,
             TT::InteriorAug const& _aug)
       : Node{false,
              std::accumulate(
@@ -205,7 +205,7 @@ static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
 template <typename Interior, typename TT>
 static Interior* AllocInteriorNode(
     typename Interior::NodeArrSlice tree_nodes_slice,
-    typename TT::SplitSeqSlice split_slice) {
+    typename TT::SplitSlice split_slice) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes_slice, split_slice);
   return o;
