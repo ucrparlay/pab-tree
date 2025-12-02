@@ -27,11 +27,15 @@ void BTree<TT>::BatchInsert_(Slice In) {
   if (this->root_ == nullptr) {  // TODO: may check using explicity tag
     return Build_(In);
   }
-  auto [updated_node_seq, split_seq] = BatchInsertRecursive(In);
+
+  auto aux_entry_seq = TT::EntrySeq::uninitialized(In.size());
+  auto [updated_node_seq, split_seq] =
+      BatchInsertRecursive(this->root_, In, parlay::make_slice(aux_entry_seq));
+
   if (split_seq.size() == 0) {
-    this->root_ = updated_node_seq;
+    this->root_ = updated_node_seq.front();
   } else {
-    this->root_ = HandlingLeafSplitOverflow(updated_node_seq, split_seq);
+    this->root_ = AllocInteriorNode<Interior, TT>(updated_node_seq, split_seq);
   }
   return;
 }
@@ -42,12 +46,12 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T, Slice In,
                                                             Slice Out) {
   size_t n = In.size();
 
-  if (n == 0) return {T, TT::SplitSeq()};
+  if (n == 0) return {{T}, typename TT::SplitSeq()};
 
   if (T->is_leaf) {
     Leaf* TL = static_cast<Leaf*>(T);
     if (TL->size + n <= TT::kBufUB) {
-      return {InsertPoints2Leaf<Leaf>(T, In), TT::SplitSeq()};
+      return {{InsertPoints2Leaf(T, In)}, typename TT::SplitSeq()};
     } else {
       return HandlingLeafSplitOverflow(T, In);
     }
@@ -60,7 +64,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T, Slice In,
     auto split_pos_seq = parlay::tabulate(TI->split.size(), [&](size_t i) {
       // return index to first key greater or equal to v
       return parlay::internal::binary_search(
-          In, [&](Entry e) { return Entry::GetKey(e) < TI->split[i]; });
+          In, [&](E e) { return Entry::GetKey(e) < TI->split[i]; });
     });
     auto node_seq_list = NodeSeqList::uninitialized(TI->tree_nodes.size());
     auto split_seq_list = SplitSeqList::uninitialized(TI->tree_nodes.size());
@@ -77,16 +81,14 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T, Slice In,
     size_t new_node_n =
         std::accumulate(node_seq_list.begin(), node_seq_list.end(), 0,
                         [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
-                          return acc + node_seq->size;
+                          return acc + node_seq.size();
                         });
 
     if (new_node_n <= TT::kBufUB) {
-      return {TT::template UpdateInterior<TT::Interior>(T, node_seq_list,
-                                                        split_seq_list),
-              TT::SplitSeq()};
+      return {{UpdateInterior(T, node_seq_list, split_seq_list)},
+              typename TT::SplitSeq()};
     } else {
-      return {HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list),
-              TT::SplitSeq()};
+      return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
     }
   }
 

@@ -137,8 +137,8 @@ class BTree {
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  static inline void UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                                    SplitSeqList const& split_seq_list);
+  static inline Node* UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
+                                     SplitSeqList const& split_seq_list);
   //
   // template <typename Leaf, typename Interior, bool granularity = true>
   // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);

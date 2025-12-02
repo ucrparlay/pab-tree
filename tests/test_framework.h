@@ -226,51 +226,28 @@ void BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds,
   return;
 }
 
-template <typename Point, typename Tree, bool kTestTime = true,
+template <typename TypeTrait, typename Tree, bool kTestTime = true,
           bool kSerial = false>
-void BatchInsert(Tree& pkd, parlay::sequence<Point> const& WP,
-                 parlay::sequence<Point> const& WI, int const& rounds,
+void BatchInsert(Tree& pkd, typename TypeTrait::EntrySeq const& WP,
+                 typename TypeTrait::EntrySeq const& WI, int const& rounds,
                  double ratio = 1.0) {
-  using Points = typename Tree::Points;
-  using Box = typename Tree::Box;
-  Points wp = Points::uninitialized(WP.size());
-  Points wi = Points::uninitialized(WI.size());
+  auto wp = WP;
+  auto wi = WI;
   double loop_late = rounds > 1 ? 0.01 : -100;
-
-  // NOTE: build the tree by type
-  auto build_tree_by_type = [&]() {
-    if constexpr (pmos::IsKdTree<Tree> || pmos::IsPTree<Tree>) {
-      parlay::copy(WP, wp), parlay::copy(WI, wi);
-      pkd.Build(parlay::make_slice(wp));
-    } else if constexpr (pmos::IsOrthTree<Tree>) {
-      parlay::copy(WP, wp), parlay::copy(WI, wi);
-      auto box1 = Tree::GetBox(parlay::make_slice(wp));
-      auto box2 =
-          Tree::GetBox(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
-      Box box = Tree::GetBox(box1, box2);
-      // std::cout << box1.first << ' ' << box1.second;
-      // std::cout << box2.first << ' ' << box2.second;
-      // std::cout << box.first << ' ' << box.second << std::endl;
-      pkd.Build(parlay::make_slice(wp), box);
-    } else {
-      parlay::copy(WP, wp), parlay::copy(WI, wi);
-      pkd.Build(parlay::make_slice(wp));
-    }
-  };
 
   if constexpr (kTestTime) {  // NOTE: clean and measure time
     pkd.DeleteTree();
     double aveInsert = time_loop(
-        rounds, loop_late, [&]() { build_tree_by_type(); },
+        rounds, loop_late, [&]() { pkd.Build(wp); },
         [&]() {
           pkd.BatchInsert(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
         },
         [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
-    BuildTree<Point, Tree, false>(WP, rounds, pkd);
+    BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
   } else {  // NOTE: insert the points from previous tree
     pkd.DeleteTree();
-    build_tree_by_type();
+    pkd.Build(wp);
     parlay::copy(WI, wi);
     pkd.BatchInsert(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
     std::cout << "finish" << std::endl;
@@ -1126,17 +1103,16 @@ static auto constexpr DefaultTestFunc =
       // std::cout << "Build Finished" << std::endl;
 
       // // NOTE: batch insert
-      // if (kTag & (1 << 0)) {
-      //   if (kSummary) {
-      //     parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01,
-      //     0.1}; for (size_t i = 0; i < ratios.size(); i++) {
-      //       BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
-      //       ratios[i]);
-      //     }
-      //   } else {
-      //     BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds, 0.1);
-      //   }
-      // }
+      if (kTag & (1 << 0)) {
+        if (kSummary) {
+          parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
+          for (size_t i = 0; i < ratios.size(); i++) {
+            BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, kRounds, ratios[i]);
+          }
+        } else {
+          BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, kRounds, 0.1);
+        }
+      }
       //
       // // NOTE: batch delete
       // if (kTag & (1 << 1)) {

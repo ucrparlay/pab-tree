@@ -73,8 +73,8 @@ namespace pmos {
 // }
 
 template <typename TT>
-void BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                               SplitSeqList const& split_seq_list) {
+Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
+                                SplitSeqList const& split_seq_list) {
   assert(!T->is_leaf);
   Interior* TI = static_cast<Interior*>(T);
   // if constexpr (UpdateParFlag) {
@@ -85,7 +85,7 @@ void BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
   //     [](size_t acc, Node* n) -> size_t { return acc + n->size; });
   // TI->tree_nodes = new_nodes;
   // TI->UpdateAug(new_nodes);
-  return;
+  return T;
 }
 }  // namespace pmos
 
