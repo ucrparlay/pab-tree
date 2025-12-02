@@ -23,17 +23,18 @@ namespace pmos {
 struct AllocNormalLeafTag {};
 struct AllocEmptyLeafTag {};
 
-struct Node {
-  Node() : is_leaf{false}, size{0} {};
-  Node(bool _is_leaf, size_t _size) : is_leaf{_is_leaf}, size{_size} {};
+struct ProtoNode {
+  ProtoNode() : is_leaf{false}, size{0} {};
+  ProtoNode(bool _is_leaf, size_t _size) : is_leaf{_is_leaf}, size{_size} {};
 
   bool is_leaf;
   size_t size;
 };
 
 template <typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
-struct LeafNode : Node {
+struct LeafNode : TypeTrait::Node {
   using TT = TypeTrait;
+  using Node = TT::Node;
   using E = typename TT::E;
   using EntrySeq = typename TT::EntrySeq;
   using AT = typename TT::LeafAug;
@@ -95,23 +96,23 @@ struct LeafNode : Node {
   AT aug;
 };
 
-template <typename NodeType, typename Range>
-static auto GetAugByType(Range In) {
-  if constexpr (NodeHasNonTrivialAug<typename NodeType::AT>) {
-    return typename NodeType::AT(In);
-  } else {
-    return typename NodeType::AT();
-  }
-}
-
-template <typename NodeType>
-static auto GetAugByType(Node* l, Node* r) {
-  if constexpr (NodeHasNonTrivialAug<typename NodeType::AT>) {
-    return typename NodeType::AT(l, r);
-  } else {
-    return typename NodeType::AT();
-  }
-}
+// template <typename NodeType, typename Range>
+// static auto GetAugByType(Range In) {
+//   if constexpr (NodeHasNonTrivialAug<typename NodeType::AT>) {
+//     return typename NodeType::AT(In);
+//   } else {
+//     return typename NodeType::AT();
+//   }
+// }
+//
+// template <typename NodeType>
+// static auto GetAugByType(Node* l, Node* r) {
+//   if constexpr (NodeHasNonTrivialAug<typename NodeType::AT>) {
+//     return typename NodeType::AT(l, r);
+//   } else {
+//     return typename NodeType::AT();
+//   }
+// }
 
 // NOTE:: Alloc a leaf with input IN and given size
 // TODO: the input aug is no longer valid
@@ -148,9 +149,9 @@ static Leaf* AllocEmptyLeafNode(typename Leaf::AT const& aug) {
 
 // NOTE: multi-way node whose children # is fixed
 template <typename TypeTrait>
-struct MultiNode : Node {
-  using BucketType = uint_fast8_t;
+struct MultiNode : TypeTrait::Node {
   using TT = TypeTrait;
+  using Node = TT::Node;
 
   static consteval auto GetLevels() {
     typename TT::BufferSizeType a = 0;
@@ -163,8 +164,8 @@ struct MultiNode : Node {
   }
 
   // using NodeArr = std::array<Node*, TT::kBufUB>;
-  using NodeArr = parlay::sequence<Node*>;
-  using NodeArrSlice = parlay::slice<Node**, Node**>;
+  using NodeArr = TT::NodeSeq;
+  using NodeArrSlice = TT::NodeSlice;
 
   MultiNode(NodeArr const& _tree_nodes, TT::SplitSeq const& _split,
             TT::InteriorAug const& _aug)
@@ -229,7 +230,7 @@ static Interior* AllocInteriorNode() {
 }
 
 template <typename NodeType>
-static void FreeNode(Node* T) {
+static void FreeNode(auto T) {
   parlay::type_allocator<NodeType>::retire(static_cast<NodeType*>(T));
 }
 
@@ -237,18 +238,18 @@ static void FreeNode(Node* T) {
 // template <typename T>
 // concept IsBinaryNode = CheckBinaryNode<T, pmos::BinaryNode>;
 
-template <typename T>
-concept IsMultiNode = CheckMultiNode<T, pmos::MultiNode>;
-
-// TODO: may remove below from inner tree
-template <typename T>
-concept IsPointerToNode = CheckPointerToNode<T, Node>;
-
-template <typename T, typename Point>
-concept IsNodeBox = requires {
-  requires IsPair<T> && IsPointerToNode<typename T::first_type> &&
-               IsBox<typename T::second_type, Point>;
-};
+// template <typename T>
+// concept IsMultiNode = CheckMultiNode<T, pmos::MultiNode>;
+//
+// // TODO: may remove below from inner tree
+// template <typename T>
+// concept IsPointerToNode = CheckPointerToNode<T, Node>;
+//
+// template <typename T, typename Point>
+// concept IsNodeBox = requires {
+//   requires IsPair<T> && IsPointerToNode<typename T::first_type> &&
+//                IsBox<typename T::second_type, Point>;
+// };
 
 }  // namespace pmos
 

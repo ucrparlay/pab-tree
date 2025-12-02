@@ -35,7 +35,7 @@ ReturnType BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::BuildInnerTree(
 template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <IsMultiNode Interior>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::BuildInnerTree(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::BuildInnerTree(
     BucketType idx, HyperPlaneSeq const& pivots,
     parlay::sequence<Node*> const& tree_nodes) {
   assert(idx < kPivotNum + kBucketNum + 1);

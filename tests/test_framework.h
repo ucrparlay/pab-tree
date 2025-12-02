@@ -1449,10 +1449,10 @@ class Wrapper {
     InteriorAugEmpty(bool) { force_par_indicator.reset(); }
 
     // use a bool to reload default constructor
-    template <typename Leaf, typename Interior>
-    static bool Create(Node* l, Node* r) {
-      return true;
-    }
+    // template <typename Leaf, typename Interior>
+    // static bool Create(Node* l, Node* r) {
+    //   return true;
+    // }
 
     template <typename TreeNodes>
     static bool Create(TreeNodes const& /*nodes*/) {
@@ -1475,10 +1475,10 @@ class Wrapper {
                  : sz > granularity;
     }
 
-    template <typename Leaf, typename Interior>
-    void Update(Node*, Node*) {
-      return;
-    }
+    // template <typename Leaf, typename Interior>
+    // void Update(Node*, Node*) {
+    //   return;
+    // }
 
     template <typename TreeNodes, typename SplitSeq>
     void Update(TreeNodes const& /*nodes*/, SplitSeq const& /*splits*/) {
@@ -1664,8 +1664,9 @@ class Wrapper {
     using V = uint32_t;
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
-    using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
-                                           InteriorAugEmpty, 8, pmos::Node>;
+    using TypeTrait =
+        pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
+                             InteriorAugEmpty, 8, pmos::ProtoNode>;
     Run<BTreeWrapper<TypeTrait>>(params, test_func);
   }
 
@@ -1676,8 +1677,9 @@ class Wrapper {
     using V = uint32_t;
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
-    using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
-                                           InteriorAugEmpty, 8, pmos::Node>;
+    using TypeTrait =
+        pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
+                             InteriorAugEmpty, 8, pmos::ProtoNode>;
     Run<CpamWrapper<TypeTrait>>(params, test_func);
   }
 };

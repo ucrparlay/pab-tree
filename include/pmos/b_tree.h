@@ -28,6 +28,7 @@ class BTree {
   using V = typename TT::V;
   using Entry = TT::Entry;
 
+  using Node = TT::Node;
   using Num = typename TT::Num;
   using EntrySlice = typename TT::EntrySlice;
   using Split = typename TT::Split;
@@ -50,10 +51,6 @@ class BTree {
   static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
   using BufferSizeType = TT::BufferSizeType;
-
-  static constexpr BufferSizeType kBuf = TT::kBuf;
-  static constexpr BufferSizeType kBufLB = TT::kBufLB;
-  static constexpr BufferSizeType kBufUB = 4 * TT::kBuf;
 
   // NOTE: tree structure
   static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
@@ -351,9 +348,9 @@ class BTree {
   template <typename Range>
   static void ExtractPointsInLeaf(Node* T, Range Out);
 
-  template <typename Leaf, IsMultiNode Interior, typename Range,
-            bool granularity = true>
-  static void PartialFlatten(Node* T, Range Out, BucketType idx);
+  // template <typename Leaf, IsMultiNode Interior, typename Range,
+  //           bool granularity = true>
+  // static void PartialFlatten(Node* T, Range Out, BucketType idx);
   //
   // // NOTE: expand a multi node into a binary node
   // template <IsBinaryNode BN, IsMultiNode MN>

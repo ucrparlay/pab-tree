@@ -19,7 +19,7 @@ namespace pmos {
 template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <IsBinaryNode BN, IsMultiNode MN>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::ExpandMultiNode(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::ExpandMultiNode(
     typename MN::ST const& split, BucketType idx, BucketType deep,
     parlay::sequence<Node*> const& tree_nodes) {
   if (idx >= MN::kRegions) {
@@ -37,7 +37,7 @@ Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::ExpandMultiNode(
 template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <IsBinaryNode BN, IsMultiNode MN>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::Expand2Binary(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::Expand2Binary(
     Node* T)
   requires std::same_as<typename BN::ST, typename MN::ST::value_type>
 {
@@ -81,7 +81,7 @@ void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::CompressBinaryNode(
 template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <IsBinaryNode BN, IsMultiNode MN>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::Compress2Multi(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::Compress2Multi(
     Node* T)
   requires std::same_as<typename BN::ST, typename MN::ST::value_type>
 {

@@ -31,7 +31,7 @@ namespace pmos {
 // }
 
 template <typename TT>
-Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
+TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
   Leaf* TL = static_cast<Leaf*>(T);
 
   assert(T->size + In.size() <= TT::kBufUB);

@@ -46,7 +46,7 @@ template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <typename Leaf, typename Interior, typename PrepareFunc,
           typename... Args>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildWithInsert(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildWithInsert(
     Node* T, PrepareFunc prepare_func, Slice In, Args&&... args) {
   Points w_in, w_out;
   PrepareRebuild<Leaf, Interior>(T, In, w_in, w_out);
@@ -65,7 +65,7 @@ Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildWithInsert(
 template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <typename Leaf, typename Interior, bool granularity, typename... Args>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildSingleTree(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildSingleTree(
     Node* T, Args&&... args) {
   Points wx, wo;
   PrepareRebuild<Leaf, Interior, granularity>(T, wx, wo);
@@ -84,7 +84,7 @@ template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <typename Leaf, IsBinaryNode Interior, bool granularity,
           typename PrepareFunc, typename... Args>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildTreeRecursive(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildTreeRecursive(
     Node* T, PrepareFunc&& prepare_func, bool const allow_inba_rebuild,
     Args&&... args) {
   if (T->is_leaf) {
@@ -133,7 +133,7 @@ template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
           uint_fast8_t kImbaRatio>
 template <typename Leaf, IsMultiNode Interior, bool granularity,
           typename PrepareFunc, typename... Args>
-Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildTreeRecursive(
+TT::Node* BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RebuildTreeRecursive(
     Node* T, PrepareFunc&& prepare_func,
     [[maybe_unused]] bool const allow_inba_rebuild, Args&&... args) {
   if (T->is_leaf) {

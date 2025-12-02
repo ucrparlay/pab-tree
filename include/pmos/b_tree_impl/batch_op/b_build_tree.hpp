@@ -42,7 +42,7 @@ void BTree<TT>::Build_(EntrySlice In) {
 }
 
 template <typename TT>
-Node* BTree<TT>::BuildRecursive(EntrySlice In) {
+TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
   if (In.size() == 0) {
     return AllocEmptyLeafNode<EntrySlice, Leaf>();
   }
