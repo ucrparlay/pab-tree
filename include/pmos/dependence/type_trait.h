@@ -33,7 +33,7 @@ class TypeTrait {
   using E = EleType::E;
   using K = typename EleType::K;
   using V = typename EleType::V;
-  using Entry = EleType;
+  using Entry = EleType;  // NOTE: abstract type to access E
 
   // NOTE: general type
   using Num = Num_Comparator<K>;

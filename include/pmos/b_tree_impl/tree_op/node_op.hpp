@@ -10,83 +10,81 @@
 #include <type_traits>
 #include <utility>
 
-#include "../../b_tree.h"
+#include "b_tree.h"
 
 namespace pmos {
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, typename Interior>
-auto BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RetriveBox(
-    Node const* node)
-  requires(HasBox<typename Leaf::AT> && HasBox<typename Interior::AT>)
-{
-  return node->is_leaf ? static_cast<Leaf const*>(node)->GetBox()
-                       : static_cast<Interior const*>(node)->GetBox();
-}
+// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
+//           uint_fast8_t kImbaRatio>
+// template <typename Leaf, typename Interior>
+// auto BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RetriveBox(
+//     Node const* node)
+//   requires(HasBox<typename Leaf::AT> && HasBox<typename Interior::AT>)
+// {
+//   return node->is_leaf ? static_cast<Leaf const*>(node)->GetBox()
+//                        : static_cast<Interior const*>(node)->GetBox();
+// }
+//
+// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
+//           uint_fast8_t kImbaRatio>
+// template <typename Leaf, typename Interior>
+// typename Interior::ST const&
+// BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::GetSplit(Node const* node)
+//   requires std::same_as<
+//       typename BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::Box,
+//       typename Interior::ST>
+// {
+//   return node->is_leaf ? static_cast<Leaf const*>(node)->GetSplit()
+//                        : static_cast<Interior const*>(node)->GetSplit();
+// }
+//
+// // NOTE: update the info of T by new children L and R
+// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
+//           uint_fast8_t kImbaRatio>
+// template <IsBinaryNode Interior, bool UpdateParFlag>
+// inline void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::UpdateInterior(
+//     Node* T, Node* L, Node* R) {
+//   assert(!T->is_leaf);
+//   Interior* TI = static_cast<Interior*>(T);
+//   if constexpr (UpdateParFlag) {
+//     TI->ResetParallelFlag();
+//   }
+//   TI->size = L->size + R->size;
+//   TI->left = L;
+//   TI->right = R;
+//   TI->UpdateAug(L, R);
+//   return;
+// }
+//
+// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
+//           uint_fast8_t kImbaRatio>
+// template <IsBinaryNode Interior, bool UpdateParFlag>
+// inline void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::UpdateInterior(
+//     Node* T, NodeBox const& L, NodeBox const& R) {
+//   assert(!T->is_leaf);
+//   Interior* TI = static_cast<Interior*>(T);
+//   if constexpr (UpdateParFlag) {
+//     TI->ResetParallelFlag();
+//   }
+//   TI->size = L.first->size + R.first->size;
+//   TI->left = L.first;
+//   TI->right = R.first;
+//   TI->UpdateAug(L.first, R.first);
+//   return;
+// }
 
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, typename Interior>
-typename Interior::ST const&
-BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::GetSplit(Node const* node)
-  requires std::same_as<
-      typename BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::Box,
-      typename Interior::ST>
-{
-  return node->is_leaf ? static_cast<Leaf const*>(node)->GetSplit()
-                       : static_cast<Interior const*>(node)->GetSplit();
-}
-
-// NOTE: update the info of T by new children L and R
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <IsBinaryNode Interior, bool UpdateParFlag>
-inline void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::UpdateInterior(
-    Node* T, Node* L, Node* R) {
+template <typename TT>
+void BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
+                               SplitSeqList const& split_seq_list) {
   assert(!T->is_leaf);
   Interior* TI = static_cast<Interior*>(T);
-  if constexpr (UpdateParFlag) {
-    TI->ResetParallelFlag();
-  }
-  TI->size = L->size + R->size;
-  TI->left = L;
-  TI->right = R;
-  TI->UpdateAug(L, R);
-  return;
-}
-
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <IsBinaryNode Interior, bool UpdateParFlag>
-inline void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::UpdateInterior(
-    Node* T, NodeBox const& L, NodeBox const& R) {
-  assert(!T->is_leaf);
-  Interior* TI = static_cast<Interior*>(T);
-  if constexpr (UpdateParFlag) {
-    TI->ResetParallelFlag();
-  }
-  TI->size = L.first->size + R.first->size;
-  TI->left = L.first;
-  TI->right = R.first;
-  TI->UpdateAug(L.first, R.first);
-  return;
-}
-
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <IsMultiNode Interior, bool UpdateParFlag>
-inline void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::UpdateInterior(
-    Node* T, typename Interior::NodeArr const& new_nodes) {
-  assert(!T->is_leaf);
-  Interior* TI = static_cast<Interior*>(T);
-  if constexpr (UpdateParFlag) {
-    TI->ResetParallelFlag();
-  }
-  TI->size = std::accumulate(
-      new_nodes.begin(), new_nodes.end(), 0,
-      [](size_t acc, Node* n) -> size_t { return acc + n->size; });
-  TI->tree_nodes = new_nodes;
-  TI->UpdateAug(new_nodes);
+  // if constexpr (UpdateParFlag) {
+  //   TI->ResetParallelFlag();
+  // }
+  // TI->size = std::accumulate(
+  //     new_nodes.begin(), new_nodes.end(), 0,
+  //     [](size_t acc, Node* n) -> size_t { return acc + n->size; });
+  // TI->tree_nodes = new_nodes;
+  // TI->UpdateAug(new_nodes);
   return;
 }
 }  // namespace pmos

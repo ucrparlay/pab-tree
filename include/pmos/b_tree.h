@@ -31,6 +31,10 @@ class BTree {
   using Num = typename TT::Num;
   using Slice = typename TT::Slice;
   using Split = typename TT::Split;
+  using NodeSplitSeqPair =
+      std::pair<typename TT::NodeSeq, typename TT::SplitSeq>;
+  using NodeSeqList = parlay::sequence<typename TT::NodeSeq>;
+  using SplitSeqList = parlay::sequence<typename TT::SplitSeq>;
 
   using LeafAug = typename TT::LeafAug;
   using InteriorAug = typename TT::InteriorAug;
@@ -52,9 +56,6 @@ class BTree {
   static constexpr BufferSizeType kBufUB = 4 * TT::kBuf;
 
   // NOTE: tree structure
-  static constexpr uint_fast8_t const kLeaveWrap = 32;
-  static constexpr uint_fast8_t const kThinLeaveWrap = 24;
-  static constexpr uint_fast8_t const kSlimLeaveWrap = 8;
   static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
 
   struct BTreeInteriorNode : MultiNode<TT> {
@@ -103,6 +104,14 @@ class BTree {
   template <typename Leaf, typename Interior>
   struct InnerTree;
 
+  static size_t GetBktSt(size_t i, size_t bkt_n, size_t n) {
+    return (n * i) / bkt_n;
+  };
+
+  static size_t GetBktEnd(size_t i, size_t bkt_n, size_t n) {
+    return (n * (i + 1)) / bkt_n;
+  };
+
   // NOTE: build tree
   template <typename Range>
   void Build(Range&& In);
@@ -111,14 +120,12 @@ class BTree {
 
   Node* BuildRecursive(Slice In);
 
-  // template <typename Range>
-  // void BatchInsert(Range&& In);
-  //
-  // void BatchInsert_(Slice In);
-  //
-  // std::pair<typename TT::NodeSeq, typename TT::SplitSeq>
-  // BatchInsertRecursive(
-  //     Node* T, Slice In, Slice Out);
+  template <typename Range>
+  void BatchInsert(Range&& In);
+
+  void BatchInsert_(Slice In);
+
+  NodeSplitSeqPair BatchInsertRecursive(Node* T, Slice In, Slice Out);
 
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);
@@ -130,9 +137,8 @@ class BTree {
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  // template <IsMultiNode Interior, bool UpdateParFlag = true>
-  // static inline void UpdateInterior(
-  //     Node* T, typename Interior::NodeArr const& new_nodes);
+  static inline void UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
+                                    SplitSeqList const& split_seq_list);
   //
   // template <typename Leaf, typename Interior, bool granularity = true>
   // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);
@@ -145,8 +151,14 @@ class BTree {
   //                       parlay::sequence<BallsType>& sums);
   //
   // // NOTE: batch insert
-  // template <typename Leaf>
-  // static Node* InsertPoints2Leaf(Node* T, Slice In);
+  static Node* InsertPoints2Leaf(Node* T, Slice In);
+
+  static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, Slice In);
+
+  static NodeSplitSeqPair HandlingInteriorSplitOverflow(
+      Node* T, NodeSeqList const& node_seq_list,
+      SplitSeqList const& split_seq_list);
+
   //
   // template <typename Leaf, typename RT>
   // static RT DeletePoints4Leaf(Node* T, Slice In);
@@ -415,11 +427,12 @@ class BTree {
 
 }  // namespace pmos
 
-// #include "b_tree_impl/batch_op/b_batch_insert.hpp"
+#include "b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "b_tree_impl/box_op.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
+#include "b_tree_impl/tree_op/leaf_op.hpp"
 #include "b_tree_impl/validation.hpp"
 
 #endif  // PMOS_B_TREE_H_

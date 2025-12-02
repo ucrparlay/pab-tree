@@ -74,13 +74,6 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
     std::ranges::swap(node_in, node_out);
   };
 
-  auto get_bucket_start = [](size_t i, size_t bkt_n, size_t n) -> size_t {
-    return (n * i) / bkt_n;
-  };
-  auto get_bucket_end = [](size_t i, size_t bkt_n, size_t n) -> size_t {
-    return (n * (i + 1)) / bkt_n;
-  };
-
   // NOTE: build leaf
   size_t item_n = In.size();
   size_t bkt_n = item_n / TT::kBufMD;
@@ -88,10 +81,10 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
   parlay::parallel_for(0, bkt_n, [&](size_t i) {
     if (i < bkt_n - 1) {
       // key_out[i] = TT::GetKey(In[idx_to_pack[i + 1]]);
-      key_out[i] = Entry::GetKey(In[get_bucket_end(i, bkt_n, item_n)]);
+      key_out[i] = Entry::GetKey(In[GetBktEnd(i, bkt_n, item_n)]);
     }
-    size_t ele_l = get_bucket_start(i, bkt_n, item_n);
-    size_t ele_r = (i == bkt_n - 1) ? item_n : get_bucket_end(i, bkt_n, item_n);
+    size_t ele_l = GetBktSt(i, bkt_n, item_n);
+    size_t ele_r = (i == bkt_n - 1) ? item_n : GetBktEnd(i, bkt_n, item_n);
     node_out[i] = AllocNormalLeafNode<Slice, Leaf>(In.cut(ele_l, ele_r));
   });
   swap_key_node(bkt_n);
@@ -106,15 +99,14 @@ Node* BTree<TT>::BuildRecursive(Slice In) {
 
     parlay::parallel_for(0, bkt_n, [&](size_t i) {
       if (i < bkt_n - 1) {
-        key_out[i] = key_in[get_bucket_end(i, bkt_n, item_n) - 1];
+        key_out[i] = key_in[GetBktEnd(i, bkt_n, item_n) - 1];
       }
 
-      size_t node_l = get_bucket_start(i, bkt_n, item_n);
-      size_t node_r =
-          (i == bkt_n - 1) ? item_n : get_bucket_end(i, bkt_n, item_n);
-      size_t key_l = get_bucket_start(i, bkt_n, item_n);
-      size_t key_r = (i == bkt_n - 1) ? key_in.size()
-                                      : get_bucket_end(i, bkt_n, item_n) - 1;
+      size_t node_l = GetBktSt(i, bkt_n, item_n);
+      size_t node_r = (i == bkt_n - 1) ? item_n : GetBktEnd(i, bkt_n, item_n);
+      size_t key_l = GetBktSt(i, bkt_n, item_n);
+      size_t key_r =
+          (i == bkt_n - 1) ? key_in.size() : GetBktEnd(i, bkt_n, item_n) - 1;
       node_out[i] = AllocInteriorNode<Interior, TT>(node_in.cut(node_l, node_r),
                                                     key_in.cut(key_l, key_r));
     });

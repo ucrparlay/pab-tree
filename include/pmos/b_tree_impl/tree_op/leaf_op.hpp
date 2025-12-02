@@ -31,22 +31,56 @@ namespace pmos {
 // }
 
 template <typename TT>
-template <typename Leaf>
 Node* BTree<TT>::InsertPoints2Leaf(Node* T, Slice In) {
   Leaf* TL = static_cast<Leaf*>(T);
 
-  assert(T->size + In.size() <= kLeaveWrap);
-  if (TL->pts.size() == 0) {
+  assert(T->size + In.size() <= TT::kBufUB);
+  assert(T->size == TL->GetEle().size());
+  if (TL->elements.size() == 0) {
     assert(TL->size == 0);
-    TL->pts = TT::EntrySeq::uninitialized(kLeaveWrap);
+    TL->InitializeEleSeq();
+    assert(TL->elements.size() == TT::kBufUB);
   }
   for (size_t i = 0; i < In.size(); i++) {
-    TL->pts[TL->size + i] = In[i];
+    TL->elements[TL->size + i] = In[i];
   }
   TL->size += In.size();
 
-  TL->UpdateAug(TL->pts.cut(0, TL->size));
+  TL->UpdateAug(TL->elements.cut(0, TL->size));
   return T;
+}
+
+template <typename TT>
+BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(Node* T,
+                                                                 Slice In) {
+  auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
+  Leaf* TL = static_cast<Leaf*>(T);
+
+  for (size_t i = 0; i < T->size; i++) {  // Assume the TT::kBufUB is constant
+    entry_seq[i] = TL->elements[i];
+  }
+  parlay::parallel_for(0, In.size(),
+                       [&](size_t i) { entry_seq[T->size + i] = In[i]; });
+  FreeNode<Leaf>(T);
+
+  // NOTE: split
+  entry_seq =
+      parlay::sort(entry_seq);  // BUG: we don't need this as In is sorted
+  size_t item_n = In.size();
+  size_t bkt_n = item_n / TT::kBufMD;
+  auto key_seq = parlay::sequence<typename TT::K>::uninitialized(bkt_n - 1);
+  auto node_seq = parlay::sequence<Node*>::uninitialized(bkt_n);
+  // TODO: can merge below with build
+  parlay::parallel_for(0, bkt_n, [&](size_t i) {
+    if (i < bkt_n - 1) {
+      key_seq[i] = Entry::GetKey(In[GetBktEnd(i, bkt_n, item_n)]);
+    }
+    size_t ele_l = GetBktSt(i, bkt_n, item_n);
+    size_t ele_r = (i == bkt_n - 1) ? item_n : GetBktEnd(i, bkt_n, item_n);
+    node_seq[i] = AllocNormalLeafNode<Slice, Leaf>(In.cut(ele_l, ele_r));
+  });
+
+  return {node_seq, key_seq};
 }
 
 // template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,

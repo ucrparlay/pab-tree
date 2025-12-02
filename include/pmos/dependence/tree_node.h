@@ -37,6 +37,7 @@ struct LeafNode : Node {
   using E = typename TT::E;
   using EntrySeq = typename TT::EntrySeq;
   using AT = typename TT::LeafAug;
+  using EleAssignTagType = EleAssignTag;
 
   // NOTE: default allocator
   LeafNode() : Node{true, static_cast<size_t>(0)}, aug(AT()) {}
@@ -69,11 +70,18 @@ struct LeafNode : Node {
 
   bool CapacityFull() const { return this->size >= TT::kBufUB; }
 
-  EntrySeq const GetEle() const { return elements.substr(0, this->size); }
+  EntrySeq GetEle() const { return elements.substr(0, this->size); }
+
+  EntrySeq const& GetEleContainer() const { return this->elements; }
+
+  EntrySeq& GetEleContainer() { return this->elements; }
+
+  void InitializeEleSeq() {
+    this->elements = EntrySeq::uninitialized(TT::kBufUB);
+    return;
+  }
 
   AT& GetAug() const { return aug; }
-
-  AT const& GetSplit() const { return aug; }
 
   // TODO: should put this one in the aug as well and don't use the monostate
   template <typename Range>
