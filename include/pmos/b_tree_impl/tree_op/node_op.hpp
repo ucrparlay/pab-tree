@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "b_tree.h"
+#include "parlay/monoid.h"
 
 namespace pmos {
 // template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
@@ -132,10 +133,15 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
   typename TT::SplitSeq new_splits(new_node_n - 1);
   int node_idx = 0, split_idx = 0;
 
+  assert(node_seq_list.size() == TI->tree_nodes.size());
+  assert(split_seq_list.size() == TI->split.size() + 1);
+
   // merge node
+  size_t tot_size = 0;
   for (int i = 0; i < node_seq_list.size(); i++) {
     for (int j = 0; j < node_seq_list[i].size(); j++) {
       new_nodes[node_idx++] = node_seq_list[i][j];
+      tot_size += node_seq_list[i][j]->size;
     }
   }
 
@@ -144,13 +150,30 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
     for (int j = 0; j < split_seq_list[i].size(); j++) {
       new_splits[split_idx++] = split_seq_list[i][j];
     }
-    new_splits[split_idx++] = TI->split[i];
+    if (i < split_seq_list.size() - 1) {
+      new_splits[split_idx++] = TI->split[i];
+    }
   }
+  assert(node_idx == split_idx + 1);
+  assert(node_idx == new_node_n);
 
-  // TODO: add check
+#ifdef DEBUG
+  for (int i = 0; i < new_nodes.size(); i++) {
+    assert(new_nodes[i] != nullptr);
+    auto box = GetBox(new_nodes[i]);
+    if (i == 0) {
+      assert(box.second < new_splits[1]);
+    } else if (i == new_nodes.size() - 1) {
+      assert(box.first >= new_splits[new_splits.size() - 1]);
+    } else {
+      assert(box.first >= new_splits[i - 1] && box.second < new_splits[i]);
+    }
+  }
+#endif  // DEBUG
 
-  TI->tree_nodes = std::move(new_nodes);
-  TI->split = std::move(new_splits);
+  TI->tree_nodes = new_nodes;
+  TI->split = new_splits;
+  TI->size = tot_size;
 
   TI->UpdateAug(new_nodes, new_splits);
   return T;

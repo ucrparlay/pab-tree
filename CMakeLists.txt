@@ -42,7 +42,7 @@ endif()
 
 if(DEBUG)
 	set(CMAKE_BUILD_TYPE "Debug")
-	add_compile_options(-g -march=native)
+	add_compile_options(-g -march=native -DDEBUG)
 	if(NOT APPLE)
 		add_compile_options(-mcx16)
 	endif()

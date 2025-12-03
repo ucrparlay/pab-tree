@@ -34,8 +34,8 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
 
   // check the box of each child node falls within the split between
   parlay::sequence<typename TT::Box> box_seq(TI->tree_nodes.size());
-  // parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
-  for (size_t i = 0; i < TI->tree_nodes.size(); i++) {
+  parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
+    // for (size_t i = 0; i < TI->tree_nodes.size(); i++) {
     box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
       assert(box_seq[i].second < TI->split[0]);
@@ -54,8 +54,8 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
         assert(false);
       }
     }
-    // });
-  }
+  });
+  // }
 
   return GetBox(box_seq);
 }

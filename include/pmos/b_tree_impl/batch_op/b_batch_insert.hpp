@@ -58,7 +58,8 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
     }
   }
 
-  if (n <= kSerialBuildCutoff) {
+  // if (n <= kSerialBuildCutoff) {
+  if (1) {
     parlay::sort_inplace(In);
 
     Interior* TI = static_cast<Interior*>(T);
@@ -67,10 +68,28 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
       return parlay::internal::binary_search(
           In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
     });
-    auto node_seq_list = NodeSeqList::uninitialized(TI->tree_nodes.size());
-    auto split_seq_list = SplitSeqList::uninitialized(TI->tree_nodes.size());
+#ifdef DEBUG
+    assert(split_pos_seq.size() == TI->split.size());
+    for (int i = 1; i < split_pos_seq.size(); i++) {
+      assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
+                            [&](E const e) {
+                              return Entry::GetKey(e) >= TI->split[i - 1] &&
+                                     Entry::GetKey(e) < TI->split[i];
+                            }));
+    }
+#endif  // DEBUG
+    auto node_seq_list = NodeSeqList(TI->tree_nodes.size());
+    auto split_seq_list = SplitSeqList(TI->tree_nodes.size());
 
     for (int i = 0; i < TI->tree_nodes.size(); i++) {
+      // auto [tree_node, split_seq] = BatchInsertRecursive(
+      //     TI->tree_nodes[i],
+      //     In.cut(i == 0 ? 0 : split_pos_seq[i - 1],
+      //            i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]),
+      //     Out.cut(i == 0 ? 0 : split_pos_seq[i - 1],
+      //             i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]));
+      // node_seq_list[i] = tree_node;
+      // split_seq_list[i] = split_seq;
       std::tie(node_seq_list[i], split_seq_list[i]) = BatchInsertRecursive(
           TI->tree_nodes[i],
           In.cut(i == 0 ? 0 : split_pos_seq[i - 1],
@@ -115,8 +134,8 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
   // auto tree_nodes = parlay::sequence<Node*>::uninitialized(IT.tags_num);
   //
 
-  auto node_seq_list = NodeSeqList::uninitialized(TI->tree_nodes.size());
-  auto split_seq_list = SplitSeqList::uninitialized(TI->tree_nodes.size());
+  auto node_seq_list = NodeSeqList(TI->tree_nodes.size());
+  auto split_seq_list = SplitSeqList(TI->tree_nodes.size());
   parlay::parallel_for(
       0, TI->tree_nodes.size(),
       [&](typename TT::BucketType i) {

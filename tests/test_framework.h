@@ -249,8 +249,9 @@ void BatchInsert(Tree& pkd, typename TypeTrait::EntrySeq const& WP,
     pkd.DeleteTree();
     pkd.Build(wp);
     parlay::copy(WI, wi);
+    std::cout << "Insert " << wi.size() * ratio << " elements\n" << std::flush;
     pkd.BatchInsert(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
-    std::cout << "finish" << std::endl;
+    std::cout << "finish ccp insert" << std::endl;
   }
 
   return;
@@ -1059,7 +1060,7 @@ std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) {
-    wp[i].ReadKey(pts[i], i);
+    wp[i].ReadKey(pts[i], i + id_offset);
     // wp[i].ReadKey(pts[i]);
     wp[i].ReadVal(pts.cut(i * dim + 1, (i + 1) * dim));
   });

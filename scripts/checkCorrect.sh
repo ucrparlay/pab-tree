@@ -13,8 +13,8 @@ make clean
 make ${tester}
 cd ${cur_path} || exit
 
-tag=$((2#0000))
-read_file=0
+tag=$((2#0001))
+read_file=1
 queryTypes=$((2#000))
 trees=(0)
 dims=(2)

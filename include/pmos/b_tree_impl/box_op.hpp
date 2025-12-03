@@ -25,6 +25,21 @@ TT::Box BTree<TT>::GetBox(TT::EntrySeq const& ele_seq) {
 }
 
 template <typename TT>
+TT::Box BTree<TT>::GetBox(Node* T) {
+  if (T->is_leaf) {
+    Leaf* TL = static_cast<Leaf*>(T);
+    return GetBox(TL->GetEle());
+  } else {
+    Interior* TI = static_cast<Interior*>(T);
+    parlay::sequence<typename TT::Box> box_seq(TI->tree_nodes.size());
+    parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
+      box_seq[i] = GetBox(TI->tree_nodes[i]);
+    });
+    return GetBox(box_seq);
+  }
+}
+
+template <typename TT>
 TT::Box BTree<TT>::GetBox(TT::BoxSeq const& box_seq) {
   auto box = box_seq[0];
   for (int i = 1; i < box_seq.size(); i++) {

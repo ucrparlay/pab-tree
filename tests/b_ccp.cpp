@@ -8,7 +8,7 @@ size_t maxReduceSize = 0;
 int const kCCPQueryNum = 10000;
 size_t const kCCPBatchQuerySize = 1000000;
 // size_t const kCCPBatchQuerySize = 110;
-double const batchInsertCheckRatio = 0.1;
+double const kBatchInsertCheckRatio = 0.1;
 double const kCCPBatchDiffTotalRatio = 1.0;
 double const kCCPBatchDiffOverlapRatio = 0.5;
 
@@ -27,7 +27,9 @@ void runKDParallel(auto const& wp, auto const& wi, int query_num,
   puts("---------------finish build tree---------------");
 
   if (tag & (1 << 0)) {
-    BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2, batchInsertCheckRatio);
+    BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2, kBatchInsertCheckRatio);
+    assert(tree.GetSize() ==
+           wp.size() + static_cast<size_t>(wi.size() * kBatchInsertCheckRatio));
     tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
     std::cout << "---------------finish insert----------------\n" << std::flush;
   }

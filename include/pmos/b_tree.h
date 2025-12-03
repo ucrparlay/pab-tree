@@ -183,7 +183,7 @@ class BTree {
   static inline BucketType RetriveTag(E const e, TT::SplitSeq const& split_seq);
   //
   static TT::BallSeq SeievePoints(EntrySlice A, EntrySlice B,
-                                   TT::SplitSeq const& split_seq);
+                                  TT::SplitSeq const& split_seq);
   //
   // template <typename Leaf, typename Interior, typename PrepareFunc,
   //           typename... Args>
@@ -370,11 +370,13 @@ class BTree {
   //   requires std::same_as<typename BN::ST, typename MN::ST::value_type>;
   //
   // NOTE: validations
-  TT::Box GetBox(TT::Box const& a, TT::Box const& b);
+  static TT::Box GetBox(TT::Box const& a, TT::Box const& b);
 
-  TT::Box GetBox(TT::EntrySeq const& ele_seq);
+  static TT::Box GetBox(TT::EntrySeq const& ele_seq);
 
-  TT::Box GetBox(TT::BoxSeq const& box_seq);
+  static TT::Box GetBox(TT::BoxSeq const& box_seq);
+
+  static TT::Box GetBox(Node* T);
 
   TT::Box GetEmptyBox();
 
@@ -416,9 +418,9 @@ class BTree {
   // // NOTE: param interfaces
   // void SetRoot(Node* root) { this->root_ = root; }
   //
-  // Node* GetRoot() { return this->root_; }
-  //
-  // size_t GetSize() { return this->root_ ? this->root_->size : 0; }
+  Node* GetRoot() { return this->root_; }
+
+  size_t GetSize() { return this->root_ ? this->root_->size : 0; }
   //
   // Box GetRootBox() { return this->tree_box_; }
   //
