@@ -161,8 +161,9 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
   for (int i = 0; i < new_nodes.size(); i++) {
     assert(new_nodes[i] != nullptr);
     auto box = GetBox(new_nodes[i]);
+    if (new_nodes.size() == 1) continue;
     if (i == 0) {
-      assert(box.second < new_splits[1]);
+      assert(box.second < new_splits[0]);
     } else if (i == new_nodes.size() - 1) {
       assert(box.first >= new_splits[new_splits.size() - 1]);
     } else {
@@ -188,6 +189,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
   auto flatten_node_seq = parlay::flatten(node_seq_list);
   auto flatten_split_seq = parlay::sort(
       parlay::append(TI->GetSplit(), parlay::flatten(split_seq_list)));
+  assert(parlay::is_sorted(parlay::flatten(split_seq_list)));
 
   size_t bkt_n = GetBktNum(flatten_node_seq.size());
   auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
