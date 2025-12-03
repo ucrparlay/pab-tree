@@ -63,9 +63,9 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
 
     Interior* TI = static_cast<Interior*>(T);
     auto split_pos_seq = parlay::tabulate(TI->split.size(), [&](size_t i) {
-      // return index to first key greater or equal to v
+      // return index to first key where is less is false
       return parlay::internal::binary_search(
-          In, [&](E e) { return Entry::GetKey(e) < TI->split[i]; });
+          In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
     });
     auto node_seq_list = NodeSeqList::uninitialized(TI->tree_nodes.size());
     auto split_seq_list = SplitSeqList::uninitialized(TI->tree_nodes.size());
@@ -99,8 +99,11 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
   // IT.AssignNodeTag(T, 1);
   // assert(IT.tags_num > 0 && IT.tags_num <= BT::kBucketNum);
   //
-  // BT::template SeievePoints<Interior>(In, Out, n, IT.tags, IT.sums,
-  //                                     IT.tags_num);
+  // WARN: assume the B is large enough, otherwise should sieve multiplt levels
+  Interior* TI = static_cast<Interior*>(T);
+  auto sums = SeievePoints(In, Out, TI->split);
+  assert(sums.size() == TI->tree_nodes.size());
+  assert(std::accumulate(sums.begin(), sums.end(), 0) == n);
   //
   // IT.TagInbalanceNode([&]([[maybe_unused]] BucketType idx) -> bool {
   //   auto const TI = static_cast<Interior*>(IT.tags[idx].first);
@@ -111,39 +114,34 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
   // assert(IT.tags_num > 0 && IT.tags_num <= BT::kBucketNum);
   // auto tree_nodes = parlay::sequence<Node*>::uninitialized(IT.tags_num);
   //
-  // parlay::parallel_for(
-  //     0, IT.tags_num,
-  //     [&](decltype(IT.tags_num) i) {
-  //       size_t s = 0;
-  //       for (decltype(IT.tags_num) j = 0; j < i; j++) {
-  //         s += IT.sums_tree[IT.rev_tag[j]];
-  //       }
-  //
-  //       DimsType next_dim = d, depth = IT.GetDepthByIndex(IT.rev_tag[i]);
-  //       for (BucketType i = 0; i < depth; i++) {
-  //         next_dim = split_rule_.NextDimension(next_dim);
-  //       }
-  //
-  //       if (IT.tags[IT.rev_tag[i]].second == BT::kBucketNum + 1) {
-  //         // NOTE: continue sieve
-  //         tree_nodes[i] = BatchInsertRecursive(
-  //             IT.tags[IT.rev_tag[i]].first,
-  //             Out.cut(s, s + IT.sums_tree[IT.rev_tag[i]]),
-  //             In.cut(s, s + IT.sums_tree[IT.rev_tag[i]]), next_dim);
-  //       } else {  // NOTE: launch rebuild subtree
-  //         assert(IT.tags[IT.rev_tag[i]].second == BT::kBucketNum + 2);
-  //         assert(IT.tags[IT.rev_tag[i]].first->size +
-  //                    IT.sums_tree[IT.rev_tag[i]] >=
-  //                0);
-  //
-  //         tree_nodes[i] = BT::template RebuildWithInsert<Leaf, Interior>(
-  //             IT.tags[IT.rev_tag[i]].first, prepare_func,
-  //             Out.cut(s, s + IT.sums_tree[IT.rev_tag[i]]), next_dim);
-  //       }
-  //     },
-  //     1);
-  //
-  // return IT.template UpdateInnerTree<InnerTree::kUpdatePointer>(tree_nodes);
+
+  auto node_seq_list = NodeSeqList::uninitialized(TI->tree_nodes.size());
+  auto split_seq_list = SplitSeqList::uninitialized(TI->tree_nodes.size());
+  parlay::parallel_for(
+      0, TI->tree_nodes.size(),
+      [&](typename TT::BucketType i) {
+        size_t s = 0;
+        for (typename TT::BucketType j = 0; j < i; j++) {
+          s += sums[j];
+        }
+
+        std::tie(node_seq_list[i], split_seq_list[i]) = BatchInsertRecursive(
+            TI->tree_nodes[i], Out.cut(s, s + sums[i]), In.cut(s, s + sums[i]));
+      },
+      1);
+
+  size_t new_node_n =
+      std::accumulate(node_seq_list.begin(), node_seq_list.end(), 0,
+                      [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
+                        return acc + node_seq.size();
+                      });
+
+  if (new_node_n <= TT::kBufUB) {
+    return {{UpdateInterior(T, node_seq_list, split_seq_list, new_node_n)},
+            typename TT::SplitSeq()};
+  } else {
+    return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
+  }
 }
 
 }  // namespace pmos

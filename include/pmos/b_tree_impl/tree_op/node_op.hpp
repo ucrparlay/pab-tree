@@ -122,8 +122,8 @@ size_t BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 
 template <typename TT>
 TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                                SplitSeqList const& split_seq_list,
-                                size_t new_node_n) {
+                                    SplitSeqList const& split_seq_list,
+                                    size_t new_node_n) {
   assert(!T->is_leaf);
   assert(new_node_n <= TT::kBufUB);
 

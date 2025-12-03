@@ -55,6 +55,7 @@ class TypeTrait {
 
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
+  // TODO:: needs to check this value as well
   using BucketType =
       std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
   using BallsType = uint_fast32_t;

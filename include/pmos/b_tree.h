@@ -180,15 +180,10 @@ class BTree {
   // static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
   // tags);
   //
-  // template <IsMultiNode Interior>
-  // static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
-  // tags);
+  static inline BucketType RetriveTag(E const e, TT::SplitSeq const& split_seq);
   //
-  // template <typename Interior>
-  // static void SeievePoints(Slice A, Slice B, size_t const n,
-  //                          NodeTagSeq const& tags,
-  //                          parlay::sequence<BallsType>& sums,
-  //                          BucketType const tags_num);
+  static TT::BallSeq SeievePoints(EntrySlice A, EntrySlice B,
+                                   TT::SplitSeq const& split_seq);
   //
   // template <typename Leaf, typename Interior, typename PrepareFunc,
   //           typename... Args>
@@ -441,6 +436,7 @@ class BTree {
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "b_tree_impl/box_op.hpp"
+#include "b_tree_impl/points_op.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
 #include "b_tree_impl/tree_op/leaf_op.hpp"
 #include "b_tree_impl/tree_op/node_op.hpp"
