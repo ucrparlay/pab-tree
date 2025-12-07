@@ -8,6 +8,7 @@
 #include <iostream>
 
 #include "baselines/cpam.h"
+#include "baselines/pam.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
@@ -1069,19 +1070,19 @@ std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
 
 template <typename TreeWrapper>
 void PrintTreeParam() {
-  std::cout << "Tree: " << TreeWrapper::TreeType::GetTreeName() << "; "
-            << "AugType: " << TreeWrapper::TreeType::CheckHasBox() << "; "
-            << "Split: " << TreeWrapper::SplitRule::GetSplitName() << "; "
-            << "BDO: " << TreeWrapper::TreeType::GetBuildDepthOnce() << "; "
-            << "Inba: " << TreeWrapper::TreeType::GetImbalanceRatio() << "; ";
+  std::cout << "Tree: " << TreeWrapper::TreeType::GetTreeName() << "; ";
+  // << "AugType: " << TreeWrapper::TreeType::CheckHasBox() << "; "
+  // << "Split: " << TreeWrapper::SplitRule::GetSplitName() << "; "
+  // << "BDO: " << TreeWrapper::TreeType::GetBuildDepthOnce() << "; "
+  // << "Inba: " << TreeWrapper::TreeType::GetImbalanceRatio() << "; ";
 
-  if constexpr (std::is_integral_v<typename TreeWrapper::Point::Coord>) {
-    std::cout << "Coord: integer"
-              << "; ";
-  } else if (std::is_floating_point_v<typename TreeWrapper::Point::Coord>) {
-    std::cout << "Coord: float"
-              << "; ";
-  }
+  // if constexpr (std::is_integral_v<typename TreeWrapper::Point::Coord>) {
+  //   std::cout << "Coord: integer"
+  //             << "; ";
+  // } else if (std::is_floating_point_v<typename TreeWrapper::Point::Coord>) {
+  //   std::cout << "Coord: float"
+  //             << "; ";
+  // }
   std::cout << "\n" << std::flush;
   return;
 }
@@ -1504,6 +1505,10 @@ class Wrapper {
   struct CpamWrapper {
     using TreeType = typename CPAMTree::CpamRaw<TypeTrait>;
   };
+  template <typename TypeTrait>
+  struct PamWrapper {
+    using TreeType = typename PAMTree::PamRaw<TypeTrait>;
+  };
 
   // NOTE: Apply the dim and split rule
   struct AugId {
@@ -1568,7 +1573,7 @@ class Wrapper {
     using E = typename TT::E;
     using EntrySeq = typename TT::EntrySeq;
 
-    // PrintTreeParam<TreeWrapper>();
+    PrintTreeParam<TreeWrapper>();
 
     std::string name, insert_file_path = "";
     EntrySeq wp, wi;
@@ -1668,7 +1673,9 @@ class Wrapper {
     using TypeTrait =
         pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
                              InteriorAugEmpty, 8, pmos::ProtoNode>;
-    Run<BTreeWrapper<TypeTrait>>(params, test_func);
+    if (tree_type == 0) {
+      Run<BTreeWrapper<TypeTrait>>(params, test_func);
+    }
   }
 
   template <typename RunFunc>
@@ -1681,6 +1688,12 @@ class Wrapper {
     using TypeTrait =
         pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
                              InteriorAugEmpty, 8, pmos::ProtoNode>;
-    Run<CpamWrapper<TypeTrait>>(params, test_func);
+    if (tree_type == 0) {
+      // B-tree
+    } else if (tree_type == 1) {
+      Run<CpamWrapper<TypeTrait>>(params, test_func);
+    } else if (tree_type == 2) {
+      Run<PamWrapper<TypeTrait>>(params, test_func);
+    }
   }
 };

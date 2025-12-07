@@ -53,7 +53,7 @@ class BTree {
   using BufferSizeType = TT::BufferSizeType;
 
   // NOTE: tree structure
-  static constexpr uint_fast16_t const kSerialBuildCutoff = 1 << 10;
+  static constexpr uint_fast16_t const kSerialBuildCutoff = 512;
 
   struct BTreeInteriorNode : MultiNode<TT> {
     using TT = TT;
@@ -427,6 +427,8 @@ class BTree {
   // consteval static auto GetBuildDepthOnce() {
   //   return static_cast<int>(kBuildDepthOnce);
   // }
+
+  constexpr static char const* GetTreeName() { return "BTree"; }
 
  protected:
   Node* root_ = nullptr;
