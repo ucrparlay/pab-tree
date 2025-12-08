@@ -77,12 +77,14 @@ class BTreeTypeTrait
  public:
   using BT = TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
                        InteriorAugType, kSkHeightVal, NodeType>;
-  using BufferSizeType =
-      std::conditional_t<(kBufferSize > 255u), uint_fast16_t, uint_fast8_t>;
+  static uint const kBufMDFac = 2;
+  static uint const kBufUBFac = 4;
+  using BufferSizeType = std::conditional_t<(kBufferSize * kBufUBFac > 255u),
+                                            uint_fast16_t, uint_fast8_t>;
   static constexpr BufferSizeType kBuf = kBufferSize;
   static constexpr BufferSizeType kBufLB = kBufferSize;
-  static constexpr BufferSizeType kBufMD = 2 * kBufferSize;
-  static constexpr BufferSizeType kBufUB = 4 * kBufferSize;
+  static constexpr BufferSizeType kBufMD = kBufMDFac * kBufferSize;
+  static constexpr BufferSizeType kBufUB = kBufUBFac * kBufferSize;
 
   using Split = BT::K;
   using SplitSeq = parlay::sequence<Split>;
