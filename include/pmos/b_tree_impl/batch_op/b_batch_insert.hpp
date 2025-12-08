@@ -112,7 +112,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
             Out.cut(i == 0 ? 0 : split_pos_seq[i - 1],
                     i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]));
       },
-      In.size() > kSerialBuildCutoff);
+      1);
   // for (int i = 0; i < TI->tree_nodes.size(); i++) {
   //   std::tie(node_seq_list[i], split_seq_list[i]) = BatchInsertRecursive(
   //       TI->tree_nodes[i],
