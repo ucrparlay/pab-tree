@@ -69,9 +69,9 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(
   auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
   auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
-  [[maybe_unused]] size_t rt_bkt_n = GenerateLeafNodes(
-      parlay::make_slice(entry_seq), parlay::make_slice(split_seq),
-      parlay::make_slice(node_seq));
+  size_t rt_bkt_n = GenerateLeafNodes(parlay::make_slice(entry_seq),
+                                      parlay::make_slice(split_seq),
+                                      parlay::make_slice(node_seq));
 
   assert(rt_bkt_n == bkt_n);
 
