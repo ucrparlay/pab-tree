@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "CPAM/include/cpam/cpam.h"
+#include "b_tree.h"
 // #include "geobase.h"
 // #include "hilbert.h"
 
@@ -131,6 +132,7 @@ class CpamRaw {
   //   }
   // }
   //
+
   // template <class T, class MBR>
   // auto range_count(T& zCPAM, MBR& query_mbr) {
   //   // auto f = [&](auto& cur) { return mbr_mbr_relation(cur, query_mbr); };
@@ -186,6 +188,12 @@ class CpamRaw {
   //   return logger;
   // }
   //
+
+  auto Contain(K const k) const {
+    pmos::RangeQueryLogger logger;
+    auto res = this->cpam_aug_map_.contains(k);
+    return std::make_pair(res, logger);
+  }
   // auto RangeCount(Box const& q) {
   //   psi::RangeQueryLogger logger;
   //   auto size = this->range_count(this->cpam_aug_map_, q);

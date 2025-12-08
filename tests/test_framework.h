@@ -879,6 +879,37 @@ void rangeCountFix(Tree& pkd, Typename* kdknn, int const& rounds, int rec_type,
 // }
 //
 //* test range query for fix rectangle
+template <typename TT, typename Tree>
+void Membership(Tree const& pkd, auto const& query_ele, int kRounds,
+                auto& res) {
+  using Entry = typename TT::Entry;
+  int query_num = query_ele.size();
+  parlay::sequence<size_t> vis_leaf(query_num), vis_inter(query_num);
+
+  double aveQuery = time_loop(
+      kRounds, 0.01, [&]() {},
+      [&]() {
+        parlay::parallel_for(0, query_num, [&](size_t i) {
+          auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
+
+          res[i] = contain;
+          vis_leaf[i] = logger.vis_leaf_num;
+          vis_inter[i] = logger.vis_interior_num;
+        });
+      },
+      [&]() {});
+
+  std::cout << aveQuery << " " << std::flush;
+  std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, query_num))) /
+                   static_cast<double>(query_num)
+            << " " << std::flush;
+  std::cout << static_cast<double>(
+                   parlay::reduce(vis_inter.cut(0, query_num))) /
+                   static_cast<double>(query_num)
+            << " " << std::flush;
+  return;
+}
+
 template <typename Point, typename Tree>
 void rangeQueryFix(Tree& pkd, Typename* kdknn, int const& rounds,
                    parlay::sequence<Point>& Out, int rec_type, int rec_num,
@@ -1129,7 +1160,13 @@ static auto constexpr DefaultTestFunc =
       //                                         kBatchInsertRatio);
       //   }
       // }
-      //
+
+      if (kQueryType & (1 << 0)) {  // NOTE: membership
+        size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+        auto query_ele = wp.subseq(0, batch_size);
+        auto res = parlay::sequence<bool>(query_ele.size(), false);
+        Membership<TT>(tree, query_ele, kRounds, res);
+      }
       // Typename* kdknn = nullptr;
       // auto run_batch_knn = [&](Points const& query_pts, int kth) {
       //   kdknn = new Typename[query_pts.size()];
@@ -1349,7 +1386,8 @@ static auto constexpr DefaultTestFunc =
       // // }
       //
       // // BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds,
-      // 0.000000001); if (kQueryType & (1 << 0)) {  // NOTE: KNN
+      // 0.000000001);
+      // if (kQueryType & (1 << 0)) {  // NOTE: KNN
       //   size_t batch_size = static_cast<size_t>(wp.size() *
       //   kBatchQueryRatio);
       //

@@ -36,6 +36,8 @@ struct LeafNode : TypeTrait::Node {
   using TT = TypeTrait;
   using Node = TT::Node;
   using E = typename TT::E;
+  using K = typename TT::K;
+  using Entry = TT::Entry;
   using EntrySeq = typename TT::EntrySeq;
   using AT = typename TT::LeafAug;
   using EleAssignTagType = EleAssignTag;
@@ -70,6 +72,13 @@ struct LeafNode : TypeTrait::Node {
   }
 
   bool CapacityFull() const { return this->size >= TT::kBufUB; }
+
+  bool Contain(K const k) const {
+    return std::ranges::find_if(
+               this->elements.begin(), this->elements.begin() + this->size,
+               [&](E const e) { return Entry::GetKey(e) == k; }) !=
+           this->elements.begin() + this->size;
+  }
 
   EntrySeq GetEle() const { return elements.substr(0, this->size); }
 

@@ -17,6 +17,7 @@ void runKDParallel(auto const& wp, auto const& wi, int query_num,
                    int const query_type, int const K, int const tag,
                    int const rounds) {
   using Tree = TreeDesc::TreeType;
+  using EntrySeq = typename TT::EntrySeq;
 
   Tree tree;
   constexpr bool kTestTime = false;
@@ -109,36 +110,41 @@ void runKDParallel(auto const& wp, auto const& wi, int query_num,
   //               wp.subseq(0, kCCPBatchQuerySize));
   // }
 
-  // // NOTE: query phase
-  // if (query_type & (1 << 0)) {  // NOTE: NN query
-  //   knn_checker(wp, wi, wp.subseq(0, kCCPBatchQuerySize));
-  // }
+  EntrySeq new_wp;
+  if (tag == (1 << 0)) {  // insert
+    new_wp = wp;
+    new_wp.append(
+        wi.cut(0, static_cast<size_t>(wi.size() * kBatchInsertCheckRatio)));
+  } else if (tag == (1 << 1)) {
+    new_wp = wp.subseq(static_cast<size_t>(wi.size() * kBatchInsertCheckRatio),
+                       wp.size());
+  } else if (tag & (1 << 2)) {  // WARN: this assume before we run diff, the
+                                // tree should conation wp, e.g., just after
+                                // build or build->insert->delete
+    size_t total_batch_size =
+        static_cast<size_t>(wp.size() * kCCPBatchDiffTotalRatio);
+    size_t overlap_size =
+        static_cast<size_t>(total_batch_size * kCCPBatchDiffOverlapRatio);
+    new_wp = wp.subseq(overlap_size, wp.size());
+  } else if (tag == (1 << 3)) {
+    new_wp = wp;
+    // new_wp.append(wi);
+  } else if (tag == (1 << 4)) {
+    new_wp = wp.subseq(wp.size() / 2, wp.size());
+  } else {
+    new_wp = wp;
+  }
 
-  // Points new_wp;
-  // if (tag == (1 << 0)) {
-  //   new_wp = wp;
-  //   new_wp.append(
-  //       wi.cut(0, static_cast<size_t>(wi.size() * batchInsertCheckRatio)));
-  // } else if (tag == (1 << 1)) {
-  //   new_wp = wp.subseq(static_cast<size_t>(wi.size() *
-  //   batchInsertCheckRatio),
-  //                      wp.size());
-  // } else if (tag & (1 << 2)) {  // WARN: this assume before we run diff, the
-  //                               // tree should conation wp, e.g., just after
-  //                               // build or build->insert->delete
-  //   size_t total_batch_size =
-  //       static_cast<size_t>(wp.size() * kCCPBatchDiffTotalRatio);
-  //   size_t overlap_size =
-  //       static_cast<size_t>(total_batch_size * kCCPBatchDiffOverlapRatio);
-  //   new_wp = wp.subseq(overlap_size, wp.size());
-  // } else if (tag == (1 << 3)) {
-  //   new_wp = wp;
-  //   // new_wp.append(wi);
-  // } else if (tag == (1 << 4)) {
-  //   new_wp = wp.subseq(wp.size() / 2, wp.size());
-  // } else {
-  //   new_wp = wp;
-  // }
+  // // NOTE: query phase
+  if (query_type & (1 << 0)) {  // NOTE: membership
+    size_t batch_size = static_cast<size_t>(wp.size() * kBatchInsertCheckRatio);
+    auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
+    auto res = parlay::sequence<bool>(query_ele.size(), false);
+    Membership<TT>(tree, query_ele, rounds, res);
+    assert(parlay::all_of(res, [&](auto r) { return res == true; }));
+    std::cout << "--------------finish membership------------------\n"
+              << std::flush;
+  }
 
   // if (query_type & (1 << 1)) {  // NOTE: range count
   //   for (auto range_query_type : {0, 1, 2}) {

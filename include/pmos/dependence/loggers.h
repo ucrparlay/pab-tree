@@ -5,6 +5,11 @@
 
 namespace pmos {
 
+struct MembershipLogger {
+  size_t vis_leaf_num = 0;
+  size_t vis_interior_num = 0;
+};
+
 struct KNNLogger {
   size_t vis_leaf_num = 0;
   size_t vis_interior_num = 0;

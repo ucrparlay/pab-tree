@@ -398,6 +398,10 @@ class BTree {
   //
   template <typename Leaf, typename Interior>
   void Validate();
+
+  std::pair<bool, MembershipLogger> Contain(K const k) const;
+
+  bool ContainRec(Node const* T, K const k) const;
   //
   // template <typename Leaf, typename Interior>
   // size_t GetTreeHeight();
@@ -441,6 +445,7 @@ class BTree {
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "b_tree_impl/box_op.hpp"
 #include "b_tree_impl/points_op.hpp"
+#include "b_tree_impl/query_op/membership.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
 #include "b_tree_impl/tree_op/leaf_op.hpp"
 #include "b_tree_impl/tree_op/node_op.hpp"

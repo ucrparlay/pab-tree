@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "CPAM/include/pam/pam.h"
+#include "b_tree.h"
 // #include "geobase.h"
 // #include "hilbert.h"
 
@@ -198,6 +199,12 @@ class PamRaw {
   //   auto size = this->range_report(this->cpam_aug_map_, q, Out);
   //   return std::make_pair(size, logger);
   // }
+
+  auto Contain(K const k) const {
+    pmos::RangeQueryLogger logger;
+    auto res = this->cpam_aug_map_.contains(k);
+    return std::make_pair(res, logger);
+  }
 
   void DeleteTree() {
     cpam_aug_map_.clear();
