@@ -15,7 +15,7 @@ cd ${cur_path} || exit
 
 tag=$((2#0001))
 read_file=1
-queryTypes=$((2#000))
+queryTypes=$((2#001))
 trees=(0)
 dims=(2)
 K=100

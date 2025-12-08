@@ -142,7 +142,7 @@ void runKDParallel(auto const& wp, auto const& wi, int query_num,
     auto res = parlay::sequence<bool>(query_ele.size(), false);
     Membership<TT>(tree, query_ele, rounds, res);
     assert(parlay::all_of(res, [&](auto r) { return r == true; }));
-    std::cout << "--------------finish membership------------------\n"
+    std::cout << "\n--------------finish membership------------------\n"
               << std::flush;
   }
 
