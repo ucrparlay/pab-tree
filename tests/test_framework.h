@@ -1102,6 +1102,8 @@ std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
 template <typename TreeWrapper>
 void PrintTreeParam() {
   std::cout << "Tree: " << TreeWrapper::TreeType::GetTreeName() << "; ";
+  std::cout << "Buf: " << static_cast<int>(TreeWrapper::TreeType::TT::kBuf)
+            << "; ";
   // << "AugType: " << TreeWrapper::TreeType::CheckHasBox() << "; "
   // << "Split: " << TreeWrapper::SplitRule::GetSplitName() << "; "
   // << "BDO: " << TreeWrapper::TreeType::GetBuildDepthOnce() << "; "
@@ -1708,8 +1710,32 @@ class Wrapper {
     using V = uint32_t;
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
+#ifdef LEAF1
+    static constexpr uint const kBuf = 1;
+#elif defined(LEAF2)
+    static constexpr uint const kBuf = 2;
+#elif defined(LEAF4)
+    static constexpr uint const kBuf = 4;
+#elif defined(LEAF8)
+    static constexpr uint const kBuf = 8;
+#elif defined(LEAF16)
+    static constexpr uint const kBuf = 16;
+#elif defined(LEAF32)
+    static constexpr uint const kBuf = 32;
+#elif defined(LEAF64)
+    static constexpr uint const kBuf = 64;
+#elif defined(LEAF128)
+    static constexpr uint const kBuf = 128;
+#elif defined(LEAF512)
+    static constexpr uint const kBuf = 512;
+#elif defined(LEAF1024)
+    static constexpr uint const kBuf = 1024;
+#else
+    static constexpr uint const kBuf = 16;  // Default
+#endif  // LEAF1
+
     using TypeTrait =
-        pmos::BTreeTypeTrait<ElementWrapper<E>, 16, LeafAugEmpty,
+        pmos::BTreeTypeTrait<ElementWrapper<E>, kBuf, LeafAugEmpty,
                              InteriorAugEmpty, 8, pmos::ProtoNode>;
     if (tree_type == 0) {
       Run<BTreeWrapper<TypeTrait>>(params, test_func);

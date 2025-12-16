@@ -190,6 +190,8 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
   auto flatten_split_seq = parlay::sort(
       parlay::append(TI->GetSplit(), parlay::flatten(split_seq_list)));
   assert(parlay::is_sorted(parlay::flatten(split_seq_list)));
+  // std::cout << "Split interior node with size " << flatten_node_seq.size()
+  //           << std::endl;
 
   size_t bkt_n = GetBktNum(flatten_node_seq.size());
   auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);

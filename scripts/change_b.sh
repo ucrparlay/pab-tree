@@ -4,14 +4,13 @@ set -o xtrace
 
 /usr/bin/drop_caches
 
-# declare -a leaf_wrap=(4 16 32 64 128 512 1024)
-declare -a leaf_wrap=(512 1024)
+declare -a leaf_wrap=(2 4 8 16 32 64 128 512 1024)
 
 Nodes=(1000000000)
 Dim=(2)
 declare -A datas
-datas["/data/legacy/data3/zmen002/kdtree/ss_varden/"]="../benchmark/ss_varden/"
-datas["/data/legacy/data3/zmen002/kdtree/uniform/"]="../benchmark/uniform/"
+# datas["/data/legacy/data3/zmen002/kdtree/ss_varden/"]="../benchmark/ss_varden/"
+datas["/data/zmen002/kv_pair/uniform_bigint/"]="../benchmark/uniform/"
 
 tag=$((2#0001))
 summary=1

@@ -126,7 +126,7 @@ class BTree {
 
   void BatchInsert_(EntrySlice In);
 
-  NodeSplitSeqPair BatchInsertRecursive(Node* T, EntrySlice In, EntrySlice Out);
+  NodeSplitSeqPair BatchInsertRecursive(Node* T, EntrySlice In);
 
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);

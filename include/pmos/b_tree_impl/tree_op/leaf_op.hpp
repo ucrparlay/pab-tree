@@ -62,6 +62,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(
   parlay::parallel_for(0, In.size(),
                        [&](size_t i) { entry_seq[T->size + i] = In[i]; });
   FreeNode<Leaf>(T);
+  // std::cout << "Split leaf node with size " << entry_seq.size() << std::endl;
 
   // NOTE: split
   entry_seq = parlay::sort(entry_seq);  // PERF: we need sort as In is unsorted

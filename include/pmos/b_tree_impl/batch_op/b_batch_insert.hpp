@@ -29,31 +29,35 @@ void BTree<TT>::BatchInsert_(EntrySlice In) {
     return Build_(In);
   }
 
+  parlay::internal::timer t;
+  t.reset(), t.start();
   auto sorted_seq = parlay::sort(In);
+  t.next("sort");
 
-  auto aux_entry_seq = TT::EntrySeq::uninitialized(In.size());
   auto [updated_node_seq, split_seq] =
-      BatchInsertRecursive(this->root_, parlay::make_slice(sorted_seq),
-                           parlay::make_slice(aux_entry_seq));
+      BatchInsertRecursive(this->root_, parlay::make_slice(sorted_seq));
+  t.next("batch insert");
 
   if (split_seq.size() == 0) {
     this->root_ = updated_node_seq.front();
   } else {
     this->root_ = AllocInteriorNode<Interior, TT>(updated_node_seq, split_seq);
   }
+  t.next("alloc root");
+  puts("-----------------------");
   return;
 }
 
 template <typename TT>
 BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
-                                                            EntrySlice In,
-                                                            EntrySlice Out) {
+                                                            EntrySlice In) {
   size_t n = In.size();
 
   if (n == 0) return {{T}, typename TT::SplitSeq()};
 
   if (T->is_leaf) {
     Leaf* TL = static_cast<Leaf*>(T);
+    // return {{T}, typename TT::SplitSeq()};
     if (TL->size + n <= TT::kBufUB) {
       return {{InsertPoints2Leaf(T, In)}, typename TT::SplitSeq()};
     } else {
@@ -63,32 +67,21 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
 
   Interior* TI = static_cast<Interior*>(T);
 
-  // PARA: helpers to finalize interior node after batch insert
-  auto finalize_interior =
-      [&](NodeSeqList& node_seq_list,
-          SplitSeqList& split_seq_list) -> NodeSplitSeqPair {
-    size_t new_node_n =
-        std::accumulate(node_seq_list.begin(), node_seq_list.end(), 0,
-                        [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
-                          return acc + node_seq.size();
-                        });
-    if (new_node_n <= TT::kBufUB) {
-      return {{UpdateInterior(T, node_seq_list, split_seq_list, new_node_n)},
-              typename TT::SplitSeq()};
-    }
-    return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
-  };
-
   auto split_pos_seq = parlay::sequence<int>(TI->split.size());
   for (int i = 0; i < TI->split.size(); i++) {
+    // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
     split_pos_seq[i] = parlay::internal::binary_search(
         In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
   }
-  // auto split_pos_seq = parlay::tabulate(TI->split.size(), [&](size_t i) {
-  //   // return index to first key where is less is false
-  //   return parlay::internal::binary_search(
-  //       In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
-  // });
+  // auto split_pos_seq = parlay::tabulate(
+  //     TI->split.size(),
+  //     [&](size_t i) {
+  //       // return index to first key where is less is false
+  //       // return In.size() / TI->split.size() * (i + 1);
+  //       return parlay::internal::binary_search(
+  //           In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
+  //     },
+  //     1);
 #ifdef DEBUG
   assert(split_pos_seq.size() == TI->split.size());
   for (int i = 1; i < split_pos_seq.size(); i++) {
@@ -108,21 +101,21 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
         std::tie(node_seq_list[i], split_seq_list[i]) = BatchInsertRecursive(
             TI->tree_nodes[i],
             In.cut(i == 0 ? 0 : split_pos_seq[i - 1],
-                   i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]),
-            Out.cut(i == 0 ? 0 : split_pos_seq[i - 1],
-                    i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]));
+                   i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]));
       },
       1);
-  // for (int i = 0; i < TI->tree_nodes.size(); i++) {
-  //   std::tie(node_seq_list[i], split_seq_list[i]) = BatchInsertRecursive(
-  //       TI->tree_nodes[i],
-  //       In.cut(i == 0 ? 0 : split_pos_seq[i - 1],
-  //              i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]),
-  //       Out.cut(i == 0 ? 0 : split_pos_seq[i - 1],
-  //               i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]));
-  // }
 
-  return finalize_interior(node_seq_list, split_seq_list);
+  size_t new_node_n =
+      std::accumulate(node_seq_list.begin(), node_seq_list.end(), 0,
+                      [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
+                        return acc + node_seq.size();
+                      });
+  if (new_node_n <= TT::kBufUB) {
+    // return {{T}, typename TT::SplitSeq()};
+    return {{UpdateInterior(T, node_seq_list, split_seq_list, new_node_n)},
+            typename TT::SplitSeq()};
+  }
+  return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
 }
 
 // template <typename TT>
