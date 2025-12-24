@@ -172,40 +172,56 @@ struct MultiNode : TypeTrait::Node {
     return a;
   }
 
-  // using NodeArr = std::array<Node*, TT::kBufUB>;
-  using NodeArr = TT::NodeSeq;
-  using NodeArrSlice = TT::NodeSlice;
+  using NodeArr = std::array<Node*, TT::kBufUB>;
+  using SplitArr = std::array<typename TT::Split, TT::kBufUB>;
 
-  MultiNode(NodeArr const& _tree_nodes, TT::SplitSeq const& _split,
+  MultiNode(TT::NodeSeq const& _tree_nodes, TT::SplitSeq const& _split,
             TT::InteriorAug const& _aug)
       : Node{false,
              std::accumulate(
                  _tree_nodes.begin(), _tree_nodes.end(), static_cast<size_t>(0),
                  [](size_t acc, Node* n) -> size_t { return acc + n->size; })},
-        tree_nodes(_tree_nodes),
-        split(_split),
-        aug(_aug) {}
+        node_n(_tree_nodes.size()),
+        aug(_aug) {
+    for (int i = 0; i < _tree_nodes.size(); i++) {
+      tree_nodes[i] = _tree_nodes[i];
+    }
+    for (int i = 0; i < _split.size(); i++) {
+      split[i] = _split[i];
+    }
+  }
 
-  MultiNode(NodeArrSlice _tree_nodes_slice, TT::SplitSlice _split_slice,
+  MultiNode(TT::NodeSlice _tree_nodes_slice, TT::SplitSlice _split_slice,
             TT::InteriorAug const& _aug)
       : Node{false,
              std::accumulate(
                  _tree_nodes_slice.begin(), _tree_nodes_slice.end(),
                  static_cast<size_t>(0),
                  [](size_t acc, Node* n) -> size_t { return acc + n->size; })},
-        tree_nodes(parlay::to_sequence(_tree_nodes_slice)),
-        split(parlay::to_sequence(_split_slice)),
-        aug(_aug) {}
+        node_n(_tree_nodes_slice.size()),
+        aug(_aug) {
+    for (int i = 0; i < _tree_nodes_slice.size(); i++) {
+      tree_nodes[i] = _tree_nodes_slice[i];
+    }
+    for (int i = 0; i < _split_slice.size(); i++) {
+      split[i] = _split_slice[i];
+    }
+  }
 
-  TT::SplitSeq const& GetSplit() const { return split; }
+  TT::BufferSizeType GetNodeN() const { return node_n; }
 
+  TT::BufferSizeType GetSplitN() const { return node_n - 1; }
+
+  SplitArr const& GetSplit() const { return split; }
+
+  TT::BufferSizeType node_n;
   NodeArr tree_nodes;
-  TT::SplitSeq split;
+  SplitArr split;
   TT::InteriorAug aug;
 };
 
 template <typename Interior, typename TT>
-static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
+static Interior* AllocInteriorNode(typename TT::NodeSeq const& tree_nodes,
                                    typename TT::SplitSeq const& split) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes, split);
@@ -213,9 +229,8 @@ static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
 }
 
 template <typename Interior, typename TT>
-static Interior* AllocInteriorNode(
-    typename Interior::NodeArrSlice tree_nodes_slice,
-    typename TT::SplitSlice split_slice) {
+static Interior* AllocInteriorNode(typename TT::NodeSlice tree_nodes_slice,
+                                   typename TT::SplitSlice split_slice) {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes_slice, split_slice);
   return o;
@@ -223,7 +238,7 @@ static Interior* AllocInteriorNode(
 
 // TODO: maybe replace the NodeArr, ST, and AT with template parameters
 template <typename Interior, typename TT>
-static Interior* AllocInteriorNode(typename Interior::NodeArr const& tree_nodes,
+static Interior* AllocInteriorNode(typename TT::NodeSlice const& tree_nodes,
                                    typename TT::SplitSeq const& split,
                                    typename TT::InteriorAug const& aug) {
   Interior* o = parlay::type_allocator<Interior>::alloc();

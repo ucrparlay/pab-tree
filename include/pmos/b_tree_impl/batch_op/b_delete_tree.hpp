@@ -33,7 +33,7 @@ void BTree<TT>::DeleteTreeRecursive(Node* T) {
     // NOTE: enable granularity control by default, if it is disabled,
     // always delete in parallel
     parlay::parallel_for(
-        0, TI->tree_nodes.size(),
+        0, TI->GetNodeN(),
         [&](size_t i) { DeleteTreeRecursive(TI->tree_nodes[i]); },
         // WARN: the granularity control may not work well here
         ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBuf);

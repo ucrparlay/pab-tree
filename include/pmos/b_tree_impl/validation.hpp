@@ -23,23 +23,19 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
   Interior const* TI = static_cast<Interior const*>(T);
 
   // ensure the split number is 1 less than the child number
-  assert(TI->tree_nodes.size() == TI->split.size() + 1);
-
-  // ensure the split number is 1 less than the child number
-  assert(T == this->root_ || (TI->tree_nodes.size() >= TT::kBufLB &&
-                              TI->tree_nodes.size() <= TT::kBufUB));
+  assert(T == this->root_ ||
+         (TI->GetNodeN() >= TT::kBufLB && TI->GetNodeN() <= TT::kBufUB));
 
   // ensure the split is increasing
   assert(parlay::is_sorted(TI->split, [&](TT::K a, TT::K b) { return a < b; }));
 
   // check the box of each child node falls within the split between
-  parlay::sequence<typename TT::Box> box_seq(TI->tree_nodes.size());
-  parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
-    // for (size_t i = 0; i < TI->tree_nodes.size(); i++) {
+  parlay::sequence<typename TT::Box> box_seq(TI->GetNodeN());
+  parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
     box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
       assert(box_seq[i].second < TI->split[0]);
-    } else if (i == TI->tree_nodes.size() - 1) {
+    } else if (i == TI->GetNodeN() - 1) {
       assert(box_seq[i].first >= TI->split[i - 1]);
     } else {
       // assert(box_seq[i].first >= TI->split[i - 1] &&
@@ -68,10 +64,10 @@ int BTree<TT>::CheckHeight(Node const* T) {
   }
 
   Interior const* TI = static_cast<Interior const*>(T);
-  assert(TI->tree_nodes.size() == TI->split.size() + 1);
-  parlay::sequence<int> heights(TI->tree_nodes.size());
+  assert(TI->GetNodeN() == TI->split.size() + 1);
+  parlay::sequence<int> heights(TI->GetNodeN());
 
-  parlay::parallel_for(0, TI->tree_nodes.size(), [&](size_t i) {
+  parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
     heights[i] = CheckHeight<Leaf, Interior>(TI->tree_nodes[i]);
   });
 
@@ -88,9 +84,9 @@ int BTree<TT>::GetHeight(Node const* T) {
   }
 
   Interior const* TI = static_cast<Interior const*>(T);
-  parlay::sequence<int> heights(TI->tree_nodes.size());
+  parlay::sequence<int> heights(TI->GetNodeN());
 
-  for (int i = 0; i < TI->tree_nodes.size(); i++) {
+  for (int i = 0; i < TI->GetNodeN(); i++) {
     heights[i] = GetHeight<Leaf, Interior>(TI->tree_nodes[i]);
   }
 
@@ -107,7 +103,7 @@ int BTree<TT>::GetTreeNodesNum(Node const* T) {
   Interior const* TI = static_cast<Interior const*>(T);
 
   int sum = 0;
-  for (int i = 0; i < TI->tree_nodes.size(); i++) {
+  for (int i = 0; i < TI->GetNodeN(); i++) {
     sum += GetTreeNodesNum<Leaf, Interior>(TI->tree_nodes[i]);
   }
 
@@ -153,7 +149,7 @@ void BTree<TT>::Validate() {
 //     return std::max(l, r);
 //   } else if constexpr (IsMultiNode<Interior>) {
 //     size_t max_depth = 0;
-//     for (size_t i = 0; i < TI->tree_nodes.size(); i++) {
+//     for (size_t i = 0; i < TI->GetNodeN(); i++) {
 //       max_depth = std::max(max_depth, GetMaxTreeDepth<Leaf, Interior>(
 //                                           TI->tree_nodes[i], deep + 1));
 //     }
@@ -198,7 +194,7 @@ void BTree<TT>::Validate() {
 //     return l + r + 1;
 //   } else {
 //     size_t sum = 0;
-//     for (int i = 0; i < TI->tree_nodes.size(); i++) {
+//     for (int i = 0; i < TI->GetNodeN(); i++) {
 //       sum += CountTreeNodesNum<Leaf, Interior>(TI->tree_nodes[i]);
 //     }
 //     return sum + 1;

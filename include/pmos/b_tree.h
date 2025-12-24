@@ -58,20 +58,20 @@ class BTree {
   struct BTreeInteriorNode : MultiNode<TT> {
     using TT = TT;
     using BaseNode = MultiNode<TT>;
-    using BTreeNodeArr = typename BaseNode::NodeArr;
-    using BTreeNodeArrSlice = typename BaseNode::NodeArrSlice;
+    // using BTreeNodeArr = typename BaseNode::NodeArr;
+    // using BTreeNodeArrSlice = typename BaseNode::NodeArrSlice;
 
-    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes,
+    BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split)
         : BaseNode(_tree_nodes, _split, typename TT::InteriorAug()) {
     }  // TODO:finish AT
 
-    BTreeInteriorNode(BTreeNodeArrSlice _tree_nodes_slice,
+    BTreeInteriorNode(TT::NodeSlice _tree_nodes_slice,
                       TT::SplitSlice _split_slice)
         : BaseNode(_tree_nodes_slice, _split_slice,
                    typename TT::InteriorAug()) {}  // TODO:finish AT
 
-    BTreeInteriorNode(BTreeNodeArr const& _tree_nodes,
+    BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split, TT::InteriorAug const& _aug)
         : BaseNode(_tree_nodes, _split, _aug) {}
 
@@ -89,9 +89,7 @@ class BTree {
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
-    auto UpdateAug(BTreeNodeArr const& tree_nodes, TT::SplitSeq const& splits) {
-      return this->aug.Update(tree_nodes, splits);
-    }
+    auto UpdateAug() { return this->aug.Update(); }
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
@@ -383,7 +381,7 @@ class BTree {
 
   static TT::Box GetBox(TT::BoxSeq const& box_seq);
 
-  static TT::Box GetBox(Node* T);
+  static TT::Box GetBox(Node const* T);
 
   TT::Box GetEmptyBox();
 

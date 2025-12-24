@@ -1478,7 +1478,7 @@ class Wrapper {
   }
 
   struct LeafAugEmpty {
-    LeafAugEmpty() {};
+    LeafAugEmpty(){};
 
     template <typename Slice>
     LeafAugEmpty(Slice In){};
@@ -1531,6 +1531,8 @@ class Wrapper {
     void Update(TreeNodes const& /*nodes*/, SplitSeq const& /*splits*/) {
       return;
     }
+
+    void Update() { return; }
 
     void Reset() { this->force_par_indicator.reset(); }
 

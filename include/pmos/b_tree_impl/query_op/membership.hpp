@@ -2,6 +2,7 @@
 #define PMOS_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
 
 #include "b_tree.h"
+#include "parlay/slice.h"
 
 namespace pmos {
 template <typename TT>
@@ -18,12 +19,14 @@ bool BTree<TT>::ContainRec(Node const* T, K const k) const {
 
   Interior const* TI = static_cast<Interior const*>(T);
   auto pos = parlay::internal::binary_search(
-      TI->split, [&](K const key) { return k >= key; });
+      parlay::make_slice(TI->split.begin(),
+                         TI->split.begin() + TI->GetSplitN()),
+      [&](K const key) { return k >= key; });
 
-  assert(pos < TI->tree_nodes.size());
+  assert(pos < TI->GetNodeN());
   assert(pos == 0 ? k < TI->split.front()
-                  : (pos == TI->split.size()
-                         ? k >= TI->split.back()
+                  : (pos == TI->GetSplitN()
+                         ? k >= TI->split[TI->GetNodeN() - 2]
                          : (k >= TI->split[pos - 1] && k < TI->split[pos])));
   return ContainRec(TI->tree_nodes[pos], k);
 }
