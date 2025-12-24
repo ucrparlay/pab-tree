@@ -132,7 +132,7 @@ namespace pmos {
 // }
 template <typename TT>
 void BTree<TT>::PartitionBinarySearchRec(
-    TT::SplitSlice split_seq_s,
+    auto split_seq_s,
     // parlay::sequence<int>& split_pos_seq,
     auto& split_pos_seq, EntrySlice entry_seq_s, size_t split_offset,
     size_t in_offset) {

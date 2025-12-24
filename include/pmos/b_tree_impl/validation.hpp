@@ -27,7 +27,8 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
          (TI->GetNodeN() >= TT::kBufLB && TI->GetNodeN() <= TT::kBufUB));
 
   // ensure the split is increasing
-  assert(parlay::is_sorted(TI->split, [&](TT::K a, TT::K b) { return a < b; }));
+  assert(parlay::is_sorted(TI->GetSplitSlice(),
+                           [&](TT::K a, TT::K b) { return a < b; }));
 
   // check the box of each child node falls within the split between
   parlay::sequence<typename TT::Box> box_seq(TI->GetNodeN());
@@ -64,7 +65,6 @@ int BTree<TT>::CheckHeight(Node const* T) {
   }
 
   Interior const* TI = static_cast<Interior const*>(T);
-  assert(TI->GetNodeN() == TI->split.size() + 1);
   parlay::sequence<int> heights(TI->GetNodeN());
 
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {

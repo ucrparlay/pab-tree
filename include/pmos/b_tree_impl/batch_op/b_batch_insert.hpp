@@ -112,25 +112,17 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
   Interior* TI = static_cast<Interior*>(T);
 
   // auto split_pos_seq = parlay::sequence<int>(TI->split.size());
-  std::array<size_t, TT::kBufUB> split_pos_seq;
-  // PartitionBinarySearchRec(parlay::make_slice(TI->split), split_pos_seq, In,
-  // 0,
-  //                          0);
+  std::array<SizeT, TT::kBufUB> split_pos_seq;
+  // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
   // TODO: maybe we can decide it by skewed distribution
-  size_t offset = 0;
-  for (int i = 0; i < TI->split.size(); i++) {
+  SizeT offset = 0;
+  for (int i = 0; i < TI->GetSplitN(); i++) {
     // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
-    size_t pos = parlay::internal::binary_search(
+    SizeT pos = parlay::internal::binary_search(
         In.cut(i == 0 ? 0 : split_pos_seq[i - 1], In.size()),
         [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
     offset += pos;
     split_pos_seq[i] = offset;
-    // split_pos_seq[i] = std::lower_bound(In.begin(), In.end(), TI->split[i],
-    //                                     [&](E const e, typename TT::K const
-    //                                     k) {
-    //                                       return Entry::GetKey(e) < k;
-    //                                     }) -
-    //                    In.begin();
   }
 // auto split_pos_seq = parlay::tabulate(
 //     TI->split.size(),
@@ -142,8 +134,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
 //     },
 //     1);
 #ifdef DEBUG
-  assert(split_pos_seq.size() == TI->split.size());
-  for (int i = 1; i < split_pos_seq.size(); i++) {
+  for (int i = 1; i < TI->GetSplitN(); i++) {
     assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
                           [&](E const e) {
                             return Entry::GetKey(e) >= TI->split[i - 1] &&
@@ -186,18 +177,6 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
             BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
       },
       1);
-
-  // parlay::parallel_for(
-  //     0, cnt,
-  //     [&](size_t i) {
-  //       size_t l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
-  //       size_t r = nodes_map[i] == TI->GetNodeN() - 1
-  //                      ? n
-  //                      : split_pos_seq[nodes_map[i]];
-  //       std::tie(node_seq_list[nodes_map[i]], split_seq_list[nodes_map[i]]) =
-  //           BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
-  //     },
-  //     1);
 
   // for (int i = 0; i < TI->GetNodeN(); i++) {
   //   int l = (i == 0 ? 0 : split_pos_seq[i - 1]);

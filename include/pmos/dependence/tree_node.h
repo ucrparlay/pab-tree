@@ -214,6 +214,15 @@ struct MultiNode : TypeTrait::Node {
 
   SplitArr const& GetSplit() const { return split; }
 
+  auto GetNodeSlice() const {
+    return parlay::make_slice(tree_nodes.begin(),
+                              tree_nodes.begin() + GetNodeN());
+  }
+
+  auto GetSplitSlice() const {
+    return parlay::make_slice(split.begin(), split.begin() + GetSplitN());
+  }
+
   TT::BufSizeT node_n;
   NodeArr tree_nodes;
   SplitArr split;

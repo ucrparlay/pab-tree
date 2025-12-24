@@ -51,6 +51,7 @@ class BTree {
   static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
   using BufSizeT = TT::BufSizeT;
+  using SizeT = TT::SizeT;
 
   // NOTE: tree structure
   static constexpr uint_fast16_t const kSerialBuildCutoff = 512;
@@ -163,7 +164,7 @@ class BTree {
 
   static Node* InsertPoints2Leaf(Node* T, EntrySlice In);
 
-  static void PartitionBinarySearchRec(TT::SplitSlice split_seq_s,
+  static void PartitionBinarySearchRec(auto split_seq_s,
                                        // parlay::sequence<int>& split_pos_seq,
                                        auto& split_pos_seq,
                                        EntrySlice entry_seq_s,

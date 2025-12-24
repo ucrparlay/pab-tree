@@ -133,9 +133,7 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
   // typename TT::SplitSeq new_splits(new_node_n - 1);
   typename TT::BufSizeT node_idx = 0, split_idx = 0;
 
-  assert(node_seq_list.size() == TI->GetNodeN());
-  assert(split_seq_list.size() == TI->GetSplitN());
-
+  // TODO: we can remove new_node_n and compute here
   // merge node
   size_t tot_size = 0;
   for (typename TT::BufSizeT i = 0; i < TI->GetNodeN(); i++) {
@@ -166,8 +164,10 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
 #ifdef DEBUG
   for (int i = 0; i < TI->GetNodeN(); i++) {
     assert(TI->tree_nodes[i] != nullptr);
+    if (TI->GetNodeN() == 1) {
+      continue;
+    }
     auto box = GetBox(TI->tree_nodes[i]);
-    if (TI->tree_nodes[i] == 1) continue;
     if (i == 0) {
       assert(box.second < TI->split[0]);
     } else if (i == TI->GetNodeN() - 1) {
@@ -178,8 +178,6 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
   }
 #endif  // DEBUG
 
-  // TODO: we needs to update the Aug here
-  // WARN: we needs to update the Aug here
   TI->UpdateAug();
   return T;
 }
@@ -194,7 +192,8 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
       parlay::append(typename TT::SplitSeq(TI->split.begin(),
                                            TI->split.begin() + TI->GetSplitN()),
                      parlay::flatten(split_seq_list)));
-  assert(parlay::is_sorted(flatten_split_seq));
+  assert(parlay::is_sorted(flatten_split_seq,
+                           [&](TT::K a, TT::K b) { return a < b; }));
   // std::cout << "Split interior node with size " << flatten_node_seq.size()
   //           << std::endl;
 
