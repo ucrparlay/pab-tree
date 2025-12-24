@@ -30,7 +30,7 @@ solver="b_test"
 for i in "${!leaf_wrap[@]}"; do
 	cur_path=$(pwd)
 	cd ../build || exit
-	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++-14 -DLEAF="${leaf_wrap[${i}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DLEAF="${leaf_wrap[${i}]}" "${HOME}/ParallelMultiwayOrderedSet"
 	make ${solver}
 	cd "${cur_path}" || exit
 

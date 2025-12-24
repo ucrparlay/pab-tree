@@ -17,7 +17,7 @@ log_folder_name = "linear_wrap"
 subprocess.run(
     f"""
     > logs/{log_folder_name}/{input_type}.log
-    for file in $(ls logs/{log_folder_name}/*.in_*.log); do
+    for file in $(ls logs/{log_folder_name}/*.log); do
         filename=$(basename "$file")
         cat "$file" >> logs/{log_folder_name}/{input_type}.log
         echo "" >> logs/{log_folder_name}/{input_type}.log
@@ -38,8 +38,7 @@ def to_float(match):
 def combine(P) -> List:
     lines = open(P, "r").readlines()
 
-    solver = "Array"
-    leaf_wrap = 0
+    buf_value = 0
     benchmark = ""
     index = 0
     all_data = []
@@ -52,29 +51,21 @@ def combine(P) -> List:
             index += 1
             continue
 
-        # Tree information
+        # Tree information - parse Buf value
         if lin_sep[0] == "Tree:":
-            leaf_wrap = int(lin_sep[11].strip(";"))
+            buf_value = int(lin_sep[3].strip(";"))
 
             match lines[index + 1].split(" ")[0]:
                 case "1.in":
-                    benchmark = "Varden"
-                case "2_sort_by_0.in":
-                    benchmark = "Uniform_by_x"
-                case "2.in":
                     benchmark = "Uniform"
-            index += 2
+            index += 1
 
         else:
-            # parse result
-            solver = "Pointer" if solver == "Array" else "Array"
+            # parse result - summarize by Buf value
             all_data.append(
-                [benchmark, solver, leaf_wrap]
-                + [lin_sep[i] for i in range(0, len(lin_sep), 6)]
+                [benchmark, buf_value]
+                + lin_sep[1:]
             )
-            # all_data = all_data + \
-            #     [[benchmark, solver, leaf_wrap, lin_sep[0],
-            #         lin_sep[6], lin_sep[12], lin_sep[18], lin_sep[24], lin_sep[30], lin_sep[36]]]
             index += 1
 
     return all_data
@@ -90,13 +81,15 @@ def post_processing(data):
         key=lambda x: (
             bench_order.index(x[0]),
             # tree_order.index(x[1]),
-            int(x[2]),
+            int(x[1]),
         ),
     )
     return sorted_lst
 
 
 def csvSetup():
+    target_path = Path(store_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     csv_file_pointer = open(store_path, "w", newline="")
     print(csv_file_pointer.name)
     csv_file_pointer.truncate()
@@ -104,19 +97,15 @@ def csvSetup():
     csv_writer.writerow(
         [
             "benchmark",
-            "solver",
             "leaf_wrap",
-            "InD1",
-            "InD10",
-            "InD100",
-            "InD1000",
-            "OOD1",
-            "OOD10",
-            "OOD100",
-            "OOD1000",
-            "S",
-            "M",
-            "L",
+            "build",
+            "0.01%",
+            "0.1%",
+            "1%",
+            "10%",
+            "membership",
+            "vis_leaf",
+            "vis_interior"
         ]
     )
     return csv_writer, csv_file_pointer
