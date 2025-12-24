@@ -79,12 +79,13 @@ class BTreeTypeTrait
                        InteriorAugType, kSkHeightVal, NodeType>;
   static uint const kBufMDFac = 2;
   static uint const kBufUBFac = 4;
-  using BufferSizeType = std::conditional_t<(kBufferSize * kBufUBFac > 255u),
-                                            uint_fast16_t, uint_fast8_t>;
-  static constexpr BufferSizeType kBuf = kBufferSize;
-  static constexpr BufferSizeType kBufLB = kBufferSize;
-  static constexpr BufferSizeType kBufMD = kBufMDFac * kBufferSize;
-  static constexpr BufferSizeType kBufUB = kBufUBFac * kBufferSize;
+  using SizeT = uint_fast32_t;
+  using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 255u),
+                                      uint_fast16_t, uint_fast8_t>;
+  static constexpr BufSizeT kBuf = kBufferSize;
+  static constexpr BufSizeT kBufLB = kBufferSize;
+  static constexpr BufSizeT kBufMD = kBufMDFac * kBufferSize;
+  static constexpr BufSizeT kBufUB = kBufUBFac * kBufferSize;
 
   using Split = BT::K;
   using SplitSeq = parlay::sequence<Split>;
