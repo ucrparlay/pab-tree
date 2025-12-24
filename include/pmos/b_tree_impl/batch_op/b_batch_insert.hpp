@@ -68,9 +68,13 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
   Interior* TI = static_cast<Interior*>(T);
 
   auto split_pos_seq = parlay::sequence<int>(TI->split.size());
+  PartitionBinarySearchRec(parlay::make_slice(TI->split), split_pos_seq, In, 0,
+                           0);
+
+  auto new_split_pos_seq = parlay::sequence<int>(TI->split.size());
   for (int i = 0; i < TI->split.size(); i++) {
     // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
-    split_pos_seq[i] = parlay::internal::binary_search(
+    new_split_pos_seq[i] = parlay::internal::binary_search(
         In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
   }
   // auto split_pos_seq = parlay::tabulate(
@@ -83,6 +87,17 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
   //     },
   //     1);
 #ifdef DEBUG
+  // for (int i = 0; i < new_split_pos_seq.size(); i++) {
+  //   printf("i=%d, new=%d, old=%d\n", i, new_split_pos_seq[i],
+  //   split_pos_seq[i]);
+  // }
+
+  for (int i = 0; i < new_split_pos_seq.size(); i++) {
+    // if (new_split_pos_seq[i] != split_pos_seq[i])
+    //   printf("i=%d, new=%d, old=%d\n", i, new_split_pos_seq[i],
+    //          split_pos_seq[i]);
+    assert(new_split_pos_seq[i] == split_pos_seq[i]);
+  }
   assert(split_pos_seq.size() == TI->split.size());
   for (int i = 1; i < split_pos_seq.size(); i++) {
     assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),

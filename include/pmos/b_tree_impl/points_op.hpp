@@ -132,6 +132,33 @@ namespace pmos {
 // }
 
 template <typename TT>
+void BTree<TT>::PartitionBinarySearchRec(TT::SplitSlice split_seq,
+                                         parlay::sequence<int>& split_pos_seq,
+                                         EntrySlice In, size_t split_offset,
+                                         size_t In_offset) {
+  if (split_seq.size() == 0)
+    return;
+  else if (split_seq.size() == 1) {
+    split_pos_seq[split_offset] =
+        In_offset + parlay::internal::binary_search(In, [&](E const e) {
+          return Entry::GetKey(e) < split_seq[0];
+        });
+    return;
+  } else {
+    size_t mid = split_seq.size() >> 1;
+    size_t pos = parlay::internal::binary_search(
+        In, [&](E const e) { return Entry::GetKey(e) < split_seq[mid]; });
+    split_pos_seq[split_offset + mid] = In_offset + pos;
+    PartitionBinarySearchRec(split_seq.cut(0, mid), split_pos_seq,
+                             In.cut(0, pos), split_offset, In_offset);
+    PartitionBinarySearchRec(split_seq.cut(mid + 1, split_seq.size()),
+                             split_pos_seq, In.cut(pos, In.size()),
+                             split_offset + mid + 1, In_offset + pos);
+    return;
+  }
+}
+
+template <typename TT>
 typename TT::BucketType BTree<TT>::RetriveTag(E const e,
                                               TT::SplitSeq const& split_seq) {
   return parlay::internal::binary_search(

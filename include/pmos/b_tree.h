@@ -165,6 +165,11 @@ class BTree {
 
   static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, EntrySlice In);
 
+  static void PartitionBinarySearchRec(TT::SplitSlice split_seq,
+                                       parlay::sequence<int>& split_pos_seq,
+                                       EntrySlice In, size_t split_offset,
+                                       size_t In_offset);
+
   static NodeSplitSeqPair HandlingInteriorSplitOverflow(
       Node* T, NodeSeqList const& node_seq_list,
       SplitSeqList const& split_seq_list);
