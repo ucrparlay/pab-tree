@@ -132,13 +132,13 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
   Interior* TI = static_cast<Interior*>(T);
   // typename TT::NodeSeq new_nodes(new_node_n);
   // typename TT::SplitSeq new_splits(new_node_n - 1);
-  typename TT::BufSizeT node_idx = 0, split_idx = 0;
+  BufSizeT node_idx = 0, split_idx = 0;
 
   // TODO: we can remove new_node_n and compute here
   // merge node
   SizeT tot_size = 0;
-  for (typename TT::BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    for (typename TT::BufSizeT j = 0; j < node_seq_list[i].size(); j++) {
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    for (BufSizeT j = 0; j < node_seq_list[i].size(); j++) {
       TI->tree_nodes[node_idx++] = node_seq_list[i][j];
       tot_size += node_seq_list[i][j]->size;
     }
@@ -146,8 +146,8 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
 
   // merge split
   typename Interior::SplitArr new_splits;
-  for (typename TT::BufSizeT i = 0; i < TI->GetSplitN(); i++) {
-    for (typename TT::BufSizeT j = 0; j < split_seq_list[i].size(); j++) {
+  for (BufSizeT i = 0; i < TI->GetSplitN(); i++) {
+    for (BufSizeT j = 0; j < split_seq_list[i].size(); j++) {
       new_splits[split_idx++] = split_seq_list[i][j];
     }
     if (i < split_seq_list.size() - 1) {

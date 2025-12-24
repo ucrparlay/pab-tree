@@ -161,9 +161,10 @@ template <typename TypeTrait>
 struct MultiNode : TypeTrait::Node {
   using TT = TypeTrait;
   using Node = TT::Node;
+  using BufSizeT = typename TT::BufSizeT;
 
   static consteval auto GetLevels() {
-    typename TT::BufSizeT a = 0;
+    BufSizeT a = 0;
     auto temp = TT::kBufUB;
     while (temp > 1) {
       temp >>= 1;  // divide by 2
@@ -183,10 +184,10 @@ struct MultiNode : TypeTrait::Node {
                  [](size_t acc, Node* n) -> size_t { return acc + n->size; })},
         node_n(_tree_nodes.size()),
         aug(_aug) {
-    for (int i = 0; i < _tree_nodes.size(); i++) {
+    for (BufSizeT i = 0; i < _tree_nodes.size(); i++) {
       tree_nodes[i] = _tree_nodes[i];
     }
-    for (int i = 0; i < _split.size(); i++) {
+    for (BufSizeT i = 0; i < _split.size(); i++) {
       split[i] = _split[i];
     }
   }
@@ -200,10 +201,10 @@ struct MultiNode : TypeTrait::Node {
                  [](size_t acc, Node* n) -> size_t { return acc + n->size; })},
         node_n(_tree_nodes_slice.size()),
         aug(_aug) {
-    for (int i = 0; i < _tree_nodes_slice.size(); i++) {
+    for (BufSizeT i = 0; i < _tree_nodes_slice.size(); i++) {
       tree_nodes[i] = _tree_nodes_slice[i];
     }
-    for (int i = 0; i < _split_slice.size(); i++) {
+    for (BufSizeT i = 0; i < _split_slice.size(); i++) {
       split[i] = _split_slice[i];
     }
   }
