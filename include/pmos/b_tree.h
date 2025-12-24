@@ -166,7 +166,8 @@ class BTree {
   static Node* InsertPoints2Leaf(Node* T, EntrySlice In);
 
   static void PartitionBinarySearchRec(TT::SplitSlice split_seq_s,
-                                       parlay::sequence<int>& split_pos_seq,
+                                       // parlay::sequence<int>& split_pos_seq,
+                                       auto& split_pos_seq,
                                        EntrySlice entry_seq_s,
                                        size_t split_offset, size_t In_offset);
 

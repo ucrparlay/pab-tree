@@ -131,11 +131,11 @@ namespace pmos {
 //   return tags[k].second;
 // }
 template <typename TT>
-void BTree<TT>::PartitionBinarySearchRec(TT::SplitSlice split_seq_s,
-                                         parlay::sequence<int>& split_pos_seq,
-                                         EntrySlice entry_seq_s,
-                                         size_t split_offset,
-                                         size_t in_offset) {
+void BTree<TT>::PartitionBinarySearchRec(
+    TT::SplitSlice split_seq_s,
+    // parlay::sequence<int>& split_pos_seq,
+    auto& split_pos_seq, EntrySlice entry_seq_s, size_t split_offset,
+    size_t in_offset) {
   if (split_seq_s.size() == 0)
     return;
   else if (split_seq_s.size() == 1) {
@@ -151,6 +151,20 @@ void BTree<TT>::PartitionBinarySearchRec(TT::SplitSlice split_seq_s,
       return Entry::GetKey(e) < split_seq_s[mid];
     });
     split_pos_seq[split_offset + mid] = in_offset + pos;
+    // parlay::par_do_if(
+    //     entry_seq_s.size() > BTree<TT>::kSerialBuildCutoff,
+    //     [&]() {
+    //       PartitionBinarySearchRec(split_seq_s.cut(0, mid), split_pos_seq,
+    //                                entry_seq_s.cut(0, pos), split_offset,
+    //                                in_offset);
+    //     },
+    //     [&]() {
+    //       PartitionBinarySearchRec(split_seq_s.cut(mid + 1,
+    //       split_seq_s.size()),
+    //                                split_pos_seq,
+    //                                entry_seq_s.cut(pos, entry_seq_s.size()),
+    //                                split_offset + mid + 1, in_offset + pos);
+    //     });
     PartitionBinarySearchRec(split_seq_s.cut(0, mid), split_pos_seq,
                              entry_seq_s.cut(0, pos), split_offset, in_offset);
     PartitionBinarySearchRec(split_seq_s.cut(mid + 1, split_seq_s.size()),
