@@ -43,7 +43,8 @@ TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
     TL->InitializeEleSeq();
     assert(TL->elements.size() == TT::kBufUB);
   }
-  for (size_t i = 0; i < In.size(); i++) {
+  // PERF: BufSizeT should be enough since total size fits within
+  for (BufSizeT i = 0; i < In.size(); i++) {
     TL->elements[TL->size + i] = In[i];
   }
   TL->size += In.size();
@@ -58,23 +59,23 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(
   auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
   Leaf* TL = static_cast<Leaf*>(T);
 
-  for (size_t i = 0; i < T->size; i++) {  // Assume the TT::kBufUB is constant
+  for (SizeT i = 0; i < T->size; i++) {  // Assume the TT::kBufUB is constant
     entry_seq[i] = TL->elements[i];
   }
   parlay::parallel_for(0, In.size(),
-                       [&](size_t i) { entry_seq[T->size + i] = In[i]; });
+                       [&](SizeT i) { entry_seq[T->size + i] = In[i]; });
   FreeNode<Leaf>(T);
   // std::cout << "Split leaf node with size " << entry_seq.size() << std::endl;
 
   // NOTE: split
   entry_seq = parlay::sort(entry_seq);  // PERF: we need sort as In is unsorted
-  size_t bkt_n = GetBktNum(entry_seq.size());
+  SizeT bkt_n = GetBktNum(entry_seq.size());
   auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
   auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
-  size_t rt_bkt_n = GenerateLeafNodes(parlay::make_slice(entry_seq),
-                                      parlay::make_slice(split_seq),
-                                      parlay::make_slice(node_seq));
+  SizeT rt_bkt_n = GenerateLeafNodes(parlay::make_slice(entry_seq),
+                                     parlay::make_slice(split_seq),
+                                     parlay::make_slice(node_seq));
 
   assert(rt_bkt_n == bkt_n);
 

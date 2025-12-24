@@ -100,15 +100,13 @@ class BTree {
   template <typename Leaf, typename Interior>
   struct InnerTree;
 
-  static size_t GetBktNum(size_t const item_n) { return item_n / TT::kBufMD; }
+  static SizeT GetBktNum(SizeT const item_n) { return item_n / TT::kBufMD; }
 
-  static size_t GetBktStIdx(size_t const i, size_t const bkt_n,
-                            size_t const n) {
+  static SizeT GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n) {
     return (n * i) / bkt_n;
   };
 
-  static size_t GetBktEndIdx(size_t const i, size_t const bkt_n,
-                             size_t const n) {
+  static SizeT GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n) {
     return (n * (i + 1)) / bkt_n;
   };
 
@@ -142,13 +140,15 @@ class BTree {
                                      auto const& split_seq_list,
                                      size_t new_node_n);
 
-  static size_t GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
-                                  TT::NodeSlice node_out);
+  // PARA: return bucket_num
+  static SizeT GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
+                                 TT::NodeSlice node_out);
 
-  static size_t GenerateInteriorNodes(TT::NodeSlice node_in,
-                                      TT::NodeSlice node_out,
-                                      TT::SplitSlice key_in,
-                                      TT::SplitSlice key_out);
+  // PARA: return bucket_num
+  static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
+                                     TT::NodeSlice node_out,
+                                     TT::SplitSlice key_in,
+                                     TT::SplitSlice key_out);
   //
   // template <typename Leaf, typename Interior, bool granularity = true>
   // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);

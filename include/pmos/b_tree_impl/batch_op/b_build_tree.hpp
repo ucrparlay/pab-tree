@@ -75,13 +75,13 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
   };
 
   // NOTE: build leaf
-  size_t bkt_n = GenerateLeafNodes(In, key_out, node_out);
+  SizeT bkt_n = GenerateLeafNodes(In, key_out, node_out);
   swap_key_node(bkt_n);
   assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
 
   // NOTE: build Interior
   while (node_in.size() >= TT::kBufUB) {
-    size_t interior_bkt_n =
+    SizeT interior_bkt_n =
         GenerateInteriorNodes(node_in, node_out, key_in, key_out);
     swap_key_node(interior_bkt_n);
     assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));

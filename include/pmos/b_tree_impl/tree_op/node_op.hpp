@@ -73,47 +73,48 @@ namespace pmos {
 //   return;
 // }
 template <typename TT>
-size_t BTree<TT>::GenerateLeafNodes(TT::EntrySlice In, TT::SplitSlice key_out,
-                                    TT::NodeSlice node_out) {
-  size_t item_n = In.size();
-  size_t bkt_n = GetBktNum(item_n);
+TT::SizeT BTree<TT>::GenerateLeafNodes(TT::EntrySlice In,
+                                       TT::SplitSlice key_out,
+                                       TT::NodeSlice node_out) {
+  SizeT item_n = In.size();
+  SizeT bkt_n = GetBktNum(item_n);
   assert(bkt_n > 0);
   assert(key_out.size() >= bkt_n - 1);
   assert(node_out.size() >= bkt_n);
 
-  parlay::parallel_for(0, bkt_n, [&](size_t i) {
+  parlay::parallel_for(0, bkt_n, [&](SizeT i) {
     if (i < bkt_n - 1) {
       // key_out[i] = TT::GetKey(In[idx_to_pack[i + 1]]);
       key_out[i] = Entry::GetKey(In[GetBktEndIdx(i, bkt_n, item_n)]);
     }
-    size_t ele_l = GetBktStIdx(i, bkt_n, item_n);
-    size_t ele_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
+    SizeT ele_l = GetBktStIdx(i, bkt_n, item_n);
+    SizeT ele_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
     node_out[i] = AllocNormalLeafNode<EntrySlice, Leaf>(In.cut(ele_l, ele_r));
   });
   return bkt_n;
 }
 
 template <typename TT>
-size_t BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
-                                        TT::NodeSlice node_out,
-                                        TT::SplitSlice key_in,
-                                        TT::SplitSlice key_out) {
+TT::SizeT BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
+                                           TT::NodeSlice node_out,
+                                           TT::SplitSlice key_in,
+                                           TT::SplitSlice key_out) {
   assert(key_in.size() == node_in.size() - 1);
-  size_t item_n = node_in.size();
-  size_t bkt_n = GetBktNum(item_n);
+  SizeT item_n = node_in.size();
+  SizeT bkt_n = GetBktNum(item_n);
   assert(bkt_n > 0);
   assert(key_out.size() >= bkt_n - 1);
   assert(node_out.size() >= bkt_n);
 
-  parlay::parallel_for(0, bkt_n, [&](size_t i) {
+  parlay::parallel_for(0, bkt_n, [&](SizeT i) {
     if (i < bkt_n - 1) {
       key_out[i] = key_in[GetBktEndIdx(i, bkt_n, item_n) - 1];
     }
 
-    size_t node_l = GetBktStIdx(i, bkt_n, item_n);
-    size_t node_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
-    size_t key_l = GetBktStIdx(i, bkt_n, item_n);
-    size_t key_r =
+    SizeT node_l = GetBktStIdx(i, bkt_n, item_n);
+    SizeT node_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
+    SizeT key_l = GetBktStIdx(i, bkt_n, item_n);
+    SizeT key_r =
         (i == bkt_n - 1) ? key_in.size() : GetBktEndIdx(i, bkt_n, item_n) - 1;
     node_out[i] = AllocInteriorNode<Interior, TT>(node_in.cut(node_l, node_r),
                                                   key_in.cut(key_l, key_r));
@@ -135,7 +136,7 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
 
   // TODO: we can remove new_node_n and compute here
   // merge node
-  size_t tot_size = 0;
+  SizeT tot_size = 0;
   for (typename TT::BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     for (typename TT::BufSizeT j = 0; j < node_seq_list[i].size(); j++) {
       TI->tree_nodes[node_idx++] = node_seq_list[i][j];
@@ -197,11 +198,11 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
   // std::cout << "Split interior node with size " << flatten_node_seq.size()
   //           << std::endl;
 
-  size_t bkt_n = GetBktNum(flatten_node_seq.size());
+  SizeT bkt_n = GetBktNum(flatten_node_seq.size());
   auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
   auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
-  [[maybe_unused]] size_t rt_bkt_n = GenerateInteriorNodes(
+  [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
       parlay::make_slice(flatten_node_seq), parlay::make_slice(node_seq),
       parlay::make_slice(flatten_split_seq), parlay::make_slice(split_seq));
 

@@ -74,7 +74,7 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
     Node* T,
     // void BTree<TT>::BatchInsertRecursive(Node* T,
     EntrySlice In) {
-  size_t n = In.size();
+  SizeT n = In.size();
   // vis_inter_num++;
 
   // insert_leaf_timer.reset();
@@ -153,11 +153,11 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
   // SplitSeqList split_seq_list(TT::kBufUB);
   std::array<typename TT::NodeSeq, TT::kBufUB> node_seq_list;
   std::array<typename TT::SplitSeq, TT::kBufUB> split_seq_list;
-  parlay::sequence<int> nodes_map(TI->GetNodeN());
-  int cnt = 0;
-  for (int i = 0; i < TI->GetNodeN(); i++) {
-    size_t l = (i == 0 ? 0 : split_pos_seq[i - 1]);
-    size_t r = (i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]);
+  parlay::sequence<BufSizeT> nodes_map(TI->GetNodeN());
+  BufSizeT cnt = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
+    SizeT r = (i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]);
     if (l != r) {
       nodes_map[cnt++] = i;
     } else {
@@ -168,11 +168,11 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
 
   parlay::parallel_for(
       0, cnt,
-      [&](size_t i) {
-        size_t l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
-        size_t r = nodes_map[i] == TI->GetNodeN() - 1
-                       ? n
-                       : split_pos_seq[nodes_map[i]];
+      [&](BufSizeT i) {
+        SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+        SizeT r = nodes_map[i] == TI->GetNodeN() - 1
+                      ? n
+                      : split_pos_seq[nodes_map[i]];
         std::tie(node_seq_list[nodes_map[i]], split_seq_list[nodes_map[i]]) =
             BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
       },
@@ -211,8 +211,8 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
   //                     [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
   //                       return acc + node_seq.size();
   //                     });
-  size_t new_node_n = 0;
-  for (int i = 0; i < TI->GetNodeN(); i++) {
+  SizeT new_node_n = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     new_node_n += node_seq_list[i].size();
   }
   if (new_node_n <= TT::kBufUB) {
