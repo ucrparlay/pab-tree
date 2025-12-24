@@ -139,9 +139,9 @@ class BTree {
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  static inline Node* UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                                     SplitSeqList const& split_seq_list,
-                                     size_t new_node_n);
+  static inline Node* UpdateInterior(Node* T, auto const& node_seq_list,
+                                     auto const& split_seq_list,
+                                     size_t old_node_n, size_t new_node_n);
 
   static size_t GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
                                   TT::NodeSlice node_out);
@@ -174,8 +174,7 @@ class BTree {
   static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, EntrySlice In);
 
   static NodeSplitSeqPair HandlingInteriorSplitOverflow(
-      Node* T, NodeSeqList const& node_seq_list,
-      SplitSeqList const& split_seq_list);
+      Node* T, auto const& node_seq_list, auto const& split_seq_list);
 
   //
   // template <typename Leaf, typename RT>

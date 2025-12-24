@@ -156,32 +156,36 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
   //   throw std::runtime_error(
   //       "Too many child nodes in interior node during batch insert.");
   // }
-  NodeSeqList node_seq_list(TI->tree_nodes.size());
-  SplitSeqList split_seq_list(TI->tree_nodes.size());
-  parlay::sequence<int> nodes_map(TI->tree_nodes.size());
-  int cnt = 0;
-  for (int i = 0; i < TI->tree_nodes.size(); i++) {
-    size_t l = (i == 0 ? 0 : split_pos_seq[i - 1]);
-    size_t r = (i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]);
-    if (l != r) {
-      nodes_map[cnt++] = i;
-    } else {
-      node_seq_list[i] = {TI->tree_nodes[i]};
-      split_seq_list[i] = typename TT::SplitSeq();
-    }
-  }
-
-  parlay::parallel_for(
-      0, cnt,
-      [&](size_t i) {
-        size_t l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
-        size_t r = nodes_map[i] == TI->tree_nodes.size() - 1
-                       ? n
-                       : split_pos_seq[nodes_map[i]];
-        std::tie(node_seq_list[nodes_map[i]], split_seq_list[nodes_map[i]]) =
-            BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
-      },
-      1);
+  // NodeSeqList node_seq_list(TI->tree_nodes.size());
+  // SplitSeqList split_seq_list(TI->tree_nodes.size());
+  // NodeSeqList node_seq_list(TT::kBufUB);
+  // SplitSeqList split_seq_list(TT::kBufUB);
+  std::array<typename TT::NodeSeq, TT::kBufUB> node_seq_list;
+  std::array<typename TT::SplitSeq, TT::kBufUB> split_seq_list;
+  // parlay::sequence<int> nodes_map(TI->tree_nodes.size());
+  // int cnt = 0;
+  // for (int i = 0; i < TI->tree_nodes.size(); i++) {
+  //   size_t l = (i == 0 ? 0 : split_pos_seq[i - 1]);
+  //   size_t r = (i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]);
+  //   if (l != r) {
+  //     nodes_map[cnt++] = i;
+  //   } else {
+  //     node_seq_list[i] = {TI->tree_nodes[i]};
+  //     split_seq_list[i] = typename TT::SplitSeq();
+  //   }
+  // }
+  //
+  // parlay::parallel_for(
+  //     0, cnt,
+  //     [&](size_t i) {
+  //       size_t l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+  //       size_t r = nodes_map[i] == TI->tree_nodes.size() - 1
+  //                      ? n
+  //                      : split_pos_seq[nodes_map[i]];
+  //       std::tie(node_seq_list[nodes_map[i]], split_seq_list[nodes_map[i]]) =
+  //           BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
+  //     },
+  //     1);
 
   // parlay::parallel_for(
   //     0, cnt,
@@ -195,18 +199,17 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
   //     },
   //     1);
 
-  // for (int i = 0; i < TI->tree_nodes.size(); i++) {
-  //   int l = (i == 0 ? 0 : split_pos_seq[i - 1]);
-  //   int r = (i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]);
-  //   if (l == r) {
-  //     node_seq_list[i] = {TI->tree_nodes[i]};
-  //     split_seq_list[i] = typename TT::SplitSeq();
-  //   } else
-  //     // BatchInsertRecursive(TI->tree_nodes[i], In.cut(l, r));
-  //     std::tie(node_seq_list[i], split_seq_list[i]) =
-  //         // auto a =
-  //         BatchInsertRecursive(TI->tree_nodes[i], In.cut(l, r));
-  // }
+  for (int i = 0; i < TI->tree_nodes.size(); i++) {
+    int l = (i == 0 ? 0 : split_pos_seq[i - 1]);
+    int r = (i == TI->tree_nodes.size() - 1 ? n : split_pos_seq[i]);
+    if (l == r) {
+      // node_seq_list[i] = {TI->tree_nodes[i]};
+      // split_seq_list[i] = typename TT::SplitSeq();
+    } else
+      // BatchInsertRecursive(TI->tree_nodes[i], In.cut(l, r));
+      // std::tie(node_seq_list[i], split_seq_list[i]) =
+      auto a = BatchInsertRecursive(TI->tree_nodes[i], In.cut(l, r));
+  }
   // merge_timer.reset();
   // merge_timer.start();
   //
@@ -221,19 +224,24 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(
   // merge_timer.stop();
   // merge_time += merge_timer.total_time();
   // return result;
-  // return {{T}, typename TT::SplitSeq{}};
+  return {{T}, typename TT::SplitSeq{}};
   // return;
-  size_t new_node_n =
-      std::accumulate(node_seq_list.begin(), node_seq_list.end(), 0,
-                      [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
-                        return acc + node_seq.size();
-                      });
-  if (new_node_n <= TT::kBufUB) {
-    return {{UpdateInterior(T, node_seq_list, split_seq_list, new_node_n)},
-            typename TT::SplitSeq()};
-  } else {
-    return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
-  }
+  // size_t new_node_n =
+  //     std::accumulate(node_seq_list.begin(), node_seq_list.end(), 0,
+  //                     [](size_t acc, TT::NodeSeq const& node_seq) -> size_t {
+  //                       return acc + node_seq.size();
+  //                     });
+  // size_t new_node_n = 0;
+  // for (int i = 0; i < TI->tree_nodes.size(); i++) {
+  //   new_node_n += node_seq_list[i].size();
+  // }
+  // if (new_node_n <= TT::kBufUB) {
+  //   return {{UpdateInterior(T, node_seq_list, split_seq_list,
+  //                           TI->tree_nodes.size(), new_node_n)},
+  //           typename TT::SplitSeq()};
+  // } else {
+  //   return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
+  // }
 }
 
 // template <typename TT>

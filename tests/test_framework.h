@@ -1144,8 +1144,8 @@ static auto constexpr DefaultTestFunc =
       // // NOTE: batch insert
       if (kTag & (1 << 0)) {
         if (kSummary) {
-          parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
-          // parlay::sequence<double> const ratios = {0.0001, 0.001};
+          // parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
+          parlay::sequence<double> const ratios = {0.0001, 0.001};
           for (size_t i = 0; i < ratios.size(); i++) {
             BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, kRounds, ratios[i]);
           }

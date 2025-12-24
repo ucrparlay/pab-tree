@@ -122,9 +122,9 @@ size_t BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 }
 
 template <typename TT>
-TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
-                                    SplitSeqList const& split_seq_list,
-                                    size_t new_node_n) {
+TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
+                                    auto const& split_seq_list,
+                                    size_t old_node_n, size_t new_node_n) {
   assert(!T->is_leaf);
   assert(new_node_n <= TT::kBufUB);
 
@@ -138,7 +138,7 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
 
   // merge node
   size_t tot_size = 0;
-  for (int i = 0; i < node_seq_list.size(); i++) {
+  for (int i = 0; i < old_node_n; i++) {
     for (int j = 0; j < node_seq_list[i].size(); j++) {
       new_nodes[node_idx++] = node_seq_list[i][j];
       tot_size += node_seq_list[i][j]->size;
@@ -146,7 +146,7 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
   }
 
   // merge split
-  for (int i = 0; i < split_seq_list.size(); i++) {
+  for (int i = 0; i < old_node_n - 1; i++) {
     for (int j = 0; j < split_seq_list[i].size(); j++) {
       new_splits[split_idx++] = split_seq_list[i][j];
     }
@@ -182,8 +182,7 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, NodeSeqList const& node_seq_list,
 
 template <typename TT>
 BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
-    Node* T, NodeSeqList const& node_seq_list,
-    SplitSeqList const& split_seq_list) {
+    Node* T, auto const& node_seq_list, auto const& split_seq_list) {
   assert(!T->is_leaf);
   Interior* TI = static_cast<Interior*>(T);
   auto flatten_node_seq = parlay::flatten(node_seq_list);
