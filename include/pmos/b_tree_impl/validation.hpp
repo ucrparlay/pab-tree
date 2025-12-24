@@ -82,6 +82,40 @@ int BTree<TT>::CheckHeight(Node const* T) {
 
 template <typename TT>
 template <typename Leaf, typename Interior>
+int BTree<TT>::GetHeight(Node const* T) {
+  if (T->is_leaf) {
+    return 0;
+  }
+
+  Interior const* TI = static_cast<Interior const*>(T);
+  parlay::sequence<int> heights(TI->tree_nodes.size());
+
+  for (int i = 0; i < TI->tree_nodes.size(); i++) {
+    heights[i] = GetHeight<Leaf, Interior>(TI->tree_nodes[i]);
+  }
+
+  return *parlay::max_element(heights) + 1;
+}
+
+template <typename TT>
+template <typename Leaf, typename Interior>
+int BTree<TT>::GetTreeNodesNum(Node const* T) {
+  if (T->is_leaf) {
+    return 1;
+  }
+
+  Interior const* TI = static_cast<Interior const*>(T);
+
+  int sum = 0;
+  for (int i = 0; i < TI->tree_nodes.size(); i++) {
+    sum += GetTreeNodesNum<Leaf, Interior>(TI->tree_nodes[i]);
+  }
+
+  return sum + 1;
+}
+
+template <typename TT>
+template <typename Leaf, typename Interior>
 void BTree<TT>::Validate() {
   std::cout << ">>> begin validate tree\n" << std::flush;
 

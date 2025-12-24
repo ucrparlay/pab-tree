@@ -245,6 +245,7 @@ void BatchInsert(Tree& pkd, typename TypeTrait::EntrySeq const& WP,
         },
         [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
+    // std::cout << ratio << " " << aveInsert << " " << std::endl;
     BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
   } else {  // NOTE: insert the points from previous tree
     pkd.DeleteTree();
@@ -890,15 +891,18 @@ void Membership(Tree const& pkd, auto const& query_ele, int kRounds,
       kRounds, 0.01, [&]() {},
       [&]() {
         parlay::parallel_for(0, query_num, [&](size_t i) {
+          // for (int i = 0; i < query_num; i++) {
           auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
 
           res[i] = contain;
           vis_leaf[i] = logger.vis_leaf_num;
           vis_inter[i] = logger.vis_interior_num;
+          // }
         });
       },
       [&]() {});
 
+  // std::cout << query_num << " ";
   std::cout << aveQuery << " " << std::flush;
   std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, query_num))) /
                    static_cast<double>(query_num)
@@ -1141,6 +1145,7 @@ static auto constexpr DefaultTestFunc =
       if (kTag & (1 << 0)) {
         if (kSummary) {
           parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
+          // parlay::sequence<double> const ratios = {0.0001, 0.001};
           for (size_t i = 0; i < ratios.size(); i++) {
             BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, kRounds, ratios[i]);
           }

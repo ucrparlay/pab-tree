@@ -127,6 +127,7 @@ class BTree {
   void BatchInsert_(EntrySlice In);
 
   NodeSplitSeqPair BatchInsertRecursive(Node* T, EntrySlice In);
+  // void BatchInsertRecursive(Node* T, EntrySlice In);
 
   // static inline BucketType FindBucket(Point const& p,
   //                                     HyperPlaneSeq const& pivots);
@@ -160,8 +161,14 @@ class BTree {
   //                       HyperPlaneSeq const& pivots,
   //                       parlay::sequence<BallsType>& sums);
   //
-  // // NOTE: batch insert
+  // NOTE: batch insert
+
   static Node* InsertPoints2Leaf(Node* T, EntrySlice In);
+
+  static void PartitionBinarySearchRec(TT::SplitSlice split_seq_s,
+                                       parlay::sequence<int>& split_pos_seq,
+                                       EntrySlice entry_seq_s,
+                                       size_t split_offset, size_t In_offset);
 
   static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, EntrySlice In);
 
@@ -385,6 +392,12 @@ class BTree {
 
   template <typename Leaf, typename Interior>
   int CheckHeight(Node const* T);
+
+  template <typename Leaf, typename Interior>
+  int GetHeight(Node const* T);
+
+  template <typename Leaf, typename Interior>
+  int GetTreeNodesNum(Node const* T);
   //
   // template <typename Leaf, typename Interior>
   // Points CheckCover(Node* T,
@@ -436,6 +449,18 @@ class BTree {
 
  protected:
   Node* root_ = nullptr;
+  parlay::internal::timer insert_leaf_timer;
+  parlay::internal::timer lower_bound_timer;
+  parlay::internal::timer merge_timer;
+  parlay::internal::timer recurse_timer;
+
+  double insert_leaf_time = 0.0;
+  double lower_bound_time = 0.0;
+  double merge_time = 0.0;
+  double recurse_time = 0.0;
+
+  int vis_leaf_num = 0;
+  int vis_inter_num = 0;
 };
 
 }  // namespace pmos

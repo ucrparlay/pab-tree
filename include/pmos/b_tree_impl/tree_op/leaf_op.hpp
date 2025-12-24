@@ -38,6 +38,8 @@ TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
   assert(T->size == TL->GetEle().size());
   if (TL->elements.size() == 0) {
     assert(TL->size == 0);
+    throw std::runtime_error(
+        "Error: Leaf elements not initialized before insertion.");
     TL->InitializeEleSeq();
     assert(TL->elements.size() == TT::kBufUB);
   }
