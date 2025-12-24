@@ -163,7 +163,7 @@ struct MultiNode : TypeTrait::Node {
   using Node = TT::Node;
 
   static consteval auto GetLevels() {
-    typename TT::BufferSizeType a = 0;
+    typename TT::BufSizeT a = 0;
     auto temp = TT::kBufUB;
     while (temp > 1) {
       temp >>= 1;  // divide by 2
@@ -208,13 +208,13 @@ struct MultiNode : TypeTrait::Node {
     }
   }
 
-  TT::BufferSizeType GetNodeN() const { return node_n; }
+  TT::BufSizeT GetNodeN() const { return node_n; }
 
-  TT::BufferSizeType GetSplitN() const { return node_n - 1; }
+  TT::BufSizeT GetSplitN() const { return node_n - 1; }
 
   SplitArr const& GetSplit() const { return split; }
 
-  TT::BufferSizeType node_n;
+  TT::BufSizeT node_n;
   NodeArr tree_nodes;
   SplitArr split;
   TT::InteriorAug aug;

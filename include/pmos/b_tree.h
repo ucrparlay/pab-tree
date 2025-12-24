@@ -50,7 +50,7 @@ class BTree {
   static constexpr uint_fast8_t const kLog2Base = TT::kLog2Base;
   static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
-  using BufferSizeType = TT::BufferSizeType;
+  using BufSizeT = TT::BufSizeT;
 
   // NOTE: tree structure
   static constexpr uint_fast16_t const kSerialBuildCutoff = 512;
@@ -139,7 +139,7 @@ class BTree {
   //
   static inline Node* UpdateInterior(Node* T, auto const& node_seq_list,
                                      auto const& split_seq_list,
-                                     size_t old_node_n, size_t new_node_n);
+                                     size_t new_node_n);
 
   static size_t GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
                                   TT::NodeSlice node_out);
