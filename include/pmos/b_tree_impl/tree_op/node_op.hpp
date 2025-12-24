@@ -129,25 +129,26 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
   assert(new_node_n <= TT::kBufUB);
 
   Interior* TI = static_cast<Interior*>(T);
-  typename TT::NodeSeq new_nodes(new_node_n);
-  typename TT::SplitSeq new_splits(new_node_n - 1);
-  int node_idx = 0, split_idx = 0;
+  // typename TT::NodeSeq new_nodes(new_node_n);
+  // typename TT::SplitSeq new_splits(new_node_n - 1);
+  typename TT::BufferSizeType node_idx = 0, split_idx = 0;
 
-  assert(node_seq_list.size() == TI->tree_nodes.size());
-  assert(split_seq_list.size() == TI->split.size() + 1);
+  assert(node_seq_list.size() == TI->GetNodeN());
+  assert(split_seq_list.size() == TI->GetSplitN());
 
   // merge node
   size_t tot_size = 0;
-  for (int i = 0; i < old_node_n; i++) {
-    for (int j = 0; j < node_seq_list[i].size(); j++) {
-      new_nodes[node_idx++] = node_seq_list[i][j];
+  for (typename TT::BufferSizeType i = 0; i < TI->GetNodeN(); i++) {
+    for (typename TT::BufferSizeType j = 0; j < node_seq_list[i].size(); j++) {
+      TI->tree_nodes[node_idx++] = node_seq_list[i][j];
       tot_size += node_seq_list[i][j]->size;
     }
   }
 
   // merge split
-  for (int i = 0; i < old_node_n - 1; i++) {
-    for (int j = 0; j < split_seq_list[i].size(); j++) {
+  typename Interior::SplitArr new_splits;
+  for (typename TT::BufferSizeType i = 0; i < TI->GetSplitN(); i++) {
+    for (typename TT::BufferSizeType j = 0; j < split_seq_list[i].size(); j++) {
       new_splits[split_idx++] = split_seq_list[i][j];
     }
     if (i < split_seq_list.size() - 1) {
@@ -157,26 +158,29 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T, auto const& node_seq_list,
   assert(node_idx == split_idx + 1);
   assert(node_idx == new_node_n);
 
+  // TI->tree_nodes = new_nodes;
+  TI->split = new_splits;
+  TI->size = tot_size;
+  TI->node_n = new_node_n;
+
 #ifdef DEBUG
-  for (int i = 0; i < new_nodes.size(); i++) {
-    assert(new_nodes[i] != nullptr);
-    auto box = GetBox(new_nodes[i]);
-    if (new_nodes.size() == 1) continue;
+  for (int i = 0; i < TI->GetNodeN(); i++) {
+    assert(TI->tree_nodes[i] != nullptr);
+    auto box = GetBox(TI->tree_nodes[i]);
+    if (TI->tree_nodes[i] == 1) continue;
     if (i == 0) {
-      assert(box.second < new_splits[0]);
-    } else if (i == new_nodes.size() - 1) {
-      assert(box.first >= new_splits[new_splits.size() - 1]);
+      assert(box.second < TI->split[0]);
+    } else if (i == TI->GetNodeN() - 1) {
+      assert(box.first >= TI->split[TI->GetSplitN() - 1]);
     } else {
-      assert(box.first >= new_splits[i - 1] && box.second < new_splits[i]);
+      assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
     }
   }
 #endif  // DEBUG
 
-  TI->tree_nodes = new_nodes;
-  TI->split = new_splits;
-  TI->size = tot_size;
-
-  TI->UpdateAug(new_nodes, new_splits);
+  // TODO: we needs to update the Aug here
+  // WARN: we needs to update the Aug here
+  TI->UpdateAug();
   return T;
 }
 
@@ -187,8 +191,10 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingInteriorSplitOverflow(
   Interior* TI = static_cast<Interior*>(T);
   auto flatten_node_seq = parlay::flatten(node_seq_list);
   auto flatten_split_seq = parlay::sort(
-      parlay::append(TI->GetSplit(), parlay::flatten(split_seq_list)));
-  assert(parlay::is_sorted(parlay::flatten(split_seq_list)));
+      parlay::append(typename TT::SplitSeq(TI->split.begin(),
+                                           TI->split.begin() + TI->GetSplitN()),
+                     parlay::flatten(split_seq_list)));
+  assert(parlay::is_sorted(flatten_split_seq));
   // std::cout << "Split interior node with size " << flatten_node_seq.size()
   //           << std::endl;
 
