@@ -15,7 +15,7 @@ template <typename Leaf, typename Interior>
 TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
   if (T->is_leaf) {
     Leaf const* TL = static_cast<Leaf const*>(T);
-    assert(T == this->root_ || (TL->GetEle().size() > TT::kBufLB &&
+    assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
                                 TL->GetEle().size() <= TT::kBufUB));
     return GetBox(TL->GetEle());
   }
