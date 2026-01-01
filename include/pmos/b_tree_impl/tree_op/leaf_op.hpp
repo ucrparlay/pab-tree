@@ -54,8 +54,8 @@ TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
 }
 
 template <typename TT>
-BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(
-    Node* T, EntrySlice In) {
+TT::SizeT BTree<TT>::HandlingLeafSplitOverflow(
+    Node* T, EntrySlice In, NodeSplitPairSlice node_split_slice) {
   auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
   Leaf* TL = static_cast<Leaf*>(T);
 
@@ -73,13 +73,12 @@ BTree<TT>::NodeSplitSeqPair BTree<TT>::HandlingLeafSplitOverflow(
   auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
   auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
-  SizeT rt_bkt_n = GenerateLeafNodes(parlay::make_slice(entry_seq),
-                                     parlay::make_slice(split_seq),
-                                     parlay::make_slice(node_seq));
+  SizeT rt_bkt_n =
+      GenerateLeafNodes(parlay::make_slice(entry_seq), node_split_slice);
 
   assert(rt_bkt_n == bkt_n);
 
-  return {node_seq, split_seq};
+  return rt_bkt_n;
 }
 
 // template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,

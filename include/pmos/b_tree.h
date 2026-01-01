@@ -34,6 +34,10 @@ class BTree {
   using Split = typename TT::Split;
   using NodeSplitSeqPair =
       std::pair<typename TT::NodeSeq, typename TT::SplitSeq>;
+
+  using NodeSplitPair = std::pair<Node*, Split>;
+  using NodeSplitPairSeq = parlay::sequence<NodeSplitPair>;
+  using NodeSplitPairSlice = parlay::slice<NodeSplitPair*, NodeSplitPair*>;
   using NodeSeqList = parlay::sequence<typename TT::NodeSeq>;
   using SplitSeqList = parlay::sequence<typename TT::SplitSeq>;
 
@@ -123,7 +127,8 @@ class BTree {
 
   void BatchInsert_(EntrySlice In);
 
-  NodeSplitSeqPair BatchInsertRecursive(Node* T, EntrySlice In);
+  SizeT BatchInsertRecursive(Node* T, EntrySlice In,
+                             NodeSplitPairSlice node_split_seq);
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
   // static inline BucketType FindBucket(Point const& p,
@@ -136,13 +141,17 @@ class BTree {
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  static inline Node* UpdateInterior(Node* T, auto const& node_seq_list,
-                                     auto const& split_seq_list,
+  static inline Node* UpdateInterior(Node* T,
+                                     NodeSplitPairSlice node_split_slice,
+                                     auto& new_split_node_arr,
                                      size_t new_node_n);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
                                  TT::NodeSlice node_out);
+
+  static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
+                                 NodeSplitPairSlice node_split_out);
 
   // PARA: return bucket_num
   static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
@@ -170,10 +179,12 @@ class BTree {
                                        EntrySlice entry_seq_s,
                                        size_t split_offset, size_t In_offset);
 
-  static NodeSplitSeqPair HandlingLeafSplitOverflow(Node* T, EntrySlice In);
+  static SizeT HandlingLeafSplitOverflow(Node* T, EntrySlice In,
+                                         NodeSplitPairSlice node_split_slice);
 
-  static NodeSplitSeqPair HandlingInteriorSplitOverflow(
-      Node* T, auto const& node_seq_list, auto const& split_seq_list);
+  static SizeT HandlingInteriorSplitOverflow(
+      Node* T, NodeSplitPairSlice node_split_slice,
+      auto const& new_split_node_n_arr, SizeT new_node_n);
 
   //
   // template <typename Leaf, typename RT>
