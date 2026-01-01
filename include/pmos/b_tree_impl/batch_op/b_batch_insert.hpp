@@ -163,7 +163,8 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
   // std::array<typename TT::NodeSeq, TT::kBufUB> node_seq_list;
   // std::array<typename TT::SplitSeq, TT::kBufUB> split_seq_list;
   std::array<SizeT, TT::kBufUB> new_split_node_n_arr;
-  parlay::sequence<BufSizeT> nodes_map(TI->GetNodeN());
+  std::array<SizeT, TT::kBufUB> nodes_map;
+  // parlay::sequence<BufSizeT> nodes_map(TI->GetNodeN());
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
@@ -183,7 +184,7 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
                       ? n
                       : split_pos_seq[nodes_map[i]];
         // std::tie(node_seq_list[nodes_map[i]], split_seq_list[nodes_map[i]]) =
-        new_split_node_n_arr[i] =
+        new_split_node_n_arr[nodes_map[i]] =
             BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r),
                                  node_split_slice.cut(l, r));
       },

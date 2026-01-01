@@ -181,7 +181,8 @@ TT::Node* BTree<TT>::UpdateInterior(
 
   // merge node
   SizeT tot_entry_sz = 0;
-  BufSizeT node_idx = 0;
+  // BufSizeT node_idx = 0;
+  int node_idx = 0;
   typename Interior::NodeArr new_nodes;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     if (return_node_n_arr[i] == 0) {
@@ -199,16 +200,18 @@ TT::Node* BTree<TT>::UpdateInterior(
   // merge split
   // NOTE:the original split will always stay
   typename Interior::SplitArr new_splits;
-  BufSizeT split_idx = 0;
-  for (BufSizeT i = 0; i < TI->GetSplitN(); i++) {
+  // BufSizeT split_idx = 0;
+  int split_idx = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
     // HACK: if return_node_n_arr[i] == 0, then no new splits from this child
-    // should skip; but -1 always smaller than 0, so the loop never runs
-    for (BufSizeT j = 0; j < return_node_n_arr[i] - 1; j++) {
-      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+    // should skip; but -1 always smaller than 0, so the loop never runs.
+    // Needs to handle the type carefully.
+    for (int j = 0; j < static_cast<int>(return_node_n_arr[i]) - 1; j++) {
       new_splits[split_idx++] = node_split_slice[st + j].second;
     }
     // append the tree split
-    if (i < TI->GetSplitN() - 1) {
+    if (i < TI->GetNodeN() - 1) {  // skip the new splits for last node
       new_splits[split_idx++] = TI->split[i];
     }
   }
@@ -280,20 +283,17 @@ TT::SizeT BTree<TT>::HandlingInteriorSplitOverflow(
 
   // merge split
   SizeT split_idx = 0;
-  for (BufSizeT i = 0; i < TI->GetSplitN(); i++) {
-    if (return_node_n_arr[i] == 0 && i < TI->GetSplitN() - 1) {
-      flatten_split_seq[split_idx++] = TI->split[i];
-    } else {
-      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
 
-      parlay::parallel_for(0, return_node_n_arr[i] - 1, [&](SizeT j) {
-        flatten_split_seq[split_idx + j] = node_split_slice[st + j].second;
-      });
-      split_idx += return_node_n_arr[i] - 1;
-      if (i < TI->GetSplitN() - 1) {
-        // not the last split, then append the tree split
-        flatten_split_seq[split_idx++] = TI->split[i];
-      }
+    parlay::parallel_for(
+        0, static_cast<int>(return_node_n_arr[i]) - 1, [&](SizeT j) {
+          flatten_split_seq[split_idx + j] = node_split_slice[st + j].second;
+        });
+    split_idx += return_node_n_arr[i] - 1;
+
+    if (i < TI->GetNodeN() - 1) {  // skip the new splits for last node
+      flatten_split_seq[split_idx++] = TI->split[i];
     }
   }
 
