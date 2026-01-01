@@ -145,10 +145,35 @@ TT::SizeT BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 }
 
 template <typename TT>
-TT::Node* BTree<TT>::UpdateInterior(Node* T,
-                                    NodeSplitPairSlice node_split_slice,
-                                    auto& new_split_node_n_arr,
-                                    size_t new_node_n) {
+TT::SizeT BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
+                                           TT::SplitSlice key_in,
+                                           NodeSplitPairSlice node_split_out) {
+  assert(key_in.size() == node_in.size() - 1);
+  SizeT item_n = node_in.size();
+  SizeT bkt_n = GetBktNum(item_n);
+  assert(bkt_n > 0);
+  assert(node_split_out.size() >= bkt_n);
+
+  parlay::parallel_for(0, bkt_n, [&](SizeT i) {
+    if (i < bkt_n - 1) {
+      node_split_out[i].second = key_in[GetBktEndIdx(i, bkt_n, item_n) - 1];
+    }
+
+    SizeT node_l = GetBktStIdx(i, bkt_n, item_n);
+    SizeT node_r = (i == bkt_n - 1) ? item_n : GetBktEndIdx(i, bkt_n, item_n);
+    SizeT key_l = GetBktStIdx(i, bkt_n, item_n);
+    SizeT key_r =
+        (i == bkt_n - 1) ? key_in.size() : GetBktEndIdx(i, bkt_n, item_n) - 1;
+    node_split_out[i].first = AllocInteriorNode<Interior, TT>(
+        node_in.cut(node_l, node_r), key_in.cut(key_l, key_r));
+  });
+  return bkt_n;
+}
+template <typename TT>
+TT::Node* BTree<TT>::UpdateInterior(
+    Node* T, NodeSplitPairSlice node_split_slice,
+    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+    std::array<SizeT, TT::kBufUB> const& return_node_n_arr, size_t new_node_n) {
   assert(!T->is_leaf);
   assert(new_node_n <= TT::kBufUB);
 
@@ -157,18 +182,17 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T,
   // merge node
   SizeT tot_entry_sz = 0;
   BufSizeT node_idx = 0;
-  BufSizeT slice_offset = 0;
   typename Interior::NodeArr new_nodes;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    if (new_split_node_n_arr[i] == 0) {
+    if (return_node_n_arr[i] == 0) {
       new_nodes[node_idx++] = TI->tree_nodes[i];
       tot_entry_sz += new_nodes[node_idx - 1]->size;
     } else {
-      for (BufSizeT j = 0; j < new_split_node_n_arr[i]; j++) {
-        new_nodes[node_idx++] = node_split_slice[slice_offset + j].first;
+      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+      for (BufSizeT j = 0; j < return_node_n_arr[i]; j++) {
+        new_nodes[node_idx++] = node_split_slice[st + j].first;
         tot_entry_sz += new_nodes[node_idx - 1]->size;
       }
-      slice_offset += new_split_node_n_arr[i];
     }
   }
 
@@ -176,12 +200,14 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T,
   // NOTE:the original split will always stay
   typename Interior::SplitArr new_splits;
   BufSizeT split_idx = 0;
-  slice_offset = 0;
   for (BufSizeT i = 0; i < TI->GetSplitN(); i++) {
-    for (BufSizeT j = 0; j < new_split_node_n_arr[i] - 1; j++) {
-      new_splits[split_idx++] = node_split_slice[slice_offset + j].second;
+    // HACK: if return_node_n_arr[i] == 0, then no new splits from this child
+    // should skip; but -1 always smaller than 0, so the loop never runs
+    for (BufSizeT j = 0; j < return_node_n_arr[i] - 1; j++) {
+      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+      new_splits[split_idx++] = node_split_slice[st + j].second;
     }
-    slice_offset += new_split_node_n_arr[i] - 1;
+    // append the tree split
     if (i < TI->GetSplitN() - 1) {
       new_splits[split_idx++] = TI->split[i];
     }
@@ -226,51 +252,62 @@ TT::Node* BTree<TT>::UpdateInterior(Node* T,
 template <typename TT>
 TT::SizeT BTree<TT>::HandlingInteriorSplitOverflow(
     Node* T, NodeSplitPairSlice node_split_slice,
-    auto const& new_split_node_n_arr, SizeT new_node_n) {
+    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+    std::array<SizeT, TT::kBufUB> const& return_node_n_arr, SizeT new_node_n) {
   assert(!T->is_leaf);
   Interior* TI = static_cast<Interior*>(T);
   // auto flatten_node_seq = parlay::flatten(node_seq_list);
-  typename TT::NodeSeq flatten_node_seq(new_node_n);
+  typename TT::NodeSeq flatten_node_seq =
+      TT::NodeSeq::uninitialized(new_node_n);
+  typename TT::SplitSeq flatten_split_seq =
+      TT::SplitSeq::uninitialized(new_node_n - 1);
 
   SizeT node_idx = 0;
-  BufSizeT slice_offset = 0;
+
+  // merge node
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    if (new_split_node_n_arr[i] == 0) {
+    if (return_node_n_arr[i] == 0) {
       flatten_node_seq[node_idx++] = TI->tree_nodes[i];
     } else {
-      parlay::parallel_for(0, new_split_node_n_arr[i], [&](BufSizeT j) {
-        flatten_node_seq[node_idx + j] =
-            node_split_slice[slice_offset + j].first;
+      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+
+      parlay::parallel_for(0, return_node_n_arr[i], [&](SizeT j) {
+        flatten_node_seq[node_idx + j] = node_split_slice[st + j].first;
       });
-      // for (BufSizeT j = 0; j < new_split_node_n_arr[i]; j++) {
-      //   flatten_node_seq[node_idx++] = node_split_slice[slice_offset +
-      //   j].first;
-      // }
-      slice_offset += new_split_node_n_arr[i];
+      node_idx += return_node_n_arr[i];
     }
   }
 
-  // PARA: slice_offset after accumulate should be the same as the new node num
-  auto flatten_split_seq = parlay::sort(parlay::append(
-      typename TT::SplitSeq(TI->split.begin(),
-                            TI->split.begin() + TI->GetSplitN()),
-      parlay::tabulate(slice_offset - 1,
-                       [&](SizeT i) { return node_split_slice[i].second; })));
+  // merge split
+  SizeT split_idx = 0;
+  for (BufSizeT i = 0; i < TI->GetSplitN(); i++) {
+    if (return_node_n_arr[i] == 0 && i < TI->GetSplitN() - 1) {
+      flatten_split_seq[split_idx++] = TI->split[i];
+    } else {
+      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
 
+      parlay::parallel_for(0, return_node_n_arr[i] - 1, [&](SizeT j) {
+        flatten_split_seq[split_idx + j] = node_split_slice[st + j].second;
+      });
+      split_idx += return_node_n_arr[i] - 1;
+      if (i < TI->GetSplitN() - 1) {
+        // not the last split, then append the tree split
+        flatten_split_seq[split_idx++] = TI->split[i];
+      }
+    }
+  }
+
+  assert(node_idx == split_idx + 1);
   assert(parlay::is_sorted(flatten_split_seq,
                            [&](TT::K a, TT::K b) { return a < b; }));
   // std::cout << "Split interior node with size " << flatten_node_seq.size()
   //           << std::endl;
 
-  SizeT bkt_n = GetBktNum(flatten_node_seq.size());
-  auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
-  auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
-
+  // launch rebuild
   [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
-      parlay::make_slice(flatten_node_seq), parlay::make_slice(node_seq),
-      parlay::make_slice(flatten_split_seq), parlay::make_slice(split_seq));
+      parlay::make_slice(flatten_node_seq),
+      parlay::make_slice(flatten_split_seq), node_split_slice);
 
-  assert(rt_bkt_n == bkt_n);
   return rt_bkt_n;
 }
 

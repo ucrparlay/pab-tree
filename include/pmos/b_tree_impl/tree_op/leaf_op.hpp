@@ -38,8 +38,8 @@ TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
   assert(T->size == TL->GetEle().size());
   if (TL->elements.size() == 0) {
     assert(TL->size == 0);
-    throw std::runtime_error(
-        "Error: Leaf elements not initialized before insertion.");
+    // throw std::runtime_error(
+    //     "Error: Leaf elements not initialized before insertion.");
     TL->InitializeEleSeq();
     assert(TL->elements.size() == TT::kBufUB);
   }
@@ -69,14 +69,14 @@ TT::SizeT BTree<TT>::HandlingLeafSplitOverflow(
 
   // NOTE: split
   entry_seq = parlay::sort(entry_seq);  // PERF: we need sort as In is unsorted
-  SizeT bkt_n = GetBktNum(entry_seq.size());
-  auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
-  auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
+  // SizeT bkt_n = GetBktNum(entry_seq.size());
+  // auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
+  // auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
   SizeT rt_bkt_n =
       GenerateLeafNodes(parlay::make_slice(entry_seq), node_split_slice);
 
-  assert(rt_bkt_n == bkt_n);
+  // assert(rt_bkt_n == bkt_n);
 
   return rt_bkt_n;
 }

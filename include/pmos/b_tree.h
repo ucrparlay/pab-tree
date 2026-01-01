@@ -114,6 +114,14 @@ class BTree {
     return (n * (i + 1)) / bkt_n;
   };
 
+  // static SizeT GetSplitRangeStIdx(SizeT const i, auto& split_pos_seq) {
+  //   return static_cast<SizeT>(i == 0 ? 0 : split_pos_seq[i - 1]);
+  // }
+  //
+  // static SizeT GetSplitRangeEndIdx(SizeT const i, auto& split_pos_seq) {
+  //   return static_cast<SizeT>(i == 0 ? 0 : split_pos_seq[i - 1]);
+  // }
+
   // NOTE: build tree
   template <typename Range>
   void Build(Range&& In);
@@ -141,10 +149,11 @@ class BTree {
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  static inline Node* UpdateInterior(Node* T,
-                                     NodeSplitPairSlice node_split_slice,
-                                     auto& new_split_node_arr,
-                                     size_t new_node_n);
+  static Node* UpdateInterior(
+      Node* T, NodeSplitPairSlice node_split_slice,
+      std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+      std::array<SizeT, TT::kBufUB> const& return_node_n_arr,
+      size_t new_node_n);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
@@ -158,6 +167,10 @@ class BTree {
                                      TT::NodeSlice node_out,
                                      TT::SplitSlice key_in,
                                      TT::SplitSlice key_out);
+
+  static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
+                                     TT::SplitSlice key_in,
+                                     NodeSplitPairSlice node_split_out);
   //
   // template <typename Leaf, typename Interior, bool granularity = true>
   // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);
@@ -184,7 +197,8 @@ class BTree {
 
   static SizeT HandlingInteriorSplitOverflow(
       Node* T, NodeSplitPairSlice node_split_slice,
-      auto const& new_split_node_n_arr, SizeT new_node_n);
+      std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+      std::array<SizeT, TT::kBufUB> const& return_node_n_arr, SizeT new_node_n);
 
   //
   // template <typename Leaf, typename RT>

@@ -46,7 +46,7 @@ void BTree<TT>::BatchInsert_(EntrySlice In) {
   // t.reset(), t.start();
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
-  auto [updated_node_seq, split_seq] =
+  SizeT new_node_n =
       BatchInsertRecursive(this->root_, parlay::make_slice(sorted_seq),
                            parlay::make_slice(node_split_seq));
   // t.next("batch insert");
@@ -62,11 +62,15 @@ void BTree<TT>::BatchInsert_(EntrySlice In) {
   // std::cout << In.size() << " " << vis_leaf_num << " leaf nodes visited, "
   //           << vis_inter_num << " interior nodes visited." << std::endl;
 
-  if (split_seq.size() == 0) {
-    this->root_ = updated_node_seq.front();
-  } else {
-    this->root_ = AllocInteriorNode<Interior, TT>(updated_node_seq, split_seq);
+  if (new_node_n > 0) {
+    auto updated_node_seq = parlay::tabulate(
+        new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
+    auto updated_split_seq = parlay::tabulate(
+        new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
+    this->root_ =
+        AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
   }
+
   // t.next("alloc root");
   // puts("-----------------------");
   return;
@@ -75,6 +79,8 @@ void BTree<TT>::BatchInsert_(EntrySlice In) {
 template <typename TT>
 TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
                                           NodeSplitPairSlice node_split_slice) {
+  assert(In.size() == node_split_slice.size());
+
   SizeT n = In.size();
   // vis_inter_num++;
 
@@ -221,11 +227,11 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
     new_node_n += new_split_node_n_arr[i] == 0 ? 1 : new_split_node_n_arr[i];
   }
   if (new_node_n <= TT::kBufUB) {
-    [[maybe_unused]] Node* new_inter_node =
-        UpdateInterior(T, node_split_slice, new_split_node_n_arr, new_node_n);
+    [[maybe_unused]] Node* new_inter_node = UpdateInterior(
+        T, node_split_slice, split_pos_seq, new_split_node_n_arr, new_node_n);
     return 0;
   } else {
-    return HandlingInteriorSplitOverflow(T, node_split_slice,
+    return HandlingInteriorSplitOverflow(T, node_split_slice, split_pos_seq,
                                          new_split_node_n_arr, new_node_n);
   }
 }
