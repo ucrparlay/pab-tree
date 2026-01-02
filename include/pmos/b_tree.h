@@ -163,15 +163,6 @@ class BTree {
                                  NodeSplitPairSlice node_split_out);
 
   // PARA: return bucket_num
-  // static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
-  //                                    TT::NodeSlice node_out,
-  //                                    TT::SplitSlice key_in,
-  //                                    TT::SplitSlice key_out);
-  //
-  // static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
-  //                                    TT::SplitSlice key_in,
-  //                                    NodeSplitPairSlice node_split_out);
-
   template <typename KeyFunc, typename NodeFunc>
   struct GenNodesOutputHandler {
     KeyFunc set_key;

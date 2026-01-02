@@ -29,13 +29,7 @@ void BTree<TT>::Build(Range&& In) {
 
 template <typename TT>
 void BTree<TT>::Build_(EntrySlice In) {
-  // puts("-----");
   auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
-  // sort_seq = parlay::remove_duplicates_ordered(sort_seq);
-  // for (int i = 0; i < 10; i++) {
-  //   std::cout << TT::GetKey(sort_seq[i]) << " ";
-  // }
-  // std::cout << sort_seq.size() << std::endl;
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;
@@ -75,7 +69,6 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
   };
 
   // NOTE: build leaf
-  // SizeT bkt_n = GenerateLeafNodes(In, key_out, node_out);
   SizeT bkt_n = GenerateLeafNodes(
       In, GenNodesOutputHandler{
               .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
@@ -85,8 +78,6 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
 
   // NOTE: build Interior
   while (node_in.size() >= TT::kBufUB) {
-    // SizeT interior_bkt_n =
-    //     GenerateInteriorNodes(node_in, node_out, key_in, key_out);
     SizeT interior_bkt_n = GenerateInteriorNodes(
         node_in, key_in,
         GenNodesOutputHandler{
