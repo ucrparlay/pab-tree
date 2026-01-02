@@ -73,8 +73,13 @@ TT::SizeT BTree<TT>::HandlingLeafSplitOverflow(
   // auto split_seq = TT::SplitSeq::uninitialized(bkt_n - 1);
   // auto node_seq = TT::NodeSeq::uninitialized(bkt_n);
 
-  SizeT rt_bkt_n =
-      GenerateLeafNodes(parlay::make_slice(entry_seq), node_split_slice);
+  SizeT rt_bkt_n = GenerateLeafNodes(
+      parlay::make_slice(entry_seq),
+      GenNodesOutputHandler{
+          .set_key = [&](SizeT i,
+                         auto key) { node_split_slice[i].second = key; },
+          .set_node = [&](SizeT i,
+                          auto node) { node_split_slice[i].first = node; }});
 
   // assert(rt_bkt_n == bkt_n);
 

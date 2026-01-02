@@ -163,14 +163,29 @@ class BTree {
                                  NodeSplitPairSlice node_split_out);
 
   // PARA: return bucket_num
-  static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
-                                     TT::NodeSlice node_out,
-                                     TT::SplitSlice key_in,
-                                     TT::SplitSlice key_out);
+  // static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
+  //                                    TT::NodeSlice node_out,
+  //                                    TT::SplitSlice key_in,
+  //                                    TT::SplitSlice key_out);
+  //
+  // static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
+  //                                    TT::SplitSlice key_in,
+  //                                    NodeSplitPairSlice node_split_out);
 
+  template <typename KeyFunc, typename NodeFunc>
+  struct GenNodesOutputHandler {
+    KeyFunc set_key;
+    NodeFunc set_node;
+  };
+
+  template <typename OutputHandler>
+  static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
+                                 OutputHandler&& output_handler);
+
+  template <typename OutputHandler>
   static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
                                      TT::SplitSlice key_in,
-                                     NodeSplitPairSlice node_split_out);
+                                     OutputHandler&& output_handler);
   //
   // template <typename Leaf, typename Interior, bool granularity = true>
   // static void PrepareRebuild(Node* T, Slice In, Points& wx, Points& wo);
@@ -266,9 +281,11 @@ class BTree {
   //                                     DisType const r);
   //
   // template <typename CircleType>
-  // static inline double P2CMinDistance(Point const& p, CircleType const& cl);
+  // static inline double P2CMinDistance(Point const& p, CircleType const&
+  // cl);
   //
-  // static inline DisType InterruptibleDistance(Point const& p, Point const& q,
+  // static inline DisType InterruptibleDistance(Point const& p, Point const&
+  // q,
   //                                             DisType up);
   //
   // // NOTE: get the split for a node
@@ -284,8 +301,8 @@ class BTree {
   // // NOTE: search knn in the binary node
   // template <typename Leaf, IsBinaryNode Interior, typename Range>
   // static void KNNBinary(Node* T, Point const& q,
-  //                       kBoundedQueue<Point, Range>& bq, Box const& node_box,
-  //                       KNNLogger& logger)
+  //                       kBoundedQueue<Point, Range>& bq, Box const&
+  //                       node_box, KNNLogger& logger)
   //   requires std::same_as<typename Interior::ST, HyperPlane>;
   //
   // template <typename Leaf, IsBinaryNode Interior, typename Range>
@@ -296,19 +313,19 @@ class BTree {
   // // NOTE: search knn in the expanded multi node
   // template <typename Leaf, IsMultiNode Interior, typename Range>
   // static void KNNMultiExpand(Node* T, Point const& q, DimsType dim,
-  //                            BucketType idx, kBoundedQueue<Point, Range>& bq,
-  //                            Box const& node_box, KNNLogger& logger);
+  //                            BucketType idx, kBoundedQueue<Point, Range>&
+  //                            bq, Box const& node_box, KNNLogger& logger);
   //
   // // NOTE: search knn in the expanded multi node
   // template <typename Leaf, IsMultiNode Interior, typename Range>
   // static void KNNMultiExpandBox(Node* T, Point const& q, DimsType dim,
-  //                               BucketType idx, kBoundedQueue<Point, Range>&
-  //                               bq, KNNLogger& logger);
+  //                               BucketType idx, kBoundedQueue<Point,
+  //                               Range>& bq, KNNLogger& logger);
   //
   // // NOTE: search knn in the multi node
   // template <typename Leaf, IsMultiNode Interior, typename Range>
-  // static void KNNMulti(Node* T, Point const& q, kBoundedQueue<Point, Range>&
-  // bq,
+  // static void KNNMulti(Node* T, Point const& q, kBoundedQueue<Point,
+  // Range>& bq,
   //                      KNNLogger& logger);
   //
   // // NOTE: search knn in the mix of binary and multi node
@@ -320,8 +337,8 @@ class BTree {
   // // NOTE: search knn in the cover node
   // // TODO: change type of interior
   // template <typename Leaf, IsDynamicNode Interior, typename Range>
-  // static void KNNCover(Node* T, Point const& q, kBoundedQueue<Point, Range>&
-  // bq,
+  // static void KNNCover(Node* T, Point const& q, kBoundedQueue<Point,
+  // Range>& bq,
   //                      KNNLogger& logger);
   //
   // // NOTE: range count stuffs
@@ -380,7 +397,8 @@ class BTree {
   //
   // // NOTE: expand a multi node into a binary node
   // template <IsBinaryNode BN, IsMultiNode MN>
-  // static Node* ExpandMultiNode(typename MN::ST const& split, BucketType idx,
+  // static Node* ExpandMultiNode(typename MN::ST const& split, BucketType
+  // idx,
   //                              BucketType deep,
   //                              parlay::sequence<Node*> const& tree_nodes);
   //
@@ -425,7 +443,8 @@ class BTree {
   //
   // template <typename Leaf, typename Interior>
   // Points CheckCover(Node* T,
-  //                   typename Interior::CircleType const& level_cover_circle);
+  //                   typename Interior::CircleType const&
+  //                   level_cover_circle);
   //
   // template <typename Leaf, typename Interior>
   // static size_t CheckSize(Node* T);
