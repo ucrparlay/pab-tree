@@ -169,6 +169,7 @@ TT::SizeT BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
   });
   return bkt_n;
 }
+
 template <typename TT>
 TT::Node* BTree<TT>::UpdateInterior(
     Node* T, NodeSplitPairSlice node_split_slice,
@@ -180,9 +181,9 @@ TT::Node* BTree<TT>::UpdateInterior(
   Interior* TI = static_cast<Interior*>(T);
 
   // merge node
+  assert(std::numeric_limits<BufSizeT>::max() >= new_node_n);
   SizeT tot_entry_sz = 0;
-  // BufSizeT node_idx = 0;
-  int node_idx = 0;
+  BufSizeT node_idx = 0;
   typename Interior::NodeArr new_nodes;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     if (return_node_n_arr[i] == 0) {
@@ -200,8 +201,7 @@ TT::Node* BTree<TT>::UpdateInterior(
   // merge split
   // NOTE:the original split will always stay
   typename Interior::SplitArr new_splits;
-  // BufSizeT split_idx = 0;
-  int split_idx = 0;
+  BufSizeT split_idx = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
     // HACK: if return_node_n_arr[i] == 0, then no new splits from this child
@@ -226,8 +226,8 @@ TT::Node* BTree<TT>::UpdateInterior(
   assert(node_idx == split_idx + 1);
   assert(node_idx == new_node_n);
 
-  TI->tree_nodes = new_nodes;
-  TI->split = new_splits;
+  TI->tree_nodes = std::move(new_nodes);
+  TI->split = std::move(new_splits);
   TI->size = tot_entry_sz;
   TI->node_n = new_node_n;
 
@@ -259,15 +259,13 @@ TT::SizeT BTree<TT>::HandlingInteriorSplitOverflow(
     std::array<SizeT, TT::kBufUB> const& return_node_n_arr, SizeT new_node_n) {
   assert(!T->is_leaf);
   Interior* TI = static_cast<Interior*>(T);
-  // auto flatten_node_seq = parlay::flatten(node_seq_list);
   typename TT::NodeSeq flatten_node_seq =
       TT::NodeSeq::uninitialized(new_node_n);
   typename TT::SplitSeq flatten_split_seq =
       TT::SplitSeq::uninitialized(new_node_n - 1);
 
-  SizeT node_idx = 0;
-
   // merge node
+  SizeT node_idx = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     if (return_node_n_arr[i] == 0) {
       flatten_node_seq[node_idx++] = TI->tree_nodes[i];
