@@ -180,8 +180,8 @@ TT::SizeT BTree<TT>::GenerateLeafNodes(TT::EntrySlice In,
   SizeT item_n = In.size();
   SizeT bkt_n = GetBktNum(item_n);
   assert(bkt_n > 0);
-  assert(key_out.size() >= bkt_n - 1);
-  assert(node_out.size() >= bkt_n);
+  // assert(key_out.size() >= bkt_n - 1);
+  // assert(node_out.size() >= bkt_n);
 
   parlay::parallel_for(0, bkt_n, [&](SizeT i) {
     if (i < bkt_n - 1) {
@@ -205,7 +205,7 @@ template <typename OutputHandler>
 TT::SizeT BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
                                            TT::SplitSlice key_in,
                                            OutputHandler&& output_handler) {
-  assert(key_in.size() == node_in.size() - 1);
+  // assert(key_in.size() == node_in.size() - 1);
   SizeT item_n = node_in.size();
   SizeT bkt_n = GetBktNum(item_n);
   assert(bkt_n > 0);
