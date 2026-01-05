@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
   auto generate = [&]<typename Point>(std::string const& new_path) {
     std::cout << "Generating... " << std::endl;
-    auto wp = UniformGenerator<Point>::WithinBox(pts_num);
+    auto wp = UniformGenerator<Point>::Generate(pts_num);
     std::cout << "Writing... " << std::endl;
     PrintToFile(new_path, wp);
   };

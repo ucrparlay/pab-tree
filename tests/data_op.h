@@ -67,241 +67,70 @@ void PrintToFile(std::string const& path, auto const& wp) {
   return;
 }
 
-// template <typename InputPoint, typename OutputPoint>
-// class DataLaundry {
-//  public:
-//   using InputPoints = parlay::sequence<InputPoint>;
-//   using OutputPoints = parlay::sequence<OutputPoint>;
-//
-//   static OutputPoints RoundDown(auto const& wp, int const multiply_offset) {
-//     return parlay::tabulate(wp.size(), [&](size_t i) -> OutputPoint {
-//       OutputPoint p;
-//       for (int j = 0; j < OutputPoint::GetDim(); j++) {
-//         p.pnt[j] = static_cast<typename OutputPoint::Coord>(
-//             std::floor(wp[i].pnt[j] * multiply_offset));
-//       }
-//       p.aug = wp[i].aug;
-//       return p;
-//     });
-//   }
-//
-//   static OutputPoints RemoveDuplicates(auto const& wp) {
-//     using BP = typename OutputPoint::BP;
-//     auto new_pts = parlay::unique(
-//         parlay::sort(wp,
-//                      [&](auto const& a, auto const& b) {
-//                        return static_cast<BP const&>(a) <
-//                               static_cast<BP const&>(b);
-//                      }),
-//         [&](auto const& a, auto const& b) {
-//           return static_cast<BP const&>(a) == static_cast<BP const&>(b);
-//         });
-//     // return new_pts;
-//     return parlay::sort(new_pts, [&](auto const& a, auto const& b) {
-//       return a.aug.id < b.aug.id;
-//     });
-//   }
-//
-//   static OutputPoints ShiftToFirstRegion(auto& wp) {
-//     auto bb = pmos::BaseTree<OutputPoint>::GetBox(parlay::make_slice(wp));
-//     return parlay::tabulate(wp.size(), [&](size_t i) {
-//       OutputPoint p;
-//       for (int j = 0; j < OutputPoint::GetDim(); j++) {
-//         p[j] = static_cast<typename OutputPoint::Coord>(wp[i][j] -
-//         bb.first[j]);
-//       }
-//       return p;
-//     });
-//   }
-//
-//   static bool CheckCoordWithinRange(auto& wp) {
-//     return parlay::all_of(wp, [&](auto const& p) {
-//       return std::ranges::all_of(
-//           p.pnt, [](auto const& c) { return c >= 0 && c <= INT32_MAX; });
-//     });
-//   }
-// };
-
-template <typename E>
-class UniformGenerator {
+template <typename E, typename BatchDisFunc>
+class Generator {
  public:
   using Points = parlay::sequence<E>;
 
-  static Points WithinBox(size_t const gen_num) {
-    Points wp(gen_num);
-
-    std::random_device rd;      // a seed source for the random number engine
-    std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
-    std::uniform_int_distribution<int> distrib(1, kValueUB);
-
-    parlay::random_generator gen(distrib(gen_mt));
-    std::uniform_int_distribution<int> dis(
-        0, kValueUB);  // WARN : assume using int
-
-    // generate n random points in a cube
-    parlay::parallel_for(0, gen_num, [&](size_t i) {
-      auto r = gen[i];
-      wp[i].key = dis(r);
-      if constexpr (std::tuple_size<typename E::V>::value == 1) {
-        std::get<0>(wp[i].val) = dis(r);
-      }
-    });
-    return wp;
+  static Points Gen(size_t const base_n, size_t batch_n) {
+    Points wp(base_n);
+    auto ground_seq = GenUniformSeq<typename E::K>(base_n + batch_n);
+    BatchDisFunc::template GenSeq<size_t>(batch_n, ground_seq.size());
   }
 };
-//
-// template <typename Point, bool kSameDensity>
-// class VardenGenerator {
-//  public:
-//   using Points = parlay::sequence<Point>;
-//   using DimsType = Point::DimsType;
-//   using Num = pmos::Num_Comparator<Axis>;
-//
-//   constexpr static double GetRhoNoice() { return 1.0 / 10000; }
-//
-//   // PARA: initial spreader avaliable counter
-//   constexpr static size_t SpreaderSize() { return 100; }
-//
-//   static double RestartProbability(size_t n) {
-//     return 10.0 / (n * (1 - GetRhoNoice()));
-//   }
-//
-//   static size_t GetNoicePtsNum(size_t gen_num) {
-//     return static_cast<size_t>(static_cast<double>(gen_num) * GetRhoNoice());
-//   }
-//
-//   static size_t GetClusterPtsNum(size_t gen_num) {
-//     return gen_num - GetNoicePtsNum(gen_num);
-//   }
-//
-//   size_t RadisuByVincinity(
-//       [[maybe_unused]] size_t const prev_restart) noexcept {
-//     if constexpr (kSameDensity) {
-//       return 100;
-//     } else {
-//       return 100 * ((prev_restart % 10) + 1);
-//     }
-//   }
-//
-//   size_t ShiftDistance([[maybe_unused]] size_t const prev_restart) noexcept {
-//     if constexpr (kSameDensity) {
-//       return 50 * Point::GetDim();
-//     } else {
-//       return RadisuByVincinity(prev_restart) * Point::GetDim() / 2;
-//     }
-//   }
-//
-//   Points GenerateCluster(size_t const gen_num, size_t const cur_restart_idx)
-//   {
-//     using Spreader = std::pair<Point, DimsType>;
-//     std::random_device rd;      // a seed source for the random number engine
-//     std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
-//     std::uniform_int_distribution<int> distrib(1, kValueUB);
-//
-//     parlay::random_generator gen(distrib(gen_mt));
-//     std::uniform_int_distribution<int> dis(0, kValueUB);
-//     std::bernoulli_distribution bernoulli(0.5);
-//
-//     auto generate_random_point = [&]() -> Point {
-//       Point p;
-//       for (auto& c : p.pnt) {
-//         c = dis(gen);
-//       }
-//       return p;
-//     };
-//
-//     // ((a % b) + b) % b; negative modular
-//     auto shift_pts =
-//         parlay::tabulate(gen_num / SpreaderSize() + 1, [&](size_t i) {
-//           if (i) {
-//             int const dir = dis(gen) % Point::GetDim();  // pick a dir
-//             Point p(static_cast<Point::Coord>(0));
-//             int sign = bernoulli(gen) ? 1 : -1;
-//             p[dir] =
-//                 sign * ShiftDistance(cur_restart_idx);  // move dis in this
-//                 dir
-//             return Spreader(p, dir);
-//           } else {
-//             return Spreader(generate_random_point(), 0);
-//           }
-//         });
-//
-//     parlay::scan_inclusive_inplace(
-//         shift_pts.cut(1, shift_pts.size()),
-//         parlay::binary_op(
-//             [](Spreader const& a, Spreader const& b) {
-//               Point c(a.first);  // WARN: order here matters
-//               c[b.second] += b.first[b.second];
-//               return Spreader(c, b.second);
-//             },
-//             shift_pts[0]));
-//
-//     // TODO: may need to adjust the range of coordinates
-//     auto pts =
-//         parlay::flatten(parlay::tabulate(shift_pts.size(), [&](size_t i) {
-//           size_t sz = i != shift_pts.size() - 1 ? SpreaderSize()
-//                                                 : gen_num - i *
-//                                                 SpreaderSize();
-//           return UniformGenerator<Point>::WithinSphere(
-//               sz, shift_pts[i].first, RadisuByVincinity(cur_restart_idx));
-//         }));
-//
-//     assert(pts.size() == gen_num);
-//     return pts;
-//   }
-//
-//   Points Apply(size_t const gen_num) {
-//     std::random_device rd;      // a seed source for the random number engine
-//     std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
-//     std::uniform_int_distribution<int> distrib(1, 2024);
-//
-//     parlay::random_generator gen(
-//         distrib(gen_mt));  // PARA: thread safe random generator
-//     std::uniform_real_distribution<double> dis(0.0, 1.0);
-//
-//     // NOTE: begin generate
-//     // pick the restart points
-//     auto r_start_pts =
-//         parlay::tabulate(GetClusterPtsNum(gen_num), [&](size_t i) -> bool {
-//           auto r = gen[i];
-//           return i == 0 || dis(r) < RestartProbability(gen_num);
-//         });
-//
-//     // pack the index of the restart points
-//     auto restart_idx = parlay::pack_index(r_start_pts);
-//     restart_idx.push_back(GetClusterPtsNum(gen_num));
-//
-//     // generate the points for each cluster and pack them
-//     auto cluster_seq =
-//         parlay::flatten(parlay::tabulate(restart_idx.size() - 1, [&](size_t
-//         i) {
-//           return GenerateCluster(restart_idx[i + 1] - restart_idx[i], i);
-//         }));
-//
-//     // move the points to the first region of the space
-//     auto bb = pmos::BaseTree<Point>::GetBox(parlay::make_slice(cluster_seq));
-//     for (DimsType j = 0; j < Point::GetDim(); j++) {
-//       bb.first[j] = Num::Min(bb.first[j], static_cast<Axis>(0));
-//       bb.first[j] = Num::Abs(bb.first[j]);
-//     }
-//     parlay::parallel_for(0, cluster_seq.size(), [&](size_t i) {
-//       for (DimsType j = 0; j < Point::GetDim(); j++) {
-//         cluster_seq[i][j] += bb.first[j];
-//         if (cluster_seq[i][j] < 0) {
-//           std::cout << "cluster_seq[i][j]: " << cluster_seq[i][j] <<
-//           std::endl;
-//         }
-//       }
-//     });
-//
-//     // append the noice points
-//     return parlay::append(cluster_seq, UniformGenerator<Point>::WithinBox(
-//                                            GetNoicePtsNum(gen_num)));
-//   }
-// };
-//
-// template <typename Point>
-// auto generate_varden_points(size_t pts_num) {
-//   VardenGenerator<Point, false> varden;
-//   return varden.Apply(pts_num);
-// }
+
+template <class T>
+static parlay::sequence<T> GenUniformSeq(size_t n) {
+  printf("uniform distribution with num_keys: %zu\n", n);
+  parlay::sequence<T> seq(n);
+  parlay::parallel_for(0, n, [&](size_t i) {
+    size_t v = i;
+    seq[i] = v;
+  });
+  return parlay::random_shuffle(seq);
+}
+
+template <class T>
+parlay::sequence<T> exponential_generator(size_t n, double lambda) {
+  printf("exponential distribution with lambda: %.10f\n", lambda);
+  size_t cutoff = n;
+  parlay::sequence<size_t> nums(cutoff + 1, 0);
+
+  parlay::parallel_for(0, cutoff, [&](size_t i) {
+    nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
+  });
+  size_t tot = scan_inplace(make_slice(nums));
+  assert(tot >= n);
+
+  parlay::sequence<T> seq(n);
+  parlay::parallel_for(0, cutoff, [&](size_t i) {
+    parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
+      // seq[j] = _hash(static_cast<T>(i));
+      seq[j] = i;
+    });
+  });
+  return random_shuffle(seq);
+}
+
+template <class T>
+parlay::sequence<T> zipfian_generator(size_t n, double s) {
+  printf("zipfian distribution with s: %f\n", s);
+  size_t cutoff = n;
+  auto harmonic = parlay::delayed_seq<double>(
+      cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
+  double sum = parlay::reduce(make_slice(harmonic));
+  double v = n / sum;
+  parlay::sequence<size_t> nums(cutoff + 1, 0);
+  parlay::parallel_for(
+      0, cutoff, [&](size_t i) { nums[i] = max(1.0, v / pow(i + 1, s)); });
+  size_t tot = scan_inplace(make_slice(nums));
+  assert(tot >= n);
+  parlay::sequence<T> seq(n);
+  parlay::parallel_for(0, cutoff, [&](size_t i) {
+    parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
+      // seq[j] = _hash(static_cast<T>(i));
+      seq[j] = i;
+    });
+  });
+  return random_shuffle(seq);
+}
