@@ -8,6 +8,7 @@
 #include "common/IO.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
+#include "parlay/internal/group_by.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "parlay/sequence.h"
@@ -121,7 +122,7 @@ void bucketize(Seq const& data) {
 }
 
 template <class Seq>
-auto SampleWeightedSeq(Seq& weight_seq, size_t n) {
+auto SampleWeightedSeq(Seq&& weight_seq, size_t n) {
   std::random_device rd;      // a seed source for the random number engine
   std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
   std::uniform_int_distribution<int> distrib(1, kValueUB);
@@ -143,12 +144,12 @@ auto SampleWeightedSeq(Seq& weight_seq, size_t n) {
 }
 
 template <class Seq>
-auto SupplySample(Seq& current_seq, size_t n, size_t l, size_t r) {
+auto SupplySample(Seq const& current_seq, size_t extra_n, size_t l, size_t r) {
   std::set<size_t> selected_set;
-  parlay::sort_inplace(current_seq);
-  while (selected_set.size() < n) {
+  auto sorted_seq = parlay::sort(current_seq);
+  while (selected_set.size() < extra_n) {
     size_t idx = get_random_index(l, r, 0);
-    if (*std::lower_bound(current_seq.begin(), current_seq.end(), idx) != idx &&
+    if (*std::lower_bound(sorted_seq.begin(), sorted_seq.end(), idx) != idx &&
         selected_set.find(idx) == selected_set.end()) {
       selected_set.insert(idx);
     }
@@ -161,11 +162,30 @@ constexpr size_t duplicate_ratio = 2;
 template <class T = size_t>
 class UniformGenerator {
  public:
-  static parlay::sequence<T> Generate(double, size_t n, size_t max_k) {
-    printf("uniform distribution with num_keys: %zu\n", n);
-    parlay::sequence<T> seq(n);
-    parlay::parallel_for(0, n, [&](size_t i) { seq[i] = i % max_k; });
-    return parlay::random_shuffle(seq);
+  static parlay::sequence<T> GenerateGroundSeq(double, size_t n, size_t max_k) {
+    printf("uniform distribution ground with num_keys: %zu\n", n);
+    return parlay::tabulate(n, [&](size_t i) { return i; });
+  }
+
+  static parlay::sequence<T> Generate(double, size_t batch_n, size_t ground_n) {
+    printf("uniform distribution with num_keys: %zu\n", batch_n);
+    auto sample = parlay::remove_duplicates(SampleWeightedSeq(
+        parlay::tabulate(ground_n, [&](size_t i) -> size_t { return 1; }),
+        batch_n));
+    sample.append(SupplySample(sample, batch_n - sample.size(), 0, ground_n));
+    bucketize(sample);
+    // std::cout << sample.size() << std::endl;
+
+    if (parlay::remove_duplicates(sample).size() < batch_n) {
+      std::cout << "Generated unique keys: " << sample.size()
+                << ", required: " << batch_n << std::endl;
+      throw std::runtime_error(
+          "UniformGenerator: not enough unique keys generated.");
+    } else {
+      std::cout << "Generated unique keys: " << sample.size()
+                << ", required: " << batch_n << std::endl;
+    }
+    return sample;
   }
 };
 
@@ -176,37 +196,37 @@ class ExponentialGenerator {
   static double constexpr x_scale_fac = 0.0005;
   static size_t constexpr supply_factor = 10;
 
-  static parlay::sequence<T> Generate(double lambda, size_t n, size_t max_k) {
+  static parlay::sequence<T> Generate(double lambda, size_t batch_n,
+                                      size_t ground_n) {
     printf("exponential distribution with lambda: %.10f\n", lambda);
-    // size_t cutoff = 2 * n;
-    size_t cutoff = max_k;
+    size_t cutoff = ground_n;
     parlay::sequence<size_t> nnums(cutoff, 0);
     parlay::sequence<double> nums(cutoff, 0);
 
     parlay::parallel_for(0, cutoff, [&](size_t i) {
       // nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
-      nums[i] = (lambda * exp(-lambda * (x_scale_fac * i)));
+      nums[i] = lambda * exp(-lambda * (x_scale_fac * i));
       // nums[i] %= max_k;
     });
     std::cout << std::endl;
-    auto sample = parlay::remove_duplicates(SampleWeightedSeq(nums, n));
+    auto sample = parlay::remove_duplicates(SampleWeightedSeq(nums, batch_n));
     // sample = parlay::remove_duplicates(sample);
     // bucketize(sample);
-    sample.append(
-        SupplySample(sample, n - sample.size(), 0, cutoff / supply_factor));
+    sample.append(SupplySample(sample, batch_n - sample.size(), 0,
+                               cutoff / supply_factor));
     bucketize(sample);
     // std::cout << sample.size() << std::endl;
 
-    if (parlay::remove_duplicates(sample).size() < n) {
-      std::cout << "Generated unique keys: " << nums.size()
-                << ", required: " << n << std::endl;
+    if (parlay::remove_duplicates(sample).size() < batch_n) {
+      std::cout << "Generated unique keys: " << sample.size()
+                << ", required: " << batch_n << std::endl;
       throw std::runtime_error(
           "ExponentialGenerator: not enough unique keys generated.");
     } else {
       std::cout << "Generated unique keys: " << sample.size()
-                << ", required: " << n << std::endl;
+                << ", required: " << batch_n << std::endl;
     }
-    return parlay::random_shuffle(parlay::make_slice(sample));
+    return sample;
   }
 };
 
@@ -242,12 +262,58 @@ class Generator {
  public:
   using EntrySeq = parlay::sequence<E>;
 
+  static void Validate(int batch_op, size_t base_n, size_t batch_n,
+                       auto base_k_seq, auto batch_k_seq, auto ground_k_seq) {
+    if (parlay::remove_duplicates(base_k_seq).size() !=
+        (batch_op == 0 ? base_n : base_n - batch_n)) {
+      throw std::runtime_error(
+          "Validate: Base sequence size mismatch after remove duplicates.");
+    }
+
+    if (parlay::remove_duplicates(batch_k_seq).size() != batch_n) {
+      throw std::runtime_error(
+          "Validate: Batch sequence size mismatch after remove duplicates.");
+    }
+
+    if (parlay::remove_duplicates(ground_k_seq).size() !=
+        (batch_op == 0 ? base_n + batch_n : base_n)) {
+      throw std::runtime_error(
+          "Validate: Ground sequence size mismatch after remove duplicates.");
+    }
+
+    if (ground_k_seq.size() != (batch_op == 0 ? base_n + batch_n : base_n)) {
+      throw std::runtime_error("Validate: Ground sequence size mismatch.");
+    }
+
+    base_k_seq = parlay::sort(base_k_seq);
+    batch_k_seq = parlay::sort(batch_k_seq);
+    ground_k_seq = parlay::sort(ground_k_seq);
+    if (batch_op == 0 && parlay::any_of(batch_k_seq, [&](size_t idx) {
+          auto it = std::lower_bound(base_k_seq.begin(), base_k_seq.end(), idx);
+          return it != base_k_seq.end() && *it == idx;
+        })) {
+      throw std::runtime_error(
+          "Validate: Insert batch has keys already in base sequence.");
+    } else if (batch_op == 1 && !parlay::all_of(batch_k_seq, [&](size_t idx) {
+                 auto it = std::lower_bound(ground_k_seq.begin(),
+                                            ground_k_seq.end(), idx);
+                 return it != ground_k_seq.end() && *it == idx;
+               })) {
+      throw std::runtime_error(
+          "Validate: Delete batch has keys not in base sequence.");
+    }
+
+    std::cout << "Validation passed." << std::endl;
+  }
+
   static EntrySeq ToEntry(parlay::sequence<size_t> const& key_seq) {
+    // shuffle keys
+    auto rand_seq = parlay::random_shuffle(parlay::make_slice(key_seq));
     return parlay::tabulate(key_seq.size(), [&](size_t i) {
       if constexpr (std::is_same_v<typename E::V, std::tuple<>>) {
-        return E{.key = key_seq[i]};
+        return E{.key = rand_seq[i]};
       } else if constexpr (std::tuple_size_v<typename E::V> == 1) {
-        return E{.key = key_seq[i], .val = {i}};
+        return E{.key = rand_seq[i], .val = {i}};
       } else {
         static_assert(false,
                       "Generator::ToEntry: Unsupported Entry value type.");
@@ -262,8 +328,9 @@ class Generator {
     // PARA: initiaze size before take batch
     size_t tot_size =
         batch_op == 0 ? base_n + batch_n : base_n;  // insert or delete
-    auto ground_k_seq = UniformGenerator<size_t>::Generate(
+    auto ground_k_seq = UniformGenerator<size_t>::GenerateGroundSeq(
         param, tot_size, std::numeric_limits<size_t>::max());
+    assert(parlay::remove_duplicates(ground_k_seq).size() == tot_size);
     auto batch_idx_seq =
         BatchDisFunc::Generate(param, batch_n, ground_k_seq.size());
 
@@ -274,23 +341,13 @@ class Generator {
     auto base_k_seq = parlay::pack(ground_k_seq, flag);
 
     // gen batch indexes
-    parlay::parallel_for(0, flag.size(), [&](size_t i) { flag[i] = !flag[i]; });
+    parlay::parallel_for(0, flag.size(), [&](size_t i) {
+      flag[i] = flag[i] == false ? true : false;
+    });
     auto batch_k_seq = parlay::pack(ground_k_seq, flag);
 
-    // assert(base_k_seq.size() == base_n);
-    // assert(batch_k_seq.size() == batch_n);
-    if ((batch_op == 0 &&
-         (base_k_seq.size() != base_n || batch_k_seq.size() != batch_n)) ||
-        (batch_op == 1 &&
-         (ground_k_seq.size() != base_n || batch_k_seq.size() != batch_n))) {
-      std::cout << " base_k_seq.size(): " << base_k_seq.size()
-                << " expected: " << base_n << std::endl;
-      std::cout << " batch_k_seq.size(): " << batch_k_seq.size()
-                << " expected: " << batch_n << std::endl;
-      throw std::runtime_error(
-          "Generator::GenBatch: Generated batch size "
-          "mismatch. Please adjust the parameters.");
-    }
+    Validate(batch_op, base_n, batch_n, base_k_seq, batch_k_seq, ground_k_seq);
+
     return batch_op == 0
                ? std::make_pair(ToEntry(base_k_seq), ToEntry(batch_k_seq))
                : std::make_pair(ToEntry(ground_k_seq), ToEntry(batch_k_seq));
