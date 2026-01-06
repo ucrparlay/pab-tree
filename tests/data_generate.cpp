@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
   // PARA: 0: insert, 1: delete
   batch_op = P.getOptionIntValue("-batch_op", 0);
   // PARA: uni: none
-  // PARA: exp: 1, 2, 5, 7, 10
+  // PARA: exp: 0.00005
   // PARA: zip: 0.6, 0.8, 1, 1.2, 1.5
   param = P.getOptionDoubleValue("-param", 1.0);
   std::cout << "base_n: " << base_n << " batch_n: " << batch_n
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
   path += std::string(dis_type == 0 ? "uni/" : dis_type == 1 ? "exp/" : "zip/");
   std::filesystem::create_directory(path);
 
-  path += std::string(batch_op == 0 ? "ins" : "del");
+  path += std::string(batch_op == 0 ? "ins/" : "del/");
   std::filesystem::create_directory(path);
 
   path += toString(base_n) + "_" + toString(val_n) + "/";
@@ -45,34 +45,18 @@ int main(int argc, char* argv[]) {
     using K = typename E::K;
     std::cout << "Generating... " << std::endl;
     EntrySeq base_seq, batch_seq;
-    if (batch_op == 0) {
-      if (dis_type == 0) {
-        std::tie(base_seq, batch_seq) =
-            Generator<E, UniformGenerator<>>::GenInsertBatch(base_n, batch_n,
-                                                             param);
-      } else if (dis_type == 1) {
-        std::tie(base_seq, batch_seq) =
-            Generator<E, ExponentialGenerator<>>::GenInsertBatch(
-                base_n, batch_n, param);
-      } else if (dis_type == 2) {
-        std::tie(base_seq, batch_seq) =
-            Generator<E, ZipfianGenerator<>>::GenInsertBatch(base_n, batch_n,
-                                                             param);
-      }
-    } else {
-      if (dis_type == 0) {
-        std::tie(base_seq, batch_seq) =
-            Generator<E, UniformGenerator<>>::GenDeleteBatch(base_n, batch_n,
-                                                             param);
-      } else if (dis_type == 1) {
-        std::tie(base_seq, batch_seq) =
-            Generator<E, ExponentialGenerator<>>::GenDeleteBatch(
-                base_n, batch_n, param);
-      } else if (dis_type == 2) {
-        std::tie(base_seq, batch_seq) =
-            Generator<E, ZipfianGenerator<>>::GenDeleteBatch(base_n, batch_n,
-                                                             param);
-      }
+    if (dis_type == 0) {
+      std::tie(base_seq, batch_seq) =
+          Generator<E, UniformGenerator<>>::GenBatch(batch_op, base_n, batch_n,
+                                                     param);
+    } else if (dis_type == 1) {
+      std::tie(base_seq, batch_seq) =
+          Generator<E, ExponentialGenerator<>>::GenBatch(batch_op, base_n,
+                                                         batch_n, param);
+    } else if (dis_type == 2) {
+      std::tie(base_seq, batch_seq) =
+          Generator<E, ZipfianGenerator<>>::GenBatch(batch_op, base_n, batch_n,
+                                                     param);
     }
     std::cout << "Writing... " << std::endl;
     PrintToFile(new_path + ".base.in", base_seq);
@@ -82,7 +66,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < file_n; i++) {
     std::string newpath = path + toString(i + 1);
     std::cout << newpath << std::endl;
-    if (val_n == 2) {
+    if (val_n == 1) {
       generate.operator()<Wrapper::Element<Axis, std::tuple<Axis>>>(newpath);
     }
     // else if (pts_dim == 3) {

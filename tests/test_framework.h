@@ -1478,7 +1478,7 @@ class Wrapper {
   }
 
   struct LeafAugEmpty {
-    LeafAugEmpty() {};
+    LeafAugEmpty(){};
 
     template <typename Slice>
     LeafAugEmpty(Slice In){};

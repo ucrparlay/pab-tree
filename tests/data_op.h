@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <string>
@@ -68,6 +70,92 @@ void PrintToFile(std::string const& path, auto const& wp) {
   return;
 }
 
+template <typename Seq>
+void bucketize(Seq const& data) {
+  if (data.empty()) {
+    std::cout << "No data to bucketize.\n";
+    return;
+  }
+
+  // Find min and max values
+  auto minVal = *std::min_element(data.begin(), data.end());
+  auto maxVal = *std::max_element(data.begin(), data.end());
+
+  // Handle edge case where all values are the same
+  if (minVal == maxVal) {
+    std::cout << "All values are equal: " << minVal << "\n";
+    std::cout << "Bucket [" << minVal << ", " << maxVal << "]: " << data.size()
+              << " elements\n";
+    return;
+  }
+
+  int const numBuckets = 10;
+  std::vector<int> buckets(numBuckets, 0);
+  auto range = maxVal - minVal;
+  auto bucketWidth = range / numBuckets;
+
+  // Count elements in each bucket
+  for (auto val : data) {
+    int bucketIdx = static_cast<int>((val - minVal) / bucketWidth);
+    // if (bucketIdx == 0) {
+    //   std::cout << val << " ";
+    // }
+    // Handle edge case for maximum value
+    if (bucketIdx >= numBuckets) bucketIdx = numBuckets - 1;
+    buckets[bucketIdx]++;
+  }
+  // std::flush(std::cout);
+
+  // Display results
+  std::cout << std::scientific << std::setprecision(4);
+  std::cout << "Range: [" << minVal << ", " << maxVal << "]\n";
+  std::cout << "Bucket width: " << bucketWidth << "\n\n";
+
+  for (int i = 0; i < numBuckets; i++) {
+    double lower = minVal + i * bucketWidth;
+    double upper = minVal + (i + 1) * bucketWidth;
+    std::cout << "Bucket " << std::setw(2) << i << " [" << std::setw(10)
+              << lower << ", " << std::setw(10) << upper << "): " << buckets[i]
+              << " elements\n";
+  }
+}
+
+template <class Seq>
+auto SampleWeightedSeq(Seq& weight_seq, size_t n) {
+  std::random_device rd;      // a seed source for the random number engine
+  std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
+  std::uniform_int_distribution<int> distrib(1, kValueUB);
+
+  auto [cum_seq, total] = parlay::scan(weight_seq);
+  parlay::random_generator gen(distrib(gen_mt));
+  std::uniform_real_distribution<double> dis(0, total);
+
+  auto random_dis = parlay::tabulate(n, [&](size_t i) {
+    auto r = gen[i];
+    return dis(r);
+  });
+
+  auto sample_idx = parlay::tabulate(n, [&](size_t i) -> size_t {
+    return std::lower_bound(cum_seq.begin(), cum_seq.end(), random_dis[i]) -
+           cum_seq.begin();
+  });
+  return sample_idx;
+}
+
+template <class Seq>
+auto SupplySample(Seq& current_seq, size_t n, size_t l, size_t r) {
+  std::set<size_t> selected_set;
+  parlay::sort_inplace(current_seq);
+  while (selected_set.size() < n) {
+    size_t idx = get_random_index(l, r, 0);
+    if (*std::lower_bound(current_seq.begin(), current_seq.end(), idx) != idx &&
+        selected_set.find(idx) == selected_set.end()) {
+      selected_set.insert(idx);
+    }
+  }
+  return Seq(selected_set.begin(), selected_set.end());
+}
+
 constexpr size_t duplicate_ratio = 2;
 
 template <class T = size_t>
@@ -84,22 +172,41 @@ class UniformGenerator {
 template <class T = size_t>
 class ExponentialGenerator {
  public:
+  static double constexpr val_scale_fac = 1e10;
+  static double constexpr x_scale_fac = 0.0005;
+  static size_t constexpr supply_factor = 10;
+
   static parlay::sequence<T> Generate(double lambda, size_t n, size_t max_k) {
     printf("exponential distribution with lambda: %.10f\n", lambda);
-    size_t cutoff = duplicate_ratio * n;
-    parlay::sequence<size_t> nums(cutoff + 1, 0);
+    // size_t cutoff = 2 * n;
+    size_t cutoff = max_k;
+    parlay::sequence<size_t> nnums(cutoff, 0);
+    parlay::sequence<double> nums(cutoff, 0);
 
     parlay::parallel_for(0, cutoff, [&](size_t i) {
-      nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
-      nums[i] %= max_k;
+      // nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
+      nums[i] = (lambda * exp(-lambda * (x_scale_fac * i)));
+      // nums[i] %= max_k;
     });
+    std::cout << std::endl;
+    auto sample = parlay::remove_duplicates(SampleWeightedSeq(nums, n));
+    // sample = parlay::remove_duplicates(sample);
+    // bucketize(sample);
+    sample.append(
+        SupplySample(sample, n - sample.size(), 0, cutoff / supply_factor));
+    bucketize(sample);
+    // std::cout << sample.size() << std::endl;
 
-    nums = parlay::remove_duplicates(nums);
-    if (nums.size() < n) {
+    if (parlay::remove_duplicates(sample).size() < n) {
+      std::cout << "Generated unique keys: " << nums.size()
+                << ", required: " << n << std::endl;
       throw std::runtime_error(
           "ExponentialGenerator: not enough unique keys generated.");
+    } else {
+      std::cout << "Generated unique keys: " << sample.size()
+                << ", required: " << n << std::endl;
     }
-    return parlay::random_shuffle(nums.cut(0, n));
+    return parlay::random_shuffle(parlay::make_slice(sample));
   }
 };
 
@@ -121,6 +228,8 @@ class ZipfianGenerator {
 
     nums = parlay::remove_duplicates(nums);
     if (nums.size() < n) {
+      std::cout << "Generated unique keys: " << nums.size()
+                << ", required: " << n << std::endl;
       throw std::runtime_error(
           "ExponentialGenerator: not enough unique keys generated.");
     }
@@ -146,10 +255,13 @@ class Generator {
     });
   }
 
-  static std::pair<EntrySeq, EntrySeq> GenBatch(size_t const base_n,
+  static std::pair<EntrySeq, EntrySeq> GenBatch(int const batch_op,
+                                                size_t const base_n,
                                                 size_t const batch_n,
-                                                size_t const tot_size,
                                                 double const param) {
+    // PARA: initiaze size before take batch
+    size_t tot_size =
+        batch_op == 0 ? base_n + batch_n : base_n;  // insert or delete
     auto ground_k_seq = UniformGenerator<size_t>::Generate(
         param, tot_size, std::numeric_limits<size_t>::max());
     auto batch_idx_seq =
@@ -167,22 +279,21 @@ class Generator {
 
     // assert(base_k_seq.size() == base_n);
     // assert(batch_k_seq.size() == batch_n);
-    if (base_k_seq.size() != base_n || batch_k_seq.size() != batch_n) {
+    if ((batch_op == 0 &&
+         (base_k_seq.size() != base_n || batch_k_seq.size() != batch_n)) ||
+        (batch_op == 1 &&
+         (ground_k_seq.size() != base_n || batch_k_seq.size() != batch_n))) {
+      std::cout << " base_k_seq.size(): " << base_k_seq.size()
+                << " expected: " << base_n << std::endl;
+      std::cout << " batch_k_seq.size(): " << batch_k_seq.size()
+                << " expected: " << batch_n << std::endl;
       throw std::runtime_error(
           "Generator::GenBatch: Generated batch size "
           "mismatch. Please adjust the parameters.");
     }
-    return {ToEntry(base_k_seq), ToEntry(batch_k_seq)};
-  }
-
-  static auto GenInsertBatch(size_t const base_n, size_t const batch_n,
-                             double const param) {
-    return GenBatch(base_n, batch_n, base_n + batch_n, param);
-  }
-
-  static auto GenDeleteBatch(size_t const base_n, size_t const batch_n,
-                             double const param) {
-    return GenBatch(base_n, batch_n, base_n, param);
+    return batch_op == 0
+               ? std::make_pair(ToEntry(base_k_seq), ToEntry(batch_k_seq))
+               : std::make_pair(ToEntry(ground_k_seq), ToEntry(batch_k_seq));
   }
 };
 
