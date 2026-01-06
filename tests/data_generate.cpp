@@ -6,22 +6,26 @@ int main(int argc, char* argv[]) {
                 "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
                 "<_insertFile>] [-s <kSummary>]");
   std::string path;
-  int base_n, batch_n, pts_dim, file_num, dis_type, batch_op;
+  int base_n, batch_n, val_n, file_n, dis_type, batch_op;
   double param;
 
-  path = P.getOptionValue("-p");
-  base_n = P.getOptionIntValue("-n", 1'000'000);
+  path = P.getOptionValue("-path");
+  base_n = P.getOptionIntValue("-base_n", 1'000'000);
   batch_n = P.getOptionIntValue("-batch_n", 100'000);
-  pts_dim = P.getOptionIntValue("-d", 2);
-  file_num = P.getOptionIntValue("-file_num", 2);
+  val_n = P.getOptionIntValue("-val_n", 1);
+  file_n = P.getOptionIntValue("-file_num", 2);
   // PARA: 0: unifrom, 1: exp, 2: zipfian
   dis_type = P.getOptionIntValue("-dis", 0);
   // PARA: 0: insert, 1: delete
   batch_op = P.getOptionIntValue("-batch_op", 0);
+  // PARA: uni: none
+  // PARA: exp: 1, 2, 5, 7, 10
+  // PARA: zip: 0.6, 0.8, 1, 1.2, 1.5
   param = P.getOptionDoubleValue("-param", 1.0);
-  std::cout << "pts_num: " << base_n << " pts_dim: " << pts_dim
-            << " file_num: " << file_num << " distribution_type: " << dis_type
-            << " param: " << param << std::endl;
+  std::cout << "base_n: " << base_n << " batch_n: " << batch_n
+            << " pts_dim: " << val_n << " file_num: " << file_n
+            << " distribution_type: " << dis_type << " param: " << param
+            << std::endl;
 
   // NOTE: ../kdtree/
   path += std::string(*path.rbegin() == '/' ? "" : "/");
@@ -33,7 +37,7 @@ int main(int argc, char* argv[]) {
   path += std::string(batch_op == 0 ? "ins" : "del");
   std::filesystem::create_directory(path);
 
-  path += toString(base_n) + "_" + toString(pts_dim) + "/";
+  path += toString(base_n) + "_" + toString(val_n) + "/";
   std::filesystem::create_directory(path);
 
   auto generate = [&]<typename E>(std::string const& new_path) {
@@ -75,10 +79,10 @@ int main(int argc, char* argv[]) {
     PrintToFile(new_path + ".batch.in", batch_seq);
   };
 
-  for (int i = 0; i < file_num; i++) {
+  for (int i = 0; i < file_n; i++) {
     std::string newpath = path + toString(i + 1);
     std::cout << newpath << std::endl;
-    if (pts_dim == 2) {
+    if (val_n == 2) {
       generate.operator()<Wrapper::Element<Axis, std::tuple<Axis>>>(newpath);
     }
     // else if (pts_dim == 3) {
