@@ -33,6 +33,7 @@ void PrintToFile(std::string const& path, auto const& wp) {
   auto constexpr gen_dim = 1 + std::tuple_size_v<typename E::V>;
 
   auto header = toString(gen_num) + " " + toString(gen_dim);
+
   // NOTE: create a parlay::sequence<char> in order to call the writeSeqToFile
   auto wp_str = parlay::tabulate(wp.size(), [&](size_t i) {
     std::string str;
@@ -67,70 +68,165 @@ void PrintToFile(std::string const& path, auto const& wp) {
   return;
 }
 
-template <typename E, typename BatchDisFunc>
-class Generator {
- public:
-  using Points = parlay::sequence<E>;
+constexpr size_t duplicate_ratio = 2;
 
-  static Points Gen(size_t const base_n, size_t batch_n) {
-    Points wp(base_n);
-    auto ground_seq = GenUniformSeq<typename E::K>(base_n + batch_n);
-    BatchDisFunc::template GenSeq<size_t>(batch_n, ground_seq.size());
+template <class T = size_t>
+class UniformGenerator {
+ public:
+  static parlay::sequence<T> Generate(double, size_t n, size_t max_k) {
+    printf("uniform distribution with num_keys: %zu\n", n);
+    parlay::sequence<T> seq(n);
+    parlay::parallel_for(0, n, [&](size_t i) { seq[i] = i % max_k; });
+    return parlay::random_shuffle(seq);
   }
 };
 
-template <class T>
-static parlay::sequence<T> GenUniformSeq(size_t n) {
-  printf("uniform distribution with num_keys: %zu\n", n);
-  parlay::sequence<T> seq(n);
-  parlay::parallel_for(0, n, [&](size_t i) {
-    size_t v = i;
-    seq[i] = v;
-  });
-  return parlay::random_shuffle(seq);
-}
+template <class T = size_t>
+class ExponentialGenerator {
+ public:
+  static parlay::sequence<T> Generate(double lambda, size_t n, size_t max_k) {
+    printf("exponential distribution with lambda: %.10f\n", lambda);
+    size_t cutoff = duplicate_ratio * n;
+    parlay::sequence<size_t> nums(cutoff + 1, 0);
 
-template <class T>
-parlay::sequence<T> exponential_generator(size_t n, double lambda) {
-  printf("exponential distribution with lambda: %.10f\n", lambda);
-  size_t cutoff = n;
-  parlay::sequence<size_t> nums(cutoff + 1, 0);
-
-  parlay::parallel_for(0, cutoff, [&](size_t i) {
-    nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
-  });
-  size_t tot = scan_inplace(make_slice(nums));
-  assert(tot >= n);
-
-  parlay::sequence<T> seq(n);
-  parlay::parallel_for(0, cutoff, [&](size_t i) {
-    parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
-      // seq[j] = _hash(static_cast<T>(i));
-      seq[j] = i;
+    parlay::parallel_for(0, cutoff, [&](size_t i) {
+      nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
+      nums[i] %= max_k;
     });
-  });
-  return random_shuffle(seq);
-}
 
-template <class T>
-parlay::sequence<T> zipfian_generator(size_t n, double s) {
-  printf("zipfian distribution with s: %f\n", s);
-  size_t cutoff = n;
-  auto harmonic = parlay::delayed_seq<double>(
-      cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
-  double sum = parlay::reduce(make_slice(harmonic));
-  double v = n / sum;
-  parlay::sequence<size_t> nums(cutoff + 1, 0);
-  parlay::parallel_for(
-      0, cutoff, [&](size_t i) { nums[i] = max(1.0, v / pow(i + 1, s)); });
-  size_t tot = scan_inplace(make_slice(nums));
-  assert(tot >= n);
-  parlay::sequence<T> seq(n);
-  parlay::parallel_for(0, cutoff, [&](size_t i) {
-    parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
-      // seq[j] = _hash(static_cast<T>(i));
-      seq[j] = i;
+    nums = parlay::remove_duplicates(nums);
+    if (nums.size() < n) {
+      throw std::runtime_error(
+          "ExponentialGenerator: not enough unique keys generated.");
+    }
+    return parlay::random_shuffle(nums.cut(0, n));
+  }
+};
+
+template <class T = size_t>
+class ZipfianGenerator {
+ public:
+  static parlay::sequence<T> Generate(double s, size_t n, size_t max_k) {
+    printf("zipfian distribution with s: %f\n", s);
+    size_t cutoff = duplicate_ratio * n;
+    auto harmonic = parlay::delayed_seq<double>(
+        cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
+    double sum = parlay::reduce(make_slice(harmonic));
+    double v = n / sum;
+    parlay::sequence<size_t> nums(cutoff + 1, 0);
+    parlay::parallel_for(0, cutoff, [&](size_t i) {
+      nums[i] = max(1.0, v / pow(i + 1, s));
+      nums[i] %= max_k;
     });
-  });
-  return random_shuffle(seq);
-}
+
+    nums = parlay::remove_duplicates(nums);
+    if (nums.size() < n) {
+      throw std::runtime_error(
+          "ExponentialGenerator: not enough unique keys generated.");
+    }
+    return parlay::random_shuffle(nums.cut(0, n));
+  }
+};
+
+template <typename E, typename BatchDisFunc>
+class Generator {
+ public:
+  using EntrySeq = parlay::sequence<E>;
+
+  static EntrySeq ToEntry(parlay::sequence<size_t> const& key_seq) {
+    return parlay::tabulate(key_seq.size(), [&](size_t i) {
+      if constexpr (std::is_same_v<typename E::V, std::tuple<>>) {
+        return E{.key = key_seq[i]};
+      } else if constexpr (std::tuple_size_v<typename E::V> == 1) {
+        return E{.key = key_seq[i], .val = {i}};
+      } else {
+        static_assert(false,
+                      "Generator::ToEntry: Unsupported Entry value type.");
+      }
+    });
+  }
+
+  static std::pair<EntrySeq, EntrySeq> GenBatch(size_t const base_n,
+                                                size_t const batch_n,
+                                                size_t const tot_size,
+                                                double const param) {
+    auto ground_k_seq = UniformGenerator<size_t>::Generate(
+        param, tot_size, std::numeric_limits<size_t>::max());
+    auto batch_idx_seq =
+        BatchDisFunc::Generate(param, batch_n, ground_k_seq.size());
+
+    // gen base keys
+    parlay::sequence<bool> flag(tot_size, true);
+    parlay::parallel_for(0, batch_n,
+                         [&](size_t i) { flag[batch_idx_seq[i]] = false; });
+    auto base_k_seq = parlay::pack(ground_k_seq, flag);
+
+    // gen batch indexes
+    parlay::parallel_for(0, flag.size(), [&](size_t i) { flag[i] = !flag[i]; });
+    auto batch_k_seq = parlay::pack(ground_k_seq, flag);
+
+    // assert(base_k_seq.size() == base_n);
+    // assert(batch_k_seq.size() == batch_n);
+    if (base_k_seq.size() != base_n || batch_k_seq.size() != batch_n) {
+      throw std::runtime_error(
+          "Generator::GenBatch: Generated batch size "
+          "mismatch. Please adjust the parameters.");
+    }
+    return {ToEntry(base_k_seq), ToEntry(batch_k_seq)};
+  }
+
+  static auto GenInsertBatch(size_t const base_n, size_t const batch_n,
+                             double const param) {
+    return GenBatch(base_n, batch_n, base_n + batch_n, param);
+  }
+
+  static auto GenDeleteBatch(size_t const base_n, size_t const batch_n,
+                             double const param) {
+    return GenBatch(base_n, batch_n, base_n, param);
+  }
+};
+
+// template <class T>
+// parlay::sequence<T> exponential_generator(size_t n, double lambda) {
+//   printf("exponential distribution with lambda: %.10f\n", lambda);
+//   size_t cutoff = n;
+//   parlay::sequence<size_t> nums(cutoff + 1, 0);
+//
+//   parlay::parallel_for(0, cutoff, [&](size_t i) {
+//     nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
+//   });
+//   size_t tot = scan_inplace(make_slice(nums));
+//   assert(tot >= n);
+//
+//   parlay::sequence<T> seq(n);
+//   parlay::parallel_for(0, cutoff, [&](size_t i) {
+//     parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
+//       // seq[j] = _hash(static_cast<T>(i));
+//       seq[j] = i;
+//     });
+//   });
+//   return random_shuffle(seq);
+// }
+//
+// template <class T>
+// parlay::sequence<T> zipfian_generator(size_t n, double s) {
+//   printf("zipfian distribution with s: %f\n", s);
+//   size_t cutoff = n;
+//   auto harmonic = parlay::delayed_seq<double>(
+//       cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
+//   double sum = parlay::reduce(make_slice(harmonic));
+//   double v = n / sum;
+//   parlay::sequence<size_t> nums(cutoff + 1, 0);
+//   parlay::parallel_for(
+//       0, cutoff, [&](size_t i) { nums[i] = max(1.0, v / pow(i + 1, s)); });
+//   size_t tot = scan_inplace(make_slice(nums));
+//   assert(tot >= n);
+//   parlay::sequence<T> seq(n);
+//   parlay::parallel_for(0, cutoff, [&](size_t i) {
+//     parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
+//       // seq[j] = _hash(static_cast<T>(i));
+//       seq[j] = i;
+//     });
+//   });
+//   return random_shuffle(seq);
+// }
