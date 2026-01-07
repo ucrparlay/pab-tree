@@ -17,6 +17,7 @@
 
 using Axis = uint64_t;
 Axis const kValueUB = 1'000'000'000;
+int rand_seed = 1;
 // Axis const kValueUB = 1'000'000;
 
 inline std::string toString(auto const& a) { return std::to_string(a); }
@@ -72,7 +73,7 @@ void PrintToFile(std::string const& path, auto const& wp) {
 }
 
 template <typename Seq>
-void bucketize(Seq const& data) {
+void bucketize(Seq const& data, size_t const numBuckets = 10) {
   if (data.empty()) {
     std::cout << "No data to bucketize.\n";
     return;
@@ -90,7 +91,7 @@ void bucketize(Seq const& data) {
     return;
   }
 
-  int const numBuckets = 10;
+  // int const numBuckets = 10;
   std::vector<int> buckets(numBuckets, 0);
   auto range = maxVal - minVal;
   auto bucketWidth = range / numBuckets;
@@ -112,23 +113,27 @@ void bucketize(Seq const& data) {
   std::cout << "Range: [" << minVal << ", " << maxVal << "]\n";
   std::cout << "Bucket width: " << bucketWidth << "\n\n";
 
-  for (int i = 0; i < numBuckets; i++) {
+  // for (int i = 0; i < numBuckets; i++) {
+  for (int i = 0; i < 10; i++) {
     double lower = minVal + i * bucketWidth;
     double upper = minVal + (i + 1) * bucketWidth;
     std::cout << "Bucket " << std::setw(2) << i << " [" << std::setw(10)
               << lower << ", " << std::setw(10) << upper << "): " << buckets[i]
               << " elements\n";
   }
+
+  std::cout << data.size() << " elements total.\n\n";
+  std::flush(std::cout);
 }
 
 template <class Seq>
 auto SampleWeightedSeq(Seq&& weight_seq, size_t n) {
-  std::random_device rd;      // a seed source for the random number engine
-  std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
-  std::uniform_int_distribution<int> distrib(1, kValueUB);
+  // std::random_device rd;      // a seed source for the random number engine
+  // std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
+  // std::uniform_int_distribution<int> distrib(1, kValueUB);
 
   auto [cum_seq, total] = parlay::scan(weight_seq);
-  parlay::random_generator gen(distrib(gen_mt));
+  parlay::random_generator gen(rand_seed);
   std::uniform_real_distribution<double> dis(0, total);
 
   auto random_dis = parlay::tabulate(n, [&](size_t i) {
@@ -232,28 +237,39 @@ class ExponentialGenerator {
 
 template <class T = size_t>
 class ZipfianGenerator {
+  static double constexpr x_scale_fac = 0.0005;
+  static size_t constexpr supply_factor = 10;
+
  public:
-  static parlay::sequence<T> Generate(double s, size_t n, size_t max_k) {
+  static parlay::sequence<T> Generate(double s, size_t batch_n,
+                                      size_t ground_n) {
     printf("zipfian distribution with s: %f\n", s);
-    size_t cutoff = duplicate_ratio * n;
+    size_t cutoff = ground_n;
     auto harmonic = parlay::delayed_seq<double>(
         cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
     double sum = parlay::reduce(make_slice(harmonic));
-    double v = n / sum;
-    parlay::sequence<size_t> nums(cutoff + 1, 0);
-    parlay::parallel_for(0, cutoff, [&](size_t i) {
-      nums[i] = max(1.0, v / pow(i + 1, s));
-      nums[i] %= max_k;
-    });
+    double v = sum;
+    parlay::sequence<double> nums(cutoff, 0);
+    parlay::parallel_for(0, cutoff,
+                         [&](size_t i) { nums[i] = v / pow(i + 1, s); });
 
-    nums = parlay::remove_duplicates(nums);
-    if (nums.size() < n) {
+    auto sample = SampleWeightedSeq(nums, batch_n);
+    // nums = parlay::remove_duplicates(nums);
+    // bucketize(sample, 10);
+    sample = parlay::remove_duplicates(sample);
+    // bucketize(sample, 10);
+
+    sample.append(SupplySample(sample, batch_n - sample.size(), 0,
+                               cutoff / supply_factor));
+
+    bucketize(sample, 10);
+    if (sample.size() < batch_n) {
       std::cout << "Generated unique keys: " << nums.size()
-                << ", required: " << n << std::endl;
-      throw std::runtime_error(
-          "ExponentialGenerator: not enough unique keys generated.");
+                << ", required: " << batch_n << std::endl;
+      throw std::runtime_error("zipfian: not enough unique keys generated.");
     }
-    return parlay::random_shuffle(nums.cut(0, n));
+    // return parlay::random_shuffle(nums.cut(0, n));
+    return sample;
   }
 };
 
@@ -266,6 +282,11 @@ class Generator {
                        auto base_k_seq, auto batch_k_seq, auto ground_k_seq) {
     if (parlay::remove_duplicates(base_k_seq).size() !=
         (batch_op == 0 ? base_n : base_n - batch_n)) {
+      std::cout << "base_k_seq size: " << base_k_seq.size()
+                << " after remove duplicates: "
+                << parlay::remove_duplicates(base_k_seq).size()
+                << ", expected: " << (batch_op == 0 ? base_n : base_n - batch_n)
+                << std::endl;
       throw std::runtime_error(
           "Validate: Base sequence size mismatch after remove duplicates.");
     }

@@ -66,6 +66,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < file_n; i++) {
     std::string newpath = path + toString(i + 1);
     std::cout << newpath << std::endl;
+    rand_seed = i;
     if (val_n == 1) {
       generate.operator()<Wrapper::Element<Axis, std::tuple<Axis>>>(newpath);
     }
