@@ -73,26 +73,13 @@ void PrintToFile(std::string const& path, auto const& wp) {
 }
 
 template <typename Seq>
-void bucketize(Seq const& data, size_t const numBuckets = 10) {
-  if (data.empty()) {
-    std::cout << "No data to bucketize.\n";
-    return;
-  }
-
+auto bucketize(Seq const& data, size_t const numBuckets = 10) {
+  parlay::sequence<size_t> buckets(numBuckets, 0);
   // Find min and max values
   auto minVal = *std::min_element(data.begin(), data.end());
   auto maxVal = *std::max_element(data.begin(), data.end());
 
-  // Handle edge case where all values are the same
-  if (minVal == maxVal) {
-    std::cout << "All values are equal: " << minVal << "\n";
-    std::cout << "Bucket [" << minVal << ", " << maxVal << "]: " << data.size()
-              << " elements\n";
-    return;
-  }
-
   // int const numBuckets = 10;
-  std::vector<int> buckets(numBuckets, 0);
   auto range = maxVal - minVal;
   auto bucketWidth = range / numBuckets;
 
@@ -124,6 +111,7 @@ void bucketize(Seq const& data, size_t const numBuckets = 10) {
 
   std::cout << data.size() << " elements total.\n\n";
   std::flush(std::cout);
+  return std::make_tuple(buckets[0], minVal, maxVal);
 }
 
 template <class Seq>
@@ -153,6 +141,7 @@ auto SupplySample(Seq const& current_seq, size_t extra_n, size_t l, size_t r) {
   std::set<size_t> selected_set;
   auto sorted_seq = parlay::sort(current_seq);
   while (selected_set.size() < extra_n) {
+    // std::cout << selected_set.size() << "/" << extra_n << "\n" << std::flush;
     size_t idx = get_random_index(l, r, 0);
     if (*std::lower_bound(sorted_seq.begin(), sorted_seq.end(), idx) != idx &&
         selected_set.find(idx) == selected_set.end()) {
@@ -199,13 +188,11 @@ class ExponentialGenerator {
  public:
   static double constexpr val_scale_fac = 1e10;
   static double constexpr x_scale_fac = 0.0005;
-  static size_t constexpr supply_factor = 10;
 
   static parlay::sequence<T> Generate(double lambda, size_t batch_n,
                                       size_t ground_n) {
     printf("exponential distribution with lambda: %.10f\n", lambda);
     size_t cutoff = ground_n;
-    parlay::sequence<size_t> nnums(cutoff, 0);
     parlay::sequence<double> nums(cutoff, 0);
 
     parlay::parallel_for(0, cutoff, [&](size_t i) {
@@ -216,7 +203,13 @@ class ExponentialGenerator {
     std::cout << std::endl;
     auto sample = parlay::remove_duplicates(SampleWeightedSeq(nums, batch_n));
     // sample = parlay::remove_duplicates(sample);
-    // bucketize(sample);
+    size_t bucket_n = 10;
+    auto [first_bkt_n, min_v, max_v] = bucketize(sample, bucket_n);
+    size_t remain_n = batch_n - sample.size();
+    size_t supply_factor =
+        ((max_v - min_v) / bucket_n - first_bkt_n) > 2 * remain_n ? 10 : 1;
+    std::cout << "supply factor: " << supply_factor << std::endl;
+
     sample.append(SupplySample(sample, batch_n - sample.size(), 0,
                                cutoff / supply_factor));
     bucketize(sample);

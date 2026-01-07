@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
   batch_op = P.getOptionIntValue("-batch_op", 0);
   // PARA: uni: none
   // PARA: exp: 0.00005
-  // PARA: zip: 0.6, 0.8, 1, 1.2, 1.5
+  // PARA: zip: 0.7
   param = P.getOptionDoubleValue("-param", 1.0);
   std::cout << "base_n: " << base_n << " batch_n: " << batch_n
             << " pts_dim: " << val_n << " file_num: " << file_n
@@ -38,6 +38,9 @@ int main(int argc, char* argv[]) {
   std::filesystem::create_directory(path);
 
   path += toString(base_n) + "_" + toString(val_n) + "/";
+  std::filesystem::create_directory(path);
+
+  path += toString(base_n / batch_n) + "/";
   std::filesystem::create_directory(path);
 
   auto generate = [&]<typename E>(std::string const& new_path) {
