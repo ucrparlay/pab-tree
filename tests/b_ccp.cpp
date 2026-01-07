@@ -13,24 +13,25 @@ double const kCCPBatchDiffTotalRatio = 1.0;
 double const kCCPBatchDiffOverlapRatio = 0.5;
 
 template <typename TT, typename TreeDesc>
-void runKDParallel(auto const& wp, auto const& wi, int query_num,
-                   int const query_type, int const K, int const tag,
-                   int const rounds) {
+void CheckCorrectness(Wrapper::Options opts) {
   using Tree = TreeDesc::TreeType;
   using EntrySeq = typename TT::EntrySeq;
 
   Tree tree;
   constexpr bool kTestTime = false;
+  EntrySeq wp, wi;
 
-  BuildTree<TT, Tree, kTestTime, 2>(wp, rounds, tree);
-  tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+  if (opts.tag & (1 << 0)) {
+    auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
+    auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
+    auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
 
-  puts("---------------finish build tree---------------");
+    BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+    tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    puts("---------------finish build insert tree---------------");
 
-  if (tag & (1 << 0)) {
-    BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2, kBatchInsertCheckRatio);
-    assert(tree.GetSize() ==
-           wp.size() + static_cast<size_t>(wi.size() * kBatchInsertCheckRatio));
+    BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
+    assert(tree.GetSize() == wp.size() + wi.size());
     tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
     std::cout << "---------------finish insert----------------\n" << std::flush;
   }
@@ -111,36 +112,41 @@ void runKDParallel(auto const& wp, auto const& wi, int query_num,
   // }
 
   EntrySeq new_wp;
-  if (tag == (1 << 0)) {  // insert
+  if (opts.tag == (1 << 0)) {  // insert
     new_wp = wp;
-    new_wp.append(
-        wi.cut(0, static_cast<size_t>(wi.size() * kBatchInsertCheckRatio)));
-  } else if (tag == (1 << 1)) {
-    new_wp = wp.subseq(static_cast<size_t>(wi.size() * kBatchInsertCheckRatio),
-                       wp.size());
-  } else if (tag & (1 << 2)) {  // WARN: this assume before we run diff, the
-                                // tree should conation wp, e.g., just after
-                                // build or build->insert->delete
-    size_t total_batch_size =
-        static_cast<size_t>(wp.size() * kCCPBatchDiffTotalRatio);
-    size_t overlap_size =
-        static_cast<size_t>(total_batch_size * kCCPBatchDiffOverlapRatio);
-    new_wp = wp.subseq(overlap_size, wp.size());
-  } else if (tag == (1 << 3)) {
-    new_wp = wp;
-    // new_wp.append(wi);
-  } else if (tag == (1 << 4)) {
-    new_wp = wp.subseq(wp.size() / 2, wp.size());
-  } else {
+    new_wp.append(wi);
+  }
+  // else if (opts.tag == (1 << 1)) {
+  //   new_wp = wp.subseq(static_cast<size_t>(wi.size() *
+  //   kBatchInsertCheckRatio),
+  //                      wp.size());
+  // } else if (opts.tag & (1 << 2)) {  // WARN: this assume before we run
+  // diff,
+  //                                    // the tree should conation wp, e.g.,
+  //                                    just
+  //                                    // after build or
+  //                                    build->insert->delete
+  //   size_t total_batch_size =
+  //       static_cast<size_t>(wp.size() * kCCPBatchDiffTotalRatio);
+  //   size_t overlap_size =
+  //       static_cast<size_t>(total_batch_size * kCCPBatchDiffOverlapRatio);
+  //   new_wp = wp.subseq(overlap_size, wp.size());
+  // } else if (opts.tag == (1 << 3)) {
+  //   new_wp = wp;
+  //   // new_wp.append(wi);
+  // } else if (opts.tag == (1 << 4)) {
+  //   new_wp = wp.subseq(wp.size() / 2, wp.size());
+  // }
+  else {
     new_wp = wp;
   }
 
   // // NOTE: query phase
-  if (query_type & (1 << 0)) {  // NOTE: membership
+  if (opts.query_type & (1 << 0)) {  // NOTE: membership
     size_t batch_size = static_cast<size_t>(wp.size() * kBatchInsertCheckRatio);
     auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
     auto res = parlay::sequence<bool>(query_ele.size(), false);
-    Membership<TT>(tree, query_ele, rounds, res);
+    Membership<TT>(tree, query_ele, opts.rounds, res);
     assert(parlay::all_of(res, [&](auto r) { return r == true; }));
     std::cout << "\n--------------finish membership------------------\n"
               << std::flush;
@@ -174,28 +180,15 @@ void runKDParallel(auto const& wp, auto const& wi, int query_num,
 
 int main(int argc, char* argv[]) {
   commandLine params(argc, argv);
-
-  char* input_file_path = params.getOptionValue("-p");
-  int K = params.getOptionIntValue("-k", 100);
-  int dim = params.getOptionIntValue("-d", 3);
-  size_t N = params.getOptionLongValue("-n", -1);
-  int tag = params.getOptionIntValue("-t", 1);
-  int kRounds = params.getOptionIntValue("-r", 3);
-  int query_type = params.getOptionIntValue("-q", 0);
-  int read_insert_file = params.getOptionIntValue("-i", 1);
-  int tree_type = params.getOptionIntValue("-T", 0);
+  Wrapper::Options opts(params);
 
   auto run = [&]<typename TreeWrapper, typename TypeTrait>(
-                 TypeTrait::EntrySeq const& wp, TypeTrait::EntrySeq const& wi,
-                 size_t const& N, int const& K, int const& kRounds,
-                 string const& kInsertFile, int const& kTag,
-                 int const& kQueryType, int const kSummary) -> void {
+                 Wrapper::Options opts) -> void {
     // NOTE: run the test
-    runKDParallel<TypeTrait, TreeWrapper>(wp, wi, kCCPQueryNum, query_type, K,
-                                          tag, kRounds);
+    CheckCorrectness<TypeTrait, TreeWrapper>(opts);
   };
 
-  Wrapper::ApplyOrthogonal(tree_type, dim, params, run);
+  Wrapper::ApplyOrthogonal(opts, run);
 
   puts("\nok");
   return 0;

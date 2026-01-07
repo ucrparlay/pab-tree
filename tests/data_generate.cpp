@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
   // PARA: 0: insert, 1: delete
   batch_op = P.getOptionIntValue("-batch_op", 0);
   // PARA: uni: none
-  // PARA: exp: 0.00005
+  // PARA: exp: 0.00005 for 1e9
   // PARA: zip: 0.7
   param = P.getOptionDoubleValue("-param", 1.0);
   std::cout << "base_n: " << base_n << " batch_n: " << batch_n
@@ -31,15 +31,19 @@ int main(int argc, char* argv[]) {
   path += std::string(*path.rbegin() == '/' ? "" : "/");
   std::filesystem::create_directory(path);
 
+  // NOTE: ../kdtree/uni/
   path += std::string(dis_type == 0 ? "uni/" : dis_type == 1 ? "exp/" : "zip/");
   std::filesystem::create_directory(path);
 
-  path += std::string(batch_op == 0 ? "ins/" : "del/");
-  std::filesystem::create_directory(path);
-
+  // NOTE: ../kdtree/uni/1000000_1/
   path += toString(base_n) + "_" + toString(val_n) + "/";
   std::filesystem::create_directory(path);
 
+  // NOTE: ../kdtree/uni/1000000_1/ins/
+  path += std::string(batch_op == 0 ? "ins/" : "del/");
+  std::filesystem::create_directory(path);
+
+  // NOTE: ../kdtree/uni/1000000_1/ins/10/
   path += toString(base_n / batch_n) + "/";
   std::filesystem::create_directory(path);
 

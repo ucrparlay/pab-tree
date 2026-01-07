@@ -1126,31 +1126,36 @@ void PrintTreeParam() {
 
 // NOTE: default test functions for all custom tree
 static auto constexpr DefaultTestFunc =
-    []<class TreeDesc, typename TypeTrait>(
-        TypeTrait::EntrySeq const& wp, TypeTrait::EntrySeq const& wi,
-        size_t const& N, int const& K, int const& kRounds,
-        string const& kInsertFile, int const& kTag, int const& kQueryType,
-        int const kSummary) {
+    []<class TreeDesc, typename TypeTrait, typename Options>(Options opts) {
       using Tree = TreeDesc::TreeType;
       using TT = TypeTrait;
+      using EntrySeq = TT::EntrySeq;
+      EntrySeq wp, wi;
 
       Tree tree;
       constexpr bool kTestTime = true;
 
-      // std::cout << "Called Build" << std::endl;
-      BuildTree<TT, Tree, kTestTime, 2>(wp, kRounds, tree);
-      // std::cout << "Build Finished" << std::endl;
+      read_points<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+      BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
       // // NOTE: batch insert
-      if (kTag & (1 << 0)) {
-        if (kSummary) {
+      if (opts.tag & (1 << 0)) {
+        if (opts.summary) {
           parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
-          // parlay::sequence<double> const ratios = {0.0001, 0.001};
           for (size_t i = 0; i < ratios.size(); i++) {
-            BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, kRounds, ratios[i]);
+            auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratios[i]);
+            auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
+            auto [n2, d2] =
+                read_points<typename TT::E>(batch_path.c_str(), wi, n);
+            BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
           }
         } else {
-          BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, kRounds, 0.1);
+          auto [base_path, batch_path] =
+              opts.ParseInsertBatchPath(opts.batch_ratio);
+          auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
+          auto [n2, d2] =
+              read_points<typename TT::E>(batch_path.c_str(), wi, n);
+          BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       }
       //
@@ -1159,20 +1164,20 @@ static auto constexpr DefaultTestFunc =
       //   if (kSummary) {
       //     parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01,
       //     0.1}; for (size_t i = 0; i < ratios.size(); i++) {
-      //       BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
+      //       BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, opts.rounds,
       //       ratios[i]);
       //     }
       //   } else {
-      //     BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
+      //     BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, opts.rounds,
       //                                         kBatchInsertRatio);
       //   }
       // }
 
-      if (kQueryType & (1 << 0)) {  // NOTE: membership
+      if (opts.query_type & (1 << 0)) {  // NOTE: membership
         size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
         auto query_ele = wp.subseq(0, batch_size);
         auto res = parlay::sequence<bool>(query_ele.size(), false);
-        Membership<TT>(tree, query_ele, kRounds, res);
+        Membership<TT>(tree, query_ele, opts.rounds, res);
       }
       // Typename* kdknn = nullptr;
       // auto run_batch_knn = [&](Points const& query_pts, int kth) {
@@ -1600,61 +1605,111 @@ class Wrapper {
     IdType id;
   };
 
+  struct Options {
+    Options(commandLine& params) {
+      this->dims = params.getOptionIntValue("-d", 1);
+      this->input_file_path = std::string(params.getOptionValue("-p"));
+      this->base_n = params.getOptionLongValue("-n", -1);
+      this->tag = params.getOptionIntValue("-t", 1);
+      this->rounds = params.getOptionIntValue("-r", 3);
+      this->query_type = params.getOptionIntValue("-q", 0);
+      this->summary = params.getOptionIntValue("-s", 0);
+      this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
+      this->tree_type = params.getOptionIntValue("-T", 0);
+    }
+
+    std::pair<std::string, std::string> ExtractPrefixes(
+        std::string const& path) {
+      // locate pivot: first occurrence of "/ins/" or "/del/"
+      size_t posIns = path.find("/ins/");
+      size_t posDel = path.find("/del/");
+      size_t pivot = std::string::npos;
+      if (posIns != std::string::npos) pivot = posIns;
+      if (posDel != std::string::npos &&
+          (pivot == std::string::npos || posDel < pivot))
+        pivot = posDel;
+
+      if (pivot == std::string::npos) return {"", ""};  // pattern not found
+
+      // directory prefix (up to just before /ins/ or /del/)
+      std::string dirPrefix = path.substr(0, pivot) + "/";
+
+      // filename part
+      size_t lastSlash = path.find_last_of('/');
+      std::string filename =
+          (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
+      // strip extensions
+      auto strip_suffix = [](std::string& s, std::string const& suf) {
+        if (s.size() >= suf.size() &&
+            s.compare(s.size() - suf.size(), suf.size(), suf) == 0) {
+          s.erase(s.size() - suf.size());
+        }
+      };
+      strip_suffix(filename, ".in");
+      strip_suffix(filename, ".base");
+
+      return {dirPrefix, filename};
+    }
+
+    std::pair<std::string, std::string> ParseInsertBatchPath(
+        double batch_ratio) {
+      // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
+      auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
+      std::string base_path =
+          dir_prefix + "/ins/" +
+          std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
+          file_prefix + ".base.in";
+
+      std::string batch_path = base_path;
+      batch_path.replace(batch_path.find(".base."), 6, ".batch.");
+      return std::make_pair(base_path, batch_path);
+    }
+
+    std::pair<std::string, std::string> ParseDeleteBatchPath(
+        double batch_ratio) {
+      // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
+      auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
+      std::string base_path =
+          dir_prefix + "/delete/" +
+          std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
+          file_prefix + ".base.in";
+
+      std::string batch_path = base_path;
+      batch_path.replace(batch_path.find(".base."), 6, ".batch.");
+
+      return std::make_pair(base_path, batch_path);
+    }
+
+    int dims;
+    std::string input_file_path = "";
+    size_t base_n;
+    int tag;
+    int rounds;
+    int query_type;
+    bool summary;
+    double batch_ratio;
+    int tree_type;
+  };
+
   // NOTE: driven functions
   template <typename TreeWrapper, typename RunFunc>
-  static void Run(commandLine& P, RunFunc test_func) {
-    char* input_file_path = P.getOptionValue("-p");
-    int K = P.getOptionIntValue("-k", 100);
-    int dims = P.getOptionIntValue("-d", 3);
-    size_t N = P.getOptionLongValue("-n", -1);
-    int tag = P.getOptionIntValue("-t", 1);
-    int rounds = P.getOptionIntValue("-r", 3);
-    int query_type = P.getOptionIntValue("-q", 0);
-    int read_insert_file = P.getOptionIntValue("-i", 1);
-    char* insert_file_path_cml = P.getOptionValue("-I");
-    int summary = P.getOptionIntValue("-s", 0);
-    int tree_type = P.getOptionIntValue("-T", 0);
-    int split_type = P.getOptionIntValue("-l", 0);
-
+  static void Run(Options const& opts, RunFunc test_func) {
     using TT = typename TreeWrapper::TreeType::TT;
     using E = typename TT::E;
     using EntrySeq = typename TT::EntrySeq;
 
     PrintTreeParam<TreeWrapper>();
 
-    std::string name, insert_file_path = "";
-    EntrySeq wp, wi;
-
-    if (input_file_path != NULL) {  // NOTE: read main Points
-      name = std::string(input_file_path);
-      name = name.substr(name.rfind('/') + 1);
-      std::cout << name << " ";
-      auto [n, d] = read_points<E>(input_file_path, wp, 0);
-      N = n;
-    }
-
-    if (read_insert_file == 1) {
-      if (insert_file_path_cml != NULL) {  // given in commadnline
-        insert_file_path = std::string(insert_file_path_cml);
-        // std::cout << insert_file_path << std::endl;
-      } else {  // determine the name otherwise
-        int id = std::stoi(name.substr(0, name.find_first_of('.')));
-#ifdef CCP
-        id = (id + 1) % 10;  // WARN: MOD graph number used to test
-#else
-        id = (id + 1) % 3;
-#endif  // CCP
-        if (!id) id++;
-        auto pos = std::string(input_file_path).rfind('/') + 1;
-        insert_file_path = std::string(input_file_path).substr(0, pos) +
-                           std::to_string(id) + ".in";
-      }
-      auto [n, d] = read_points<E>(insert_file_path.c_str(), wi, N);
-    }
+    // if (opts.input_file_path != "") {  // NOTE: read main Points
+    //   name = opts.input_file_path;
+    //   name = name.substr(name.rfind('/') + 1);
+    //   std::cout << name << " ";
+    //   auto [n, d] = read_points<E>(opts.input_file_path.c_str(), wp, 0);
+    //   opts.base_n = n;
+    // }
 
     // Apply the test function
-    test_func.template operator()<TreeWrapper, TT>(
-        wp, wi, N, K, rounds, insert_file_path, tag, query_type, summary);
+    test_func.template operator()<TreeWrapper, TT>(opts);
   };
 
   // NOTE: the element we use
@@ -1711,8 +1766,7 @@ class Wrapper {
 
   // NOTE: For kd tree and orth tree
   template <typename RunFunc>
-  static void ApplyOrthogonal(int const tree_type, int const dim,
-                              commandLine& params, RunFunc test_func) {
+  static void ApplyOrthogonal(Options const& opts, RunFunc test_func) {
     using K = std::pair<uint32_t, uint32_t>;
     using V = uint32_t;
     using E = Element<K, V>;
@@ -1744,8 +1798,8 @@ class Wrapper {
     using TypeTrait =
         pmos::BTreeTypeTrait<ElementWrapper<E>, kBuf, LeafAugEmpty,
                              InteriorAugEmpty, 8, pmos::ProtoNode>;
-    if (tree_type == 0) {
-      Run<BTreeWrapper<TypeTrait>>(params, test_func);
+    if (opts.tree_type == 0) {
+      Run<BTreeWrapper<TypeTrait>>(opts, test_func);
     }
   }
 
