@@ -29,7 +29,7 @@ class ParTreeCorrectTest : public ::testing::Test {
   static constexpr double kBatchInsertCheckRatio = 0.1;
 
   std::vector<size_t> nodes{1000000, 5000000, 10000000, 50000000};
-  std::vector<std::string> distributions{"uni", "exp", "norm"};
+  std::vector<std::string> distributions{"uni", "exp", "norm", "dual_norm"};
   std::vector<std::string> batch_ops{"ins"};
 
   template <typename TT, typename TreeDesc>
@@ -197,6 +197,10 @@ TEST_F(ParTreeCorrectTest, Norm5M) { BTreeTest("norm", 5000000); }
 TEST_F(ParTreeCorrectTest, Norm10M) { BTreeTest("norm", 10000000); }
 
 TEST_F(ParTreeCorrectTest, Norm50M) { BTreeTest("norm", 50000000); }
+
+TEST_F(ParTreeCorrectTest, DualNorm10M) { BTreeTest("dual_norm", 10000000); }
+
+TEST_F(ParTreeCorrectTest, DualNorm50M) { BTreeTest("dual_norm", 50000000); }
 
 // Define the static member
 std::string ParTreeCorrectTest::file_filter = "";

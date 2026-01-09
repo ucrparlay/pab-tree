@@ -161,7 +161,8 @@ class UniformGenerator {
     return parlay::tabulate(n, [&](size_t i) { return i; });
   }
 
-  static parlay::sequence<T> Generate(double, size_t n) {
+  template <typename Param>
+  static parlay::sequence<T> Generate(Param const&, size_t n) {
     parlay::random_generator gen(rand_seed);
     std::uniform_real_distribution<double> dis(0, 1);
 
@@ -175,12 +176,17 @@ class UniformGenerator {
 template <class T = double>
 class ExponentialGenerator {
  public:
-  static parlay::sequence<T> Generate(double lambda, size_t n) {
+  template <typename Param>
+  static parlay::sequence<T> Generate(Param const& param, size_t n) {
+    if (param.size() != 1) {
+      throw std::runtime_error(
+          "ExponentialGenerator::Generate requires 1 parameter: lambda.");
+    }
+    double lambda = param[0];
     std::cout << "exponential distribution with lambda: " << lambda
               << std::endl;
     parlay::random_generator gen(rand_seed);
     std::exponential_distribution<double> dis(lambda);
-
     auto ran_seq = parlay::tabulate(n, [&](size_t i) -> double {
       auto r = gen[i];
       return dis(r);
@@ -206,10 +212,17 @@ class ExponentialGenerator {
 template <class T = double>
 class NormalGenerator {
  public:
-  static parlay::sequence<T> Generate(double dev, size_t n) {
-    std::cout << "normal distribution with dev: " << dev << std::endl;
+  template <typename Param>
+  static parlay::sequence<T> Generate(Param const& param, size_t n) {
+    if (param.size() != 2) {
+      throw std::runtime_error(
+          "NormalGenerator::Generate requires 2 parameters: mean and dev.");
+    }
+    double mean = param[0], dev = param[1];
+    std::cout << "normal distribution with mean: " << mean << " dev: " << dev
+              << std::endl;
     parlay::random_generator gen(rand_seed);
-    std::normal_distribution<double> dis(0.5, dev);
+    std::normal_distribution<double> dis(mean, dev);
 
     auto ran_seq = parlay::tabulate(n, [&](size_t i) -> double {
       auto r = gen[i];
@@ -245,7 +258,7 @@ class ZipfianGenerator {
   }
 };
 
-template <typename E, typename BatchDisFunc>
+template <typename E, typename BaseDisFunc, typename BatchDisFunc>
 class Generator {
  public:
   using EntrySeq = parlay::sequence<E>;
@@ -335,13 +348,15 @@ class Generator {
             [&](auto const& t) -> size_t { return std::get<2>(t); }));
   }
 
+  template <typename Param>
   static std::pair<EntrySeq, EntrySeq> GenBatch(int const batch_op,
                                                 size_t const base_n,
                                                 size_t const batch_n,
-                                                double const param) {
-    auto base_ran_seq = UniformGenerator<double>::Generate(
-        param, batch_op == 0 ? base_n : base_n - batch_n);
-    auto batch_ran_seq = BatchDisFunc::Generate(param, batch_n);
+                                                Param const& base_param,
+                                                Param const& batch_param) {
+    auto base_ran_seq = BaseDisFunc::Generate(
+        base_param, batch_op == 0 ? base_n : base_n - batch_n);
+    auto batch_ran_seq = BatchDisFunc::Generate(batch_param, batch_n);
     bucketize(batch_ran_seq, 10);
     auto [dis_base_seq, dis_batch_seq] = Discreatize(
         std::move(base_ran_seq), std::move(batch_ran_seq), batch_op);
@@ -349,32 +364,6 @@ class Generator {
               << ", batch size: " << dis_batch_seq.size() << std::endl;
     Validate(batch_op, base_n, batch_n, dis_base_seq, dis_batch_seq);
     return {ToEntry(dis_base_seq), ToEntry(dis_batch_seq)};
-    // size_t tot_size =
-    //     batch_op == 0 ? base_n + batch_n : base_n;  // insert or delete
-    // auto ground_k_seq = UniformGenerator<size_t>::GenerateGroundSeq(
-    //     param, tot_size, std::numeric_limits<size_t>::max());
-    // assert(parlay::remove_duplicates(ground_k_seq).size() == tot_size);
-    // auto batch_idx_seq =
-    //     BatchDisFunc::Generate(param, batch_n, ground_k_seq.size());
-    //
-    // // gen base keys
-    // parlay::sequence<bool> flag(tot_size, true);
-    // parlay::parallel_for(0, batch_n,
-    //                      [&](size_t i) { flag[batch_idx_seq[i]] = false; });
-    // auto base_k_seq = parlay::pack(ground_k_seq, flag);
-    //
-    // // gen batch indexes
-    // parlay::parallel_for(0, flag.size(), [&](size_t i) {
-    //   flag[i] = flag[i] == false ? true : false;
-    // });
-    // auto batch_k_seq = parlay::pack(ground_k_seq, flag);
-    //
-    // Validate(batch_op, base_n, batch_n, base_k_seq, batch_k_seq,
-    // ground_k_seq);
-    //
-    // return batch_op == 0
-    //            ? std::make_pair(ToEntry(base_k_seq), ToEntry(batch_k_seq))
-    //            : std::make_pair(ToEntry(ground_k_seq), ToEntry(batch_k_seq));
   }
 };
 
