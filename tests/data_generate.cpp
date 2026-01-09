@@ -52,19 +52,14 @@ int main(int argc, char* argv[]) {
     using K = typename E::K;
     std::cout << "Generating... " << std::endl;
     EntrySeq base_seq, batch_seq;
-    if (dis_type == 0) {
-      std::tie(base_seq, batch_seq) =
-          Generator<E, UniformGenerator<>>::GenBatch(batch_op, base_n, batch_n,
-                                                     param);
-    } else if (dis_type == 1) {
-      std::tie(base_seq, batch_seq) =
-          Generator<E, ExponentialGenerator<>>::GenBatch(batch_op, base_n,
-                                                         batch_n, param);
-    } else if (dis_type == 2) {
-      std::tie(base_seq, batch_seq) =
-          Generator<E, ZipfianGenerator<>>::GenBatch(batch_op, base_n, batch_n,
-                                                     param);
-    }
+    std::tie(base_seq, batch_seq) =
+        dis_type == 0 ? Generator<E, UniformGenerator<>>::GenBatch(
+                            batch_op, base_n, batch_n, param)
+        : dis_type == 1 ? Generator<E, ExponentialGenerator<>>::GenBatch(
+                              batch_op, base_n, batch_n, param)
+                        : Generator<E, NormalGenerator<>>::GenBatch(
+                              batch_op, base_n, batch_n, param);
+
     std::cout << "Writing... " << std::endl;
     PrintToFile(new_path + ".base.in", base_seq);
     PrintToFile(new_path + ".batch.in", batch_seq);

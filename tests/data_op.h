@@ -153,7 +153,7 @@ auto SupplySample(Seq const& current_seq, size_t extra_n, size_t l, size_t r) {
 
 constexpr size_t duplicate_ratio = 2;
 
-template <class T = size_t>
+template <class T = double>
 class UniformGenerator {
  public:
   static parlay::sequence<T> GenerateGroundSeq(double, size_t n, size_t max_k) {
@@ -161,74 +161,78 @@ class UniformGenerator {
     return parlay::tabulate(n, [&](size_t i) { return i; });
   }
 
-  static parlay::sequence<T> Generate(double, size_t batch_n, size_t ground_n) {
-    printf("uniform distribution with num_keys: %zu\n", batch_n);
-    auto sample = parlay::remove_duplicates(SampleWeightedSeq(
-        parlay::tabulate(ground_n, [&](size_t i) -> size_t { return 1; }),
-        batch_n));
-    sample.append(SupplySample(sample, batch_n - sample.size(), 0, ground_n));
-    bucketize(sample);
-    // std::cout << sample.size() << std::endl;
+  static parlay::sequence<T> Generate(double, size_t n) {
+    parlay::random_generator gen(rand_seed);
+    std::uniform_real_distribution<double> dis(0, 1);
 
-    if (parlay::remove_duplicates(sample).size() < batch_n) {
-      std::cout << "Generated unique keys: " << sample.size()
-                << ", required: " << batch_n << std::endl;
-      throw std::runtime_error(
-          "UniformGenerator: not enough unique keys generated.");
-    } else {
-      std::cout << "Generated unique keys: " << sample.size()
-                << ", required: " << batch_n << std::endl;
-    }
-    return sample;
+    return parlay::tabulate(n, [&](size_t i) {
+      auto r = gen[i];
+      return dis(r);
+    });
   }
 };
 
-template <class T = size_t>
+template <class T = double>
 class ExponentialGenerator {
  public:
   static double constexpr val_scale_fac = 1e10;
   static double constexpr x_scale_fac = 0.0005;
 
-  static parlay::sequence<T> Generate(double lambda, size_t batch_n,
-                                      size_t ground_n) {
-    printf("exponential distribution with lambda: %.10f\n", lambda);
-    size_t cutoff = ground_n;
-    parlay::sequence<double> nums(cutoff, 0);
+  static parlay::sequence<T> Generate(double lambda, size_t n) {
+    parlay::random_generator gen(rand_seed);
+    std::exponential_distribution<double> dis(lambda);
 
-    parlay::parallel_for(0, cutoff, [&](size_t i) {
-      // nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
-      nums[i] = lambda * exp(-lambda * (x_scale_fac * i));
-      // nums[i] %= max_k;
+    auto ran_seq = parlay::tabulate(n, [&](size_t i) -> double {
+      auto r = gen[i];
+      return dis(r);
     });
-    std::cout << std::endl;
-    auto sample = parlay::remove_duplicates(SampleWeightedSeq(nums, batch_n));
-    // sample = parlay::remove_duplicates(sample);
-    size_t bucket_n = 10;
-    auto [first_bkt_n, min_v, max_v] = bucketize(sample, bucket_n);
-    size_t remain_n = batch_n - sample.size();
-    size_t supply_factor =
-        ((max_v - min_v) / bucket_n - first_bkt_n) > 2 * remain_n ? 10 : 1;
-    std::cout << "supply factor: " << supply_factor << std::endl;
 
-    sample.append(SupplySample(sample, batch_n - sample.size(), 0,
-                               cutoff / supply_factor));
-    bucketize(sample);
-    // std::cout << sample.size() << std::endl;
-
-    if (parlay::remove_duplicates(sample).size() < batch_n) {
-      std::cout << "Generated unique keys: " << sample.size()
-                << ", required: " << batch_n << std::endl;
-      throw std::runtime_error(
-          "ExponentialGenerator: not enough unique keys generated.");
-    } else {
-      std::cout << "Generated unique keys: " << sample.size()
-                << ", required: " << batch_n << std::endl;
+    ran_seq = parlay::filter(ran_seq, [&](auto x) { return x <= 1.0; });
+    parlay::sequence<T> append_seq(n - ran_seq.size());
+    for (int i = 0; i < append_seq.size(); i++) {
+      auto r = gen[i];
+      auto num = dis(r);
+      while (num > 1.0) {
+        r = gen[i];
+        num = dis(r);
+      }
+      append_seq[i] = num;
     }
-    return sample;
+    return parlay::append(ran_seq, append_seq);
   }
 };
 
-template <class T = size_t>
+template <class T = double>
+class NormalGenerator {
+ public:
+  static double constexpr val_scale_fac = 1e10;
+  static double constexpr x_scale_fac = 0.0005;
+
+  static parlay::sequence<T> Generate(double dev, size_t n) {
+    parlay::random_generator gen(rand_seed);
+    std::normal_distribution<double> dis(0.5, dev);
+
+    auto ran_seq = parlay::tabulate(n, [&](size_t i) -> double {
+      auto r = gen[i];
+      return dis(r);
+    });
+
+    ran_seq = parlay::filter(ran_seq, [&](auto x) { return x <= 1.0; });
+    parlay::sequence<T> append_seq(n - ran_seq.size());
+    for (int i = 0; i < append_seq.size(); i++) {
+      auto r = gen[i];
+      auto num = dis(r);
+      while (num > 1.0) {
+        r = gen[i];
+        num = dis(r);
+      }
+      append_seq[i] = num;
+    }
+    return parlay::append(ran_seq, append_seq);
+  }
+};
+
+template <class T = double>
 class ZipfianGenerator {
   static double constexpr x_scale_fac = 0.0005;
   static size_t constexpr supply_factor = 10;
@@ -237,32 +241,7 @@ class ZipfianGenerator {
   static parlay::sequence<T> Generate(double s, size_t batch_n,
                                       size_t ground_n) {
     printf("zipfian distribution with s: %f\n", s);
-    size_t cutoff = ground_n;
-    auto harmonic = parlay::delayed_seq<double>(
-        cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
-    double sum = parlay::reduce(make_slice(harmonic));
-    double v = sum;
-    parlay::sequence<double> nums(cutoff, 0);
-    parlay::parallel_for(0, cutoff,
-                         [&](size_t i) { nums[i] = v / pow(i + 1, s); });
-
-    auto sample = SampleWeightedSeq(nums, batch_n);
-    // nums = parlay::remove_duplicates(nums);
-    // bucketize(sample, 10);
-    sample = parlay::remove_duplicates(sample);
-    // bucketize(sample, 10);
-
-    sample.append(SupplySample(sample, batch_n - sample.size(), 0,
-                               cutoff / supply_factor));
-
-    bucketize(sample, 10);
-    if (sample.size() < batch_n) {
-      std::cout << "Generated unique keys: " << nums.size()
-                << ", required: " << batch_n << std::endl;
-      throw std::runtime_error("zipfian: not enough unique keys generated.");
-    }
-    // return parlay::random_shuffle(nums.cut(0, n));
-    return sample;
+    throw std::runtime_error("ZipfianGenerator::Generate not implemented.");
   }
 };
 
@@ -272,7 +251,7 @@ class Generator {
   using EntrySeq = parlay::sequence<E>;
 
   static void Validate(int batch_op, size_t base_n, size_t batch_n,
-                       auto base_k_seq, auto batch_k_seq, auto ground_k_seq) {
+                       auto const& base_k_seq, auto const& batch_k_seq) {
     if (parlay::remove_duplicates(base_k_seq).size() !=
         (batch_op == 0 ? base_n : base_n - batch_n)) {
       std::cout << "base_k_seq size: " << base_k_seq.size()
@@ -289,29 +268,20 @@ class Generator {
           "Validate: Batch sequence size mismatch after remove duplicates.");
     }
 
-    if (parlay::remove_duplicates(ground_k_seq).size() !=
-        (batch_op == 0 ? base_n + batch_n : base_n)) {
-      throw std::runtime_error(
-          "Validate: Ground sequence size mismatch after remove duplicates.");
-    }
-
-    if (ground_k_seq.size() != (batch_op == 0 ? base_n + batch_n : base_n)) {
-      throw std::runtime_error("Validate: Ground sequence size mismatch.");
-    }
-
-    base_k_seq = parlay::sort(base_k_seq);
-    batch_k_seq = parlay::sort(batch_k_seq);
-    ground_k_seq = parlay::sort(ground_k_seq);
-    if (batch_op == 0 && parlay::any_of(batch_k_seq, [&](size_t idx) {
-          auto it = std::lower_bound(base_k_seq.begin(), base_k_seq.end(), idx);
-          return it != base_k_seq.end() && *it == idx;
+    auto base_sort_seq = parlay::sort(base_k_seq);
+    auto batch_sort_seq = parlay::sort(batch_k_seq);
+    if (batch_op == 0 && parlay::any_of(batch_sort_seq, [&](size_t idx) {
+          auto it =
+              std::lower_bound(base_sort_seq.begin(), base_sort_seq.end(), idx);
+          return it != base_sort_seq.end() && *it == idx;
         })) {
       throw std::runtime_error(
           "Validate: Insert batch has keys already in base sequence.");
-    } else if (batch_op == 1 && !parlay::all_of(batch_k_seq, [&](size_t idx) {
-                 auto it = std::lower_bound(ground_k_seq.begin(),
-                                            ground_k_seq.end(), idx);
-                 return it != ground_k_seq.end() && *it == idx;
+    } else if (batch_op == 1 &&
+               !parlay::all_of(batch_sort_seq, [&](size_t idx) {
+                 auto it = std::lower_bound(base_sort_seq.begin(),
+                                            base_sort_seq.end(), idx);
+                 return it != base_sort_seq.end() && *it == idx;
                })) {
       throw std::runtime_error(
           "Validate: Delete batch has keys not in base sequence.");
@@ -335,36 +305,74 @@ class Generator {
     });
   }
 
+  static std::pair<parlay::sequence<size_t>, parlay::sequence<size_t>>
+  Discreatize(auto base_ran_seq, auto batch_ran_seq, int batch_op) {
+    auto base_flag_seq = parlay::map(base_ran_seq, [&](double x) {
+      return std::make_tuple(x, bool(0), size_t(0));
+    });
+    auto batch_flag_seq = parlay::map(batch_ran_seq, [&](double x) {
+      return std::make_tuple(x, bool(1), size_t(0));
+    });
+
+    auto ground_seq =
+        parlay::sort(parlay::append(base_flag_seq, batch_flag_seq),
+                     [&](auto const& a, auto const& b) {
+                       return std::get<0>(a) < std::get<0>(b);
+                     });
+
+    parlay::parallel_for(0, ground_seq.size(),
+                         [&](size_t i) { std::get<2>(ground_seq[i]) = i; });
+
+    std::make_pair(
+        parlay::map(batch_op == 0 ? parlay::filter(ground_seq,
+                                                   [&](auto const& t) {
+                                                     return std::get<1>(t) == 0;
+                                                   })
+                                  : ground_seq,
+                    [&](auto const& t) -> size_t { return std::get<2>(t); }),
+        parlay::map(
+            parlay::filter(ground_seq,
+                           [&](auto const& t) { return std::get<1>(t) == 1; }),
+            [&](auto const& t) -> size_t { return std::get<2>(t); }));
+  }
+
   static std::pair<EntrySeq, EntrySeq> GenBatch(int const batch_op,
                                                 size_t const base_n,
                                                 size_t const batch_n,
                                                 double const param) {
-    // PARA: initiaze size before take batch
-    size_t tot_size =
-        batch_op == 0 ? base_n + batch_n : base_n;  // insert or delete
-    auto ground_k_seq = UniformGenerator<size_t>::GenerateGroundSeq(
-        param, tot_size, std::numeric_limits<size_t>::max());
-    assert(parlay::remove_duplicates(ground_k_seq).size() == tot_size);
-    auto batch_idx_seq =
-        BatchDisFunc::Generate(param, batch_n, ground_k_seq.size());
-
-    // gen base keys
-    parlay::sequence<bool> flag(tot_size, true);
-    parlay::parallel_for(0, batch_n,
-                         [&](size_t i) { flag[batch_idx_seq[i]] = false; });
-    auto base_k_seq = parlay::pack(ground_k_seq, flag);
-
-    // gen batch indexes
-    parlay::parallel_for(0, flag.size(), [&](size_t i) {
-      flag[i] = flag[i] == false ? true : false;
-    });
-    auto batch_k_seq = parlay::pack(ground_k_seq, flag);
-
-    Validate(batch_op, base_n, batch_n, base_k_seq, batch_k_seq, ground_k_seq);
-
-    return batch_op == 0
-               ? std::make_pair(ToEntry(base_k_seq), ToEntry(batch_k_seq))
-               : std::make_pair(ToEntry(ground_k_seq), ToEntry(batch_k_seq));
+    auto base_ran_seq = UniformGenerator<double>::Generate(
+        param, batch_op == 0 ? base_n : base_n - batch_n);
+    auto batch_ran_seq = BatchDisFunc::Generate(param, batch_n);
+    auto [dis_base_seq, dis_batch_seq] = Discreatize(
+        std::move(base_ran_seq), std::move(batch_ran_seq), batch_op);
+    Validate(batch_op, base_n, batch_n, base_ran_seq, batch_ran_seq);
+    return {ToEntry(dis_base_seq), ToEntry(dis_batch_seq)};
+    // size_t tot_size =
+    //     batch_op == 0 ? base_n + batch_n : base_n;  // insert or delete
+    // auto ground_k_seq = UniformGenerator<size_t>::GenerateGroundSeq(
+    //     param, tot_size, std::numeric_limits<size_t>::max());
+    // assert(parlay::remove_duplicates(ground_k_seq).size() == tot_size);
+    // auto batch_idx_seq =
+    //     BatchDisFunc::Generate(param, batch_n, ground_k_seq.size());
+    //
+    // // gen base keys
+    // parlay::sequence<bool> flag(tot_size, true);
+    // parlay::parallel_for(0, batch_n,
+    //                      [&](size_t i) { flag[batch_idx_seq[i]] = false; });
+    // auto base_k_seq = parlay::pack(ground_k_seq, flag);
+    //
+    // // gen batch indexes
+    // parlay::parallel_for(0, flag.size(), [&](size_t i) {
+    //   flag[i] = flag[i] == false ? true : false;
+    // });
+    // auto batch_k_seq = parlay::pack(ground_k_seq, flag);
+    //
+    // Validate(batch_op, base_n, batch_n, base_k_seq, batch_k_seq,
+    // ground_k_seq);
+    //
+    // return batch_op == 0
+    //            ? std::make_pair(ToEntry(base_k_seq), ToEntry(batch_k_seq))
+    //            : std::make_pair(ToEntry(ground_k_seq), ToEntry(batch_k_seq));
   }
 };
 
