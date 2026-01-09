@@ -71,6 +71,10 @@ add_subdirectory(include/parlaylib)
 list(REMOVE_ITEM CMAKE_MODULE_PATH "${PARLAY_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${PMOS_SOURCE_DIR}/cmake")
 
+# NOTE: GoogleTest
+add_subdirectory(external/googletest)
+enable_testing()
+
 
 # NOTE: PMOS
 add_library(PMOS INTERFACE)
@@ -108,6 +112,17 @@ endif()
 add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
 target_link_libraries(data_generator PUBLIC PMOS)
 target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
+
+# NOTE: GoogleTest for b_ccp
+add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
+target_link_libraries(unit_test PUBLIC PMOS gtest gtest_main)
+target_include_directories(unit_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
+if(JEMA)
+	target_link_libraries(unit_test PUBLIC libjemalloc.so)
+endif()
+add_test(NAME UnitTest COMMAND unit_test)
+# ctest -R BCCPTest -V
+
 
 
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
