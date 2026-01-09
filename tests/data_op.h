@@ -175,10 +175,9 @@ class UniformGenerator {
 template <class T = double>
 class ExponentialGenerator {
  public:
-  static double constexpr val_scale_fac = 1e10;
-  static double constexpr x_scale_fac = 0.0005;
-
   static parlay::sequence<T> Generate(double lambda, size_t n) {
+    std::cout << "exponential distribution with lambda: " << lambda
+              << std::endl;
     parlay::random_generator gen(rand_seed);
     std::exponential_distribution<double> dis(lambda);
 
@@ -188,12 +187,14 @@ class ExponentialGenerator {
     });
 
     ran_seq = parlay::filter(ran_seq, [&](auto x) { return x <= 1.0; });
+    std::cout << ran_seq.size() << std::flush << std::endl;
     parlay::sequence<T> append_seq(n - ran_seq.size());
+    size_t cnt = n + 1;
     for (int i = 0; i < append_seq.size(); i++) {
-      auto r = gen[i];
+      auto r = gen[cnt++];
       auto num = dis(r);
       while (num > 1.0) {
-        r = gen[i];
+        r = gen[cnt++];
         num = dis(r);
       }
       append_seq[i] = num;
@@ -205,10 +206,8 @@ class ExponentialGenerator {
 template <class T = double>
 class NormalGenerator {
  public:
-  static double constexpr val_scale_fac = 1e10;
-  static double constexpr x_scale_fac = 0.0005;
-
   static parlay::sequence<T> Generate(double dev, size_t n) {
+    std::cout << "normal distribution with dev: " << dev << std::endl;
     parlay::random_generator gen(rand_seed);
     std::normal_distribution<double> dis(0.5, dev);
 
@@ -219,11 +218,12 @@ class NormalGenerator {
 
     ran_seq = parlay::filter(ran_seq, [&](auto x) { return x <= 1.0; });
     parlay::sequence<T> append_seq(n - ran_seq.size());
+    size_t cnt = n + 1;
     for (int i = 0; i < append_seq.size(); i++) {
-      auto r = gen[i];
+      auto r = gen[cnt++];
       auto num = dis(r);
       while (num > 1.0) {
-        r = gen[i];
+        r = gen[cnt++];
         num = dis(r);
       }
       append_seq[i] = num;
@@ -252,8 +252,7 @@ class Generator {
 
   static void Validate(int batch_op, size_t base_n, size_t batch_n,
                        auto const& base_k_seq, auto const& batch_k_seq) {
-    if (parlay::remove_duplicates(base_k_seq).size() !=
-        (batch_op == 0 ? base_n : base_n - batch_n)) {
+    if (parlay::remove_duplicates(base_k_seq).size() != base_n) {
       std::cout << "base_k_seq size: " << base_k_seq.size()
                 << " after remove duplicates: "
                 << parlay::remove_duplicates(base_k_seq).size()
@@ -323,7 +322,7 @@ class Generator {
     parlay::parallel_for(0, ground_seq.size(),
                          [&](size_t i) { std::get<2>(ground_seq[i]) = i; });
 
-    std::make_pair(
+    return std::make_pair(
         parlay::map(batch_op == 0 ? parlay::filter(ground_seq,
                                                    [&](auto const& t) {
                                                      return std::get<1>(t) == 0;
@@ -343,9 +342,12 @@ class Generator {
     auto base_ran_seq = UniformGenerator<double>::Generate(
         param, batch_op == 0 ? base_n : base_n - batch_n);
     auto batch_ran_seq = BatchDisFunc::Generate(param, batch_n);
+    bucketize(batch_ran_seq, 10);
     auto [dis_base_seq, dis_batch_seq] = Discreatize(
         std::move(base_ran_seq), std::move(batch_ran_seq), batch_op);
-    Validate(batch_op, base_n, batch_n, base_ran_seq, batch_ran_seq);
+    std::cout << "final base size: " << dis_base_seq.size()
+              << ", batch size: " << dis_batch_seq.size() << std::endl;
+    Validate(batch_op, base_n, batch_n, dis_base_seq, dis_batch_seq);
     return {ToEntry(dis_base_seq), ToEntry(dis_batch_seq)};
     // size_t tot_size =
     //     batch_op == 0 ? base_n + batch_n : base_n;  // insert or delete

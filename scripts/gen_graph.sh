@@ -28,14 +28,20 @@ for base_n in "${base_n_seq[@]}"; do
 				param="1"
 			elif [ "${dis}" -eq 1 ]; then
 				if [ "${base_n}" -lt 100000000 ]; then
-					param="0.005"
+					param="10.0"
 				elif [ "${base_n}" -lt 1000000000 ]; then
-					param="0.0005"
+					param="15"
 				else
-					param="0.00005"
+					param="20"
 				fi
 			else
-				param="0.7"
+				if [ "${base_n}" -lt 100000000 ]; then
+					param="0.1"
+				elif [ "${base_n}" -lt 1000000000 ]; then
+					param="0.2"
+				else
+					param="0.2"
+				fi
 			fi
 			for b_op in "${batch_op[@]}"; do
 				./../build/data_generator -path "${path_prefix}" -base_n "${base_n}" -batch_n "${batch_n}" -val_n "${val_n}" -file_num "${file_num}" -dis "${dis}" -batch_op "${b_op}" -param "${param}" 2>&1 | tee -a "${logger_path}"

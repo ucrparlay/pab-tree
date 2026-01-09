@@ -32,7 +32,9 @@ int main(int argc, char* argv[]) {
   std::filesystem::create_directory(path);
 
   // NOTE: ../kdtree/uni/
-  path += std::string(dis_type == 0 ? "uni/" : dis_type == 1 ? "exp/" : "zip/");
+  path += std::string(dis_type == 0   ? "uni/"
+                      : dis_type == 1 ? "exp/"
+                                      : "norm/");
   std::filesystem::create_directory(path);
 
   // NOTE: ../kdtree/uni/1000000_1/
