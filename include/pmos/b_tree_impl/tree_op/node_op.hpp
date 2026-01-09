@@ -166,14 +166,17 @@ TT::SizeT BTree<TT>::HandlingInteriorSplitOverflow(
   // merge split
   SizeT split_idx = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+    if (return_node_n_arr[i] > 0) {
+      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+      assert(return_node_n_arr[i] > 0 ||
+             static_cast<int>(return_node_n_arr[i]) - 1 < 0);
 
-    parlay::parallel_for(
-        0, static_cast<int>(return_node_n_arr[i]) - 1, [&](SizeT j) {
-          flatten_split_seq[split_idx + j] = node_split_slice[st + j].second;
-        });
-    split_idx += return_node_n_arr[i] - 1;
-
+      parlay::parallel_for(
+          0, static_cast<int>(return_node_n_arr[i]) - 1, [&](SizeT j) {
+            flatten_split_seq[split_idx + j] = node_split_slice[st + j].second;
+          });
+      split_idx += return_node_n_arr[i] - 1;
+    }
     if (i < TI->GetNodeN() - 1) {  // skip the new splits for last node
       flatten_split_seq[split_idx++] = TI->split[i];
     }
