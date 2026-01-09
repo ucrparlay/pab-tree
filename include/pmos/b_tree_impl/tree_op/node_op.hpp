@@ -187,6 +187,7 @@ TT::SizeT BTree<TT>::HandlingInteriorSplitOverflow(
                            [&](TT::K a, TT::K b) { return a < b; }));
 
   // launch rebuild
+  FreeNode<Interior>(T);
   [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
       parlay::make_slice(flatten_node_seq),
       parlay::make_slice(flatten_split_seq),

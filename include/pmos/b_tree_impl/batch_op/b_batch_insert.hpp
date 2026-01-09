@@ -81,15 +81,7 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
     offset += pos;
     split_pos_seq[i] = offset;
   }
-// auto split_pos_seq = parlay::tabulate(
-//     TI->split.size(),
-//     [&](size_t i) {
-//       // return index to first key where is less is false
-//       // return In.size() / TI->split.size() * (i + 1);
-//       return parlay::internal::binary_search(
-//           In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
-//     },
-//     1);
+
 #ifdef DEBUG
   for (int i = 1; i < TI->GetSplitN(); i++) {
     assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
