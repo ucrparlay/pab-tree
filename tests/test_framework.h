@@ -1096,9 +1096,10 @@ std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) {
-    wp[i].ReadKey(pts[i], i + id_offset);
-    // wp[i].ReadKey(pts[i]);
-    wp[i].ReadVal(pts.cut(i * dim + 1, (i + 1) * dim));
+    // wp[i].ReadKey(pts[i], i + id_offset);
+    wp[i].ReadKey(pts[i * dim]);
+    wp[i].ReadVal(pts.cut(
+        i * dim + 1, (i + 1) * dim));  // WARN: assume the val is a singleton
   });
   return std::make_pair(N, dim);
 }
@@ -1609,7 +1610,6 @@ class Wrapper {
     Options(commandLine& params) {
       this->dims = params.getOptionIntValue("-d", 1);
       this->input_file_path = std::string(params.getOptionValue("-p"));
-      this->base_n = params.getOptionLongValue("-n", -1);
       this->tag = params.getOptionIntValue("-t", 1);
       this->rounds = params.getOptionIntValue("-r", 3);
       this->query_type = params.getOptionIntValue("-q", 0);
@@ -1653,11 +1653,13 @@ class Wrapper {
 
     std::pair<std::string, std::string> ParseInsertBatchPath(
         double batch_ratio) {
-      // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
+      // PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
+      // PARA: dir_pre: ../kdtree/uni/1000000_1/
+      // PARA: file_pre: 1
       auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
       std::string base_path =
-          dir_prefix + "/ins/" +
-          std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
+          dir_prefix + "ins/" +
+          std::to_string(static_cast<size_t>(batch_ratio * 100)) + "/" +
           file_prefix + ".base.in";
 
       std::string batch_path = base_path;
@@ -1670,8 +1672,8 @@ class Wrapper {
       // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
       auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
       std::string base_path =
-          dir_prefix + "/delete/" +
-          std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
+          dir_prefix + "del/" +
+          std::to_string(static_cast<size_t>(batch_ratio * 100)) + "/" +
           file_prefix + ".base.in";
 
       std::string batch_path = base_path;
@@ -1682,7 +1684,6 @@ class Wrapper {
 
     int dims;
     std::string input_file_path = "";
-    size_t base_n;
     int tag;
     int rounds;
     int query_type;
@@ -1723,8 +1724,11 @@ class Wrapper {
 
     void ReadKey(char* str, size_t i) {
       this->key = {std::stol(str), i};
-      // void ReadKey(char* str) {
-      //   this->key = std::stol(str);
+      return;
+    }
+
+    void ReadKey(char* str) {
+      this->key = std::stol(str);
       return;
     }
 
@@ -1767,7 +1771,8 @@ class Wrapper {
   // NOTE: For kd tree and orth tree
   template <typename RunFunc>
   static void ApplyOrthogonal(Options const& opts, RunFunc test_func) {
-    using K = std::pair<uint32_t, uint32_t>;
+    // using K = std::pair<uint32_t, uint32_t>;
+    using K = uint32_t;
     using V = uint32_t;
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;
@@ -1792,7 +1797,7 @@ class Wrapper {
 #elif defined(LEAF1024)
     static constexpr uint const kBuf = 1024;
 #else
-    static constexpr uint const kBuf = 16;  // Default
+    static constexpr uint const kBuf = 32;  // Default
 #endif  // LEAF1
 
     using TypeTrait =
@@ -1806,7 +1811,8 @@ class Wrapper {
   template <typename RunFunc>
   static void ApplyBaselines(int const tree_type, int const dim,
                              commandLine& params, RunFunc test_func) {
-    using K = std::pair<uint32_t, uint32_t>;
+    // using K = std::pair<uint32_t, uint32_t>;
+    using K = uint32_t;
     using V = uint32_t;
     using E = Element<K, V>;
     // using EleType = Element<uint32_t, uint32_t>;

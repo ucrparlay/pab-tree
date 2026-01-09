@@ -35,7 +35,14 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
     box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
-      assert(box_seq[i].second < TI->split[0]);
+      // assert(box_seq[i].second < TI->split[0]);
+      if (box_seq[i].second >= TI->split[0]) {
+        std::cout << "Validation failed at first node split check."
+                  << std::endl;
+        std::cout << "Box: [" << box_seq[i].first << ", " << box_seq[i].second
+                  << "], Split: " << TI->split[0] << std::endl;
+        assert(false);
+      }
     } else if (i == TI->GetNodeN() - 1) {
       assert(box_seq[i].first >= TI->split[i - 1]);
     } else {

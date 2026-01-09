@@ -23,8 +23,16 @@ void CheckCorrectness(Wrapper::Options opts) {
 
   if (opts.tag & (1 << 0)) {
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
+    std::cout << "base path: " << base_path << "\n";
+    std::cout << "batch path: " << batch_path << "\n";
     auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
     auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
+    // parlay::sort_inplace(
+    //     wp, [](auto const& a, auto const& b) { return a.key < b.key; });
+    // for (int i = 0; i < 10 && i < wp.size(); i++) {
+    //   std::cout << "wp[" << i << "]: " << wp[i].key << "\n";
+    // }
+    // return;
 
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
     tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
