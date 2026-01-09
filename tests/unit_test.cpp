@@ -13,7 +13,10 @@
 
 namespace fs = std::filesystem;
 
-class BCCPTest : public ::testing::Test {
+class ParTreeCorrectTest : public ::testing::Test {
+ public:
+  static std::string file_filter;
+
  protected:
   static constexpr char const* kDataPrefix = "/ssd1/zmen002/kv_pair";
   static constexpr int kTag = 0b0001;  // 2#0001
@@ -139,7 +142,7 @@ class BCCPTest : public ::testing::Test {
     std::cout.rdbuf(old_cout);
   }
 
-  void TestDistributionAndSize(std::string const& distribution, size_t node_size) {
+  void BTreeTest(std::string const& distribution, size_t node_size) {
     std::string files_path =
         std::string(kDataPrefix) + "/" + distribution + "/" +
         std::to_string(node_size) + "_" + std::to_string(kDim) + "/ins/" +
@@ -150,6 +153,20 @@ class BCCPTest : public ::testing::Test {
       GTEST_SKIP() << "Data files not found at: " << files_path;
     }
 
+    // Filter files if file_filter is specified
+    if (!file_filter.empty()) {
+      std::vector<std::string> filtered_files;
+      for (auto const& file : base_files) {
+        if (file.find(file_filter) != std::string::npos) {
+          filtered_files.push_back(file);
+        }
+      }
+      if (filtered_files.empty()) {
+        GTEST_SKIP() << "No files match filter: " << file_filter;
+      }
+      base_files = filtered_files;
+    }
+
     for (auto const& file : base_files) {
       SCOPED_TRACE("Testing file: " + file);
       EXPECT_NO_THROW(RunTest(file));
@@ -157,32 +174,48 @@ class BCCPTest : public ::testing::Test {
   }
 };
 
-TEST_F(BCCPTest, Uni1M) { TestDistributionAndSize("uni", 1000000); }
+TEST_F(ParTreeCorrectTest, Uni1M) { BTreeTest("uni", 1000000); }
 
-TEST_F(BCCPTest, Uni5M) { TestDistributionAndSize("uni", 5000000); }
+TEST_F(ParTreeCorrectTest, Uni5M) { BTreeTest("uni", 5000000); }
 
-TEST_F(BCCPTest, Uni10M) { TestDistributionAndSize("uni", 10000000); }
+TEST_F(ParTreeCorrectTest, Uni10M) { BTreeTest("uni", 10000000); }
 
-TEST_F(BCCPTest, Uni50M) { TestDistributionAndSize("uni", 50000000); }
+TEST_F(ParTreeCorrectTest, Uni50M) { BTreeTest("uni", 50000000); }
 
-TEST_F(BCCPTest, Exp1M) { TestDistributionAndSize("exp", 1000000); }
+TEST_F(ParTreeCorrectTest, Exp1M) { BTreeTest("exp", 1000000); }
 
-TEST_F(BCCPTest, Exp5M) { TestDistributionAndSize("exp", 5000000); }
+TEST_F(ParTreeCorrectTest, Exp5M) { BTreeTest("exp", 5000000); }
 
-TEST_F(BCCPTest, Exp10M) { TestDistributionAndSize("exp", 10000000); }
+TEST_F(ParTreeCorrectTest, Exp10M) { BTreeTest("exp", 10000000); }
 
-TEST_F(BCCPTest, Exp50M) { TestDistributionAndSize("exp", 50000000); }
+TEST_F(ParTreeCorrectTest, Exp50M) { BTreeTest("exp", 50000000); }
 
-TEST_F(BCCPTest, Norm1M) { TestDistributionAndSize("norm", 1000000); }
+TEST_F(ParTreeCorrectTest, Norm1M) { BTreeTest("norm", 1000000); }
 
-TEST_F(BCCPTest, Norm5M) { TestDistributionAndSize("norm", 5000000); }
+TEST_F(ParTreeCorrectTest, Norm5M) { BTreeTest("norm", 5000000); }
 
-TEST_F(BCCPTest, Norm10M) { TestDistributionAndSize("norm", 10000000); }
+TEST_F(ParTreeCorrectTest, Norm10M) { BTreeTest("norm", 10000000); }
 
-TEST_F(BCCPTest, Norm50M) { TestDistributionAndSize("norm", 50000000); }
+TEST_F(ParTreeCorrectTest, Norm50M) { BTreeTest("norm", 50000000); }
 
-// ./unit_test --gtest_filter=BCCPTest.Uni1M
+// Define the static member
+std::string ParTreeCorrectTest::file_filter = "";
+
+// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M
+// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --file_filter=1.base.in
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+
+  // Parse custom arguments
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg.rfind("--file_filter=", 0) == 0) {
+      ParTreeCorrectTest::file_filter =
+          arg.substr(14);  // Length of "--file_filter="
+      std::cout << "Filtering files containing: "
+                << ParTreeCorrectTest::file_filter << std::endl;
+    }
+  }
+
   return RUN_ALL_TESTS();
 }

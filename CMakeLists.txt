@@ -115,7 +115,7 @@ target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 # NOTE: GoogleTest for b_ccp
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
-target_link_libraries(unit_test PUBLIC PMOS gtest gtest_main)
+target_link_libraries(unit_test PUBLIC PMOS gtest_main)
 target_include_directories(unit_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
 if(JEMA)
 	target_link_libraries(unit_test PUBLIC libjemalloc.so)
