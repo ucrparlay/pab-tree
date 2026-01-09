@@ -57,4 +57,3 @@ transfer.sh
 *.in
 build/
 .vscode
-external/
