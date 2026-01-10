@@ -17,7 +17,7 @@ log_folder_name = "linear_wrap"
 subprocess.run(
     f"""
     > logs/{log_folder_name}/{input_type}.log
-    for file in $(ls logs/{log_folder_name}/*.log); do
+    for file in $(ls logs/{log_folder_name}/*/*/*.log); do
         filename=$(basename "$file")
         cat "$file" >> logs/{log_folder_name}/{input_type}.log
         echo "" >> logs/{log_folder_name}/{input_type}.log
@@ -40,6 +40,7 @@ def combine(P) -> List:
 
     buf_value = 0
     benchmark = ""
+    tree = ""
     index = 0
     all_data = []
     while index < len(lines):
@@ -53,18 +54,17 @@ def combine(P) -> List:
 
         # Tree information - parse Buf value
         if lin_sep[0] == "Tree:":
+            tree = str(lin_sep[1].strip(";"))
             buf_value = int(lin_sep[3].strip(";"))
+            benchmark = str(lin_sep[7].strip(";"))
 
-            match lines[index + 1].split(" ")[0]:
-                case "1.in":
-                    benchmark = "Uniform"
             index += 1
 
         else:
             # parse result - summarize by Buf value
             all_data.append(
-                [benchmark, buf_value]
-                + lin_sep[1:]
+                [benchmark, tree, buf_value]
+                + lin_sep
             )
             index += 1
 
@@ -73,15 +73,15 @@ def combine(P) -> List:
 
 def post_processing(data):
     # desired order for x[0]
-    bench_order = ["Uniform", "Uniform_by_x", "Varden"]
-    tree_order = ["Pointer", "Array"]  # desired order for x[1]
+    bench_order = ["uni", "exp", "norm", "dual_norm"]
+    tree_order = ["BTree", "PAM", "CPAM"]  # desired order for x[1]
 
     sorted_lst = sorted(
         data,
         key=lambda x: (
             bench_order.index(x[0]),
-            # tree_order.index(x[1]),
-            int(x[1]),
+            tree_order.index(x[1]),
+            int(x[2]),
         ),
     )
     return sorted_lst
@@ -97,6 +97,7 @@ def csvSetup():
     csv_writer.writerow(
         [
             "benchmark",
+            "tree",
             "leaf_wrap",
             "build",
             "0.01%",
@@ -104,8 +105,6 @@ def csvSetup():
             "1%",
             "10%",
             "membership",
-            "vis_leaf",
-            "vis_interior"
         ]
     )
     return csv_writer, csv_file_pointer

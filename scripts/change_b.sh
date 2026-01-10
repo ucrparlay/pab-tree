@@ -4,55 +4,76 @@ set -o xtrace
 
 /usr/bin/drop_caches
 
-declare -a leaf_wrap=(2 4 8 16 32 64 128 512 1024)
+declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 512 1024)
 
 Nodes=(1000000000)
-Dim=(2)
-declare -A datas
-# datas["/data/legacy/data3/zmen002/kdtree/ss_varden/"]="../benchmark/ss_varden/"
-datas["/data/zmen002/kv_pair/uniform_bigint/"]="../benchmark/uniform/"
-
+Dim=(1)
 tag=$((2#0001))
 summary=1
-read_file=1
 query_type=$((2#001))
 instance_n=1
-round=3
+round=4
 
 log_path="logs/linear_wrap"
 mkdir -p "${log_path}"
 
-# make -C ../build/ testers
+data_prefix="/data/zmen002/kv_pair"
+batch_op_seq=("ins")
+dis_seq=("uni" "exp" "norm" "dual_norm")
+batch_ratio=0.01
 
-tree=0
-solver="b_test"
+function run_test() {
+	local leaf_idx="$1"
+	local solver="$2"
+	local tree="$3"
 
-for i in "${!leaf_wrap[@]}"; do
-	cur_path=$(pwd)
-	cd ../build || exit
-	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DLEAF="${leaf_wrap[${i}]}" "${HOME}/ParallelMultiwayOrderedSet"
-	make ${solver}
-	cd "${cur_path}" || exit
+	local exe="../build/${solver}"
 
 	for dim in "${Dim[@]}"; do
-		for dataPath in "${!datas[@]}"; do
-			for node in "${Nodes[@]}"; do
+		for dis in "${dis_seq[@]}"; do
+			for batch_op in "${batch_op_seq[@]}"; do
+				for node in "${Nodes[@]}"; do
 
-				# Hilbert curve is not supported for 3D with p_test
-				# if [ ${dim} -eq 3 ] && [ ${tree} -eq 2 ] && [ ${split} -eq 1 ]; then
-				#     continue
-				# fi
+					local x=$(bc <<<"scale=0; 1/$batch_ratio") || return 1
+					local file_prefix="${data_prefix}/${dis}/${node}_${dim}/${batch_op}/${x}"
 
-				file_prefix="${dataPath}${node}_${dim}"
-				dest="${log_path}/${leaf_wrap[${i}]}.log"
-				: >"${dest}"
-				echo ">>>${dest}"
-				exe="../build/${solver}"
+					local dest="${log_path}/${tree}/${dis}/${leaf_wrap_seq[${leaf_idx}]}.log"
+					mkdir -p "${dest%/*}"
+					: >"${dest}"
+					echo ">>>${dest}"
 
-				for ((j = 1; j <= instance_n; j++)); do
-					numactl -i all ${exe} -p "${file_prefix}/${j}.in" -r "${round}" -i ${read_file} -s ${summary} -t ${tag} -q ${query_type} -T ${tree} 2>&1 | tee -a "${dest}"
+					for ((j = 1; j <= instance_n; j++)); do
+						numactl -i all ${exe} -p "${file_prefix}/${j}.base.in" -r "${round}" -s ${summary} -t ${tag} -q ${query_type} -b "${batch_ratio}" -T ${tree} -D "${dis}" 2>&1 | tee -a "${dest}"
+					done
 				done
 			done
 		done
 	done
+}
+
+function run_cmake() {
+	local leaf_idx="$1"
+	local solver="$2"
+
+	local cur_path=$(pwd)
+	cd ../build || exit
+	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	make ${solver}
+	cd "${cur_path}" || exit
+}
+
+solver="baselines"
+tree=2
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+tree=1
+run_cmake 4 "${solver}"
+run_test 4 "${solver}" "${tree}"
+
+solver="b_test"
+tree=0
+for idx in "${!leaf_wrap_seq[@]}"; do
+	run_cmake "${idx}" "${solver}"
+	run_test "${idx}" "${solver}" "${tree}"
 done

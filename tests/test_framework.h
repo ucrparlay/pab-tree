@@ -1606,19 +1606,14 @@ class Wrapper {
       this->summary = params.getOptionIntValue("-s", 0);
       this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
       this->tree_type = params.getOptionIntValue("-T", 0);
-      this->dis_type = params.getOptionIntValue("-D", 0);
+      this->dis_type = std::string(params.getOptionValue("-D"));
     }
 
     void const PrintOptions() const {
       std::cout << "InputFile: "
                 << std::filesystem::path(input_file_path).filename().string()
                 << "; ";
-      std::cout << "Dis: "
-                << (this->dis_type == 0   ? "uni"
-                    : this->dis_type == 1 ? "exp"
-                    : this->dis_type == 2 ? "norm"
-                                          : "dual_norm")
-                << "; ";
+      std::cout << "Dis: " << this->dis_type << "; ";
     }
 
     std::pair<std::string, std::string> ExtractPrefixes(
@@ -1693,7 +1688,7 @@ class Wrapper {
     bool summary;
     double batch_ratio;  // decides the default batch file path
     int tree_type;
-    int dis_type;
+    std::string dis_type;
   };
 
   // NOTE: driven functions
