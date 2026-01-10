@@ -26,7 +26,7 @@ class ParTreeCorrectTest : public ::testing::Test {
   static constexpr int kDim = 1;
   static constexpr int kRounds = 2;
   static constexpr int kSummary = 0;
-  static constexpr double kBatchInsertCheckRatio = 0.1;
+  static constexpr double kBatchQueryRatio = 0.1;
 
   std::vector<size_t> nodes{1000000, 5000000, 10000000, 50000000};
   std::vector<std::string> distributions{"uni", "exp", "norm", "dual_norm"};
@@ -64,8 +64,7 @@ class ParTreeCorrectTest : public ::testing::Test {
     }
 
     if (opts.query_type & (1 << 0)) {
-      size_t batch_size =
-          static_cast<size_t>(wp.size() * kBatchInsertCheckRatio);
+      size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);

@@ -187,25 +187,10 @@ class ExponentialGenerator {
               << std::endl;
     parlay::random_generator gen(rand_seed);
     std::exponential_distribution<double> dis(lambda);
-    auto ran_seq = parlay::tabulate(n, [&](size_t i) -> double {
+    return parlay::tabulate(n, [&](size_t i) -> double {
       auto r = gen[i];
       return dis(r);
     });
-
-    ran_seq = parlay::filter(ran_seq, [&](auto x) { return x <= 1.0; });
-    std::cout << ran_seq.size() << std::flush << std::endl;
-    parlay::sequence<T> append_seq(n - ran_seq.size());
-    size_t cnt = n + 1;
-    for (int i = 0; i < append_seq.size(); i++) {
-      auto r = gen[cnt++];
-      auto num = dis(r);
-      while (num > 1.0) {
-        r = gen[cnt++];
-        num = dis(r);
-      }
-      append_seq[i] = num;
-    }
-    return parlay::append(ran_seq, append_seq);
   }
 };
 
@@ -224,24 +209,10 @@ class NormalGenerator {
     parlay::random_generator gen(rand_seed);
     std::normal_distribution<double> dis(mean, dev);
 
-    auto ran_seq = parlay::tabulate(n, [&](size_t i) -> double {
+    return parlay::tabulate(n, [&](size_t i) -> double {
       auto r = gen[i];
       return dis(r);
     });
-
-    ran_seq = parlay::filter(ran_seq, [&](auto x) { return x <= 1.0; });
-    parlay::sequence<T> append_seq(n - ran_seq.size());
-    size_t cnt = n + 1;
-    for (int i = 0; i < append_seq.size(); i++) {
-      auto r = gen[cnt++];
-      auto num = dis(r);
-      while (num > 1.0) {
-        r = gen[cnt++];
-        num = dis(r);
-      }
-      append_seq[i] = num;
-    }
-    return parlay::append(ran_seq, append_seq);
   }
 };
 
@@ -318,7 +289,8 @@ class Generator {
   }
 
   static std::pair<parlay::sequence<size_t>, parlay::sequence<size_t>>
-  Discreatize(auto base_ran_seq, auto batch_ran_seq, int batch_op) {
+  Discreatize(auto const& base_ran_seq, auto const& batch_ran_seq,
+              int batch_op) {
     auto base_flag_seq = parlay::map(base_ran_seq, [&](double x) {
       return std::make_tuple(x, bool(0), size_t(0));
     });
@@ -357,6 +329,7 @@ class Generator {
     auto base_ran_seq = BaseDisFunc::Generate(
         base_param, batch_op == 0 ? base_n : base_n - batch_n);
     auto batch_ran_seq = BatchDisFunc::Generate(batch_param, batch_n);
+    bucketize(base_ran_seq, 10);
     bucketize(batch_ran_seq, 10);
     auto [dis_base_seq, dis_batch_seq] = Discreatize(
         std::move(base_ran_seq), std::move(batch_ran_seq), batch_op);

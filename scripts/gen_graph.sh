@@ -11,8 +11,8 @@ batch_ratio_seq=(100)
 # file_num=1
 # batch_ratio_seq=(10000 1000 100 10)
 
-# dis_seq=(0 1 2)
-dis_seq=(3)
+dis_seq=(0 1 2 3)
+# dis_seq=(3)
 batch_op=(0 1)
 val_n=1
 
@@ -38,8 +38,6 @@ for base_n in "${base_n_seq[@]}"; do
 			elif [ "${dis}" -eq 2 ]; then #uni+normal
 				if [ "${base_n}" -lt 100000000 ]; then
 					batch_param="0.5,0.1"
-				elif [ "${base_n}" -lt 1000000000 ]; then
-					batch_param="0.5,0.2"
 				else
 					batch_param="0.5,0.2"
 				fi
@@ -47,9 +45,6 @@ for base_n in "${base_n_seq[@]}"; do
 				if [ "${base_n}" -lt 100000000 ]; then
 					base_param="0.25,0.15"
 					batch_param="0.75,0.15"
-				elif [ "${base_n}" -lt 1000000000 ]; then
-					base_param="0.25,0.25"
-					batch_param="0.75,0.25"
 				else
 					base_param="0.25,0.25"
 					batch_param="0.75,0.25"
