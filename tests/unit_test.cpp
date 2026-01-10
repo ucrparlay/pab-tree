@@ -20,7 +20,7 @@ class ParTreeCorrectTest : public ::testing::Test {
  protected:
   static constexpr char const* kDataPrefix = "/ssd1/zmen002/kv_pair";
   static constexpr int kTag = 0b0001;  // 2#0001
-  static constexpr double kBatchRatio = 1.0;
+  static constexpr double kBatchRatio = 0.01;
   static constexpr int kQueryType = 0b001;  // 2#001
   static constexpr int kTreeType = 0;
   static constexpr int kDim = 1;

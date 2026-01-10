@@ -584,7 +584,7 @@ void BatchDeleteByStep(Tree& pkd, parlay::sequence<Point> const& WP,
 //   check_box(n),
 //       skip_box(n);
 //
-//   double aveQuery = time_loop(
+//   double ave_query = time_loop(
 //       rounds, loopLate,
 //       [&]() { parlay::parallel_for(0, n, [&](size_t i) { bq[i].reset(); });
 //       },
@@ -608,7 +608,7 @@ void BatchDeleteByStep(Tree& pkd, parlay::sequence<Point> const& WP,
 //       },
 //       [&]() {});
 //
-//   std::cout << aveQuery << " " << std::flush;
+//   std::cout << ave_query << " " << std::flush;
 //   if (printHeight) {
 //     // WARN: change when using multi-node
 //     size_t max_deep = 0;
@@ -727,7 +727,7 @@ void RangeQuery(parlay::sequence<Point> const& wp, Tree& pkd, int const& rounds,
   parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num),
       gen_box(rec_num), full_box(rec_num), skip_box(rec_num);
 
-  double aveQuery = time_loop(
+  double ave_query = time_loop(
       rounds, 0.01, [&]() {},
       [&]() {
         parlay::parallel_for(0, rec_num, [&](size_t i) {
@@ -788,7 +788,7 @@ void RangeQuery(parlay::sequence<Point> const& wp, Tree& pkd, int const& rounds,
     }
   }
 
-  std::cout << aveQuery << "\n" << std::flush;
+  std::cout << ave_query << "\n" << std::flush;
   return;
 }
 
@@ -862,7 +862,7 @@ void rangeCountFix(Tree& pkd, Typename* kdknn, int const& rounds, int rec_type,
 //     DIM); parlay::sequence<size_t> visLeafNum(rec_num, 0),
 //     visInterNum(rec_num, 0); parlay::internal::timer t; for (int i = 0; i <
 //     rec_num; i++) {
-//         double aveQuery = time_loop(
+//         double ave_query = time_loop(
 //             rounds, -1.0,
 //             [&]() {
 //                 visInterNum[i] = 0;
@@ -872,7 +872,7 @@ void rangeCountFix(Tree& pkd, Typename* kdknn, int const& rounds, int rec_type,
 //             visLeafNum[i], visInterNum[i]); }, [&]() {});
 //         if (query_box_seq[i].second != kdknn[i]) std::cout << "wrong" <<
 //         std::endl; std::cout << query_box_seq[i].second << " " <<
-//         std::scientific << aveQuery
+//         std::scientific << ave_query
 //         << std::endl;
 //     }
 //
@@ -887,7 +887,7 @@ void Membership(Tree const& pkd, auto const& query_ele, int kRounds,
   int query_num = query_ele.size();
   parlay::sequence<size_t> vis_leaf(query_num), vis_inter(query_num);
 
-  double aveQuery = time_loop(
+  double ave_query = time_loop(
       kRounds, 0.01, [&]() {},
       [&]() {
         parlay::parallel_for(0, query_num, [&](size_t i) {
@@ -895,22 +895,23 @@ void Membership(Tree const& pkd, auto const& query_ele, int kRounds,
           auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
 
           res[i] = contain;
-          vis_leaf[i] = logger.vis_leaf_num;
-          vis_inter[i] = logger.vis_interior_num;
+          // vis_leaf[i] = logger.vis_leaf_num;
+          // vis_inter[i] = logger.vis_interior_num;
           // }
         });
       },
       [&]() {});
 
   // std::cout << query_num << " ";
-  std::cout << aveQuery << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, query_num))) /
-                   static_cast<double>(query_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(
-                   parlay::reduce(vis_inter.cut(0, query_num))) /
-                   static_cast<double>(query_num)
-            << " " << std::flush;
+  std::cout << ave_query << " " << std::flush;
+  // std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0,
+  // query_num))) /
+  //                  static_cast<double>(query_num)
+  //           << " " << std::flush;
+  // std::cout << static_cast<double>(
+  //                  parlay::reduce(vis_inter.cut(0, query_num))) /
+  //                  static_cast<double>(query_num)
+  //           << " " << std::flush;
   return;
 }
 
@@ -937,7 +938,7 @@ void rangeQueryFix(Tree& pkd, Typename* kdknn, int const& rounds,
   // using ref_t = std::reference_wrapper<Point>;
   // parlay::sequence<ref_t> out_ref( Out.size(), std::ref( Out[0] ) );
 
-  double aveQuery = time_loop(
+  double ave_query = time_loop(
       rounds, 0.01, [&]() {},
       [&]() {
         parlay::parallel_for(0, rec_num, [&](size_t i) {
@@ -954,7 +955,7 @@ void rangeQueryFix(Tree& pkd, Typename* kdknn, int const& rounds,
       },
       [&]() {});
 
-  std::cout << aveQuery << " " << std::flush;
+  std::cout << ave_query << " " << std::flush;
   std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, rec_num))) /
                    static_cast<double>(rec_num)
             << " " << std::flush;
@@ -1109,19 +1110,6 @@ void PrintTreeParam() {
   std::cout << "Tree: " << TreeWrapper::TreeType::GetTreeName() << "; ";
   std::cout << "Buf: " << static_cast<int>(TreeWrapper::TreeType::TT::kBuf)
             << "; ";
-  // << "AugType: " << TreeWrapper::TreeType::CheckHasBox() << "; "
-  // << "Split: " << TreeWrapper::SplitRule::GetSplitName() << "; "
-  // << "BDO: " << TreeWrapper::TreeType::GetBuildDepthOnce() << "; "
-  // << "Inba: " << TreeWrapper::TreeType::GetImbalanceRatio() << "; ";
-
-  // if constexpr (std::is_integral_v<typename TreeWrapper::Point::Coord>) {
-  //   std::cout << "Coord: integer"
-  //             << "; ";
-  // } else if (std::is_floating_point_v<typename TreeWrapper::Point::Coord>) {
-  //   std::cout << "Coord: float"
-  //             << "; ";
-  // }
-  std::cout << "\n" << std::flush;
   return;
 }
 
@@ -1145,6 +1133,7 @@ static auto constexpr DefaultTestFunc =
           parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01, 0.1};
           for (size_t i = 0; i < ratios.size(); i++) {
             auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratios[i]);
+            // std::cout << base_path << " " << batch_path << std::endl;
             auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
             auto [n2, d2] =
                 read_points<typename TT::E>(batch_path.c_str(), wi, n);
@@ -1153,6 +1142,7 @@ static auto constexpr DefaultTestFunc =
         } else {
           auto [base_path, batch_path] =
               opts.ParseInsertBatchPath(opts.batch_ratio);
+          // std::cout << base_path << " " << batch_path << std::endl;
           auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
           auto [n2, d2] =
               read_points<typename TT::E>(batch_path.c_str(), wi, n);
@@ -1484,7 +1474,7 @@ class Wrapper {
   }
 
   struct LeafAugEmpty {
-    LeafAugEmpty(){};
+    LeafAugEmpty() {};
 
     template <typename Slice>
     LeafAugEmpty(Slice In){};
@@ -1608,7 +1598,7 @@ class Wrapper {
 
   struct Options {
     Options(commandLine& params) {
-      this->dims = params.getOptionIntValue("-d", 1);
+      this->val_n = params.getOptionIntValue("-d", 1);
       this->input_file_path = std::string(params.getOptionValue("-p"));
       this->tag = params.getOptionIntValue("-t", 1);
       this->rounds = params.getOptionIntValue("-r", 3);
@@ -1616,6 +1606,19 @@ class Wrapper {
       this->summary = params.getOptionIntValue("-s", 0);
       this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
       this->tree_type = params.getOptionIntValue("-T", 0);
+      this->dis_type = params.getOptionIntValue("-D", 0);
+    }
+
+    void const PrintOptions() const {
+      std::cout << "InputFile: "
+                << std::filesystem::path(input_file_path).filename().string()
+                << "; ";
+      std::cout << "Dis: "
+                << (this->dis_type == 0   ? "uni"
+                    : this->dis_type == 1 ? "exp"
+                    : this->dis_type == 2 ? "norm"
+                                          : "dual_norm")
+                << "; ";
     }
 
     std::pair<std::string, std::string> ExtractPrefixes(
@@ -1659,7 +1662,7 @@ class Wrapper {
       auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
       std::string base_path =
           dir_prefix + "ins/" +
-          std::to_string(static_cast<size_t>(batch_ratio * 100)) + "/" +
+          std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
           file_prefix + ".base.in";
 
       std::string batch_path = base_path;
@@ -1682,14 +1685,15 @@ class Wrapper {
       return std::make_pair(base_path, batch_path);
     }
 
-    int dims;
+    int val_n;
     std::string input_file_path = "";
     int tag;
     int rounds;
     int query_type;
     bool summary;
-    double batch_ratio;
+    double batch_ratio;  // decides the default batch file path
     int tree_type;
+    int dis_type;
   };
 
   // NOTE: driven functions
@@ -1700,14 +1704,8 @@ class Wrapper {
     using EntrySeq = typename TT::EntrySeq;
 
     PrintTreeParam<TreeWrapper>();
-
-    // if (opts.input_file_path != "") {  // NOTE: read main Points
-    //   name = opts.input_file_path;
-    //   name = name.substr(name.rfind('/') + 1);
-    //   std::cout << name << " ";
-    //   auto [n, d] = read_points<E>(opts.input_file_path.c_str(), wp, 0);
-    //   opts.base_n = n;
-    // }
+    opts.PrintOptions();
+    std::cout << "\n" << std::flush;
 
     // Apply the test function
     test_func.template operator()<TreeWrapper, TT>(opts);

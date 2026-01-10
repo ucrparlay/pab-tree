@@ -22,6 +22,7 @@
 
 #pragma once
 #include "IO.h"
+#include "filesystem"
 #include "geometry.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
