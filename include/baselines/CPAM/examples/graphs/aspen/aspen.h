@@ -1,0 +1,10 @@
+#pragma once
+#pragma GCC diagnostic ignored "-Wsubobject-linkage"
+#include "api.h"
+#include "build.h"
+#include "cpam/cpam.h"
+#include "immutable_graph.h"
+#include "pam/pam.h"
+#include "traversable_graph.h"
+#include "utils.h"
+#include "versioned_graph.h"
