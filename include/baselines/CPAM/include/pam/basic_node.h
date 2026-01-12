@@ -1,5 +1,5 @@
 #pragma once
-#include "parlay/alloc.h"
+#include "../../../../parlaylib/include/parlay/alloc.h"
 
 using node_size_t = unsigned int;
 // using node_size_t = size_t;

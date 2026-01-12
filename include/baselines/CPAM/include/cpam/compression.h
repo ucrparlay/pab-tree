@@ -5,7 +5,7 @@
 #include <tuple>
 #include <type_traits>
 
-#include "parlay/primitives.h"
+#include "../../../../parlaylib/include/parlay/primitives.h"
 
 namespace cpam {
 

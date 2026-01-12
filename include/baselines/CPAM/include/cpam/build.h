@@ -1,6 +1,6 @@
 #pragma once
+#include "../../../../parlaylib/include/parlay/primitives.h"
 #include "get_time.h"
-#include "parlay/primitives.h"
 
 namespace cpam {
 

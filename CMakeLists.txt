@@ -94,9 +94,14 @@ target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 # add_executable(p_test ${PROJECT_SOURCE_DIR}/tests/p_test.cpp)
 # target_link_libraries(p_test PUBLIC PMOS)
 # target_include_directories(p_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
+add_library(cpam INTERFACE)
+set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/baselines/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/baselines/CPAM/include/pam")
+target_link_libraries(cpam INTERFACE parlay PMOS)
+target_include_directories(cpam INTERFACE $<BUILD_INTERFACE:${CPAM_INCLUDE_DIR}>
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}> ${PROJECT_SOURCE_DIR}/include/parlaylib/include)
 #
 add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
-target_link_libraries(baselines PUBLIC PMOS)
+target_link_libraries(baselines PUBLIC cpam)
 target_include_directories(baselines PUBLIC ${PROJECT_SOURCE_DIR}/include)
 #
 # add_executable(testers ${PROJECT_SOURCE_DIR}/tests/testers.cpp)
