@@ -1,9 +1,6 @@
 [submodule "include/parlaylib"]
 	path = include/parlaylib
 	url = https://github.com/cmuparlay/parlaylib
-[submodule "include/baselines/CPAM"]
-	path = include/baselines/CPAM
-	url = https://github.com/ParAlg/CPAM
 [submodule "external/googletest"]
 	path = external/googletest
 	url = https://github.com/google/googletest.git
