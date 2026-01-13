@@ -1542,24 +1542,9 @@ static auto constexpr DefaultTestFunc =
 class Wrapper
 {
 public:
-  // NOTE: determine the build depth once for the orth tree
-  static consteval uint8_t BTreeGetBuildDepthOnce(uint8_t const dim)
-  {
-    if (dim == 2 || dim == 3) {
-      return 6;
-    } else if (dim == 4) {
-      return 8;
-    } else if (dim >= 5 && dim <= 8) {
-      return dim;
-    } else {
-      static_assert("Cannot decide the build tree depth once for this dim");
-      return 0;
-    }
-  }
-
   struct LeafAugEmpty
   {
-    LeafAugEmpty() {};
+    LeafAugEmpty() = default;
 
     template<typename Slice>
     LeafAugEmpty(Slice In){};
@@ -1567,16 +1552,15 @@ public:
     template<typename Slice>
     void UpdateAug(Slice In)
     {
-      return;
     }
 
-    void Reset() { return; }
+    void Reset() {}
   };
 
   struct InteriorAugEmpty
   {
     InteriorAugEmpty() { force_par_indicator.reset(); }
-    InteriorAugEmpty(bool) { force_par_indicator.reset(); }
+    InteriorAugEmpty(bool /*flag*/) { force_par_indicator.reset(); }
 
     // use a bool to reload default constructor
     // template <typename Leaf, typename Interior>
@@ -1597,12 +1581,12 @@ public:
 
     void ResetParallelFlag() { this->force_par_indicator.reset(); }
 
-    bool GetParallelFlagIniStatus()
+    [[nodiscard]] bool GetParallelFlagIniStatus() const
     {
       return this->force_par_indicator.has_value();
     }
 
-    bool ForceParallel(size_t sz, size_t granularity) const
+    [[nodiscard]] bool ForceParallel(size_t sz, size_t granularity) const
     {
       return this->force_par_indicator.has_value()
                ? this->force_par_indicator.value()
