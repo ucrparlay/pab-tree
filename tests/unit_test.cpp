@@ -34,14 +34,15 @@ protected:
   std::vector<std::string> batch_ops{ "ins" };
 
   template<typename TT, typename TreeDesc>
-  void CheckCorrectness(Wrapper::Options opts)
+  static void CheckCorrectness(Wrapper::Options opts)
   {
     using Tree = TreeDesc::TreeType;
     using EntrySeq = typename TT::EntrySeq;
 
     Tree tree;
     constexpr bool kTestTime = false;
-    EntrySeq wp, wi;
+    EntrySeq wp;
+    EntrySeq wi;
 
     if (opts.tag & (1 << 0)) {
       auto [base_path, batch_path] =
@@ -66,7 +67,7 @@ protected:
     }
 
     if (opts.query_type & (1 << 0)) {
-      size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+      auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
@@ -76,7 +77,8 @@ protected:
     tree.DeleteTree();
   }
 
-  std::vector<std::string> FindBaseFiles(std::string const& files_path)
+  static auto FindBaseFiles(std::string const& files_path)
+    -> std::vector<std::string>
   {
     std::vector<std::string> base_files;
     if (!fs::exists(files_path)) {
@@ -94,7 +96,8 @@ protected:
     return base_files;
   }
 
-  void RunTest(std::string const& file_path, std::string const& distribution)
+  static void RunTest(std::string const& file_path,
+                      std::string const& distribution)
   {
     std::vector<char const*> argv = { "unit_test",
                                       "-p",
@@ -147,7 +150,7 @@ protected:
     std::cout.rdbuf(old_cout);
   }
 
-  void BTreeTest(std::string const& distribution, size_t node_size)
+  static void BTreeTest(std::string const& distribution, size_t node_size)
   {
     std::string files_path = std::string(kDataPrefix) + "/" + distribution +
                              "/" + std::to_string(node_size) + "_" +
@@ -263,7 +266,7 @@ main(int argc, char** argv)
   // Parse custom arguments
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg.rfind("--file_filter=", 0) == 0) {
+    if (arg.starts_with("--file_filter=")) {
       ParTreeCorrectTest::file_filter =
         arg.substr(14); // Length of "--file_filter="
       std::cout << "Filtering files containing: "

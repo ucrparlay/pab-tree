@@ -205,7 +205,7 @@ AllocEmptyLeafNode(typename Leaf::AT const& aug)
 
 // NOTE: multi-way node whose children # is fixed
 template<typename TypeTrait>
-struct MultiNode : TypeTrait::Node
+struct MultiWayNode : TypeTrait::Node
 {
   using TT = TypeTrait;
   using Node = TT::Node;
@@ -225,9 +225,9 @@ struct MultiNode : TypeTrait::Node
   using NodeArr = std::array<Node*, TT::kBufUB>;
   using SplitArr = std::array<typename TT::Split, TT::kBufUB>;
 
-  MultiNode(TT::NodeSeq const& _tree_nodes,
-            TT::SplitSeq const& _split,
-            TT::InteriorAug const& _aug)
+  MultiWayNode(TT::NodeSeq const& _tree_nodes,
+               TT::SplitSeq const& _split,
+               TT::InteriorAug const& _aug)
     : Node{ false,
             std::accumulate(
               _tree_nodes.begin(),
@@ -245,9 +245,9 @@ struct MultiNode : TypeTrait::Node
     }
   }
 
-  MultiNode(TT::NodeSlice _tree_nodes_slice,
-            TT::SplitSlice _split_slice,
-            TT::InteriorAug const& _aug)
+  MultiWayNode(TT::NodeSlice _tree_nodes_slice,
+               TT::SplitSlice _split_slice,
+               TT::InteriorAug const& _aug)
     : Node{ false,
             std::accumulate(
               _tree_nodes_slice.begin(),

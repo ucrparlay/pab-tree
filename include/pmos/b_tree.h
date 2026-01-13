@@ -126,10 +126,10 @@ public:
   }
 
   // PARA: interior node type
-  struct BTreeInteriorNode : MultiNode<TT>
+  struct BTreeInteriorNode : MultiWayNode<TT>
   {
     using TT = TT;
-    using BaseNode = MultiNode<TT>;
+    using BaseNode = MultiWayNode<TT>;
 
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split)
