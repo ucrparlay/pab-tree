@@ -109,10 +109,24 @@ public:
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
   using Interior = BTreeInteriorNode;
 
-  // NOTE: array based inner tree for batch insertion and deletion
-  template<typename Leaf, typename Interior>
-  struct InnerTree;
+  // NOTE: constructor and destructor
+  BTree() = default;
 
+  template<typename Range>
+  BTree(Range in)
+  {
+    this->Build(in);
+  }
+
+  template<typename Range>
+  BTree(Range const& in)
+  {
+    this->Build(in);
+  }
+
+  ~BTree() { this->DeleteTree(); }
+
+  // NOTE: helper function to decide the bucket number and range
   static auto GetBktNum(SizeT const item_n) -> SizeT
   {
     return item_n / TT::kBufMD;
@@ -129,14 +143,6 @@ public:
   {
     return (n * (i + 1)) / bkt_n;
   };
-
-  // static SizeT GetSplitRangeStIdx(SizeT const i, auto& split_pos_seq) {
-  //   return static_cast<SizeT>(i == 0 ? 0 : split_pos_seq[i - 1]);
-  // }
-  //
-  // static SizeT GetSplitRangeEndIdx(SizeT const i, auto& split_pos_seq) {
-  //   return static_cast<SizeT>(i == 0 ? 0 : split_pos_seq[i - 1]);
-  // }
 
   // NOTE: build tree
   template<typename Range>

@@ -109,7 +109,6 @@ struct LeafNode : TypeTrait::Node
   void InitializeEleSeq()
   {
     this->elements = EntrySeq::uninitialized(TT::kBufUB);
-    return;
   }
 
   AT& GetAug() const { return aug; }

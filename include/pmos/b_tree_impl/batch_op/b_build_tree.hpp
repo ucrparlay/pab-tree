@@ -24,7 +24,7 @@ BTree<TT>::Build(Range&& In)
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
-  EntrySlice A = parlay::make_slice(In);
+  EntrySlice A = parlay::make_slice(std::forward<Range>(In));
   Build_(A);
 }
 
@@ -35,7 +35,6 @@ BTree<TT>::Build_(EntrySlice In)
   auto sort_seq = parlay::sort(In); // TODO: more optimization within sort
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
-  return;
 }
 
 template<typename TT>

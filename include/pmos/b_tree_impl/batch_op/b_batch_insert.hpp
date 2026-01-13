@@ -20,7 +20,7 @@ BTree<TT>::BatchInsert(Range&& In)
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
-  EntrySlice A = parlay::make_slice(In);
+  EntrySlice A = parlay::make_slice(std::forward<Range>(In));
   BatchInsert_(A);
 }
 
