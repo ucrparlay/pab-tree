@@ -63,12 +63,73 @@ public:
   // NOTE: tree structure
   static constexpr uint_fast16_t const kSerialBuildCutoff = 512;
 
+  // NOTE: constructor and destructor
+  BTree() = default;
+
+  template<typename Range>
+  BTree(Range in)
+  {
+    this->Build(in);
+  }
+
+  template<typename Range>
+  BTree(Range const& in)
+  {
+    this->Build(in);
+  }
+
+  // copy constructor
+  // copy @other
+  BTree(const BTree& other)
+    : root_(other.root_ ? this->CopyTreeRecursive(other.root_) : nullptr)
+  {
+  }
+
+  // copy assignment operator
+  // copy @other, will launch a deep copy
+  BTree& operator=(const BTree& other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+
+    this->DeleteTree(); // delete current tree
+    this->root_ = other.root_ ? this->CopyTreeRecursive(other.root_) : nullptr;
+    return *this;
+  }
+
+  // move constructor
+  BTree(BTree&& other) noexcept
+    : root_(other.root_)
+  {
+    other.root_ = nullptr;
+  }
+
+  // move assignment operator
+  BTree& operator=(BTree&& other) noexcept
+  {
+    if (this == &other) {
+      return *this;
+    }
+
+    this->DeleteTree();        // delete current tree
+    this->root_ = other.root_; // steal
+    other.root_ = nullptr;
+
+    return *this;
+  }
+
+  // destructor
+  ~BTree()
+  {
+    this->DeleteTree();
+  }
+
+  // PARA: interior node type
   struct BTreeInteriorNode : MultiNode<TT>
   {
     using TT = TT;
     using BaseNode = MultiNode<TT>;
-    // using BTreeNodeArr = typename BaseNode::NodeArr;
-    // using BTreeNodeArrSlice = typename BaseNode::NodeArrSlice;
 
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split)
@@ -89,9 +150,15 @@ public:
     {
     }
 
-    void SetParallelFlag(bool const flag) { this->aug.SetParallelFlag(flag); }
+    void SetParallelFlag(bool const flag)
+    {
+      this->aug.SetParallelFlag(flag);
+    }
 
-    void ResetParallelFlag() { this->aug.ResetParallelFlag(); }
+    void ResetParallelFlag()
+    {
+      this->aug.ResetParallelFlag();
+    }
 
     auto GetParallelFlagIniStatus() -> bool
     {
@@ -103,43 +170,27 @@ public:
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
-    auto UpdateAug() { return this->aug.Update(); }
+    auto UpdateAug()
+    {
+      return this->aug.Update();
+    }
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
   using Interior = BTreeInteriorNode;
 
-  // NOTE: constructor and destructor
-  BTree() = default;
-
-  template<typename Range>
-  BTree(Range in)
-  {
-    this->Build(in);
-  }
-
-  template<typename Range>
-  BTree(Range const& in)
-  {
-    this->Build(in);
-  }
-
-  ~BTree() { this->DeleteTree(); }
-
   // NOTE: helper function to decide the bucket number and range
-  static auto GetBktNum(SizeT const item_n) -> SizeT
+  static SizeT GetBktNum(SizeT const item_n)
   {
     return item_n / TT::kBufMD;
   }
 
-  static auto GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
-    -> SizeT
+  static SizeT GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
   {
     return (n * i) / bkt_n;
   };
 
-  static auto GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
-    -> SizeT
+  static SizeT GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
   {
     return (n * (i + 1)) / bkt_n;
   };
@@ -283,6 +334,8 @@ public:
   // template <SupportsForceParallel Interior, bool granularity>
   template<bool granularity>
   inline static bool ForceParallelRecursion(Interior const* T);
+
+  Node* CopyTreeRecursive(Node* T);
 
   void DeleteTree();
 
@@ -497,9 +550,15 @@ public:
   // // NOTE: param interfaces
   // void SetRoot(Node* root) { this->root_ = root; }
   //
-  Node* GetRoot() { return this->root_; }
+  Node* GetRoot()
+  {
+    return this->root_;
+  }
 
-  size_t GetSize() { return this->root_ ? this->root_->size : 0; }
+  size_t GetSize()
+  {
+    return this->root_ ? this->root_->size : 0;
+  }
   //
   // Box GetRootBox() { return this->tree_box_; }
   //
@@ -507,7 +566,10 @@ public:
   //   return static_cast<int>(kBuildDepthOnce);
   // }
 
-  constexpr static char const* GetTreeName() { return "BTree"; }
+  constexpr static char const* GetTreeName()
+  {
+    return "BTree";
+  }
 
 private:
   Node* root_ = nullptr;
