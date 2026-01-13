@@ -94,7 +94,7 @@ protected:
     return base_files;
   }
 
-  void RunTest(std::string const& file_path)
+  void RunTest(std::string const& file_path, std::string const& distribution)
   {
     std::vector<char const*> argv = { "unit_test",
                                       "-p",
@@ -112,14 +112,16 @@ protected:
                                       "-q",
                                       std::to_string(kQueryType).c_str(),
                                       "-b",
-                                      std::to_string(kBatchRatio).c_str() };
+                                      std::to_string(kBatchRatio).c_str(),
+                                      "-D",
+                                      distribution.c_str() };
 
     // Print the command being executed
     std::cout << "Running: b_ccp";
     for (size_t i = 1; i < argv.size(); i++) {
       std::cout << " " << argv[i];
     }
-    std::cout << std::flush << std::endl;
+    std::cout << std::flush << "\n";
 
     std::vector<char*> argv_mutable;
     for (char const* arg : argv) {
@@ -147,10 +149,10 @@ protected:
 
   void BTreeTest(std::string const& distribution, size_t node_size)
   {
-    std::string files_path =
-      std::string(kDataPrefix) + "/" + distribution + "/" +
-      std::to_string(node_size) + "_" + std::to_string(kDim) + "/ins/" +
-      std::to_string(static_cast<int>(kBatchRatio * 100));
+    std::string files_path = std::string(kDataPrefix) + "/" + distribution +
+                             "/" + std::to_string(node_size) + "_" +
+                             std::to_string(kDim) + "/ins/" +
+                             std::to_string(static_cast<int>(1 / kBatchRatio));
     auto base_files = FindBaseFiles(files_path);
 
     if (base_files.empty()) {
@@ -173,7 +175,7 @@ protected:
 
     for (auto const& file : base_files) {
       SCOPED_TRACE("Testing file: " + file);
-      EXPECT_NO_THROW(RunTest(file));
+      EXPECT_NO_THROW(RunTest(file, distribution));
     }
   }
 };
