@@ -9,12 +9,18 @@
 //   SPAA 2016
 // *******************************************
 
-struct red_black_tree {
-  typedef enum { RED, BLACK } Color;
+struct red_black_tree
+{
+  typedef enum
+  {
+    RED,
+    BLACK
+  } Color;
   // static const unsigned char RED = 0;
   // static const unsigned char BLACK = 1;
 
-  struct data {
+  struct data
+  {
     unsigned char height;
     Color color;
   };
@@ -24,19 +30,22 @@ struct red_black_tree {
   // defines: node_join, is_balanced
   // redefines: update, single
   // inherits: make_node
-  template <class Node>
-  struct balance : Node {
+  template<class Node>
+  struct balance : Node
+  {
     using node = typename Node::node;
     using t_utils = balance_utils<balance>;
     using ET = typename Node::ET;
     using GC = gc<balance>;
 
-    static bool is_balanced(node* t) {
+    static bool is_balanced(node* t)
+    {
       // return (!t ||
       // (((t->color == BLACK) ||
       // (color(t->lc) == BLACK && color(t->rc) == BLACK))
       // && (height(t->lc) == height(t->rc))));
-      if (!t) return true;
+      if (!t)
+        return true;
       bool f = true;
       if (!((t->color == BLACK) ||
             (color(t->lc) == BLACK && color(t->rc) == BLACK))) {
@@ -52,19 +61,22 @@ struct red_black_tree {
       return f;
     }
 
-    static void update(node* t) {
+    static void update(node* t)
+    {
       Node::update(t);
       t->height = height(t->lc) + (t->color == BLACK);
     }
 
-    static node* make_node(ET e) {
+    static node* make_node(ET e)
+    {
       node* o = Node::make_node(e);
       o->height = 2;
       o->color = BLACK;
       return o;
     }
 
-    static node* single(ET e) {
+    static node* single(ET e)
+    {
       node* o = Node::single(e);
       o->height = 2;
       o->color = BLACK;
@@ -72,7 +84,8 @@ struct red_black_tree {
     }
 
     // main function
-    static node* node_join(node* t1, node* t2, node* k) {
+    static node* node_join(node* t1, node* t2, node* k)
+    {
       // right join
       if (height(t1) > height(t2)) {
         node* t = right_join(t1, t2, k);
@@ -117,13 +130,14 @@ struct red_black_tree {
       return balanced_join(t1, t2, k, BLACK);
     }
 
-   private:
+  private:
     static int height(node* a) { return (a == NULL) ? 1 : a->height; }
 
     static int color(node* a) { return (a == NULL) ? BLACK : a->color; }
 
     // a version without rotation
-    static node* balanced_join(node* l, node* r, node* e, Color color) {
+    static node* balanced_join(node* l, node* r, node* e, Color color)
+    {
       e->color = color;
       e->lc = l;
       e->rc = r;
@@ -131,7 +145,8 @@ struct red_black_tree {
       return e;
     }
 
-    static node* right_join(node* t1, node* t2, node* k) {
+    static node* right_join(node* t1, node* t2, node* k)
+    {
       // if (!t1) {
       // if (!t2) std::cout << "null and null" << std::endl; else {
       // std::cout << "null and non-null" << std::endl;
@@ -154,7 +169,8 @@ struct red_black_tree {
       return t;
     }
 
-    static node* left_join(node* t1, node* t2, node* k) {
+    static node* left_join(node* t1, node* t2, node* k)
+    {
       // if (!t2) {
       // if (!t1) std::cout << "null and null" << std::endl; else {
       // std::cout << "null and non-null" << std::endl;

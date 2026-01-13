@@ -13,12 +13,14 @@
 #include "parlay/primitives.h"
 
 namespace pmos {
-template <typename TT>
-template <typename Range>
-void BTree<TT>::Build(Range&& In) {
+template<typename TT>
+template<typename Range>
+void
+BTree<TT>::Build(Range&& In)
+{
   static_assert(parlay::is_random_access_range_v<Range>);
   static_assert(
-      parlay::is_less_than_comparable_v<parlay::range_reference_type_t<Range>>);
+    parlay::is_less_than_comparable_v<parlay::range_reference_type_t<Range>>);
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
@@ -26,16 +28,20 @@ void BTree<TT>::Build(Range&& In) {
   Build_(A);
 }
 
-template <typename TT>
-void BTree<TT>::Build_(EntrySlice In) {
-  auto sort_seq = parlay::sort(In);  // TODO: more optimization within sort
+template<typename TT>
+void
+BTree<TT>::Build_(EntrySlice In)
+{
+  auto sort_seq = parlay::sort(In); // TODO: more optimization within sort
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
   return;
 }
 
-template <typename TT>
-TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
+template<typename TT>
+TT::Node*
+BTree<TT>::BuildRecursive(EntrySlice In)
+{
   if (In.size() == 0) {
     return AllocEmptyLeafNode<EntrySlice, Leaf>();
   }
@@ -45,16 +51,16 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
   }
 
   auto tree_node_seq_in =
-      parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
+    parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
   auto tree_node_seq_out =
-      parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
+    parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
   auto node_in = parlay::make_slice(tree_node_seq_in);
   auto node_out = parlay::make_slice(tree_node_seq_out);
 
   auto key_seq_in = parlay::sequence<typename TT::K>::uninitialized(
-      (In.size() / TT::kBufMD) + 1);
+    (In.size() / TT::kBufMD) + 1);
   auto key_seq_out = parlay::sequence<typename TT::K>::uninitialized(
-      (In.size() / TT::kBufMD) + 1);
+    (In.size() / TT::kBufMD) + 1);
   auto key_in = parlay::make_slice(key_seq_in);
   auto key_out = parlay::make_slice(key_seq_out);
 
@@ -69,19 +75,21 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
 
   // NOTE: build leaf
   SizeT bkt_n = GenerateLeafNodes(
-      In, GenNodesOutputHandler{
-              .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
-              .set_node = [&](SizeT i, auto node) { node_out[i] = node; }});
+    In,
+    GenNodesOutputHandler{
+      .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
+      .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
   swap_key_node(bkt_n);
   assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
 
   // NOTE: build Interior
   while (node_in.size() >= TT::kBufUB) {
     SizeT interior_bkt_n = GenerateInteriorNodes(
-        node_in, key_in,
-        GenNodesOutputHandler{
-            .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
-            .set_node = [&](SizeT i, auto node) { node_out[i] = node; }});
+      node_in,
+      key_in,
+      GenNodesOutputHandler{
+        .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
+        .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
     swap_key_node(interior_bkt_n);
     assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
   }
@@ -90,6 +98,6 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
   return this->root_;
 }
 
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
+#endif // PMOS_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_

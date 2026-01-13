@@ -9,8 +9,9 @@
 
 namespace cpam {
 
-template <class Seq, class EntryT>
-struct map_ops : Seq {
+template<class Seq, class EntryT>
+struct map_ops : Seq
+{
   using Entry = EntryT;
   using node = typename Seq::node;
   using regular_node = typename Seq::regular_node;
@@ -30,7 +31,8 @@ struct map_ops : Seq {
   // static K get_key(node *s) { return Entry::get_key(Seq::get_entry(s));}
   // static V get_val(node *s) { return Entry::get_val(Seq::get_entry(s));}
 
-  static std::optional<ET> find_compressed(ptr b, K const& key) {
+  static std::optional<ET> find_compressed(ptr b, K const& key)
+  {
     std::optional<ET> ret;
     auto find_f = [&](const ET& et) {
       if (!(Entry::comp(key, Entry::get_key(et)) ||
@@ -43,8 +45,10 @@ struct map_ops : Seq {
     return ret;
   }
 
-  static std::optional<ET> find(ptr b, K const& key) {
-    if (b.empty()) return {};
+  static std::optional<ET> find(ptr b, K const& key)
+  {
+    if (b.empty())
+      return {};
     if (b.is_compressed()) {
       return find_compressed(std::move(b), key);
     }
@@ -55,13 +59,14 @@ struct map_ops : Seq {
     } else if (Entry::comp(Entry::get_key(e), key)) {
       ret = find(std::move(rc), key);
     } else {
-      ret = {e};
+      ret = { e };
     }
     GC::decrement(m);
     return ret;
   }
 
-  static std::optional<ET> find_compressed2(node* b, K const& key) {
+  static std::optional<ET> find_compressed2(node* b, K const& key)
+  {
     std::optional<ET> ret;
     auto find_f = [&](const ET& et) -> bool {
       if (!(Entry::comp(key, Entry::get_key(et)) ||
@@ -75,8 +80,10 @@ struct map_ops : Seq {
     return ret;
   }
 
-  static std::optional<ET> find2(node* b, K const& key) {
-    if (!b) return {};
+  static std::optional<ET> find2(node* b, K const& key)
+  {
+    if (!b)
+      return {};
     // if (Seq::is_compressed(b)) return find_compressed2(b, key);
     auto f = [&](const ET& et) { return Entry::get_key(et); };
     if (Seq::is_compressed(b))
@@ -88,11 +95,12 @@ struct map_ops : Seq {
     else if (Entry::comp(Entry::get_key(e), key))
       return find2(rc, key);
     else
-      return {e};
+      return { e };
   }
 
-  template <class BinaryOp>
-  static inline void update_value(regular_node* a, BinaryOp const& op) {
+  template<class BinaryOp>
+  static inline void update_value(regular_node* a, BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     Entry::set_val(re, op(re));
     Seq::set_entry(a, re);
@@ -117,8 +125,10 @@ struct map_ops : Seq {
   //    return r;
   //  }
 
-  static size_t rank(node* b, K const& key, size_t sum = 0) {
-    if (!b) return sum;
+  static size_t rank(node* b, K const& key, size_t sum = 0)
+  {
+    if (!b)
+      return sum;
     if (Seq::is_compressed(b)) {
       auto fn = [&](auto const& et) {
         if (Entry::comp(Entry::get_key(et), key)) {
@@ -131,22 +141,27 @@ struct map_ops : Seq {
     auto rb = Seq::cast_to_regular(b);
     if (Entry::comp(get_key(rb), key)) {
       return rank(rb->rc, key, sum + Seq::size(rb->lc) + 1);
-    } else if (!Entry::comp(key, get_key(rb))) {  // equal
-      return sum + Seq::size(rb->lc);             // +1?
+    } else if (!Entry::comp(key, get_key(rb))) { // equal
+      return sum + Seq::size(rb->lc);            // +1?
     }
     return rank(rb->lc, key, sum);
   }
 
-  struct split_info {
+  struct split_info
+  {
     node* l;
     std::optional<ET> mid;
     node* r;
     split_info(node* l, std::optional<ET> mid, node* r)
-        : l(l), mid(mid), r(r) {};
+      : l(l)
+      , mid(mid)
+      , r(r) {};
   };
 
-  static split_info split(ptr a, K const& k) {
-    if (a.empty()) return split_info(NULL, std::nullopt, NULL);
+  static split_info split(ptr a, K const& k)
+  {
+    if (a.empty())
+      return split_info(NULL, std::nullopt, NULL);
     auto [lc, e, rc, m] = Seq::expose(std::move(a));
     K const& kmid = Entry::get_key(e);
 
@@ -224,9 +239,12 @@ struct map_ops : Seq {
   //    return split_inplace(bst, e);
   //  }
 
-  template <class BinaryOp>
-  static inline void combine_values(ET& re, ET e, bool reverse,
-                                    BinaryOp const& op) {
+  template<class BinaryOp>
+  static inline void combine_values(ET& re,
+                                    ET e,
+                                    bool reverse,
+                                    BinaryOp const& op)
+  {
     if (reverse)
       Entry::set_val(re, op(Entry::get_val(e), Entry::get_val(re)));
     else
@@ -235,9 +253,12 @@ struct map_ops : Seq {
 
   // a is the root, e is the new (incoming value), rev=false
   // combine(old, new)
-  template <class BinaryOp>
-  static inline void combine_values(node* a, ET e, bool reverse,
-                                    BinaryOp const& op) {
+  template<class BinaryOp>
+  static inline void combine_values(node* a,
+                                    ET e,
+                                    bool reverse,
+                                    BinaryOp const& op)
+  {
     //    ET& re = Seq::get_entry(a);
     //    combine_values(re, e, reverse, op);
     ET re = Seq::get_entry(a);
@@ -250,39 +271,47 @@ struct map_ops : Seq {
 
   // Value-based version of combine. No reverse on this one for some
   // reason.
-  template <class VE, class BinaryOp>
-  static inline void combine_values_v(node* a, VE v0, BinaryOp const& op) {
+  template<class VE, class BinaryOp>
+  static inline void combine_values_v(node* a, VE v0, BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     Entry::set_val(re, op(Entry::get_val(re), v0));
     Seq::set_entry(a, re);
   }
 
-  template <class VE, class BinaryOp>
-  static inline void update_valuev(node* a, VE v0, BinaryOp const& op) {
+  template<class VE, class BinaryOp>
+  static inline void update_valuev(node* a, VE v0, BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     Entry::set_val(re, op(Entry::get_val(re), v0));
     Seq::set_entry(a, re);
   }
 
   // valid only if key type is printable
-  static void output_r(node* t) {
-    if (!t) return;
+  static void output_r(node* t)
+  {
+    if (!t)
+      return;
     output_r(t->lc);
     std::cout << get_key(t) << " ";
     output_r(t->rc);
   }
 
   // valid only if key type is printable
-  static void output(node* t) {
+  static void output(node* t)
+  {
     output_r(t);
     std::cout << std::endl;
   }
 
   // reuses node
-  template <class BinaryOp>
-  static node* uniont(ptr b1, ptr b2, BinaryOp const& op) {
-    if (b1.empty()) return b2.node_ptr();
-    if (b2.empty()) return b1.node_ptr();
+  template<class BinaryOp>
+  static node* uniont(ptr b1, ptr b2, BinaryOp const& op)
+  {
+    if (b1.empty())
+      return b2.node_ptr();
+    if (b2.empty())
+      return b1.node_ptr();
 
     size_t n1 = b1.size(), n2 = b2.size();
     if (n1 + n2 <= kBaseCaseSize) {
@@ -290,7 +319,8 @@ struct map_ops : Seq {
     }
 
     auto [l2, e, r2, m2] = Seq::expose(std::move(b2));
-    if (!m2) m2 = Seq::single(e);
+    if (!m2)
+      m2 = Seq::single(e);
 
     auto sp1 = split(std::move(b1), Entry::get_key(e));
 #ifdef DEBUG
@@ -299,22 +329,26 @@ struct map_ops : Seq {
 #endif
 
     auto [l, r] = utils::fork<node*>(
-        Seq::do_parallel(n1, n2),
-        [&]() { return uniont(sp1.l, std::move(l2), op); },
-        [&]() { return uniont(sp1.r, std::move(r2), op); });
+      Seq::do_parallel(n1, n2),
+      [&]() { return uniont(sp1.l, std::move(l2), op); },
+      [&]() { return uniont(sp1.r, std::move(r2), op); });
 #ifdef DEBUG
     Seq::check_structure(l);
     Seq::check_structure(r);
 #endif
 
-    if (sp1.mid) combine_values(m2, *sp1.mid, true, op);
+    if (sp1.mid)
+      combine_values(m2, *sp1.mid, true, op);
     return Seq::node_join(l, r, m2);
   }
 
-  template <class Seq1, class Seq2, class BinaryOp>
-  static node* intersect(typename Seq1::node* b1, typename Seq2::ptr b2,
-                         BinaryOp const& op) {
-    if (!b1) return NULL;
+  template<class Seq1, class Seq2, class BinaryOp>
+  static node* intersect(typename Seq1::node* b1,
+                         typename Seq2::ptr b2,
+                         BinaryOp const& op)
+  {
+    if (!b1)
+      return NULL;
     if (b2.empty()) {
       Seq1::GC::decrement_recursive(b1);
       return NULL;
@@ -324,8 +358,8 @@ struct map_ops : Seq {
     size_t n2 = b2.size();
 
     if (n1 + n2 <= kBaseCaseSize) {
-      return intersect_bc<Seq1, Seq2, BinaryOp>(std::move(b1), std::move(b2),
-                                                op);
+      return intersect_bc<Seq1, Seq2, BinaryOp>(
+        std::move(b1), std::move(b2), op);
     }
 
     auto [l2, e2, r2, m2] = Seq2::expose(std::move(b2));
@@ -338,9 +372,9 @@ struct map_ops : Seq {
 #endif
 
     auto [l, r] = utils::fork<node*>(
-        Seq::do_parallel(n1, n2),
-        [&]() { return intersect<Seq1, Seq2>(sp1.l, std::move(l2), op); },
-        [&]() { return intersect<Seq1, Seq2>(sp1.r, std::move(r2), op); });
+      Seq::do_parallel(n1, n2),
+      [&]() { return intersect<Seq1, Seq2>(sp1.l, std::move(l2), op); },
+      [&]() { return intersect<Seq1, Seq2>(sp1.r, std::move(r2), op); });
 
 #ifdef DEBUG
     Seq::check_structure(l);
@@ -355,12 +389,14 @@ struct map_ops : Seq {
       return Seq::join2(l, r);
   }
 
-  static node* difference(ptr b1, node* b2) {
+  static node* difference(ptr b1, node* b2)
+  {
     if (b1.empty()) {
       GC::decrement_recursive(b2);
       return NULL;
     }
-    if (!b2) return b1.node_ptr();
+    if (!b2)
+      return b1.node_ptr();
 
     size_t n1 = b1.size(), n2 = Seq::size(b2);
     if (n1 + n2 <= kBaseCaseSize) {
@@ -371,22 +407,25 @@ struct map_ops : Seq {
     auto sp2 = split(b2, Entry::get_key(e));
 
     auto [l, r] = utils::fork<node*>(
-        Seq::do_parallel(n1, n2),
-        [&]() { return difference(std::move(l1), sp2.l); },
-        [&]() { return difference(std::move(r1), sp2.r); });
+      Seq::do_parallel(n1, n2),
+      [&]() { return difference(std::move(l1), sp2.l); },
+      [&]() { return difference(std::move(r1), sp2.r); });
 
     if (sp2.mid) {
       GC::decrement(m1);
       return Seq::join2(l, r);
     } else {
-      if (!m1) m1 = Seq::single(e);
+      if (!m1)
+        m1 = Seq::single(e);
       return Seq::node_join(l, r, m1);
     }
   }
 
   // TODO: this seems inefficient.
-  static node* range_root(ptr b, K const& key_left, K const& key_right) {
-    if (b.empty()) return NULL;
+  static node* range_root(ptr b, K const& key_left, K const& key_right)
+  {
+    if (b.empty())
+      return NULL;
     if (b.is_compressed()) {
       return b.node_ptr();
     }
@@ -405,8 +444,10 @@ struct map_ops : Seq {
     return b.node_ptr();
   }
 
-  static node* range_root_2(node* b, K const& key_left, K const& key_right) {
-    if (!b) return NULL;
+  static node* range_root_2(node* b, K const& key_left, K const& key_right)
+  {
+    if (!b)
+      return NULL;
     if (Seq::is_compressed(b)) {
       return b;
     }
@@ -420,8 +461,9 @@ struct map_ops : Seq {
     return b;
   }
 
-  template <class F>
-  static node* comp_bc(ptr b, F& f) {
+  template<class F>
+  static node* comp_bc(ptr b, F& f)
+  {
     auto r = b.node_ptr();
 
     ET stack[2 * B];
@@ -442,8 +484,10 @@ struct map_ops : Seq {
     }
   }
 
-  static node* left(ptr b, K const& e) {
-    if (b.empty()) return NULL;
+  static node* left(ptr b, K const& e)
+  {
+    if (b.empty())
+      return NULL;
     if (b.is_compressed()) {
       auto comp = [&](K const& k) { return k <= e; };
       return comp_bc(std::move(b), comp);
@@ -457,8 +501,10 @@ struct map_ops : Seq {
     return Seq::join(lc.node_ptr(), b_e, left(std::move(rc), e), m);
   }
 
-  static node* left_2(node* b, K const& e) {
-    if (!b) return NULL;
+  static node* left_2(node* b, K const& e)
+  {
+    if (!b)
+      return NULL;
     if (Seq::is_compressed(b)) {
       auto comp = [&](K const& k) { return k <= e; };
       return comp_bc(b, comp);
@@ -472,8 +518,10 @@ struct map_ops : Seq {
     return Seq::join(lc, b_e, left_2(rc, e), nullptr);
   }
 
-  static node* right(ptr b, K const& e) {
-    if (b.empty()) return NULL;
+  static node* right(ptr b, K const& e)
+  {
+    if (b.empty())
+      return NULL;
     if (b.is_compressed()) {
       auto comp = [&](K const& k) { return e <= k; };
       return comp_bc(std::move(b), comp);
@@ -489,8 +537,10 @@ struct map_ops : Seq {
 
   // TODO: get rid of right() and replace with right_2(). Ditto with
   // left() and range() (and their _2 counterparts).
-  static node* right_2(node* b, K const& e) {
-    if (!b) return NULL;
+  static node* right_2(node* b, K const& e)
+  {
+    if (!b)
+      return NULL;
     if (Seq::is_compressed(b)) {
       auto comp = [&](K const& k) { return e <= k; };
       return comp_bc(b, comp);
@@ -504,9 +554,11 @@ struct map_ops : Seq {
     return Seq::join(right_2(lc, e), b_e, rc, nullptr);
   }
 
-  static node* range(ptr b, K const& low, K const& high) {
+  static node* range(ptr b, K const& low, K const& high)
+  {
     node* r = range_root(std::move(b), low, high);
-    if (!r) return NULL;
+    if (!r)
+      return NULL;
     if (Seq::is_compressed(r)) {
       // Build tree only on elements in the range in the leaf.
       auto comp = [&](K const& k) { return low <= k && k <= high; };
@@ -516,17 +568,19 @@ struct map_ops : Seq {
       regular_node* root = Seq::single(Seq::get_entry(r));
       auto lc = rr->lc;
       auto rc = rr->rc;
-      auto ret = Seq::node_join(right(ptr(lc, true), low),
-                                left(ptr(rc, true), high), root);
+      auto ret = Seq::node_join(
+        right(ptr(lc, true), low), left(ptr(rc, true), high), root);
 
       GC::decrement_recursive(r);
       return ret;
     }
   }
 
-  static node* range_2(node* b, K const& low, K const& high) {
+  static node* range_2(node* b, K const& low, K const& high)
+  {
     node* r = range_root_2(b, low, high);
-    if (!r) return NULL;
+    if (!r)
+      return NULL;
     if (Seq::is_compressed(r)) {
       // Build tree only on elements in the range in the leaf.
       auto comp = [&](K const& k) { return low <= k && k <= high; };
@@ -539,24 +593,26 @@ struct map_ops : Seq {
 
   // TODO: move both of the following fns to a better location.
   // templatized version of inc_if
-  template <bool copy = false>
-  static node* inc_tmpl(node* x) {
+  template<bool copy = false>
+  static node* inc_tmpl(node* x)
+  {
     if constexpr (copy) {
       GC::increment(x);
     }
     return x;
   }
-  template <bool copy = false>
-  static regular_node* make_node_tmpl(regular_node* x) {
+  template<bool copy = false>
+  static regular_node* make_node_tmpl(regular_node* x)
+  {
     if constexpr (copy) {
       return Seq::make_regular_node(Seq::get_entry(x));
     }
     return x;
   }
 
-  template <class Func, class J>
-  static node* insert_compressed(compressed_node* b, const ET& e,
-                                 Func const& f) {
+  template<class Func, class J>
+  static node* insert_compressed(compressed_node* b, const ET& e, Func const& f)
+  {
     ET arr[2 * B + 1];
     Seq::compressed_node_elms(b, arr);
     size_t n = Seq::size(b);
@@ -573,7 +629,7 @@ struct map_ops : Seq {
         parlay::assign_uninitialized(merged[out_off++], e);
         placed = true;
         break;
-      } else {  // arr[k] == key
+      } else { // arr[k] == key
         parlay::assign_uninitialized(merged[out_off], arr[k++]);
         combine_values(merged[out_off], e, true, f);
         out_off++;
@@ -590,8 +646,9 @@ struct map_ops : Seq {
     return Seq::make_compressed(merged, out_off);
   }
 
-  template <class Func>
-  static node* insert_compressed2(node* b, const ET& e, Func const& f) {
+  template<class Func>
+  static node* insert_compressed2(node* b, const ET& e, Func const& f)
+  {
     ET merged[2 * B + 1];
 
     K key = Entry::get_key(e);
@@ -605,7 +662,7 @@ struct map_ops : Seq {
           parlay::assign_uninitialized(merged[out_off++], e);
           parlay::assign_uninitialized(merged[out_off++], et);
           placed = true;
-        } else {  // get_key(et) == key
+        } else { // get_key(et) == key
           parlay::assign_uninitialized(merged[out_off], et);
           combine_values(merged[out_off], e, true, f);
           out_off++;
@@ -624,9 +681,11 @@ struct map_ops : Seq {
 
   // A specialized version of insert that will switch to the version with
   // copy=true once it hits a node with ref_cnt(node) > 1.
-  template <class Func, class J, bool copy = false>
-  static node* insert_tmpl(node* b, const ET& e, Func const& f, J const& join) {
-    if (!b) return Seq::single(e);
+  template<class Func, class J, bool copy = false>
+  static node* insert_tmpl(node* b, const ET& e, Func const& f, J const& join)
+  {
+    if (!b)
+      return Seq::single(e);
 
     if constexpr (!copy) {
       if (Seq::ref_cnt(b) > 1) {
@@ -659,8 +718,9 @@ struct map_ops : Seq {
     }
   }
 
-  template <class Func>
-  static node* insert(node* b, const ET& e, Func const& f) {
+  template<class Func>
+  static node* insert(node* b, const ET& e, Func const& f)
+  {
     auto join = [](node* l, node* r, regular_node* m) {
       auto ret = Seq::node_join(l, r, m);
       return ret;
@@ -696,7 +756,8 @@ struct map_ops : Seq {
   //    return Seq::make_compressed(merged, out_off);
   //  }
 
-  static node* remove_compressed2(node* nb, K const& key) {
+  static node* remove_compressed2(node* nb, K const& key)
+  {
     auto b = Seq::cast_to_compressed(nb);
     ET merged[2 * B];
 
@@ -708,7 +769,7 @@ struct map_ops : Seq {
           parlay::assign_uninitialized(merged[out_off++], et);
         } else if (Entry::comp(key, Entry::get_key(et))) {
           parlay::assign_uninitialized(merged[out_off++], et);
-        } else {  // get_key(et) == key
+        } else { // get_key(et) == key
           found = true;
         }
       } else {
@@ -725,9 +786,11 @@ struct map_ops : Seq {
 
   // A specialized version of insert that will switch to the version with
   // copy=true once it hits a node with ref_cnt(node) > 1.
-  template <class J, bool copy = false>
-  static node* remove_tmpl(node* b, K const& k, J const& join) {
-    if (!b) return Seq::empty();
+  template<class J, bool copy = false>
+  static node* remove_tmpl(node* b, K const& k, J const& join)
+  {
+    if (!b)
+      return Seq::empty();
 
     if constexpr (!copy) {
       if (Seq::ref_cnt(b) > 1) {
@@ -772,7 +835,8 @@ struct map_ops : Seq {
   //    return remove_tmpl<decltype(join), false>(b, k, join);
   //  }
 
-  static node* remove_compressed3(ptr b, K const& k) {
+  static node* remove_compressed3(ptr b, K const& k)
+  {
     auto r = b.node_ptr();
     ET merged[2 * B];
     size_t out_off = 0;
@@ -790,9 +854,11 @@ struct map_ops : Seq {
     return Seq::make_compressed(merged, out_off);
   }
 
-  template <class J>
-  static node* my_remove_2(ptr b, K const& k, J const& join) {
-    if (b.empty()) return nullptr;
+  template<class J>
+  static node* my_remove_2(ptr b, K const& k, J const& join)
+  {
+    if (b.empty())
+      return nullptr;
     if (b.is_compressed()) {
       return remove_compressed3(std::move(b), k);
     }
@@ -811,9 +877,11 @@ struct map_ops : Seq {
     return Seq::join2(lc.node_ptr(), rc.node_ptr());
   }
 
-  template <class J>
-  static node* my_remove(ptr b, K const& k, J const& join) {
-    if (b.empty()) return nullptr;
+  template<class J>
+  static node* my_remove(ptr b, K const& k, J const& join)
+  {
+    if (b.empty())
+      return nullptr;
     auto [lc, e, rc, root] = Seq::expose(std::move(b));
     K ek = Entry::get_key(e);
     if (Entry::comp(ek, k)) {
@@ -829,7 +897,8 @@ struct map_ops : Seq {
     return Seq::join2(lc.node_ptr(), rc.node_ptr());
   }
 
-  static node* deletet(node* b, K const& k) {
+  static node* deletet(node* b, K const& k)
+  {
     auto join = [](node* l, node* r, regular_node* m) {
       auto ret = Seq::node_join(l, r, m);
       return ret;
@@ -839,8 +908,9 @@ struct map_ops : Seq {
     //    return remove_tmpl<decltype(join), false>(b, k, join);
   }
 
-  template <class BinaryOp>
-  static node* update_compressed(node* b, K const& key, BinaryOp const& op) {
+  template<class BinaryOp>
+  static node* update_compressed(node* b, K const& key, BinaryOp const& op)
+  {
     ET arr[2 * B];
     Seq::compressed_node_elms(b, arr);
     size_t n = Seq::size(b);
@@ -867,9 +937,11 @@ struct map_ops : Seq {
     return Seq::make_compressed(merged, out_off);
   }
 
-  template <class Func, class J, bool copy = false>
-  static node* update_tmpl(node* b, K const& k, Func const& f, J const& join) {
-    if (!b) return b;
+  template<class Func, class J, bool copy = false>
+  static node* update_tmpl(node* b, K const& k, Func const& f, J const& join)
+  {
+    if (!b)
+      return b;
     if constexpr (!copy) {
       if (Seq::ref_cnt(b) > 1) {
         auto r = update_tmpl<Func, J, true>(b, k, f, join);
@@ -905,21 +977,25 @@ struct map_ops : Seq {
     }
   }
 
-  template <class Func>
-  static node* update(node* b, K const& k, Func const& f,
-                      bool extra_ptr = false) {
+  template<class Func>
+  static node* update(node* b,
+                      K const& k,
+                      Func const& f,
+                      bool extra_ptr = false)
+  {
     auto join = [](node* l, node* r, regular_node* m) {
       return Seq::node_join(l, r, m);
     };
     return update_tmpl<Func, decltype(join), false>(b, k, f, join);
   }
 
-  static node* multidelete_bc(ptr b1, K* A, size_t n) {
+  static node* multidelete_bc(ptr b1, K* A, size_t n)
+  {
     auto n_b1 = b1.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
     size_t offset = 0;
-    auto copy_f = [&](ET a) {  // TODO: copy or ref?
+    auto copy_f = [&](ET a) { // TODO: copy or ref?
       parlay::move_uninitialized(stack[offset++], a);
     };
     Seq::iterate_seq(n_b1, copy_f);
@@ -939,7 +1015,7 @@ struct map_ops : Seq {
         i++;
       } else if (comp(k_b, k_a)) {
         j++;
-      } else {  // equals, delete element.
+      } else { // equals, delete element.
         stack[i].~ET();
         i++;
         j++;
@@ -960,9 +1036,12 @@ struct map_ops : Seq {
   }
 
   // assumes array A is of length n and is sorted with no duplicates
-  static node* multi_delete_sorted(ptr b, K* A, size_t n) {
-    if (b.empty()) return nullptr;
-    if (n == 0) return b.node_ptr();
+  static node* multi_delete_sorted(ptr b, K* A, size_t n)
+  {
+    if (b.empty())
+      return nullptr;
+    if (n == 0)
+      return b.node_ptr();
 
     // size_t tot = b.size() + n;
     // TODO: add a flag to control base-case granularity?
@@ -979,15 +1058,15 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid]));
 
     auto P = utils::fork<node*>(
-        true,  // Seq::do_parallel(b.size(), n),
-        [&]() { return multi_delete_sorted(std::move(lc), A, mid); },
-        [&]() {
-          return multi_delete_sorted(std::move(rc), A + mid + dup,
-                                     n - mid - dup);
-        });
+      true, // Seq::do_parallel(b.size(), n),
+      [&]() { return multi_delete_sorted(std::move(lc), A, mid); },
+      [&]() {
+        return multi_delete_sorted(std::move(rc), A + mid + dup, n - mid - dup);
+      });
 
     if (!dup) {
-      if (!root) root = Seq::single(e);
+      if (!root)
+        root = Seq::single(e);
       return Seq::node_join(P.first, P.second, root);
     } else {
       GC::decrement(root);
@@ -996,9 +1075,12 @@ struct map_ops : Seq {
   }
 
   // TODO(laxman): This is more like a multi-update?
-  template <class VE, class CombineOp>
-  static node* multidelete_sorted_map_bc(ptr b1, std::pair<K, VE>* A, size_t n,
-                                         CombineOp const& combine_op) {
+  template<class VE, class CombineOp>
+  static node* multidelete_sorted_map_bc(ptr b1,
+                                         std::pair<K, VE>* A,
+                                         size_t n,
+                                         CombineOp const& combine_op)
+  {
     auto n_b1 = b1.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
@@ -1049,11 +1131,16 @@ struct map_ops : Seq {
   // assumes array A is of length n and is sorted with no duplicates
   // combine: <V, VE> -> V
   // map: VE -> V
-  template <class VE, class CombineOp>
-  static node* multi_delete_sorted_map(ptr b, std::pair<K, VE>* A, size_t n,
-                                       CombineOp const& combine_op) {
-    if (b.empty()) return nullptr;
-    if (n == 0) return b.node_ptr();
+  template<class VE, class CombineOp>
+  static node* multi_delete_sorted_map(ptr b,
+                                       std::pair<K, VE>* A,
+                                       size_t n,
+                                       CombineOp const& combine_op)
+  {
+    if (b.empty())
+      return nullptr;
+    if (n == 0)
+      return b.node_ptr();
 
     // size_t tot = b.size() + n;
     // TODO: add a flag to control base-case granularity?
@@ -1062,7 +1149,8 @@ struct map_ops : Seq {
     }
 
     auto [lc, e, rc, root] = Seq::expose(std::move(b));
-    if (!root) root = Seq::single(e);
+    if (!root)
+      root = Seq::single(e);
 
     K bk = Entry::get_key(e);
     auto less_val = [&](std::pair<K, VE>& a) -> bool {
@@ -1073,27 +1161,30 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid].first));
 
     auto P = utils::fork<node*>(
-        true,  // Seq::do_parallel(b.size(), n),
-        [&]() {
-          return multi_delete_sorted_map(std::move(lc), A, mid, combine_op);
-        },
-        [&]() {
-          return multi_delete_sorted_map(std::move(rc), A + mid + dup,
-                                         n - mid - dup, combine_op);
-        });
+      true, // Seq::do_parallel(b.size(), n),
+      [&]() {
+        return multi_delete_sorted_map(std::move(lc), A, mid, combine_op);
+      },
+      [&]() {
+        return multi_delete_sorted_map(
+          std::move(rc), A + mid + dup, n - mid - dup, combine_op);
+      });
 
-    if (dup) combine_values_v(root, A[mid].second, combine_op);
+    if (dup)
+      combine_values_v(root, A[mid].second, combine_op);
     return Seq::node_join(P.first, P.second, root);
   }
 
   // assumes array A is of length n and is sorted with no duplicates
-  template <class BinaryOp>
-  static node* multi_insert_sorted(ptr b, ET* A, size_t n, BinaryOp const& op) {
+  template<class BinaryOp>
+  static node* multi_insert_sorted(ptr b, ET* A, size_t n, BinaryOp const& op)
+  {
     if (b.empty()) {
       node* x = Seq::from_array(A, n);
       return x;
     }
-    if (n == 0) return b.node_ptr();
+    if (n == 0)
+      return b.node_ptr();
 
     size_t tot = b.size() + n;
     if (tot <= kBaseCaseSize) {
@@ -1101,7 +1192,8 @@ struct map_ops : Seq {
     }
 
     auto [lc, e, rc, root] = Seq::expose(std::move(b));
-    if (!root) root = Seq::single(e);
+    if (!root)
+      root = Seq::single(e);
 
     K bk = Entry::get_key(e);
     auto less_val = [&](ET& a) -> bool {
@@ -1112,21 +1204,25 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, Entry::get_key(A[mid])));
 
     auto P = utils::fork<node*>(
-        true,  // Seq::do_parallel(b.size(), n),
-        [&]() { return multi_insert_sorted(std::move(lc), A, mid, op); },
-        [&]() {
-          return multi_insert_sorted(std::move(rc), A + mid + dup,
-                                     n - mid - dup, op);
-        });
+      true, // Seq::do_parallel(b.size(), n),
+      [&]() { return multi_insert_sorted(std::move(lc), A, mid, op); },
+      [&]() {
+        return multi_insert_sorted(
+          std::move(rc), A + mid + dup, n - mid - dup, op);
+      });
 
-    if (dup) combine_values(root, A[mid], false, op);
+    if (dup)
+      combine_values(root, A[mid], false, op);
     return Seq::node_join(P.first, P.second, root);
   }
 
-  template <class VE, class CombineOp, class MapOp>
-  static node* multiinsert_map_bc(ptr b1, std::pair<K, VE>* A, size_t n,
+  template<class VE, class CombineOp, class MapOp>
+  static node* multiinsert_map_bc(ptr b1,
+                                  std::pair<K, VE>* A,
+                                  size_t n,
                                   CombineOp const& combine_op,
-                                  MapOp const& map_op) {
+                                  MapOp const& map_op)
+  {
     auto n_b1 = b1.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
@@ -1183,26 +1279,33 @@ struct map_ops : Seq {
   }
 
   // Assumes the input is sorted and there are no duplicate keys
-  template <class VE, class MapOp>
-  static node* from_array_map(std::pair<K, VE>* A, size_t n,
-                              MapOp const& map_op) {
-    if (n <= 0) return Seq::empty();
-    if (n == 1) return Seq::single(ET(A[0].first, map_op(A[0].second)));
+  template<class VE, class MapOp>
+  static node* from_array_map(std::pair<K, VE>* A,
+                              size_t n,
+                              MapOp const& map_op)
+  {
+    if (n <= 0)
+      return Seq::empty();
+    if (n == 1)
+      return Seq::single(ET(A[0].first, map_op(A[0].second)));
     if (n >= B && n <= 2 * B) {
       ET stk[2 * B];
       parlay::parallel_for(
-          0, n, [&](size_t i) { stk[i] = ET(A[i].first, map_op(A[i].second)); },
-          1);
+        0,
+        n,
+        [&](size_t i) { stk[i] = ET(A[i].first, map_op(A[i].second)); },
+        1);
       return Seq::make_compressed(stk, n);
     }
     size_t mid = n / 2;
 
     regular_node* m =
-        Seq::make_regular_node(ET(A[mid].first, map_op(A[mid].second)));
+      Seq::make_regular_node(ET(A[mid].first, map_op(A[mid].second)));
 
     auto P = utils::fork<node*>(
-        n >= Seq::kNodeLimit, [&]() { return from_array_map(A, mid, map_op); },
-        [&]() { return from_array_map(A + mid + 1, n - mid - 1, map_op); });
+      n >= Seq::kNodeLimit,
+      [&]() { return from_array_map(A, mid, map_op); },
+      [&]() { return from_array_map(A + mid + 1, n - mid - 1, map_op); });
 
     return Seq::node_join(P.first, P.second, m);
   }
@@ -1210,15 +1313,19 @@ struct map_ops : Seq {
   // assumes array A is of length n and is sorted with no duplicates
   // combine: <V, VE> -> V
   // map: VE -> V
-  template <class VE, class CombineOp, class MapOp>
-  static node* multi_insert_sorted_map(ptr b, std::pair<K, VE>* A, size_t n,
+  template<class VE, class CombineOp, class MapOp>
+  static node* multi_insert_sorted_map(ptr b,
+                                       std::pair<K, VE>* A,
+                                       size_t n,
                                        CombineOp const& combine_op,
-                                       MapOp const& map_op) {
+                                       MapOp const& map_op)
+  {
     if (b.empty()) {
       node* x = from_array_map(A, n, map_op);
       return x;
     }
-    if (n == 0) return b.node_ptr();
+    if (n == 0)
+      return b.node_ptr();
 
     size_t tot = b.size() + n;
     // if (b.is_compressed() && tot <= kBaseCaseSize) {
@@ -1230,7 +1337,8 @@ struct map_ops : Seq {
     }
 
     auto [lc, e, rc, root] = Seq::expose(std::move(b));
-    if (!root) root = Seq::single(e);
+    if (!root)
+      root = Seq::single(e);
 
     K bk = Entry::get_key(e);
     auto less_val = [&](std::pair<K, VE>& a) -> bool {
@@ -1241,23 +1349,27 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid].first));
 
     auto P = utils::fork<node*>(
-        true,  // Seq::do_parallel(b.size(), n),
-        [&]() {
-          return multi_insert_sorted_map(std::move(lc), A, mid, combine_op,
-                                         map_op);
-        },
-        [&]() {
-          return multi_insert_sorted_map(std::move(rc), A + mid + dup,
-                                         n - mid - dup, combine_op, map_op);
-        });
+      true, // Seq::do_parallel(b.size(), n),
+      [&]() {
+        return multi_insert_sorted_map(
+          std::move(lc), A, mid, combine_op, map_op);
+      },
+      [&]() {
+        return multi_insert_sorted_map(
+          std::move(rc), A + mid + dup, n - mid - dup, combine_op, map_op);
+      });
 
-    if (dup) combine_values_v(root, A[mid].second, combine_op);
+    if (dup)
+      combine_values_v(root, A[mid].second, combine_op);
     return Seq::node_join(P.first, P.second, root);
   }
 
-  template <class VE, class BinaryOp>
-  static bool multiupdate_sorted_inplace_bc(node* b, std::pair<K, VE>* A,
-                                            size_t n, BinaryOp const& op) {
+  template<class VE, class BinaryOp>
+  static bool multiupdate_sorted_inplace_bc(node* b,
+                                            std::pair<K, VE>* A,
+                                            size_t n,
+                                            BinaryOp const& op)
+  {
     size_t ct = 0;
     auto update_f = [&](ET et) {
       K key_et = Entry::get_key(et);
@@ -1279,11 +1391,16 @@ struct map_ops : Seq {
     return true;
   }
 
-  template <class VE, class BinaryOp>
-  static bool multi_update_sorted_inplace(node* b, std::pair<K, VE>* A,
-                                          size_t n, BinaryOp const& op) {
-    if (b == nullptr) return true;
-    if (n == 0) return true;
+  template<class VE, class BinaryOp>
+  static bool multi_update_sorted_inplace(node* b,
+                                          std::pair<K, VE>* A,
+                                          size_t n,
+                                          BinaryOp const& op)
+  {
+    if (b == nullptr)
+      return true;
+    if (n == 0)
+      return true;
     assert(Seq::ref_cnt(b) == 1);
 
     if (Seq::is_compressed(b)) {
@@ -1301,21 +1418,26 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid].first));
 
     auto P = utils::fork<bool>(
-        true,
-        [&]() {
-          return multi_update_sorted_inplace(std::move(rb->lc), A, mid, op);
-        },
-        [&]() {
-          return multi_update_sorted_inplace(std::move(rb->rc), A + mid + dup,
-                                             n - mid - dup, op);
-        });
+      true,
+      [&]() {
+        return multi_update_sorted_inplace(std::move(rb->lc), A, mid, op);
+      },
+      [&]() {
+        return multi_update_sorted_inplace(
+          std::move(rb->rc), A + mid + dup, n - mid - dup, op);
+      });
 
-    if (dup) combine_values_v(rb, A[mid].second, op);
+    if (dup)
+      combine_values_v(rb, A[mid].second, op);
     return P.first && P.second;
   }
 
-  static bool multifind_sorted_bc(node* b, K* A, size_t n, V* ret,
-                                  size_t offset) {
+  static bool multifind_sorted_bc(node* b,
+                                  K* A,
+                                  size_t n,
+                                  V* ret,
+                                  size_t offset)
+  {
     size_t ct = 0;
     auto emit_f = [&](const ET& et) {
       K key_et = Entry::get_key(et);
@@ -1335,10 +1457,12 @@ struct map_ops : Seq {
     return true;
   }
 
-  static bool multi_find_sorted(node* b, K* A, size_t n, V* ret,
-                                size_t offset) {
-    if (!b) return true;
-    if (n == 0) return true;
+  static bool multi_find_sorted(node* b, K* A, size_t n, V* ret, size_t offset)
+  {
+    if (!b)
+      return true;
+    if (n == 0)
+      return true;
 
     if (Seq::is_compressed(b)) {
       return multifind_sorted_bc(b, A, n, ret, offset);
@@ -1348,29 +1472,33 @@ struct map_ops : Seq {
     K bk = get_key(rb);
     auto less_val = [&](K a) -> bool { return Entry::comp(a, bk); };
     size_t mid =
-        parlay::internal::binary_search(parlay::make_slice(A, A + n), less_val);
+      parlay::internal::binary_search(parlay::make_slice(A, A + n), less_val);
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid]));
     utils::fork<bool>(
-        true, [&]() { return multi_find_sorted(rb->lc, A, mid, ret, offset); },
-        [&]() {
-          return multi_find_sorted(rb->rc, A + mid + dup, n - mid - dup, ret,
-                                   offset + mid + dup);
-        });
+      true,
+      [&]() { return multi_find_sorted(rb->lc, A, mid, ret, offset); },
+      [&]() {
+        return multi_find_sorted(
+          rb->rc, A + mid + dup, n - mid - dup, ret, offset + mid + dup);
+      });
 
-    if (dup) ret[offset + mid] = get_val(rb);
+    if (dup)
+      ret[offset + mid] = get_val(rb);
     return true;
   }
 
-  template <class InTree, class Func>
-  static node* map(typename InTree::ptr b, Func const& f) {
+  template<class InTree, class Func>
+  static node* map(typename InTree::ptr b, Func const& f)
+  {
     auto g = [&](typename InTree::ET& a) {
       return ET(InTree::Entry::get_key(a), f(a));
     };
     return Seq::template map<InTree>(std::move(b), g);
   }
 
-  template <class InTree, class Func>
-  static node* map_set(typename InTree::ptr b, Func const& f) {
+  template<class InTree, class Func>
+  static node* map_set(typename InTree::ptr b, Func const& f)
+  {
     return Seq::template map<InTree>(std::move(b), f);
   }
 
@@ -1387,8 +1515,9 @@ struct map_ops : Seq {
   //    return Seq::template map_filter<Seq1>(b, g, granularity);
   //  }
 
-  template <class BinaryOp>
-  static node* multiinsert_bc(ptr b1, ET* A, size_t n, BinaryOp const& op) {
+  template<class BinaryOp>
+  static node* multiinsert_bc(ptr b1, ET* A, size_t n, BinaryOp const& op)
+  {
     auto n_b1 = b1.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
@@ -1438,14 +1567,15 @@ struct map_ops : Seq {
     }
   }
 
-  template <class BinaryOp>
-  static node* union_bc(ptr b1, ptr b2, BinaryOp const& op) {
+  template<class BinaryOp>
+  static node* union_bc(ptr b1, ptr b2, BinaryOp const& op)
+  {
     auto n_b1 = b1.node_ptr();
     auto n_b2 = b2.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
     size_t offset = 0;
-    auto copy_f = [&](ET a) {  // TODO: copy or ref?
+    auto copy_f = [&](ET a) { // TODO: copy or ref?
       parlay::move_uninitialized(stack[offset++], a);
     };
     Seq::iterate_seq(n_b1, copy_f);
@@ -1498,13 +1628,14 @@ struct map_ops : Seq {
     }
   }
 
-  static node* difference_bc(ptr b1, ptr b2) {
+  static node* difference_bc(ptr b1, ptr b2)
+  {
     auto n_b1 = b1.node_ptr();
     auto n_b2 = b2.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
     size_t offset = 0;
-    auto copy_f = [&](ET a) {  // TODO: copy or ref?
+    auto copy_f = [&](ET a) { // TODO: copy or ref?
       parlay::move_uninitialized(stack[offset++], a);
     };
     Seq::iterate_seq(n_b1, copy_f);
@@ -1548,15 +1679,17 @@ struct map_ops : Seq {
     }
   }
 
-  template <class Seq1, class Seq2, class BinaryOp>
-  static node* intersect_bc(typename Seq1::ptr b1, typename Seq2::ptr b2,
-                            BinaryOp const& op) {
+  template<class Seq1, class Seq2, class BinaryOp>
+  static node* intersect_bc(typename Seq1::ptr b1,
+                            typename Seq2::ptr b2,
+                            BinaryOp const& op)
+  {
     auto n_b1 = b1.node_ptr();
     auto n_b2 = b2.node_ptr();
 
     ET stack[kBaseCaseSize + 1];
     size_t offset = 0;
-    auto copy_f = [&](ET a) {  // TODO: copy or ref?
+    auto copy_f = [&](ET a) { // TODO: copy or ref?
       parlay::move_uninitialized(stack[offset++], a);
     };
     Seq1::iterate_seq(n_b1, copy_f);
@@ -1600,4 +1733,4 @@ struct map_ops : Seq {
   }
 };
 
-}  // namespace cpam
+} // namespace cpam

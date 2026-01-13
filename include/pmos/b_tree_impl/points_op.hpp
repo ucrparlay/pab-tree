@@ -130,20 +130,22 @@ namespace pmos {
 //   assert(tags[k].second < kBucketNum);
 //   return tags[k].second;
 // }
-template <typename TT>
-void BTree<TT>::PartitionBinarySearchRec(
-    auto split_seq_s,
-    // parlay::sequence<int>& split_pos_seq,
-    auto& split_pos_seq, EntrySlice entry_seq_s, size_t split_offset,
-    size_t in_offset) {
+template<typename TT>
+void
+BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
+                                    // parlay::sequence<int>& split_pos_seq,
+                                    auto& split_pos_seq,
+                                    EntrySlice entry_seq_s,
+                                    size_t split_offset,
+                                    size_t in_offset)
+{
   if (split_seq_s.size() == 0)
     return;
   else if (split_seq_s.size() == 1) {
     split_pos_seq[split_offset] =
-        in_offset +
-        parlay::internal::binary_search(entry_seq_s, [&](E const e) {
-          return Entry::GetKey(e) < split_seq_s[0];
-        });
+      in_offset + parlay::internal::binary_search(entry_seq_s, [&](E const e) {
+        return Entry::GetKey(e) < split_seq_s[0];
+      });
     return;
   } else {
     size_t mid = split_seq_s.size() >> 1;
@@ -151,34 +153,42 @@ void BTree<TT>::PartitionBinarySearchRec(
       return Entry::GetKey(e) < split_seq_s[mid];
     });
     split_pos_seq[split_offset + mid] = in_offset + pos;
-    PartitionBinarySearchRec(split_seq_s.cut(0, mid), split_pos_seq,
-                             entry_seq_s.cut(0, pos), split_offset, in_offset);
+    PartitionBinarySearchRec(split_seq_s.cut(0, mid),
+                             split_pos_seq,
+                             entry_seq_s.cut(0, pos),
+                             split_offset,
+                             in_offset);
     PartitionBinarySearchRec(split_seq_s.cut(mid + 1, split_seq_s.size()),
                              split_pos_seq,
                              entry_seq_s.cut(pos, entry_seq_s.size()),
-                             split_offset + mid + 1, in_offset + pos);
+                             split_offset + mid + 1,
+                             in_offset + pos);
     return;
   }
 }
 
-template <typename TT>
-typename TT::BucketType BTree<TT>::RetriveTag(E const e,
-                                              TT::SplitSeq const& split_seq) {
+template<typename TT>
+typename TT::BucketType
+BTree<TT>::RetriveTag(E const e, TT::SplitSeq const& split_seq)
+{
   return parlay::internal::binary_search(
-      split_seq, [&](K const key) { return key <= Entry::GetKey(e); });
+    split_seq, [&](K const key) { return key <= Entry::GetKey(e); });
 }
 
 // NOTE: seieve Points from range A to range B, using the skeleton tags. The
 // sums is the number of elemenets within each bucket, the tags_num is the total
 // number of buckets in the skeleton
-template <typename TT>
-typename TT::BallSeq BTree<TT>::SeievePoints(EntrySlice A, EntrySlice B,
-                                             TT::SplitSeq const& split_seq) {
+template<typename TT>
+typename TT::BallSeq
+BTree<TT>::SeievePoints(EntrySlice A,
+                        EntrySlice B,
+                        TT::SplitSeq const& split_seq)
+{
   size_t n = A.size();
   size_t num_block = (n + kBlockSize - 1) >> kLog2Base;
   typename TT::BucketType tags_num = split_seq.size() + 1;
   parlay::sequence<parlay::sequence<typename TT::BallsType>> offset(
-      num_block, parlay::sequence<typename TT::BallsType>(tags_num));
+    num_block, parlay::sequence<typename TT::BallsType>(tags_num));
   assert(offset.size() == num_block && offset[0].size() == tags_num &&
          offset[0][0] == 0);
   parlay::parallel_for(0, num_block, [&](size_t i) {
@@ -216,6 +226,6 @@ typename TT::BallSeq BTree<TT>::SeievePoints(EntrySlice A, EntrySlice B,
 
   return sums;
 }
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_B_TREE_IMPL_POINTS_OP_HPP_
+#endif // PMOS_B_TREE_IMPL_POINTS_OP_HPP_

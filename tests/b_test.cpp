@@ -1,6 +1,8 @@
 #include "test_framework.h"
 
-int main(int argc, char* argv[]) {
+int
+main(int argc, char* argv[])
+{
   commandLine params(argc, argv);
   Wrapper::Options opts(params);
 

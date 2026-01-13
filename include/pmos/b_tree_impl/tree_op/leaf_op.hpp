@@ -15,8 +15,10 @@
 
 namespace pmos {
 
-template <typename TT>
-TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
+template<typename TT>
+TT::Node*
+BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In)
+{
   Leaf* TL = static_cast<Leaf*>(T);
 
   assert(T->size + In.size() <= TT::kBufUB);
@@ -36,29 +38,31 @@ TT::Node* BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In) {
   return T;
 }
 
-template <typename TT>
-TT::SizeT BTree<TT>::HandlingLeafSplitOverflow(
-    Node* T, EntrySlice In, NodeSplitPairSlice node_split_slice) {
+template<typename TT>
+TT::SizeT
+BTree<TT>::HandlingLeafSplitOverflow(Node* T,
+                                     EntrySlice In,
+                                     NodeSplitPairSlice node_split_slice)
+{
   auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
   Leaf* TL = static_cast<Leaf*>(T);
 
-  for (SizeT i = 0; i < T->size; i++) {  // Assume the TT::kBufUB is constant
+  for (SizeT i = 0; i < T->size; i++) { // Assume the TT::kBufUB is constant
     entry_seq[i] = TL->elements[i];
   }
-  parlay::parallel_for(0, In.size(),
-                       [&](SizeT i) { entry_seq[T->size + i] = In[i]; });
+  parlay::parallel_for(
+    0, In.size(), [&](SizeT i) { entry_seq[T->size + i] = In[i]; });
   FreeNode<Leaf>(T);
 
   // NOTE: split
-  entry_seq = parlay::sort(entry_seq);  // PERF: we need sort as In is unsorted
+  entry_seq = parlay::sort(entry_seq); // PERF: we need sort as In is unsorted
 
   SizeT rt_bkt_n = GenerateLeafNodes(
-      parlay::make_slice(entry_seq),
-      GenNodesOutputHandler{
-          .set_key = [&](SizeT i,
-                         auto key) { node_split_slice[i].second = key; },
-          .set_node = [&](SizeT i,
-                          auto node) { node_split_slice[i].first = node; }});
+    parlay::make_slice(entry_seq),
+    GenNodesOutputHandler{
+      .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
+      .set_node = [&](SizeT i,
+                      auto node) { node_split_slice[i].first = node; } });
 
   return rt_bkt_n;
 }
@@ -178,6 +182,6 @@ TT::SizeT BTree<TT>::HandlingLeafSplitOverflow(
 //     ;
 //   }
 // }
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_B_TREE_IMPL_LEAF_OP_HPP_
+#endif // PMOS_B_TREE_IMPL_LEAF_OP_HPP_

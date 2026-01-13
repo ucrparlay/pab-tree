@@ -2,8 +2,9 @@
 #include "get_time.h"
 #include "parlay/primitives.h"
 
-template <class Entry>
-struct build {
+template<class Entry>
+struct build
+{
   using K = typename Entry::key_t;
   using V = typename Entry::val_t;
   using ET = typename Entry::entry_t;
@@ -13,12 +14,13 @@ struct build {
 
   // sorts a sequence, then removes all but first element with equal keys
   // the sort is not necessarily stable, so any element could be kept
-  template <class Seq>
-  static parlay::sequence<ET> sort_remove_duplicates(
-      Seq const& A) {  // ?? const
-    if (A.size() == 0) return parlay::sequence<ET>(0);
+  template<class Seq>
+  static parlay::sequence<ET> sort_remove_duplicates(Seq const& A)
+  { // ?? const
+    if (A.size() == 0)
+      return parlay::sequence<ET>(0);
     auto B = parlay::internal::sample_sort(
-        parlay::make_slice(A.begin(), A.end()), less);
+      parlay::make_slice(A.begin(), A.end()), less);
     return B;
 
     // auto Fl = parlay::delayed_seq<bool>(
@@ -65,9 +67,10 @@ struct build {
   //   return B;
   // }
 
-  template <class Seq, class Reduce>
+  template<class Seq, class Reduce>
   static parlay::sequence<ET> sort_reduce_duplicates(Seq const& A,
-                                                     Reduce const& reduce) {
+                                                     Reduce const& reduce)
+  {
     using E = typename Seq::value_type;
     using Vi = typename E::second_type;
 
@@ -75,7 +78,8 @@ struct build {
     // std::endl;
     timer t("sort_reduce_duplicates", false);
     size_t n = A.size();
-    if (n == 0) return parlay::sequence<ET>(0);
+    if (n == 0)
+      return parlay::sequence<ET>(0);
     auto lessE = [](E const& a, E const& b) {
       return Entry::comp(a.first, b.first);
     };
@@ -106,15 +110,17 @@ struct build {
     return a;
   }
 
-  template <class Seq, class Reduce>
+  template<class Seq, class Reduce>
   static parlay::sequence<ET> sort_reduce_duplicates_a(Seq const& A,
-                                                       Reduce const& reduce) {
+                                                       Reduce const& reduce)
+  {
     using E = typename Seq::value_type;
     using Vi = typename E::second_type;
 
     timer t("sort_reduce_duplicates", false);
     size_t n = A.size();
-    if (n == 0) return parlay::sequence<ET>(0);
+    if (n == 0)
+      return parlay::sequence<ET>(0);
     auto lessE = [](E const& a, E const& b) {
       return Entry::comp(a.first, b.first);
     };
@@ -124,7 +130,7 @@ struct build {
 
     // determines the index of start of each block of equal keys
     // and copies values into vals
-    parlay::sequence<bool> Fl(n);  // ?? should it be unitialized
+    parlay::sequence<bool> Fl(n); // ?? should it be unitialized
     auto Vals = parlay::tabulate(n, [&](size_t i) -> Vi {
       Fl[i] = (i == 0) || lessE(B[i - 1], B[i]);
       return B[i].second;
@@ -145,18 +151,20 @@ struct build {
     return a;
   }
 
-  template <class Seq, class Bin_Op>
-  static parlay::sequence<ET> sort_combine_duplicates(Seq const& A, Bin_Op& f) {
+  template<class Seq, class Bin_Op>
+  static parlay::sequence<ET> sort_combine_duplicates(Seq const& A, Bin_Op& f)
+  {
     auto mon = parlay::make_monoid(f, V());
-    auto reduce_op = [&](parlay::slice<V*, V*> S) {  // ?? should it be &
+    auto reduce_op = [&](parlay::slice<V*, V*> S) { // ?? should it be &
       return parlay::reduce(S, mon);
     };
     return sort_reduce_duplicates_a(A, reduce_op);
   }
 
-  template <class Seq, class Bin_Op>
+  template<class Seq, class Bin_Op>
   static parlay::slice<ET*, ET*> sort_combine_duplicates_inplace(Seq const& A,
-                                                                 Bin_Op& f) {
+                                                                 Bin_Op& f)
+  {
     auto less = [&](ET a, ET b) { return Entry::comp(a.first, b.first); };
     parlay::internal::quicksort(A.begin(), A.size(), less);
     size_t j = 0;

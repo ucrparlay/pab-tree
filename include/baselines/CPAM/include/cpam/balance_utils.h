@@ -8,21 +8,24 @@
 
 namespace cpam {
 
-template <class Node>
-struct balance_utils {
+template<class Node>
+struct balance_utils
+{
   using node = typename Node::node;
   using regular_node = typename Node::regular_node;
   using GC = gc<Node>;
 
   static constexpr size_t B = Node::B;
 
-  template <class TNode>
-  static TNode* validate(TNode* ret) {
+  template<class TNode>
+  static TNode* validate(TNode* ret)
+  {
     return ret;
   }
 
   // requires t and t->lc have ref_cnt == 1
-  static regular_node* rotate_right(regular_node* t) {
+  static regular_node* rotate_right(regular_node* t)
+  {
     regular_node* root = Node::cast_to_regular(t->lc);
     node* rsub = root->rc;
     root->rc = t, t->lc = rsub;
@@ -32,7 +35,8 @@ struct balance_utils {
   }
 
   // requires t and t->rc have ref_cnt == 1
-  static regular_node* rotate_left(regular_node* t) {
+  static regular_node* rotate_left(regular_node* t)
+  {
     regular_node* root = Node::cast_to_regular(t->rc);
     node* lsub = root->lc;
     root->lc = t, t->rc = lsub;
@@ -42,7 +46,8 @@ struct balance_utils {
   }
 
   // requires t and t->lc have ref_cnt == 1
-  static regular_node* double_rotate_right(regular_node* t) {
+  static regular_node* double_rotate_right(regular_node* t)
+  {
     regular_node* l = Node::cast_to_regular(t->lc);
     regular_node* root = Node::cast_to_regular(GC::copy_if_needed(l->rc));
     l->rc = root->lc;
@@ -53,7 +58,8 @@ struct balance_utils {
   }
 
   // requires t and t->rc have ref_cnt == 1
-  static regular_node* double_rotate_left(regular_node* t) {
+  static regular_node* double_rotate_left(regular_node* t)
+  {
     regular_node* r = Node::cast_to_regular(t->rc);
     regular_node* root = Node::cast_to_regular(GC::copy_if_needed(r->lc));
     r->lc = root->rc;
@@ -63,8 +69,10 @@ struct balance_utils {
     return validate(rotate_left(t));
   }
 
-  static regular_node* regular_right_join(regular_node* t1, regular_node* t2,
-                                          regular_node* k) {
+  static regular_node* regular_right_join(regular_node* t1,
+                                          regular_node* t2,
+                                          regular_node* k)
+  {
     if (!Node::is_left_heavy(t1, t2))
       return validate(regular_balanced_join(t1, t2, k));
     regular_node* t = Node::cast_to_regular(GC::copy_if_needed(t1));
@@ -81,8 +89,10 @@ struct balance_utils {
     return validate(t);
   }
 
-  static regular_node* regular_left_join(regular_node* t1, regular_node* t2,
-                                         regular_node* k) {
+  static regular_node* regular_left_join(regular_node* t1,
+                                         regular_node* t2,
+                                         regular_node* k)
+  {
     if (!Node::is_left_heavy(t2, t1))
       return validate(regular_balanced_join(t1, t2, k));
     regular_node* t = Node::cast_to_regular(GC::copy_if_needed(t2));
@@ -100,8 +110,10 @@ struct balance_utils {
   }
 
   // a version without rotation
-  static regular_node* regular_balanced_join(regular_node* l, regular_node* r,
-                                             regular_node* e) {
+  static regular_node* regular_balanced_join(regular_node* l,
+                                             regular_node* r,
+                                             regular_node* e)
+  {
     e->lc = l;
     e->rc = r;
     Node::update(e);
@@ -109,8 +121,10 @@ struct balance_utils {
   }
 
   // main function
-  static regular_node* regular_node_join(regular_node* t1, regular_node* t2,
-                                         regular_node* k) {
+  static regular_node* regular_node_join(regular_node* t1,
+                                         regular_node* t2,
+                                         regular_node* k)
+  {
     if (Node::is_left_heavy(t1, t2))
       return validate(regular_right_join(t1, t2, k));
     if (Node::is_left_heavy(t2, t1))
@@ -121,7 +135,8 @@ struct balance_utils {
   /* ============================ Compressed Join
    * =============================== */
 
-  static node* right_join(node* t1_o, node* t2, regular_node* k) {
+  static node* right_join(node* t1_o, node* t2, regular_node* k)
+  {
     if (Node::is_compressed(t1_o)) {
       return validate(Node::make_compressed(t1_o, t2, k));
     }
@@ -173,7 +188,8 @@ struct balance_utils {
     return validate(t);
   }
 
-  static node* left_join(node* t1, node* t2_o, regular_node* k) {
+  static node* left_join(node* t1, node* t2_o, regular_node* k)
+  {
     if (Node::is_compressed(t2_o)) {
       return validate(Node::make_compressed(t1, t2_o, k));
     }
@@ -228,7 +244,8 @@ struct balance_utils {
   static constexpr double wb_beta = (1 - 2 * wb_alpha) / (1 - wb_alpha);
 
   // Assumes that e will be used. need to decrement if it is not (using gc)
-  static node* balanced_join(node* l, node* r, regular_node* e) {
+  static node* balanced_join(node* l, node* r, regular_node* e)
+  {
     size_t l_s = Node::size(l), r_s = Node::size(r);
     assert(!Node::is_left_heavy(l, r));
     assert(!Node::is_left_heavy(r, l));
@@ -263,11 +280,11 @@ struct balance_utils {
     return validate(e);
   }
 
-  static node* regular_join(regular_node* t1, regular_node* t2,
-                            regular_node* k) {
+  static node* regular_join(regular_node* t1, regular_node* t2, regular_node* k)
+  {
     size_t tot = Node::size(t1) + Node::size(t2) + 1;
     size_t upper_threshold =
-        ceil(B * (1 + (static_cast<double>(1) / wb_ratio)));
+      ceil(B * (1 + (static_cast<double>(1) / wb_ratio)));
     if (tot >= B && tot <= upper_threshold) {
       return validate(Node::make_compressed(t1, t2, k));
     }
@@ -277,8 +294,10 @@ struct balance_utils {
     assert(Node::size(t1) >= 2 * B || Node::size(t1) < B);
     assert(Node::size(t2) >= 2 * B || Node::size(t2) < B);
 #endif
-    if (Node::is_left_heavy(t1, t2)) return validate(right_join(t1, t2, k));
-    if (Node::is_left_heavy(t2, t1)) return validate(left_join(t1, t2, k));
+    if (Node::is_left_heavy(t1, t2))
+      return validate(right_join(t1, t2, k));
+    if (Node::is_left_heavy(t2, t1))
+      return validate(left_join(t1, t2, k));
     return validate(balanced_join(t1, t2, k));
   }
 
@@ -289,7 +308,8 @@ struct balance_utils {
   // Similarly, calls pass ownership of t1 and t2 to node_join here. In
   // particular, if node_join does not use t1 or t2 (e.g., if it decides to
   // return a compressed node), it will call decrement(t1) and decrement(t2).
-  static node* node_join(node* t1, node* t2, regular_node* k) {
+  static node* node_join(node* t1, node* t2, regular_node* k)
+  {
     bool t1_reg = Node::is_regular(t1), t2_reg = Node::is_regular(t2);
 #ifdef DEBUG
     if (!Node::check_structure(t1)) {
@@ -301,9 +321,9 @@ struct balance_utils {
 #endif
 
     if (t1_reg && t2_reg) {
-      auto ret =
-          regular_join(Node::cast_to_regular(t1), Node::cast_to_regular(t2),
-                       Node::cast_to_regular(k));
+      auto ret = regular_join(Node::cast_to_regular(t1),
+                              Node::cast_to_regular(t2),
+                              Node::cast_to_regular(k));
 #ifdef DEBUG
       if (!Node::check_structure(ret)) {
         Node::print_rec(ret);
@@ -311,7 +331,7 @@ struct balance_utils {
       }
 #endif
       return validate((node*)ret);
-    } else if (t1_reg) {  // t2 compressed
+    } else if (t1_reg) { // t2 compressed
       if (Node::is_left_heavy(t1, t2)) {
         auto ret = right_join(Node::cast_to_regular(t1), t2, k);
         return validate(ret);
@@ -324,7 +344,7 @@ struct balance_utils {
           return validate(ret);
         }
       }
-    } else if (t2_reg) {  // t1 compressed
+    } else if (t2_reg) { // t1 compressed
       if (Node::is_left_heavy(t2, t1)) {
         auto ret = left_join(t1, Node::cast_to_regular(t2), k);
         return validate(ret);
@@ -340,7 +360,7 @@ struct balance_utils {
     }
     // both compressed
     bool balanced =
-        !(Node::is_left_heavy(t1, t2) || Node::is_left_heavy(t2, t1));
+      !(Node::is_left_heavy(t1, t2) || Node::is_left_heavy(t2, t1));
     if (balanced || !Node::could_single_rotate(t1, t2)) {
       auto ret = balanced_join(t1, t2, k);
       return validate(ret);
@@ -350,4 +370,4 @@ struct balance_utils {
   }
 };
 
-}  // namespace cpam
+} // namespace cpam

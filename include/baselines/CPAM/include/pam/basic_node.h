@@ -8,11 +8,13 @@ using node_size_t = unsigned int;
 //   BASIC NODE
 // *******************************************
 
-template <class balance, class _ET>
-struct basic_node {
+template<class balance, class _ET>
+struct basic_node
+{
   using ET = _ET;
 
-  struct node : balance {
+  struct node : balance
+  {
     node* lc;
     node* rc;
     ET entry;
@@ -28,7 +30,8 @@ struct basic_node {
 
   static node_size_t ref_cnt(node* a) { return (a) ? a->ref_cnt : 0; }
 
-  static node* make_node(ET e) {
+  static node* make_node(ET e)
+  {
     node* o = allocator::alloc();
     o->ref_cnt = 1;
     // o->entry = e;
@@ -36,14 +39,16 @@ struct basic_node {
     return o;
   }
 
-  static node* single(ET e) {
+  static node* single(ET e)
+  {
     node* r = make_node(e);
     r->lc = r->rc = NULL;
     r->s = 1;
     return r;
   }
 
-  static void free_node(node* a) {
+  static void free_node(node* a)
+  {
     (a->entry).~ET();
     allocator::free(a);
   }

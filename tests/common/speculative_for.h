@@ -30,18 +30,23 @@ namespace pbbs {
 // idxT should be able to represent the range of iterations
 // int OK for up to 2^31 iterations
 // unsigned OK if freeze not used
-template <class idxT>
-struct reservation {
+template<class idxT>
+struct reservation
+{
   std::atomic<idxT> r;
   static constexpr idxT max_idx = std::numeric_limits<idxT>::max();
-  reservation() : r(max_idx) {}
+  reservation()
+    : r(max_idx)
+  {
+  }
   idxT get() const { return r.load(); }
   bool reserve(idxT i) { return parlay::write_min(&r, i, std::less<idxT>()); }
   bool reserved() const { return (r.load() < max_idx); }
   void reset() { r = max_idx; }
   void freeze() { r = -1; }
   bool check(idxT i) const { return (r.load() == i); }
-  bool checkReset(idxT i) {
+  bool checkReset(idxT i)
+  {
     if (r == i) {
       r = max_idx;
       return 1;
@@ -50,29 +55,36 @@ struct reservation {
   }
 };
 
-template <class idxT, class S>
-long speculative_for(S step, idxT s, idxT e, long granularity,
-                     bool hasState = 1, long maxTries = -1) {
-  if (maxTries < 0) maxTries = 100 + 200 * granularity;
+template<class idxT, class S>
+long
+speculative_for(S step,
+                idxT s,
+                idxT e,
+                long granularity,
+                bool hasState = 1,
+                long maxTries = -1)
+{
+  if (maxTries < 0)
+    maxTries = 100 + 200 * granularity;
   long maxRoundSize = (e - s) / granularity + 1;
   long currentRoundSize = maxRoundSize / 4;
   // integer types, do not need to be initialized
   auto I = parlay::sequence<idxT>::uninitialized(maxRoundSize);
   auto keep = parlay::sequence<bool>::uninitialized(maxRoundSize);
-  parlay::sequence<idxT> Ihold;  // initially empty
+  parlay::sequence<idxT> Ihold; // initially empty
   parlay::sequence<S> state;
   if (hasState)
     state = parlay::tabulate(maxRoundSize, [&](size_t i) -> S { return step; });
 
   long round = 0;
-  long numberDone = s;      // number of iterations done
-  long numberKeep = 0;      // number of iterations to carry to next round
-  long totalProcessed = 0;  // number done including wasteds tries
+  long numberDone = s;     // number of iterations done
+  long numberKeep = 0;     // number of iterations to carry to next round
+  long totalProcessed = 0; // number done including wasteds tries
 
   while (numberDone < e) {
     if (round++ > maxTries)
       throw std::runtime_error(
-          "speculative_for: too many iterations, increase maxTries");
+        "speculative_for: too many iterations, increase maxTries");
     long size = std::min(currentRoundSize, e - numberDone);
 
     totalProcessed += size;
@@ -80,36 +92,42 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
 
     if (hasState) {
       parlay::parallel_for(
-          0, size,
-          [&](size_t i) {
-            I[i] = (i < numberKeep) ? Ihold[i] : numberDone + i;
-            keep[i] = state[i].reserve(I[i]);
-          },
-          loop_granularity);
+        0,
+        size,
+        [&](size_t i) {
+          I[i] = (i < numberKeep) ? Ihold[i] : numberDone + i;
+          keep[i] = state[i].reserve(I[i]);
+        },
+        loop_granularity);
     } else {
       parlay::parallel_for(
-          0, size,
-          [&](size_t i) {
-            I[i] = (i < numberKeep) ? Ihold[i] : numberDone + i;
-            keep[i] = step.reserve(I[i]);
-          },
-          loop_granularity);
+        0,
+        size,
+        [&](size_t i) {
+          I[i] = (i < numberKeep) ? Ihold[i] : numberDone + i;
+          keep[i] = step.reserve(I[i]);
+        },
+        loop_granularity);
     }
 
     if (hasState) {
       parlay::parallel_for(
-          0, size,
-          [&](size_t i) {
-            if (keep[i]) keep[i] = !state[i].commit(I[i]);
-          },
-          loop_granularity);
+        0,
+        size,
+        [&](size_t i) {
+          if (keep[i])
+            keep[i] = !state[i].commit(I[i]);
+        },
+        loop_granularity);
     } else {
       parlay::parallel_for(
-          0, size,
-          [&](size_t i) {
-            if (keep[i]) keep[i] = !step.commit(I[i]);
-          },
-          loop_granularity);
+        0,
+        size,
+        [&](size_t i) {
+          if (keep[i])
+            keep[i] = !step.commit(I[i]);
+        },
+        loop_granularity);
     }
 
     // keep iterations that failed for next round
@@ -129,4 +147,4 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
   }
   return totalProcessed;
 }
-}  // namespace pbbs
+} // namespace pbbs

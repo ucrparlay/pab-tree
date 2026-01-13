@@ -4,17 +4,21 @@
 #include "../b_tree.h"
 
 namespace pmos {
-template <typename TT>
-TT::Box BTree<TT>::GetBox(TT::Box const& a, TT::Box const& b) {
+template<typename TT>
+TT::Box
+BTree<TT>::GetBox(TT::Box const& a, TT::Box const& b)
+{
   return typename TT::Box(TT::Num::Min(a.first, b.first),
                           TT::Num::Max(a.second, b.second));
 }
 
 // TODO: this can be parallelized (needs to define the min/max of a box)
-template <typename TT>
-TT::Box BTree<TT>::GetBox(TT::EntrySeq const& ele_seq) {
+template<typename TT>
+TT::Box
+BTree<TT>::GetBox(TT::EntrySeq const& ele_seq)
+{
   auto box =
-      std::make_pair(Entry::GetKey(ele_seq[0]), Entry::GetKey(ele_seq[0]));
+    std::make_pair(Entry::GetKey(ele_seq[0]), Entry::GetKey(ele_seq[0]));
   for (int i = 1; i < ele_seq.size(); i++) {
     auto key = Entry::GetKey(ele_seq[i]);
     box.first = TT::Num::Min(box.first, key);
@@ -23,8 +27,10 @@ TT::Box BTree<TT>::GetBox(TT::EntrySeq const& ele_seq) {
   return box;
 }
 
-template <typename TT>
-TT::Box BTree<TT>::GetBox(Node const* T) {
+template<typename TT>
+TT::Box
+BTree<TT>::GetBox(Node const* T)
+{
   if (T->is_leaf) {
     Leaf const* TL = static_cast<Leaf const*>(T);
     return GetBox(TL->GetEle());
@@ -38,8 +44,10 @@ TT::Box BTree<TT>::GetBox(Node const* T) {
   }
 }
 
-template <typename TT>
-TT::Box BTree<TT>::GetBox(TT::BoxSeq const& box_seq) {
+template<typename TT>
+TT::Box
+BTree<TT>::GetBox(TT::BoxSeq const& box_seq)
+{
   auto box = box_seq[0];
   for (int i = 1; i < box_seq.size(); i++) {
     box.first = TT::Num::Min(box.first, box_seq[i].first);
@@ -47,6 +55,6 @@ TT::Box BTree<TT>::GetBox(TT::BoxSeq const& box_seq) {
   }
   return box;
 }
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_B_TREE_IMPL_BOX_OP_HPP_
+#endif // PMOS_B_TREE_IMPL_BOX_OP_HPP_

@@ -11,8 +11,9 @@
 
 namespace pmos {
 
-template <class EleType>
-struct EleWrapper : EleType {
+template<class EleType>
+struct EleWrapper : EleType
+{
   using E = typename EleType::E;
   using K = typename EleType::K;
   using V = typename EleType::V;
@@ -20,21 +21,26 @@ struct EleWrapper : EleType {
 
   static inline auto GetKey(E const e) { return EleType::GetKey(e); }
   static inline auto GetVal(E const e) { return EleType::GetVal(e); }
-  static inline E ToEntry(K const& k, V const& v) {
+  static inline E ToEntry(K const& k, V const& v)
+  {
     return EleType::ToEntry(k, v);
   };
 };
 
-template <typename EleType, uint kBufferSize, typename LeafAugType,
-          typename InteriorAugType, uint_fast8_t kSkHeightVal,
-          typename NodeType>
-class TypeTrait {
- public:
+template<typename EleType,
+         uint kBufferSize,
+         typename LeafAugType,
+         typename InteriorAugType,
+         uint_fast8_t kSkHeightVal,
+         typename NodeType>
+class TypeTrait
+{
+public:
   // NOTE: element type
   using E = EleType::E;
   using K = typename EleType::K;
   using V = typename EleType::V;
-  using Entry = EleType;  // NOTE: abstract type to access E
+  using Entry = EleType; // NOTE: abstract type to access E
 
   // NOTE: general type
   using Num = Num_Comparator<K>;
@@ -57,7 +63,7 @@ class TypeTrait {
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
   // TODO:: needs to check this value as well
   using BucketType =
-      std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
+    std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
   using BallsType = uint_fast32_t;
   static constexpr BucketType const kPivotNum = (1 << kSkeletonHeight) - 1;
   static constexpr BucketType const kBucketNum = 1 << kSkeletonHeight;
@@ -68,20 +74,33 @@ class TypeTrait {
   using BallSeq = parlay::sequence<BallsType>;
 };
 
-template <typename EleType, uint kBufferSize, typename LeafAugType,
-          typename InteriorAugType, uint_fast8_t kSkHeightVal,
-          typename NodeType>
+template<typename EleType,
+         uint kBufferSize,
+         typename LeafAugType,
+         typename InteriorAugType,
+         uint_fast8_t kSkHeightVal,
+         typename NodeType>
 class BTreeTypeTrait
-    : public TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
-                       InteriorAugType, kSkHeightVal, NodeType> {
- public:
-  using BT = TypeTrait<EleWrapper<EleType>, kBufferSize, LeafAugType,
-                       InteriorAugType, kSkHeightVal, NodeType>;
+  : public TypeTrait<EleWrapper<EleType>,
+                     kBufferSize,
+                     LeafAugType,
+                     InteriorAugType,
+                     kSkHeightVal,
+                     NodeType>
+{
+public:
+  using BT = TypeTrait<EleWrapper<EleType>,
+                       kBufferSize,
+                       LeafAugType,
+                       InteriorAugType,
+                       kSkHeightVal,
+                       NodeType>;
   static uint const kBufMDFac = 2;
   static uint const kBufUBFac = 4;
   using SizeT = uint_fast32_t;
   using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 255u),
-                                      uint_fast16_t, uint_fast8_t>;
+                                      uint_fast16_t,
+                                      uint_fast8_t>;
   static constexpr BufSizeT kBuf = kBufferSize;
   static constexpr BufSizeT kBufLB = kBufferSize;
   static constexpr BufSizeT kBufMD = kBufMDFac * kBufferSize;
@@ -92,6 +111,6 @@ class BTreeTypeTrait
   using SplitSlice = parlay::slice<Split*, Split*>;
 };
 
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_DEPENDENCE_TYPE_TRAIT_H_
+#endif // PMOS_DEPENDENCE_TYPE_TRAIT_H_

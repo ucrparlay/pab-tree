@@ -7,8 +7,9 @@
 //   MAPS and SETS
 // *******************************************
 
-template <class Seq, class EntryT>
-struct map_ops : Seq {
+template<class Seq, class EntryT>
+struct map_ops : Seq
+{
   using Entry = EntryT;
   using node = typename Seq::node;
   using ET = typename Seq::ET;
@@ -22,7 +23,8 @@ struct map_ops : Seq {
   // static K get_key(node *s) { return Entry::get_key(Seq::get_entry(s));}
   // static V get_val(node *s) { return Entry::get_val(Seq::get_entry(s));}
 
-  static node* find(node* b, K const& key) {
+  static node* find(node* b, K const& key)
+  {
     while (b) {
       if (Entry::comp(key, get_key(b)))
         b = b->lc;
@@ -35,8 +37,9 @@ struct map_ops : Seq {
     return NULL;
   }
 
-  template <class BinaryOp>
-  static inline void update_value(node* a, BinaryOp const& op) {
+  template<class BinaryOp>
+  static inline void update_value(node* a, BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     Entry::set_val(re, op(re));
     Seq::set_entry(a, re);
@@ -53,7 +56,8 @@ struct map_ops : Seq {
         return insert(b, new_entry, replace);
   }*/
 
-  static node* previous(node* b, K const& key) {
+  static node* previous(node* b, K const& key)
+  {
     node* r = NULL;
     while (b) {
       if (Entry::comp(get_key(b), key)) {
@@ -65,7 +69,8 @@ struct map_ops : Seq {
     return r;
   }
 
-  static node* next(node* b, K const& key) {
+  static node* next(node* b, K const& key)
+  {
     node* r = NULL;
     while (b) {
       if (Entry::comp(key, get_key(b))) {
@@ -77,7 +82,8 @@ struct map_ops : Seq {
     return r;
   }
 
-  static size_t rank(node* b, K const& key) {
+  static size_t rank(node* b, K const& key)
+  {
     size_t ret = 0;
     while (b) {
       if (Entry::comp(get_key(b), key)) {
@@ -89,18 +95,25 @@ struct map_ops : Seq {
     return ret;
   }
 
-  struct split_info {
+  struct split_info
+  {
     split_info(node* first, node* second, bool removed)
-        : first(first), second(second), removed(removed) {};
+      : first(first)
+      , second(second)
+      , removed(removed) {};
     split_info(node* first, ET entry, node* second)
-        : first(first), second(second), entry(entry), removed(true) {};
+      : first(first)
+      , second(second)
+      , entry(entry)
+      , removed(true) {};
     node* first;
     node* second;
     ET entry;
     bool removed;
   };
 
-  static split_info split_copy(node* bst, K const& e) {
+  static split_info split_copy(node* bst, K const& e)
+  {
     if (!bst)
       return split_info(NULL, NULL, false);
 
@@ -128,7 +141,8 @@ struct map_ops : Seq {
 
   // A version that will reuse a node if ref count is 1
   // Will decrement ref count of root if it is copied
-  static split_info split_inplace(node* bst, K const& e) {
+  static split_info split_inplace(node* bst, K const& e)
+  {
     if (!bst)
       return split_info(NULL, NULL, false);
     else if (bst->ref_cnt > 1) {
@@ -152,13 +166,17 @@ struct map_ops : Seq {
     }
   }
 
-  static inline split_info split(node* bst, K const& e) {
+  static inline split_info split(node* bst, K const& e)
+  {
     return split_inplace(bst, e);
   }
 
-  template <class BinaryOp>
-  static inline void combine_values(node* a, ET e, bool reverse,
-                                    BinaryOp const& op) {
+  template<class BinaryOp>
+  static inline void combine_values(node* a,
+                                    ET e,
+                                    bool reverse,
+                                    BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     // std::cout << Entry::get_val(re) << " " << Entry::get_val(e) << std::endl;
     if (reverse)
@@ -168,30 +186,35 @@ struct map_ops : Seq {
     Seq::set_entry(a, re);
   }
 
-  template <class VE, class BinaryOp>
-  static inline void combine_values_v(node* a, VE v0, BinaryOp const& op) {
+  template<class VE, class BinaryOp>
+  static inline void combine_values_v(node* a, VE v0, BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     Entry::set_val(re, op(Entry::get_val(re), v0));
     Seq::set_entry(a, re);
   }
 
-  template <class VE, class BinaryOp>
-  static inline void update_valuev(node* a, VE v0, BinaryOp const& op) {
+  template<class VE, class BinaryOp>
+  static inline void update_valuev(node* a, VE v0, BinaryOp const& op)
+  {
     ET re = Seq::get_entry(a);
     Entry::set_val(re, op(Entry::get_val(re), v0));
     Seq::set_entry(a, re);
   }
 
   // valid only if key type is printable
-  static void output_r(node* t) {
-    if (!t) return;
+  static void output_r(node* t)
+  {
+    if (!t)
+      return;
     output_r(t->lc);
     std::cout << get_key(t) << " ";
     output_r(t->rc);
   }
 
   // valid only if key type is printable
-  static void output(node* t) {
+  static void output(node* t)
+  {
     output_r(t);
     std::cout << std::endl;
   }
@@ -200,11 +223,16 @@ struct map_ops : Seq {
   // extra_b2 means there is an extra pointer to b2 not included
   // in the reference count.  It is used as an optimization to reduce
   // the number of ref_cnt updates.
-  template <class BinaryOp>
-  static node* uniont(node* b1, node* b2, BinaryOp const op,
-                      bool extra_b2 = false) {
-    if (!b1) return GC::inc_if(b2, extra_b2);
-    if (!b2) return b1;
+  template<class BinaryOp>
+  static node* uniont(node* b1,
+                      node* b2,
+                      BinaryOp const op,
+                      bool extra_b2 = false)
+  {
+    if (!b1)
+      return GC::inc_if(b2, extra_b2);
+    if (!b2)
+      return b1;
 
     size_t n1 = Seq::size(b1);
     size_t n2 = Seq::size(b2);
@@ -214,22 +242,28 @@ struct map_ops : Seq {
     split_info bsts = split(b1, get_key(b2));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(n1, n2),
-        [&]() { return uniont(bsts.first, b2->lc, op, copy); },
-        [&]() { return uniont(bsts.second, b2->rc, op, copy); });
+      utils::do_parallel(n1, n2),
+      [&]() { return uniont(bsts.first, b2->lc, op, copy); },
+      [&]() { return uniont(bsts.second, b2->rc, op, copy); });
 
-    if (copy && !extra_b2) GC::decrement_recursive(b2);
-    if (bsts.removed) combine_values(r, bsts.entry, true, op);
+    if (copy && !extra_b2)
+      GC::decrement_recursive(b2);
+    if (bsts.removed)
+      combine_values(r, bsts.entry, true, op);
     return Seq::node_join(P.first, P.second, r);
   }
 
   // extra_b2 is for b2
-  template <class Seq1, class Seq2, class BinaryOp>
-  static node* intersect(typename Seq1::node* b1, typename Seq2::node* b2,
-                         BinaryOp const& op, bool extra_b2 = false) {
+  template<class Seq1, class Seq2, class BinaryOp>
+  static node* intersect(typename Seq1::node* b1,
+                         typename Seq2::node* b2,
+                         BinaryOp const& op,
+                         bool extra_b2 = false)
+  {
     // std::cout << "size: " << n1 << " " << n2 << std::endl;
     if (!b1) {
-      if (!extra_b2) Seq2::GC::decrement_recursive(b2);
+      if (!extra_b2)
+        Seq2::GC::decrement_recursive(b2);
       return NULL;
     }
     if (!b2) {
@@ -242,13 +276,14 @@ struct map_ops : Seq {
     typename Seq1::split_info bsts = Seq1::split(b1, Seq2::get_key(b2));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(n1, n2),
-        [&]() { return intersect<Seq1, Seq2>(bsts.first, b2->lc, op, copy); },
-        [&]() { return intersect<Seq1, Seq2>(bsts.second, b2->rc, op, copy); });
+      utils::do_parallel(n1, n2),
+      [&]() { return intersect<Seq1, Seq2>(bsts.first, b2->lc, op, copy); },
+      [&]() { return intersect<Seq1, Seq2>(bsts.second, b2->rc, op, copy); });
 
     if (bsts.removed) {
-      ET e(Seq2::get_key(b2), op(Seq1::Entry::get_val(bsts.entry),
-                                 Seq2::Entry::get_val(Seq2::get_entry(b2))));
+      ET e(Seq2::get_key(b2),
+           op(Seq1::Entry::get_val(bsts.entry),
+              Seq2::Entry::get_val(Seq2::get_entry(b2))));
       node* r = Seq::make_node(e);
       // if (copy && !extra_b2) Seq2::GC::decrement_recursive(b2);
       Seq2::GC::dec_if(b2, copy, extra_b2);
@@ -260,21 +295,23 @@ struct map_ops : Seq {
     }
   }
 
-  static node* difference(node* b1, node* b2, bool extra_b1 = false) {
+  static node* difference(node* b1, node* b2, bool extra_b1 = false)
+  {
     if (!b1) {
       GC::decrement_recursive(b2);
       return NULL;
     }
-    if (!b2) return GC::inc_if(b1, extra_b1);
+    if (!b2)
+      return GC::inc_if(b1, extra_b1);
     size_t n1 = Seq::size(b1);
     size_t n2 = Seq::size(b2);
     bool copy = extra_b1 || (b1->ref_cnt > 1);
     split_info bsts = split(b2, get_key(b1));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(n1, n2),
-        [&]() { return difference(b1->lc, bsts.first, copy); },
-        [&]() { return difference(b1->rc, bsts.second, copy); });
+      utils::do_parallel(n1, n2),
+      [&]() { return difference(b1->lc, bsts.first, copy); },
+      [&]() { return difference(b1->rc, bsts.second, copy); });
 
     if (bsts.removed) {
       GC::dec_if(b1, copy, extra_b1);
@@ -284,7 +321,8 @@ struct map_ops : Seq {
     }
   }
 
-  static node* range_root(node* b, K const& key_left, K const& key_right) {
+  static node* range_root(node* b, K const& key_left, K const& key_right)
+  {
     while (b) {
       if (Entry::comp(key_right, get_key(b))) {
         b = b->lc;
@@ -299,36 +337,47 @@ struct map_ops : Seq {
     return b;
   }
 
-  static node* left(node* b, K const& e) {
-    if (!b) return NULL;
-    if (Entry::comp(e, get_key(b))) return left(b->lc, e);
+  static node* left(node* b, K const& e)
+  {
+    if (!b)
+      return NULL;
+    if (Entry::comp(e, get_key(b)))
+      return left(b->lc, e);
     node* r = Seq::make_node(Seq::get_entry(b));
     GC::increment(b->lc);
     return Seq::node_join(b->lc, left(b->rc, e), r);
   }
 
-  static node* right(node* b, K const& e) {
-    if (!b) return NULL;
-    if (Entry::comp(get_key(b), e)) return right(b->rc, e);
+  static node* right(node* b, K const& e)
+  {
+    if (!b)
+      return NULL;
+    if (Entry::comp(get_key(b), e))
+      return right(b->rc, e);
     node* r = Seq::make_node(Seq::get_entry(b));
     GC::increment(b->rc);
     return Seq::node_join(right(b->lc, e), b->rc, r);
   }
 
-  static node* range(node* b, K const& low, K const& high) {
+  static node* range(node* b, K const& low, K const& high)
+  {
     node* r = range_root(b, low, high);
-    if (!r) return NULL;
+    if (!r)
+      return NULL;
     node* rr = Seq::make_node(Seq::get_entry(r));
     return Seq::node_join(right(r->lc, low), left(r->rc, high), rr);
   }
 
-  static node* left_number(node* b, size_t rg) {
-    if (!b) return NULL;
-    if (rg == 0) return NULL;
+  static node* left_number(node* b, size_t rg)
+  {
+    if (!b)
+      return NULL;
+    if (rg == 0)
+      return NULL;
     if (Seq::size(b) <= rg) {
       GC::increment(b);
       return b;
-    }  //?
+    } //?
     size_t x = Seq::size(b->lc);
     if (x < rg) {
       node* rr = Seq::make_node(Seq::get_entry(b));
@@ -340,7 +389,8 @@ struct map_ops : Seq {
     }
   }
 
-  static node* range_num(node* b, K const& low, size_t rg) {
+  static node* range_num(node* b, K const& low, size_t rg)
+  {
     while (b) {
       if (Entry::comp(get_key(b), low)) {
         b = b->rc;
@@ -348,23 +398,31 @@ struct map_ops : Seq {
       }
       break;
     }
-    if (!b) return NULL;
+    if (!b)
+      return NULL;
     node* ltree = range_num(b->lc, low, rg);
     size_t x = Seq::size(ltree);
-    if (x == rg) return ltree;
+    if (x == rg)
+      return ltree;
     node* rtree = left_number(b->rc, rg - x - 1);
     node* rr = Seq::make_node(Seq::get_entry(b));
     return Seq::node_join(ltree, rtree, rr);
     ;
   }
 
-  template <class Map, class Reduce>
+  template<class Map, class Reduce>
   static std::pair<typename Reduce::T, size_t> left_number_mr(
-      node* b, size_t rg, Map const& mp, Reduce const& rdc,
-      size_t grain = utils::node_limit) {
+    node* b,
+    size_t rg,
+    Map const& mp,
+    Reduce const& rdc,
+    size_t grain = utils::node_limit)
+  {
     using T = typename Reduce::T;
-    if (!b) return std::make_pair(rdc.identity(), 0);
-    if (rg == 0) return std::make_pair(rdc.identity(), 0);
+    if (!b)
+      return std::make_pair(rdc.identity(), 0);
+    if (rg == 0)
+      return std::make_pair(rdc.identity(), 0);
     size_t sz = Seq::size(b);
     if (sz <= rg) {
       // T res = Seq::map_reducef(b, mp, rdc, I);
@@ -386,10 +444,15 @@ struct map_ops : Seq {
     }
   }
 
-  template <class Map, class Reduce>
+  template<class Map, class Reduce>
   static std::pair<typename Reduce::T, size_t> range_num_mr(
-      node* b, K const& low, size_t rg, Map const& mp, Reduce const& rdc,
-      size_t grain = utils::node_limit) {
+    node* b,
+    K const& low,
+    size_t rg,
+    Map const& mp,
+    Reduce const& rdc,
+    size_t grain = utils::node_limit)
+  {
     using T = typename Reduce::T;
     while (b) {
       if (Entry::comp(get_key(b), low)) {
@@ -398,12 +461,14 @@ struct map_ops : Seq {
       }
       break;
     }
-    if (!b) return std::make_pair(rdc.identity(), 0);
+    if (!b)
+      return std::make_pair(rdc.identity(), 0);
     using ptype = std::pair<T, size_t>;
 
     ptype ltree = range_num_mr(b->lc, low, rg, mp, rdc);
     size_t x = ltree.second;
-    if (x == rg) return ltree;
+    if (x == rg)
+      return ltree;
     ptype rtree = left_number_mr(b->rc, rg - x - 1, mp, rdc);
     T rr = mp(Seq::get_entry(b));
     size_t s = x + 1 + rtree.second;
@@ -412,10 +477,15 @@ struct map_ops : Seq {
     return std::make_pair(rr, s);
   }
 
-  template <class Func, class J>
-  static node* insert_j(node* b, const ET& e, Func const& f, J const& join,
-                        bool extra_ptr = false) {
-    if (!b) return Seq::single(e);
+  template<class Func, class J>
+  static node* insert_j(node* b,
+                        const ET& e,
+                        Func const& f,
+                        J const& join,
+                        bool extra_ptr = false)
+  {
+    if (!b)
+      return Seq::single(e);
     bool copy = extra_ptr || (b->ref_cnt > 1);
 
     if (Entry::comp(get_key(b), Entry::get_key(e))) {
@@ -440,19 +510,27 @@ struct map_ops : Seq {
     }
   }
 
-  template <class Func>
-  static node* insert(node* b, const ET& e, Func const& f,
-                      bool extra_ptr = false) {
+  template<class Func>
+  static node* insert(node* b,
+                      const ET& e,
+                      Func const& f,
+                      bool extra_ptr = false)
+  {
     auto join = [](node* l, node* r, node* m) {
       return Seq::node_join(l, r, m);
     };
     return insert_j(b, e, f, join, extra_ptr);
   }
 
-  template <class Func, class J>
-  static node* update_j(node* b, K const& k, Func const& f, J const& join,
-                        bool extra_ptr = false) {
-    if (!b) return b;
+  template<class Func, class J>
+  static node* update_j(node* b,
+                        K const& k,
+                        Func const& f,
+                        J const& join,
+                        bool extra_ptr = false)
+  {
+    if (!b)
+      return b;
     bool copy = extra_ptr || (b->ref_cnt > 1);
 
     if (Entry::comp(get_key(b), k)) {
@@ -475,17 +553,22 @@ struct map_ops : Seq {
     }
   }
 
-  template <class Func>
-  static node* update(node* b, K const& k, Func const& f,
-                      bool extra_ptr = false) {
+  template<class Func>
+  static node* update(node* b,
+                      K const& k,
+                      Func const& f,
+                      bool extra_ptr = false)
+  {
     auto join = [](node* l, node* r, node* m) {
       return Seq::node_join(l, r, m);
     };
     return update_j(b, k, f, join, extra_ptr);
   }
 
-  static node* deletet(node* b, K const& k, bool extra_ptr = false) {
-    if (!b) return Seq::empty();
+  static node* deletet(node* b, K const& k, bool extra_ptr = false)
+  {
+    if (!b)
+      return Seq::empty();
 
     bool copy = extra_ptr || (b->ref_cnt > 1);
     if (Entry::comp(get_key(b), k)) {
@@ -502,16 +585,19 @@ struct map_ops : Seq {
       return o;
     }
   }
-  template <typename F, typename AT>
-  static size_t PAM_linear_search(AT* A, size_t size, F const& less) {
+  template<typename F, typename AT>
+  static size_t PAM_linear_search(AT* A, size_t size, F const& less)
+  {
     for (size_t i = 0; i < size; i++)
-      if (!less(A[i])) return i;
+      if (!less(A[i]))
+        return i;
     return size;
   }
 
   // ?? why does PAM have its own binary search?
-  template <typename F, typename AT>
-  static size_t PAM_binary_search(AT* A, size_t n, F const& less) {
+  template<typename F, typename AT>
+  static size_t PAM_binary_search(AT* A, size_t n, F const& less)
+  {
     size_t start = 0;
     size_t end = n;
     while (end - start > parlay::internal::_binary_search_base) {
@@ -525,12 +611,16 @@ struct map_ops : Seq {
     return x;
   }
 
-  static node* multi_delete_sorted(node* b, K* A, size_t n,
-                                   bool extra_ptr = false) {
+  static node* multi_delete_sorted(node* b,
+                                   K* A,
+                                   size_t n,
+                                   bool extra_ptr = false)
+  {
     if (!b) {
       return NULL;
     }
-    if (n == 0) return GC::inc_if(b, extra_ptr);
+    if (n == 0)
+      return GC::inc_if(b, extra_ptr);
 
     bool copy = extra_ptr || (b->ref_cnt > 1);
     K bk = get_key(b);
@@ -546,11 +636,11 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid]));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(Seq::size(b), n),
-        [&]() { return multi_delete_sorted(b->lc, A, mid, copy); },
-        [&]() {
-          return multi_delete_sorted(b->rc, A + mid + dup, n - mid - dup, copy);
-        });
+      utils::do_parallel(Seq::size(b), n),
+      [&]() { return multi_delete_sorted(b->lc, A, mid, copy); },
+      [&]() {
+        return multi_delete_sorted(b->rc, A + mid + dup, n - mid - dup, copy);
+      });
 
     if (!dup) {
       node* r = GC::copy_if(b, copy, extra_ptr);
@@ -564,12 +654,17 @@ struct map_ops : Seq {
   // assumes array A is of length n and is sorted with no duplicates
   // combine: <V, VE> -> V
   // map: VE -> V
-  template <class VE, class CombineOp>
-  static node* multi_delete_sorted_map(node* b, std::pair<K, VE>* A, size_t n,
+  template<class VE, class CombineOp>
+  static node* multi_delete_sorted_map(node* b,
+                                       std::pair<K, VE>* A,
+                                       size_t n,
                                        CombineOp const& combine_op,
-                                       bool extra_ptr = false) {
-    if (!b) return nullptr;
-    if (n == 0) return GC::inc_if(b, extra_ptr);
+                                       bool extra_ptr = false)
+  {
+    if (!b)
+      return nullptr;
+    if (n == 0)
+      return GC::inc_if(b, extra_ptr);
 
     bool copy = extra_ptr || (b->ref_cnt > 1);
     K bk = get_key(b);
@@ -582,29 +677,35 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid].first));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(Seq::size(b), n),
-        [&]() {
-          return multi_delete_sorted_map(b->lc, A, mid, combine_op, copy);
-        },
-        [&]() {
-          return multi_delete_sorted_map(b->rc, A + mid + dup, n - mid - dup,
-                                         combine_op, copy);
-        });
+      utils::do_parallel(Seq::size(b), n),
+      [&]() {
+        return multi_delete_sorted_map(b->lc, A, mid, combine_op, copy);
+      },
+      [&]() {
+        return multi_delete_sorted_map(
+          b->rc, A + mid + dup, n - mid - dup, combine_op, copy);
+      });
 
     node* r = GC::copy_if(b, copy, extra_ptr);
-    if (dup) combine_values_v(r, A[mid].second, combine_op);
+    if (dup)
+      combine_values_v(r, A[mid].second, combine_op);
     return Seq::node_join(P.first, P.second, r);
   }
 
   // assumes array A is of length n and is sorted with no duplicates
-  template <class BinaryOp>
-  static node* multi_insert_sorted(node* b, ET* A, size_t n, BinaryOp const& op,
-                                   bool extra_ptr = false) {
+  template<class BinaryOp>
+  static node* multi_insert_sorted(node* b,
+                                   ET* A,
+                                   size_t n,
+                                   BinaryOp const& op,
+                                   bool extra_ptr = false)
+  {
     if (!b) {
       node* x = Seq::from_array(A, n);
       return x;
     }
-    if (n == 0) return GC::inc_if(b, extra_ptr);
+    if (n == 0)
+      return GC::inc_if(b, extra_ptr);
 
     bool copy = extra_ptr || (b->ref_cnt > 1);
     K bk = get_key(b);
@@ -622,33 +723,38 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, Entry::get_key(A[mid])));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(Seq::size(b), n),
-        [&]() { return multi_insert_sorted(b->lc, A, mid, op, copy); },
-        [&]() {
-          return multi_insert_sorted(b->rc, A + mid + dup, n - mid - dup, op,
-                                     copy);
-        });
+      utils::do_parallel(Seq::size(b), n),
+      [&]() { return multi_insert_sorted(b->lc, A, mid, op, copy); },
+      [&]() {
+        return multi_insert_sorted(
+          b->rc, A + mid + dup, n - mid - dup, op, copy);
+      });
 
     node* r = GC::copy_if(b, copy, extra_ptr);
-    if (dup) combine_values(r, A[mid], false, op);
+    if (dup)
+      combine_values(r, A[mid], false, op);
     return Seq::node_join(P.first, P.second, r);
   }
 
   // Assumes the input is sorted and there are no duplicate keys
-  template <class VE, class MapOp>
-  static node* from_array_map(std::pair<K, VE>* A, size_t n,
-                              MapOp const& map_op) {
+  template<class VE, class MapOp>
+  static node* from_array_map(std::pair<K, VE>* A,
+                              size_t n,
+                              MapOp const& map_op)
+  {
     // cout << "from_array: " << n << endl;
-    if (n <= 0) return Seq::empty();
-    if (n == 1) return Seq::single(ET(A[0].first, map_op(A[0].second)));
+    if (n <= 0)
+      return Seq::empty();
+    if (n == 1)
+      return Seq::single(ET(A[0].first, map_op(A[0].second)));
     size_t mid = n / 2;
 
     node* m = Seq::make_node(ET(A[mid].first, map_op(A[mid].second)));
 
     auto P = utils::fork<node*>(
-        n >= utils::node_limit,
-        [&]() { return from_array_map(A, mid, map_op); },
-        [&]() { return from_array_map(A + mid + 1, n - mid - 1, map_op); });
+      n >= utils::node_limit,
+      [&]() { return from_array_map(A, mid, map_op); },
+      [&]() { return from_array_map(A + mid + 1, n - mid - 1, map_op); });
 
     return Seq::node_join(P.first, P.second, m);
   }
@@ -656,16 +762,20 @@ struct map_ops : Seq {
   // assumes array A is of length n and is sorted with no duplicates
   // combine: <V, VE> -> V
   // map: VE -> V
-  template <class VE, class CombineOp, class MapOp>
-  static node* multi_insert_sorted_map(node* b, std::pair<K, VE>* A, size_t n,
+  template<class VE, class CombineOp, class MapOp>
+  static node* multi_insert_sorted_map(node* b,
+                                       std::pair<K, VE>* A,
+                                       size_t n,
                                        CombineOp const& combine_op,
                                        MapOp const& map_op,
-                                       bool extra_ptr = false) {
+                                       bool extra_ptr = false)
+  {
     if (!b) {
       node* x = from_array_map(A, n, map_op);
       return x;
     }
-    if (n == 0) return GC::inc_if(b, extra_ptr);
+    if (n == 0)
+      return GC::inc_if(b, extra_ptr);
 
     bool copy = extra_ptr || (b->ref_cnt > 1);
     K bk = get_key(b);
@@ -679,27 +789,33 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid].first));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(Seq::size(b), n),
-        [&]() {
-          return multi_insert_sorted_map(b->lc, A, mid, combine_op, map_op,
-                                         copy);
-        },
-        [&]() {
-          return multi_insert_sorted_map(b->rc, A + mid + dup, n - mid - dup,
-                                         combine_op, map_op, copy);
-        });
+      utils::do_parallel(Seq::size(b), n),
+      [&]() {
+        return multi_insert_sorted_map(b->lc, A, mid, combine_op, map_op, copy);
+      },
+      [&]() {
+        return multi_insert_sorted_map(
+          b->rc, A + mid + dup, n - mid - dup, combine_op, map_op, copy);
+      });
 
     node* r = GC::copy_if(b, copy, extra_ptr);
-    if (dup) combine_values_v(r, A[mid].second, combine_op);
+    if (dup)
+      combine_values_v(r, A[mid].second, combine_op);
     return Seq::node_join(P.first, P.second, r);
   }
 
   // ?? why are we using pointers
-  template <class VE, class BinaryOp>
-  static node* multi_update_sorted(node* b, std::pair<K, VE>* A, size_t n,
-                                   BinaryOp const& op, bool extra_ptr = false) {
-    if (!b) return NULL;
-    if (n == 0) return GC::inc_if(b, extra_ptr);
+  template<class VE, class BinaryOp>
+  static node* multi_update_sorted(node* b,
+                                   std::pair<K, VE>* A,
+                                   size_t n,
+                                   BinaryOp const& op,
+                                   bool extra_ptr = false)
+  {
+    if (!b)
+      return NULL;
+    if (n == 0)
+      return GC::inc_if(b, extra_ptr);
     bool copy = extra_ptr || (b->ref_cnt > 1);
     K bk = get_key(b);
     auto less_val = [&](std::pair<K, VE>& a) -> bool {
@@ -710,55 +826,63 @@ struct map_ops : Seq {
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid].first));
 
     auto P = utils::fork<node*>(
-        utils::do_parallel(Seq::size(b), n),
-        [&]() { return multi_update_sorted(b->lc, A, mid, op, copy); },
-        [&]() {
-          return multi_update_sorted(b->rc, A + mid + dup, n - mid - dup, op,
-                                     copy);
-        });
+      utils::do_parallel(Seq::size(b), n),
+      [&]() { return multi_update_sorted(b->lc, A, mid, op, copy); },
+      [&]() {
+        return multi_update_sorted(
+          b->rc, A + mid + dup, n - mid - dup, op, copy);
+      });
 
     node* r = GC::copy_if(b, copy, extra_ptr);
-    if (dup) update_valuev(r, A[mid].second, op);
+    if (dup)
+      update_valuev(r, A[mid].second, op);
     return Seq::node_join(P.first, P.second, r);
   }
 
-  static bool multi_find_sorted(node* b, K* A, size_t n, V* ret,
-                                size_t offset) {
-    if (!b) return true;
-    if (n == 0) return true;
+  static bool multi_find_sorted(node* b, K* A, size_t n, V* ret, size_t offset)
+  {
+    if (!b)
+      return true;
+    if (n == 0)
+      return true;
     K bk = get_key(b);
     auto less_val = [&](K a) -> bool { return Entry::comp(a, bk); };
     size_t mid =
-        parlay::internal::binary_search(parlay::make_slice(A, A + n), less_val);
+      parlay::internal::binary_search(parlay::make_slice(A, A + n), less_val);
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid]));
     utils::fork<bool>(
-        utils::do_parallel(Seq::size(b), n),
-        [&]() { return multi_find_sorted(b->lc, A, mid, ret, offset); },
-        [&]() {
-          return multi_find_sorted(b->rc, A + mid + dup, n - mid - dup, ret,
-                                   offset + mid + dup);
-        });
+      utils::do_parallel(Seq::size(b), n),
+      [&]() { return multi_find_sorted(b->lc, A, mid, ret, offset); },
+      [&]() {
+        return multi_find_sorted(
+          b->rc, A + mid + dup, n - mid - dup, ret, offset + mid + dup);
+      });
 
-    if (dup) ret[offset + mid] = get_val(b);
+    if (dup)
+      ret[offset + mid] = get_val(b);
     return true;
   }
 
-  template <class InTree, class Func>
-  static node* map(typename InTree::node* b, Func const& f) {
+  template<class InTree, class Func>
+  static node* map(typename InTree::node* b, Func const& f)
+  {
     auto g = [&](typename InTree::ET& a) {
       return ET(InTree::Entry::get_key(a), f(a));
     };
     return Seq::template map<InTree>(b, g);
   }
 
-  template <class InTree, class Func>
-  static node* map_set(typename InTree::node* b, Func const& f) {
+  template<class InTree, class Func>
+  static node* map_set(typename InTree::node* b, Func const& f)
+  {
     return Seq::template map<InTree>(b, f);
   }
 
-  template <class Seq1, class Func>
-  static node* map_filter(typename Seq1::node* b, Func const& f,
-                          size_t granularity = utils::node_limit) {
+  template<class Seq1, class Func>
+  static node* map_filter(typename Seq1::node* b,
+                          Func const& f,
+                          size_t granularity = utils::node_limit)
+  {
     auto g = [&](typename Seq1::ET& a) {
       std::optional<V> v = f(a);
       if (v)

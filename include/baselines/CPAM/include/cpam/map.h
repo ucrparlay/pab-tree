@@ -14,9 +14,10 @@ using namespace std;
 
 namespace cpam {
 
-template <class _Entry, class Join_Tree>
-class map_ {
- public:
+template<class _Entry, class Join_Tree>
+class map_
+{
+public:
   using Entry = _Entry;
   using Seq_Tree = sequence_ops<Join_Tree>;
   using Tree = map_ops<Seq_Tree, Entry>;
@@ -36,7 +37,8 @@ class map_ {
 
   // initializing, reserving and finishing
   static void init() { GC::init(); }
-  static void reserve(size_t n, bool randomize = false) {
+  static void reserve(size_t n, bool randomize = false)
+  {
     GC::reserve(n, randomize);
   };
   static void finish() { GC::finish(); }
@@ -44,10 +46,15 @@ class map_ {
   void swap(map_& b) { std::swap(root, b.root); }
 
   // empty constructor
-  map_() : root(NULL) { GC::init(); }
+  map_()
+    : root(NULL)
+  {
+    GC::init();
+  }
 
   // copy constructor, increment reference count
-  map_(M const& m) {
+  map_(M const& m)
+  {
     // if (start_logging) {
     //   assert(false);
     // }
@@ -56,13 +63,15 @@ class map_ {
   }
 
   // move constructor, clear the source, leave reference count as is
-  map_(M&& m) {
+  map_(M&& m)
+  {
     root = m.root;
     m.root = NULL;
   }
 
   // copy assignment, clear target, increment reference count,
-  M& operator=(M const& m) {
+  M& operator=(M const& m)
+  {
     if (this != &m) {
       clear();
       root = m.root;
@@ -72,7 +81,8 @@ class map_ {
   }
 
   // move assignment, clear target, leave reference count as is
-  M& operator=(M&& m) {
+  M& operator=(M&& m)
+  {
     if (this != &m) {
       clear();
       root = m.root;
@@ -85,59 +95,67 @@ class map_ {
   ~map_() { clear(); }
 
   // singleton (TODO: finalize?)
-  map_(E const& e) {
+  map_(E const& e)
+  {
     GC::init();
     root = Tree::single(e);
   }
 
   // construct from an array keeping one of the equal keys
-  map_(E* s, E* e) {  //, bool seq_inplace = false) {
+  map_(E* s, E* e)
+  { //, bool seq_inplace = false) {
     M empty = M();
     root = Tree::finalize(
-        multi_insert(empty, parlay::slice<E*, E*>(s, e)).get_root());
+      multi_insert(empty, parlay::slice<E*, E*>(s, e)).get_root());
   }
 
   // construct from an array keeping one of the equal keys
-  template <class Bin_Op>
-  map_(E* s, E* e, Bin_Op f) {  //, bool seq_inplace = false) {
+  template<class Bin_Op>
+  map_(E* s, E* e, Bin_Op f)
+  { //, bool seq_inplace = false) {
     M empty = M();
     root = Tree::finalize(
-        multi_insert_combine(empty, parlay::slice<E*, E*>(s, e), f).get_root());
+      multi_insert_combine(empty, parlay::slice<E*, E*>(s, e), f).get_root());
   }
 
   // construct from sequence keeping one of the equal keys
   // template<class Range>
   // map_(Range const &S) {
   // due to overloading cannot use the generic version on range
-  map_(parlay::sequence<E> const& S) {
+  map_(parlay::sequence<E> const& S)
+  {
     M empty = M();
     root =
-        Tree::finalize(multi_insert(empty, parlay::make_slice(S)).get_root());
+      Tree::finalize(multi_insert(empty, parlay::make_slice(S)).get_root());
   }
 
-  map_(parlay::slice<E*, E*> R) {
+  map_(parlay::slice<E*, E*> R)
+  {
     M empty = M();
     root = Tree::finalize(multi_insert(empty, R).get_root());
   }
 
   // construct from sequence, combining the values corresponding to equal keys
   // with f f should have type V x V -> V
-  template <class Range, class Bin_Op>
-  map_(Range S, Bin_Op f) {
+  template<class Range, class Bin_Op>
+  map_(Range S, Bin_Op f)
+  {
     M empty = M();
     root = Tree::finalize(
-        multi_insert_combine(empty, parlay::make_slice(S), f).get_root());
+      multi_insert_combine(empty, parlay::make_slice(S), f).get_root());
   }
 
-  template <class Bin_Op>
-  map_(std::initializer_list<E> L, Bin_Op f) {
+  template<class Bin_Op>
+  map_(std::initializer_list<E> L, Bin_Op f)
+  {
     M empty = M();
     root = Tree::finalize(multi_insert_combine(empty, L, f).get_root());
   }
 
   // clears contents, decrementing ref counts
   // has a read/destruct race if concurrent with a reader
-  void clear() {
+  void clear()
+  {
     node* t = root;
     if (__sync_bool_compare_and_swap(&(this->root), t, NULL)) {
       if (GC::initialized()) {
@@ -157,51 +175,62 @@ class map_ {
   bool is_empty() { return root == NULL; }
 
   // equality
-  bool operator==(M const& m) const {
+  bool operator==(M const& m) const
+  {
     return (size() == m.size()) && (size() == map_union(*this, m).size());
   }
   bool operator!=(M const& m) const { return !(*this == m); }
 
   // apply function f on all entries
-  template <class F>
-  static void foreach_index(M const& m, F const& f, size_t start = 0,
-                            size_t granularity = kNodeLimit) {
+  template<class F>
+  static void foreach_index(M const& m,
+                            F const& f,
+                            size_t start = 0,
+                            size_t granularity = kNodeLimit)
+  {
     Tree::foreach_index(ptr(m.root, true), start, f, granularity);
   }
 
-  template <class F>
-  static void foreach_index_2(M const& m, F const& f) {
+  template<class F>
+  static void foreach_index_2(M const& m, F const& f)
+  {
     Tree::foreach_index_2(m.root, f);
   }
 
   // apply function f on all entries sequentially
-  template <class F>
-  static void foreach_seq(M const& m, F const& f) {
+  template<class F>
+  static void foreach_seq(M const& m, F const& f)
+  {
     Tree::foreach_seq(ptr(m.root, true), f);
   }
 
   // apply function f on all entries sequentially. F returns a boolean
   // indicating whether to proceed further or not.
-  template <class F>
-  static bool foreach_cond(M const& m, F const& f) {
+  template<class F>
+  static bool foreach_cond(M const& m, F const& f)
+  {
     return Tree::foreach_cond(m.root, f);
   }
 
   // apply function f on all entries sequentially. F returns a boolean
   // indicating whether to proceed further or not.
-  template <class F, class C>
-  static bool foreach_cond_par(M const& m, F const& f, C const& cond) {
+  template<class F, class C>
+  static bool foreach_cond_par(M const& m, F const& f, C const& cond)
+  {
     return Tree::foreach_cond_par(m.root, f, cond);
   }
 
-  static M from_sequence(parlay::sequence<E>& seq) {
+  static M from_sequence(parlay::sequence<E>& seq)
+  {
     return M(Seq_Tree::from_array(seq.begin(), seq.size()));
   }
 
   // apply function f to all entries in the tree and flatten them to a sequence
-  template <class OT, class F>
-  static parlay::sequence<OT> to_seq(M m, F const& f,
-                                     size_t granularity = kNodeLimit) {
+  template<class OT, class F>
+  static parlay::sequence<OT> to_seq(M m,
+                                     F const& f,
+                                     size_t granularity = kNodeLimit)
+  {
     parlay::sequence<OT> out = parlay::sequence<OT>::uninitialized(m.size());
     auto g = [&](E& e, size_t i) {
       parlay::assign_uninitialized(out[i], f(e));
@@ -211,69 +240,81 @@ class map_ {
   }
 
   // flatten all entries to an array
-  static void entries(M m, E* out) {
+  static void entries(M m, E* out)
+  {
     auto f = [&](E& e, size_t i) { out[i] = e; };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
   // flatten all entries to a sequence
-  static parlay::sequence<E> entries(M m, size_t granularity = kNodeLimit) {
+  static parlay::sequence<E> entries(M m, size_t granularity = kNodeLimit)
+  {
     auto f = [](E e) -> E { return e; };
     return to_seq<E>(std::move(m), f, granularity);
   }
 
   // flatten all values to an output random access iterator
-  template <class outIter>
-  static void values(M m, outIter out) {
+  template<class outIter>
+  static void values(M m, outIter out)
+  {
     auto f = [&](E& e, size_t i) { out[i] = Entry::get_val(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
   // flatten all keys to an output random access iterator
-  template <class outIter>
-  static void keys(M m, outIter out) {
+  template<class outIter>
+  static void keys(M m, outIter out)
+  {
     auto f = [&](E const& e, size_t const i) { out[i] = Entry::get_key(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
-  static parlay::sequence<K> keys(M m, size_t granularity = kNodeLimit) {
+  static parlay::sequence<K> keys(M m, size_t granularity = kNodeLimit)
+  {
     auto f = [](E e) -> K { return Entry::get_key(e); };
     return to_seq<K>(std::move(m), f, granularity);
   }
 
-  static void keys_to_array(M m, K* out) {
+  static void keys_to_array(M m, K* out)
+  {
     auto f = [&](E& e, size_t i) { out[i] = Entry::get_key(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
   // insertion, updates, and deletion
-  template <class Func>
-  static M insert(M m, E const& p, Func const& f) {
+  template<class Func>
+  static M insert(M m, E const& p, Func const& f)
+  {
     return M(Tree::finalize(Tree::insert(m.get_root(), p, f)));
   }
 
-  template <class Func>
-  void insert(E const& p, Func const& f) {
+  template<class Func>
+  void insert(E const& p, Func const& f)
+  {
     root = Tree::finalize(Tree::insert(root, p, f));
   }
 
-  static M insert(M m, E const& p) {
+  static M insert(M m, E const& p)
+  {
     auto replace = [](V const& a, V const& b) { return b; };
     return M(Tree::finalize(Tree::insert(m.get_root(), p, replace)));
   }
 
-  void insert(E const& p) {
+  void insert(E const& p)
+  {
     auto replace = [](V const& a, V const& b) { return b; };
     root = Tree::finalize(Tree::insert(root, p, replace));
   }
 
-  template <class Func>
-  void update(K const& k, Func const& f) {
+  template<class Func>
+  void update(K const& k, Func const& f)
+  {
     root = Tree::update(root, k, f);
   }
 
-  template <class Func>
-  static M update(M m, K const& k, Func const& f) {
+  template<class Func>
+  static M update(M m, K const& k, Func const& f)
+  {
     return M(Tree::update(m.get_root(), k, f));
   }
 
@@ -282,19 +323,22 @@ class map_ {
   // Remove entry with key k from the current map.
   void remove(K const& k) { root = Tree::deletet(root, k); }
 
-  static M join2(M a, M b) {
+  static M join2(M a, M b)
+  {
     return M(Tree::join2(a.get_root(), b.get_root()));
   }
 
   // filters elements that satisfy the predicate when applied to the elements.
-  template <class F>
-  static M filter(M m, F const& f, size_t granularity = kNodeLimit) {
+  template<class F>
+  static M filter(M m, F const& f, size_t granularity = kNodeLimit)
+  {
     return M(Tree::finalize(Tree::filter(m.get_root(), f, granularity)));
   }
 
-  template <class Seq>
+  template<class Seq>
   // static M from_sorted(Seq const &S) {
-  static M from_sorted(Seq& S) {
+  static M from_sorted(Seq& S)
+  {
     return M(Tree::from_array(S.data(), S.size()));
   }
 
@@ -334,8 +378,9 @@ class map_ {
   //  }
 
   // insert multiple keys from a sequence
-  template <class Seq>
-  static M multi_insert(M m, Seq const& SS) {
+  template<class Seq>
+  static M multi_insert(M m, Seq const& SS)
+  {
     auto replace = [](V const& a, V const& b) { return b; };
     timer t("MI", false);
     parlay::sequence<E> A = Build::sort_remove_duplicates(SS);
@@ -346,7 +391,7 @@ class map_ {
     //    M(Tree::uniont(m.get_root(), A_m.get_root(), replace)); t.next("union
     //    time");
     auto x =
-        M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), replace));
+      M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), replace));
     t.next("MI time");
     return x;
   }
@@ -362,8 +407,9 @@ class map_ {
   // }
 
   // update multiple entries from a sorted array
-  template <class Seq, class Bin_Op>
-  static bool multi_update_sorted_inplace(M& m, Seq const& SS, Bin_Op f) {
+  template<class Seq, class Bin_Op>
+  static bool multi_update_sorted_inplace(M& m, Seq const& SS, Bin_Op f)
+  {
     return Tree::multi_update_sorted_inplace(m.root, SS.data(), SS.size(), f);
   }
 
@@ -402,78 +448,90 @@ class map_ {
   //    return ret;
   //  }
 
-  template <class Seq>
-  static parlay::sequence<V> multi_find_sorted(M& m, Seq const& SS) {
+  template<class Seq>
+  static parlay::sequence<V> multi_find_sorted(M& m, Seq const& SS)
+  {
     parlay::sequence<V> ret(SS.size());
     Tree::multi_find_sorted(m.root, SS.begin(), SS.size(), ret.begin(), 0);
     return ret;
   }
 
   // insert multiple keys from an array
-  template <class Seq, class BinOp>
-  static M multi_insert_sorted(M m, Seq const& SS, BinOp f) {
+  template<class Seq, class BinOp>
+  static M multi_insert_sorted(M m, Seq const& SS, BinOp f)
+  {
     return M(Tree::finalize(
-        Tree::multi_insert_sorted(m.get_root(), SS.begin(), SS.size(), f)));
+      Tree::multi_insert_sorted(m.get_root(), SS.begin(), SS.size(), f)));
   }
 
   // insert multiple keys from an array
-  template <class Seq, class CombineOp, class MapOp>
-  static M multi_insert_sorted_map(M m, Seq& SS, CombineOp combine_op,
-                                   MapOp map_op) {
+  template<class Seq, class CombineOp, class MapOp>
+  static M multi_insert_sorted_map(M m,
+                                   Seq& SS,
+                                   CombineOp combine_op,
+                                   MapOp map_op)
+  {
     // std::cout << "sorted_map, ref_cnt = " << m.ref_cnt() << std::endl;
-    return M(Tree::multi_insert_sorted_map(m.get_root(), SS.begin(), SS.size(),
-                                           combine_op, map_op));
+    return M(Tree::multi_insert_sorted_map(
+      m.get_root(), SS.begin(), SS.size(), combine_op, map_op));
   }
 
   // insert multiple keys from an array
-  template <class Seq, class CombineOp>
-  static M multi_delete_sorted_map(M m, Seq& SS, CombineOp combine_op) {
-    return M(Tree::multi_delete_sorted_map(m.get_root(), SS.begin(), SS.size(),
-                                           combine_op));
+  template<class Seq, class CombineOp>
+  static M multi_delete_sorted_map(M m, Seq& SS, CombineOp combine_op)
+  {
+    return M(Tree::multi_delete_sorted_map(
+      m.get_root(), SS.begin(), SS.size(), combine_op));
   }
 
   // insert multiple keys from an array
-  template <class Seq>
-  static M multi_delete_sorted(M m, Seq const& SS) {
+  template<class Seq>
+  static M multi_delete_sorted(M m, Seq const& SS)
+  {
     return M(Tree::finalize(
-        Tree::multi_delete_sorted(m.get_root(), SS.begin(), SS.size())));
+      Tree::multi_delete_sorted(m.get_root(), SS.begin(), SS.size())));
   }
 
   // insert multiple keys from an array, combine duplicates with f
   // here f must have type: V x V -> V
   // if key in map, then also combined with f
-  template <class Seq, class Bin_Op>
-  static M multi_insert_combine(M m, Seq const& S, Bin_Op f) {
+  template<class Seq, class Bin_Op>
+  static M multi_insert_combine(M m, Seq const& S, Bin_Op f)
+  {
     auto A = Build::sort_combine_duplicates(S, f);
     return M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), f));
   }
 
   // What is this function _xx? in-place?
-  template <class Seq, class Bin_Op>
-  static M multi_insert_combine_xx(M m, Seq& S, Bin_Op f) {
+  template<class Seq, class Bin_Op>
+  static M multi_insert_combine_xx(M m, Seq& S, Bin_Op f)
+  {
     auto A = Build::sort_combine_duplicates_inplace(S, f);
     return M(Tree::multi_insert_sorted(m.get_root(), A.begin(), A.size(), f));
   }
 
-  template <class Func>
-  void iterate_seq(Func const& f) {
+  template<class Func>
+  void iterate_seq(Func const& f)
+  {
     Tree::iterate_seq(root, f);
   }
 
-  template <class Func>
-  void iterate_cond(Func const& f) {
+  template<class Func>
+  void iterate_cond(Func const& f)
+  {
     Tree::iterate_cond(root, f);
   }
 
   // insert multiple keys from an array, reduce duplicates with g
   // here g must have type: sequence<Val> -> V
   // if key in map, then replaced
-  template <class Seq, class Reduce>
-  static M multi_insert_reduce(M m, Seq const& S, Reduce g) {
+  template<class Seq, class Reduce>
+  static M multi_insert_reduce(M m, Seq const& S, Reduce g)
+  {
     auto replace = [](V const& a, V const& b) { return b; };
     parlay::sequence<E> A = Build::sort_reduce_duplicates(S, g);
     auto x =
-        M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), replace));
+      M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), replace));
     // auto print_fn = [&] (const E& e) {
     //   std::cout << e.first << " " << e.second.size() << std::endl;
     // };
@@ -481,37 +539,45 @@ class map_ {
     return x;
   }
 
-  template <class Val, class Reduce>
-  static M multi_insert_reduce(M m, pair<K, Val>* A, size_t n, Reduce g) {
+  template<class Val, class Reduce>
+  static M multi_insert_reduce(M m, pair<K, Val>* A, size_t n, Reduce g)
+  {
     auto replace = [](V const& a, V const& b) { return b; };
     auto B = Build::sort_reduce_duplicates(A, n, g);
     auto x =
-        M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, replace));
+      M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, replace));
     return x;
   }
 
-  template <class Val, class Reduce, class Bin_Op>
+  template<class Val, class Reduce, class Bin_Op>
   static M multi_insert_reduce(
-      M m, pair<K, Val>* A, size_t n, Reduce g,
-      Bin_Op& f = [](V const& a, V const& b) { return b; }) {
+    M m,
+    pair<K, Val>* A,
+    size_t n,
+    Reduce g,
+    Bin_Op& f = [](V const& a, V const& b) { return b; })
+  {
     auto B = Build::sort_reduce_duplicates(A, n, g);
     auto x = M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, f));
     return x;
   }
 
   // basic search routines
-  maybe_V find(K const& key) const {
+  maybe_V find(K const& key) const
+  {
     // return maybe_entry_to_val(Tree::find(ptr(root, true), key));}
     return maybe_entry_to_val(Tree::find2(root, key));
   }
 
   // returns default value if not found
-  V find(K const& key, V defaultv) const {
+  V find(K const& key, V defaultv) const
+  {
     auto et_opt = Tree::find(ptr(root, true), key);
     return et_opt.has_value() ? Entry::get_val(*et_opt) : defaultv;
   }
 
-  bool contains(K const& key) const {
+  bool contains(K const& key) const
+  {
     return Tree::find(ptr(root, true), key).has_value();
   }
 
@@ -526,29 +592,34 @@ class map_ {
   // rank and select
   size_t rank(K const& key) { return Tree::rank(root, key); }
 
-  maybe_E select(size_t const rank) const {
+  maybe_E select(size_t const rank) const
+  {
     auto ret = Tree::select(root, rank);
     return ret;
   }
 
   M take(size_t const k) { return M(Tree::take(root, k)); }
 
-  static M subseq(M& a, size_t const left, size_t const right) {
+  static M subseq(M& a, size_t const left, size_t const right)
+  {
     return M(Tree::subseq(a.root, left, right));
   }
 
   // Sequence only
-  M append(M& other) {
+  M append(M& other)
+  {
     return M(Tree::join2_i(ptr(root, true), ptr(other.root, true)));
   }
 
   // Sequence Op: returns index of first element equal to e
-  std::optional<size_t> find_unsorted(E const& e) {
+  std::optional<size_t> find_unsorted(E const& e)
+  {
     return Seq_Tree::find_unsorted(root, e);
   }
 
-  template <class Less>
-  bool is_sorted(Less less) {
+  template<class Less>
+  bool is_sorted(Less less)
+  {
     return Seq_Tree::is_sorted(root, less);
   }
 
@@ -566,35 +637,41 @@ class map_ {
 
   // extra indicates if there is an extra pointer to b2 not included in the
   // ref-cnt.
-  template <class F>
-  static M map_union(M a, M b, F const& op, bool extra = false) {
+  template<class F>
+  static M map_union(M a, M b, F const& op, bool extra = false)
+  {
     return M(Tree::uniont(a.get_root(), ptr(b.get_root(), extra), op));
   }
 
-  static M map_union(M a, M b, bool extra = false) {
+  static M map_union(M a, M b, bool extra = false)
+  {
     auto get_right = [](V a, V b) { return b; };
     auto x = M(Tree::uniont(a.get_root(), ptr(b.get_root(), extra), get_right));
     return x;
   }
 
-  template <class M1, class M2, class F>
-  static M map_intersect(M1 a, M2 b, F const& op) {
+  template<class M1, class M2, class F>
+  static M map_intersect(M1 a, M2 b, F const& op)
+  {
     using T1 = typename M1::Tree;
     using T2 = typename M2::Tree;
     return M(Tree::template intersect<T1, T2>(a.get_root(), b.get_root(), op));
   }
 
-  static M map_intersect(M a, M b) {
+  static M map_intersect(M a, M b)
+  {
     auto get_right = [](V a, V b) { return b; };
-    return M(Tree::template intersect<Tree, Tree>(a.get_root(), b.get_root(),
-                                                  get_right));
+    return M(Tree::template intersect<Tree, Tree>(
+      a.get_root(), b.get_root(), get_right));
   }
 
-  static M map_difference(M a, M b) {
+  static M map_difference(M a, M b)
+  {
     return M(Tree::difference(a.get_root(), b.get_root()));
   }
 
-  static M range(M& a, K kl, K kr) {
+  static M range(M& a, K kl, K kr)
+  {
     return M(Tree::range_2(a.root, kl, kr));
     // return M(Tree::range(ptr(a.root, true), kl, kr));
   }
@@ -618,8 +695,9 @@ class map_ {
   //    return M(Tree::right(a.root, kr));
   //  }
 
-  template <class Ma, class F>
-  static M map(Ma& a, F const& f) {
+  template<class Ma, class F>
+  static M map(Ma& a, F const& f)
+  {
     GC::init();
     // Should wrap with ptr(a.root, true)?
     // No: default conversion to ptr doesn't set the extra flag.
@@ -628,15 +706,19 @@ class map_ {
     return M(Tree::template map<typename Ma::Tree>(a.root, f));
   }
 
-  template <class Ma, class F>
-  static M map_set(Ma a, F const& f) {
+  template<class Ma, class F>
+  static M map_set(Ma a, F const& f)
+  {
     GC::init();
     return M(Tree::template map_set<typename Ma::Tree>(a.root, f));
   }
 
-  template <class F>
-  static void map_index(M& m, F const& f, size_t granularity = kNodeLimit,
-                        size_t start = 0) {
+  template<class F>
+  static void map_index(M& m,
+                        F const& f,
+                        size_t granularity = kNodeLimit,
+                        size_t start = 0)
+  {
     Tree::foreach_index(ptr(m.root, true), start, f, granularity);
   }
 
@@ -645,16 +727,21 @@ class map_ {
   //				       size_t grain=kNodeLimit) {
   //    return Tree::template semi_map_reduce<R>(m.root, f, r, grain);}
 
-  template <class R, class F>
-  static typename R::T map_reduce(M const& m, F const& f, R const& r,
-                                  size_t grain = kNodeLimit) {
+  template<class R, class F>
+  static typename R::T map_reduce(M const& m,
+                                  F const& f,
+                                  R const& r,
+                                  size_t grain = kNodeLimit)
+  {
     GC::init();
     return Tree::template map_reduce<R>(m.root, f, r, grain);
   }
 
-  template <class F>
-  static void map_void(M& m, F const& f, size_t granularity = kNodeLimit) {
-    struct do_nothing {
+  template<class F>
+  static void map_void(M& m, F const& f, size_t granularity = kNodeLimit)
+  {
+    struct do_nothing
+    {
       using T = bool;
       static T identity() { return false; }
       static T add(T a, T b) { return false; }
@@ -674,7 +761,8 @@ class map_ {
   //  }
 
   // grabs root by "moving" it.  Important for reuse
-  node* get_root() {
+  node* get_root()
+  {
     node* t = root;
     root = NULL;
     return t;
@@ -683,7 +771,11 @@ class map_ {
   node* root;
 
   // construct from a node (perhaps should be private)
-  map_(node* n) : root(n) { GC::init(); }
+  map_(node* n)
+    : root(n)
+  {
+    GC::init();
+  }
 
   // TODO: remove?
   // maybe_V node_to_val(node* a) const {
@@ -691,7 +783,8 @@ class map_ {
   //  else return maybe_V();
   //}
 
-  maybe_V maybe_entry_to_val(maybe_E e) const {
+  maybe_V maybe_entry_to_val(maybe_E e) const
+  {
     maybe_V value;
     if (e.has_value())
       return maybe_V(Entry::get_val(*e));
@@ -708,20 +801,23 @@ class map_ {
   // Some useful debugging utilities
   bool check_balance() const { return Seq_Tree::check_balance(root); }
 
-  template <class F>
-  size_t size_in_bytes(F const& f) const {
+  template<class F>
+  size_t size_in_bytes(F const& f) const
+  {
     return Tree::size_in_bytes(root, f);
   }
 
   // Returns a pair of the (number of internal nodes, number of leaf nodes).
-  std::tuple<size_t, size_t, size_t> node_stats() const {
+  std::tuple<size_t, size_t, size_t> node_stats() const
+  {
     return Tree::node_stats(root);
   }
 
   size_t ref_cnt() const { return Tree::ref_cnt(root); }
   size_t root_is_compressed() const { return Tree::is_compressed(root); }
   void print_root_info() const { Tree::print_node_info(root, "root"); }
-  void print_tree() const {
+  void print_tree() const
+  {
     // Tree::print_inorder(root);
     Tree::print_rec(root);
   }
@@ -730,39 +826,45 @@ class map_ {
 };
 
 // creates a key-value pair for the entry
-template <class entry>
-struct map_full_entry : entry {
+template<class entry>
+struct map_full_entry : entry
+{
   using val_t = typename entry::val_t;
   using key_t = typename entry::key_t;
   using entry_t = std::tuple<key_t, val_t>;
   static inline key_t get_key(entry_t const& e) { return std::get<0>(e); }
   static inline val_t get_val(entry_t const& e) { return std::get<1>(e); }
   static inline void set_val(entry_t& e, val_t const& v) { std::get<1>(e) = v; }
-  static inline entry_t to_entry(key_t const& k, val_t const& v) {
+  static inline entry_t to_entry(key_t const& k, val_t const& v)
+  {
     return std::make_tuple(k, v);
   };
 };
 
-template <class _Entry, size_t BlockSize = 128,
-          class Encoder = default_entry_encoder,
-          class Balance = weight_balanced_tree>
+template<class _Entry,
+         size_t BlockSize = 128,
+         class Encoder = default_entry_encoder,
+         class Balance = weight_balanced_tree>
 using pam_map =
-    map_<map_full_entry<_Entry>, /* Entry type */
-         typename Balance::template balance<basic_node<
-             typename Balance::data, typename map_full_entry<_Entry>::entry_t,
-             typename Encoder::template encoder<map_full_entry<_Entry>>,
-             BlockSize>>>;
+  map_<map_full_entry<_Entry>, /* Entry type */
+       typename Balance::template balance<
+         basic_node<typename Balance::data,
+                    typename map_full_entry<_Entry>::entry_t,
+                    typename Encoder::template encoder<map_full_entry<_Entry>>,
+                    BlockSize>>>;
 
-template <class _Entry, size_t BlockSize = 128,
-          class Balance = weight_balanced_tree>
+template<class _Entry,
+         size_t BlockSize = 128,
+         class Balance = weight_balanced_tree>
 using diff_encoded_map =
-    pam_map<_Entry, BlockSize, diffencoded_entry_encoder, Balance>;
+  pam_map<_Entry, BlockSize, diffencoded_entry_encoder, Balance>;
 
 // entry is just the key (no value), for use in sets
-template <class entry>
-struct set_full_entry : entry {
+template<class entry>
+struct set_full_entry : entry
+{
   using key_t = typename entry::key_t;
-  using val_t = parlay::empty;  // not used
+  using val_t = parlay::empty; // not used
   using entry_t = key_t;
   static inline key_t get_key(entry_t const& e) { return e; }
   static inline val_t get_val(entry_t const& e) { return {}; }
@@ -770,26 +872,30 @@ struct set_full_entry : entry {
   static inline entry_t to_entry(key_t const& k, val_t const& v) { return k; };
 };
 
-template <class _Entry, size_t BlockSize = 256,
-          class Encoder = default_entry_encoder,
-          class Balance = weight_balanced_tree>
+template<class _Entry,
+         size_t BlockSize = 256,
+         class Encoder = default_entry_encoder,
+         class Balance = weight_balanced_tree>
 using pam_set =
-    map_<set_full_entry<_Entry>,
-         typename Balance::template balance<basic_node<
-             typename Balance::data, typename set_full_entry<_Entry>::entry_t,
-             typename Encoder::template encoder<set_full_entry<_Entry>>,
-             BlockSize>>>;
+  map_<set_full_entry<_Entry>,
+       typename Balance::template balance<
+         basic_node<typename Balance::data,
+                    typename set_full_entry<_Entry>::entry_t,
+                    typename Encoder::template encoder<set_full_entry<_Entry>>,
+                    BlockSize>>>;
 
-template <class _Entry, size_t BlockSize = 128,
-          class Balance = weight_balanced_tree>
+template<class _Entry,
+         size_t BlockSize = 128,
+         class Balance = weight_balanced_tree>
 using diff_encoded_set =
-    pam_set<_Entry, BlockSize, diffencoded_entry_encoder, Balance>;
+  pam_set<_Entry, BlockSize, diffencoded_entry_encoder, Balance>;
 
 // entry is just a value (no key), for use in sequences
-template <class data>
-struct seq_full_entry {
+template<class data>
+struct seq_full_entry
+{
   using key_t = data;
-  using val_t = bool;  // not used
+  using val_t = bool; // not used
   using entry_t = data;
   static bool comp(key_t const& a, key_t const& b) { return true; }
   static inline key_t get_key(entry_t const& e) { return e; }
@@ -798,14 +904,17 @@ struct seq_full_entry {
 };
 
 // data can be any type
-template <typename data, size_t BlockSize = 256,
-          class Encoder = default_entry_encoder,
-          class Balance = weight_balanced_tree>
-using pam_seq = map_<
-    seq_full_entry<data>,
-    typename Balance::template balance<basic_node<
-        typename Balance::data, data,
-        typename Encoder::template encoder<seq_full_entry<data>>, BlockSize>>>;
+template<typename data,
+         size_t BlockSize = 256,
+         class Encoder = default_entry_encoder,
+         class Balance = weight_balanced_tree>
+using pam_seq =
+  map_<seq_full_entry<data>,
+       typename Balance::template balance<
+         basic_node<typename Balance::data,
+                    data,
+                    typename Encoder::template encoder<seq_full_entry<data>>,
+                    BlockSize>>>;
 
 // template <class _Entry, class Balance=weight_balanced_tree>
 // using pam_map =
@@ -851,4 +960,4 @@ using pam_seq = map_<
 //        typename Balance::template
 //        balance<basic_node<typename Balance::data, data>>>;
 
-}  // namespace cpam
+} // namespace cpam

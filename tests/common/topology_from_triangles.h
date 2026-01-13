@@ -49,20 +49,23 @@ using index_pair = pair<index_t, index_t>;
 using edge = pair<index_pair, triang_t*>;
 
 // Hash table to store skinny triangles
-struct hashEdges {
+struct hashEdges
+{
   using kType = index_pair;
   using eType = edge*;
   eType empty() { return NULL; }
   kType getKey(eType v) { return v->first; }
   size_t hash(kType s) { return hash64(s.first) + 3 * (hash64(s.second)); }
-  int cmp(kType s1, kType s2) {
+  int cmp(kType s1, kType s2)
+  {
     return ((s1.first > s2.first)     ? 1
             : (s1.first < s2.first)   ? -1
             : (s1.second > s2.second) ? 1
             : (s1.second < s2.second) ? -1
                                       : 0);
   }
-  bool cas(eType* p, eType o, eType n) {
+  bool cas(eType* p, eType o, eType n)
+  {
     return pbbs::atomic_compare_and_swap(p, o, n);
   }
   bool replaceQ(eType s, eType s2) { return 0; }
@@ -70,10 +73,15 @@ struct hashEdges {
 
 using EdgeTable = hashtable<hashEdges>;
 
-EdgeTable makeEdgeTable(size_t m) { return EdgeTable(m, hashEdges()); }
+EdgeTable
+makeEdgeTable(size_t m)
+{
+  return EdgeTable(m, hashEdges());
+}
 
-std::pair<sequence<triang_t>, sequence<vertex_t>> topology_from_triangles(
-    triangles<point>& Tri, size_t extra_points = 0) {
+std::pair<sequence<triang_t>, sequence<vertex_t>>
+topology_from_triangles(triangles<point>& Tri, size_t extra_points = 0)
+{
   size_t n = Tri.numPoints();
   size_t m = Tri.numTriangles();
 
@@ -87,7 +95,7 @@ std::pair<sequence<triang_t>, sequence<vertex_t>> topology_from_triangles(
   parallel_for(0, m, [&](size_t i) {
     for (int j = 0; j < 3; j++) {
       E[i * 3 + j] =
-          edge(index_pair(Tri.T[i][j], Tri.T[i][(j + 1) % 3]), &Triangs[i]);
+        edge(index_pair(Tri.T[i][j], Tri.T[i][(j + 1) % 3]), &Triangs[i]);
       ET.insert(&E[i * 3 + j]);
       Triangs[i].vtx[(j + 2) % 3] = &V[Tri.T[i][j]];
     }
@@ -98,7 +106,7 @@ std::pair<sequence<triang_t>, sequence<vertex_t>> topology_from_triangles(
     Triangs[i].initialized = 1;
     Triangs[i].bad = 0;
     for (int j = 0; j < 3; j++) {
-      index_pair key = {Tri.T[i][(j + 1) % 3], Tri.T[i][j]};
+      index_pair key = { Tri.T[i][(j + 1) % 3], Tri.T[i][j] };
       edge* Ed = ET.find(key);
       if (Ed != NULL)
         Triangs[i].ngh[j] = Ed->second;
@@ -115,7 +123,9 @@ std::pair<sequence<triang_t>, sequence<vertex_t>> topology_from_triangles(
 // Note that this is not currently a complete test of correctness
 // For example it would allow a set of disconnected triangles, or even no
 // triangles
-bool check_delaunay(sequence<triang_t>& Triangles, size_t boundary_size) {
+bool
+check_delaunay(sequence<triang_t>& Triangles, size_t boundary_size)
+{
   size_t n = Triangles.size();
   sequence<size_t> boundary_count(n, 0);
   size_t insideOutError = n;
@@ -130,8 +140,8 @@ bool check_delaunay(sequence<triang_t>& Triangles, size_t boundary_size) {
 
           // Check that the neighbor is outside the triangle
           if (!t.outside(v)) {
-            double vz = triAreaNormalized(t.t->vtx[(t.o + 2) % 3]->pt, v->pt,
-                                          t.t->vtx[t.o]->pt);
+            double vz = triAreaNormalized(
+              t.t->vtx[(t.o + 2) % 3]->pt, v->pt, t.t->vtx[t.o]->pt);
             // allow for small error
             if (vz < -1e-10)
               pbbs::write_min(&insideOutError, i, less<size_t>());
@@ -139,10 +149,11 @@ bool check_delaunay(sequence<triang_t>& Triangles, size_t boundary_size) {
 
           // Check that the neighbor is not in circumcircle of the triangle
           if (t.inCirc(v)) {
-            double vz = inCircleNormalized(t.t->vtx[0]->pt, t.t->vtx[1]->pt,
-                                           t.t->vtx[2]->pt, v->pt);
+            double vz = inCircleNormalized(
+              t.t->vtx[0]->pt, t.t->vtx[1]->pt, t.t->vtx[2]->pt, v->pt);
             // allow for small error
-            if (vz > 1e-10) pbbs::write_min(&inCircleError, i, less<size_t>());
+            if (vz > 1e-10)
+              pbbs::write_min(&inCircleError, i, less<size_t>());
           }
         } else
           boundary_count[i]++;

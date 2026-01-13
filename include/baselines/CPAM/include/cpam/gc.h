@@ -8,8 +8,9 @@
 
 namespace cpam {
 
-template <class Node>
-struct gc {
+template<class Node>
+struct gc
+{
   using node = typename Node::node;
   using regular_node = typename Node::regular_node;
   using compressed_node = typename Node::compressed_node;
@@ -20,7 +21,8 @@ struct gc {
 
   static void init() { alloc::init(); }
   static bool initialized() { return alloc::initialized; }
-  static void reserve(size_t n, bool randomize = false) {
+  static void reserve(size_t n, bool randomize = false)
+  {
     alloc::reserve(n / B);
     // complex_alloc::reserve(n/B);
     std::cout << "Reserving.... " << (n / B)
@@ -36,26 +38,30 @@ struct gc {
   static void decrement_recursive(node* t) { Node::decrement_recursive(t); }
 
   // atomically increment the reference count
-  static void increment(node* t) {
+  static void increment(node* t)
+  {
     if (t) {
       Node::increment_count(t, 1);
     }
   }
 
-  static void increment(node* t, int i) {
+  static void increment(node* t, int i)
+  {
     if (t) {
       Node::increment_count(t, i);
     }
   }
 
-  static inline node* inc(node* t) {
+  static inline node* inc(node* t)
+  {
     increment(t);
     return t;
   }
 
   // copies node with entry and children, incrementing children's ref counts
   // does not update
-  static inline node* copy(node* t) {
+  static inline node* copy(node* t)
+  {
     if (Node::is_regular(t)) {
       auto o = Node::make_regular_node(Node::get_entry(t));
       o->lc = inc(Node::cast_to_regular(t)->lc);
@@ -70,8 +76,10 @@ struct gc {
   // copy node if reference count is > 1, incrementing the children's ref counts
   // then decrements the copied node's count
   // does not update
-  static inline node* copy_if_needed(node* t) {
-    if (!t) std::cout << "copy if needed fail" << std::endl;
+  static inline node* copy_if_needed(node* t)
+  {
+    if (!t)
+      std::cout << "copy if needed fail" << std::endl;
     node* res = t;
     if (Node::ref_cnt(t) > 1) {
       res = copy(t);
@@ -81,15 +89,18 @@ struct gc {
   }
 
   // increments ref count if copy flag is true
-  static inline node* inc_if(node* t, bool copy) {
-    if (copy) increment(t);
+  static inline node* inc_if(node* t, bool copy)
+  {
+    if (copy)
+      increment(t);
     return t;
   }
 
   // decrements if there is no extra pointer to t
   // if t is a copy then t needs to be recursively decremented
   // if t is not a copy then t's children should already be decremented
-  static inline void dec_if(node* t, bool copy, bool extra_ptr) {
+  static inline void dec_if(node* t, bool copy, bool extra_ptr)
+  {
     if (!extra_ptr) {
       if (copy)
         decrement_recursive(t);
@@ -98,7 +109,8 @@ struct gc {
     }
   }
 
-  static size_t used_node() {
+  static size_t used_node()
+  {
     if (!alloc::initialized) {
       std::cout << "allocator not initialized" << std::endl;
       return 0;
@@ -107,7 +119,8 @@ struct gc {
     }
   }
 
-  static void print_stats() {
+  static void print_stats()
+  {
     if (!alloc::initialized)
       std::cout << "allocator not initialized" << std::endl;
     else {
@@ -121,36 +134,46 @@ struct gc {
   }
 
   // TODO:used?
-  struct read_ptr {
-    read_ptr(node* p) : p(p) {}
+  struct read_ptr
+  {
+    read_ptr(node* p)
+      : p(p)
+    {
+    }
     node* p;
 
     bool empty() { return !p; }
   };
 
-  struct ptr {
+  struct ptr
+  {
     // Constructs a ptr object with the given node pointer.
     // extra_ptr = true if there is an implicit extra pointer to this node, but
     // we don't want to bump the ref-cnt to encode this explicitly. Instead, we
     // store a bit to remember that there's an extra pointer.
-    ptr(node* a, bool extra_ptr = false) : p(set_flag(a, extra_ptr)) {
+    ptr(node* a, bool extra_ptr = false)
+      : p(set_flag(a, extra_ptr))
+    {
       // cout << "construct: " << a << ", " << extra_ptr << endl;
     }
 
-    ptr(ptr const& a) {
+    ptr(ptr const& a)
+    {
       std::cout << "Extra ptr copy " << a.p << std::endl;
       assert(false);
       p = strip_flag(a.p);
       increment(p, 1 + has_flag(a.p));
     }
 
-    ptr(ptr&& a) {
+    ptr(ptr&& a)
+    {
       // cout << "move: " << a.p << endl;
       p = a.p;
       a.p = nullptr;
     }
 
-    ptr& operator=(ptr a) {
+    ptr& operator=(ptr a)
+    {
       // cout << "assign" << endl;
       swap(p, a.p);
       return *this;
@@ -162,8 +185,10 @@ struct gc {
 
     // Equivalent to GC::inc_if(r, extra_ptr);
     // This destructs the underlying pointer.
-    node* node_ptr() {
-      if (has_flag(p)) increment(strip_flag(p));
+    node* node_ptr()
+    {
+      if (has_flag(p))
+        increment(strip_flag(p));
       node* r = strip_flag(p);
       p = nullptr;
       return r;
@@ -171,18 +196,21 @@ struct gc {
 
     node* unsafe_ptr() { return strip_flag(p); }
 
-    bool requires_copy() {
+    bool requires_copy()
+    {
       return has_flag(p) || Node::ref_cnt(strip_flag(p)) > 1;
     }
 
     size_t size() const { return Node::size(strip_flag(p)); }
 
-    ET entry() {
+    ET entry()
+    {
       assert(is_regular());
       return Node::get_entry(strip_flag(p));
     }
 
-    ~ptr() {
+    ~ptr()
+    {
       // cout << "destruct: " << p << endl;
       if (p && !has_flag(p)) {
         decrement_recursive(p);
@@ -194,7 +222,8 @@ struct gc {
 
     static node* set_flag(node* x, bool f) { return (node*)(((size_t)x) + f); }
     static bool has_flag(node* x) { return ((size_t)x) & 1; }
-    static node* strip_flag(node* x) {
+    static node* strip_flag(node* x)
+    {
       return (node*)(((size_t)x) & ~((size_t)1));
     }
     bool extra() { return has_flag(p); }
@@ -204,4 +233,4 @@ struct gc {
   };
 };
 
-}  // namespace cpam
+} // namespace cpam

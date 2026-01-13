@@ -10,9 +10,11 @@
 #include "parlay/primitives.h"
 
 namespace pmos {
-template <typename TT>
-template <typename Leaf, typename Interior>
-TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
+template<typename TT>
+template<typename Leaf, typename Interior>
+TT::Box
+BTree<TT>::VerifyTreeProperty(Node const* T)
+{
   if (T->is_leaf) {
     Leaf const* TL = static_cast<Leaf const*>(T);
     assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
@@ -64,9 +66,11 @@ TT::Box BTree<TT>::VerifyTreeProperty(Node const* T) {
   return GetBox(box_seq);
 }
 
-template <typename TT>
-template <typename Leaf, typename Interior>
-int BTree<TT>::CheckHeight(Node const* T) {
+template<typename TT>
+template<typename Leaf, typename Interior>
+int
+BTree<TT>::CheckHeight(Node const* T)
+{
   if (T->is_leaf) {
     return 0;
   }
@@ -83,9 +87,11 @@ int BTree<TT>::CheckHeight(Node const* T) {
   return heights[0] + 1;
 }
 
-template <typename TT>
-template <typename Leaf, typename Interior>
-int BTree<TT>::GetHeight(Node const* T) {
+template<typename TT>
+template<typename Leaf, typename Interior>
+int
+BTree<TT>::GetHeight(Node const* T)
+{
   if (T->is_leaf) {
     return 0;
   }
@@ -100,9 +106,11 @@ int BTree<TT>::GetHeight(Node const* T) {
   return *parlay::max_element(heights) + 1;
 }
 
-template <typename TT>
-template <typename Leaf, typename Interior>
-int BTree<TT>::GetTreeNodesNum(Node const* T) {
+template<typename TT>
+template<typename Leaf, typename Interior>
+int
+BTree<TT>::GetTreeNodesNum(Node const* T)
+{
   if (T->is_leaf) {
     return 1;
   }
@@ -117,9 +125,11 @@ int BTree<TT>::GetTreeNodesNum(Node const* T) {
   return sum + 1;
 }
 
-template <typename TT>
-template <typename Leaf, typename Interior>
-void BTree<TT>::Validate() {
+template<typename TT>
+template<typename Leaf, typename Interior>
+void
+BTree<TT>::Validate()
+{
   std::cout << ">>> begin validate tree\n" << std::flush;
 
   VerifyTreeProperty<Leaf, Interior>(this->root_);
@@ -233,6 +243,6 @@ void BTree<TT>::Validate() {
 //   return;
 // }
 
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_B_TREE_IMPL_VALIDATION_HPP_
+#endif // PMOS_B_TREE_IMPL_VALIDATION_HPP_

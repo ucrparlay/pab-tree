@@ -5,25 +5,30 @@
 //   TREAPS
 // *******************************************
 
-template <class Entry>
-struct treap {
-  struct data {};
+template<class Entry>
+struct treap
+{
+  struct data
+  {};
 
   // defines: node_join, is_balanced
   // inherits: update, make_node, single
-  template <class Node>
-  struct balance : Node {
+  template<class Node>
+  struct balance : Node
+  {
     using node = typename Node::node;
     using t_utils = balance_utils<balance>;
     using ET = typename Node::ET;
     using GC = gc<balance>;
 
-    static inline bool is_balanced(node* t) {
+    static inline bool is_balanced(node* t)
+    {
       return !t ||
              (priority(t) >= priority(t->lc) && priority(t) >= priority(t->rc));
     }
 
-    static node* node_join(node* t1, node* t2, node* k) {
+    static node* node_join(node* t1, node* t2, node* k)
+    {
       if (priority(k) >= priority(t1) && priority(k) >= priority(t2)) {
         k->lc = t1;
         k->rc = t2;
@@ -42,8 +47,9 @@ struct treap {
       }
     }
 
-   private:
-    static size_t priority(node* a) {
+  private:
+    static size_t priority(node* a)
+    {
       return (a == NULL) ? 0 : Entry::hash(Node::get_entry(a));
     }
   };

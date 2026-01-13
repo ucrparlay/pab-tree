@@ -6,8 +6,9 @@
 //   GC
 // *******************************************
 
-template <class Node>
-struct gc {
+template<class Node>
+struct gc
+{
   using node = typename Node::node;
   using alloc = typename Node::allocator;
 
@@ -18,7 +19,8 @@ struct gc {
   static size_t num_used_nodes() { return alloc::num_used_blocks(); }
 
   // atomically decrement ref count and delete node if zero
-  static bool decrement(node* t) {
+  static bool decrement(node* t)
+  {
     if (t) {
       if (utils::fetch_and_add(&t->ref_cnt, -1) == 1) {
         Node::free_node(t);
@@ -30,33 +32,38 @@ struct gc {
 
   // atomically decrement ref count and if zero:
   //   delete node and recursively decrement the two children
-  static void decrement_recursive(node* t) {
-    if (!t) return;
+  static void decrement_recursive(node* t)
+  {
+    if (!t)
+      return;
     node* lsub = t->lc;
     node* rsub = t->rc;
     if (decrement(t)) {
       utils::fork_no_result(
-          Node::size(lsub) >= utils::node_limit,
-          [&]() { decrement_recursive(lsub); },
-          [&]() { decrement_recursive(rsub); });
+        Node::size(lsub) >= utils::node_limit,
+        [&]() { decrement_recursive(lsub); },
+        [&]() { decrement_recursive(rsub); });
     }
   }
 
   // atomically increment the reference count
-  static void increment(node* t) {
+  static void increment(node* t)
+  {
     if (t) {
       utils::write_add(&t->ref_cnt, 1);
     }
   }
 
-  static inline node* inc(node* t) {
+  static inline node* inc(node* t)
+  {
     increment(t);
     return t;
   }
 
   // copies node with entry and children, incrementing children's ref counts
   // does not update
-  static inline node* copy(node* t) {
+  static inline node* copy(node* t)
+  {
     node* o = Node::make_node(Node::get_entry(t));
     o->lc = inc(t->lc);
     o->rc = inc(t->rc);
@@ -66,8 +73,10 @@ struct gc {
   // copy node if reference count is > 1, incrementing the children's ref counts
   // then decrements the copied node's count
   // does not update
-  static inline node* copy_if_needed(node* t) {
-    if (!t) std::cout << "copy if needed fail" << std::endl;
+  static inline node* copy_if_needed(node* t)
+  {
+    if (!t)
+      std::cout << "copy if needed fail" << std::endl;
     node* res = t;
     if (t->ref_cnt > 1) {
       res = copy(t);
@@ -91,35 +100,42 @@ struct gc {
   //      return node_join(l, r, o) -- needs to set children of o, and update
   //    or dec_if(t, copy extra_ptr), if t not needed
   // important to only read ref_cnt once, so it is atomic.
-  static inline node* copy_if(node* t, bool copy, bool extra_ptr) {
+  static inline node* copy_if(node* t, bool copy, bool extra_ptr)
+  {
     if (copy) {
       node* r = Node::make_node(Node::get_entry(t));
-      if (!extra_ptr) decrement_recursive(t);
+      if (!extra_ptr)
+        decrement_recursive(t);
       return r;
     } else
       return t;
   }
 
-  template <typename E>
-  static inline node* copy_if(node* t, E e, bool copy, bool extra_ptr) {
+  template<typename E>
+  static inline node* copy_if(node* t, E e, bool copy, bool extra_ptr)
+  {
     if (copy) {
       node* r = Node::make_node(e);
-      if (!extra_ptr) decrement_recursive(t);
+      if (!extra_ptr)
+        decrement_recursive(t);
       return r;
     } else
       return t;
   }
 
   // increments ref count if copy flag is true
-  static inline node* inc_if(node* t, bool copy) {
-    if (copy) increment(t);
+  static inline node* inc_if(node* t, bool copy)
+  {
+    if (copy)
+      increment(t);
     return t;
   }
 
   // decrements if there is no extra pointer to t
   // if t is a copy then t needs to be recursively decremented
   // if t is not a copy then t's children should already be decremented
-  static inline void dec_if(node* t, bool copy, bool extra_ptr) {
+  static inline void dec_if(node* t, bool copy, bool extra_ptr)
+  {
     if (!extra_ptr) {
       if (copy)
         decrement_recursive(t);
@@ -128,7 +144,8 @@ struct gc {
     }
   }
 
-  static size_t used_node() {
+  static size_t used_node()
+  {
     if (!alloc::initialized) {
       std::cout << "allocator not initialized" << std::endl;
       return 0;
@@ -137,7 +154,8 @@ struct gc {
     }
   }
 
-  static void print_stats() {
+  static void print_stats()
+  {
     if (!alloc::initialized)
       std::cout << "allocator not initialized" << std::endl;
     else {

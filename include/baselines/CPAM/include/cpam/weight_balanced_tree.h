@@ -11,14 +11,17 @@
 
 namespace cpam {
 
-struct weight_balanced_tree {
+struct weight_balanced_tree
+{
   // no additional balance criterial needed for weight balanced trees
-  struct data {};
+  struct data
+  {};
 
   // defines: node_join, is_balanced
   // inherits: update, make_node, single
-  template <class Node>
-  struct balance : public Node {
+  template<class Node>
+  struct balance : public Node
+  {
     using node = typename Node::node;
     using regular_node = typename Node::regular_node;
     using t_utils = balance_utils<balance>;
@@ -26,16 +29,20 @@ struct weight_balanced_tree {
     using Node::B;
     friend t_utils;
 
-    static node* node_join(node* t1, node* t2, regular_node* k) {
+    static node* node_join(node* t1, node* t2, regular_node* k)
+    {
       return t_utils::node_join(t1, t2, k);
     }
 
-    static regular_node* regular_node_join(regular_node* t1, regular_node* t2,
-                                           regular_node* k) {
+    static regular_node* regular_node_join(regular_node* t1,
+                                           regular_node* t2,
+                                           regular_node* k)
+    {
       return t_utils::regular_node_join(t1, t2, k);
     }
 
-    static inline bool is_balanced(regular_node* t) {
+    static inline bool is_balanced(regular_node* t)
+    {
       bool lc_heavy = is_left_heavy(t->lc, t->rc);
       bool rc_heavy = is_left_heavy(t->rc, t->lc);
       // std::cout << "lc_heavy = " << lc_heavy << " rc_heavy = " << rc_heavy <<
@@ -60,9 +67,12 @@ struct weight_balanced_tree {
     }
 
     static bool check_structure(
-        node* b, size_t orig_tree_size = std::numeric_limits<size_t>::max()) {
+      node* b,
+      size_t orig_tree_size = std::numeric_limits<size_t>::max())
+    {
       // return true;
-      if (!b) return true;
+      if (!b)
+        return true;
       // assert(Node::ref_cnt(b) == 1);
       if (orig_tree_size == std::numeric_limits<size_t>::max())
         orig_tree_size = Node::size(b);
@@ -93,27 +103,31 @@ struct weight_balanced_tree {
       }
     }
 
-   private:
+  private:
     static constexpr double alpha = 0.29;
     static constexpr double ratio = alpha / (1 - alpha);
     static constexpr double beta = (1 - 2 * alpha) / (1 - alpha);
 
     // following two needed by balance_utils
-    static inline bool is_left_heavy(node* t1, node* t2) {
+    static inline bool is_left_heavy(node* t1, node* t2)
+    {
       return ratio * weight(t1) > weight(t2);
     }
 
-    static inline bool is_left_heavy(size_t s_t1, size_t s_t2) {
+    static inline bool is_left_heavy(size_t s_t1, size_t s_t2)
+    {
       return ratio * (s_t1 + 1) > (s_t2 + 1);
     }
 
-    static inline bool is_single_rotation(regular_node* t, bool dir) {
+    static inline bool is_single_rotation(regular_node* t, bool dir)
+    {
       double balance = dir ? weight(t->rc) : weight(t->lc);
       return balance <= beta * weight(t);
     }
 
     // used?
-    static inline bool could_single_rotate(node* lc, node* rc) {
+    static inline bool could_single_rotate(node* lc, node* rc)
+    {
       size_t l_s = weight(lc);
       size_t r_s = weight(rc);
       size_t tot = (Node::size(lc) + Node::size(rc) + 1) + 1;
@@ -126,4 +140,4 @@ struct weight_balanced_tree {
   };
 };
 
-}  // namespace cpam
+} // namespace cpam

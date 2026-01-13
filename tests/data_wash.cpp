@@ -1,8 +1,10 @@
 #include "data_op.h"
 #include "test_framework.h"
 
-template <typename InputPoint>
-void RoundDataAndShift(commandLine& P) {
+template<typename InputPoint>
+void
+RoundDataAndShift(commandLine& P)
+{
   std::string input_path, output_suffix, output_path;
   int pts_dim, multiply_offset;
 
@@ -44,8 +46,10 @@ void RoundDataAndShift(commandLine& P) {
   PrintToFile(output_path, new_wp);
 }
 
-template <typename InputPoint>
-void SortByCoord(commandLine& P) {
+template<typename InputPoint>
+void
+SortByCoord(commandLine& P)
+{
   std::string input_path, output_suffix, output_path;
   int pts_dim, sort_dim;
 
@@ -72,8 +76,11 @@ void SortByCoord(commandLine& P) {
   PrintToFile(output_path, new_wp);
 }
 
-int main(int argc, char* argv[]) {
-  commandLine P(argc, argv,
+int
+main(int argc, char* argv[])
+{
+  commandLine P(argc,
+                argv,
                 "[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
                 "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
                 "<_insertFile>] [-s <kSummary>] [-u <usage>]");
@@ -101,11 +108,9 @@ int main(int argc, char* argv[]) {
     } else if (pts_dim == 9) {
       apply.template operator()<psi::AugPoint<CoordType, 9, Wrapper::AugId>>();
     } else if (pts_dim == 12) {
-      apply
-          .template operator()<psi::AugPoint<CoordType, 12, Wrapper::AugId>>();
+      apply.template operator()<psi::AugPoint<CoordType, 12, Wrapper::AugId>>();
     } else if (pts_dim == 16) {
-      apply
-          .template operator()<psi::AugPoint<CoordType, 16, Wrapper::AugId>>();
+      apply.template operator()<psi::AugPoint<CoordType, 16, Wrapper::AugId>>();
     } else {
       throw std::runtime_error("Invalid dimension");
     }

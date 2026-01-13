@@ -14,9 +14,10 @@ using parlay::par_do;
 using parlay::par_do_if;
 using parlay::sequence;
 
-template <class TypeTrait>
-class PamRaw {
- public:
+template<class TypeTrait>
+class PamRaw
+{
+public:
   using TT = TypeTrait;
   // TODO: Do we really need to define these types again?
 
@@ -33,10 +34,11 @@ class PamRaw {
   // begin of CPAM_RAW definition
   using key_type = K;
   using val_type = V;
-  using aug_type = size_t;  // aug size of the tree
+  using aug_type = size_t; // aug size of the tree
 
   //	CPAM entry
-  struct entry {
+  struct entry
+  {
     using key_t = key_type;
     using val_t = val_type;
     using aug_t = aug_type;
@@ -70,13 +72,14 @@ class PamRaw {
   //   return nn_res.top().second;
   // }
 
-  template <class PT>
-  auto map_init(PT& P) {
+  template<class PT>
+  auto map_init(PT& P)
+  {
     size_t n = P.size();
     // parlay::internal::timer t("map_init");
     parlay::sequence<par> entries(n);
     parlay::parallel_for(0, n, [&](int i) {
-      entries[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
+      entries[i] = { Entry::GetKey(P[i]), Entry::GetVal(P[i]) };
     });
     // t.next("map_init: prepare entries");
     zmap m1(entries);
@@ -91,14 +94,15 @@ class PamRaw {
   //   return make_tuple(add, remove);
   // }
   //
-  template <typename PT, typename M>
-  auto map_insert(PT& P, M&& mmp) {
+  template<typename PT, typename M>
+  auto map_insert(PT& P, M&& mmp)
+  {
     size_t n = P.size();
 
     parlay::sequence<par> insert_pts(n);
     parlay::parallel_for(0, n, [&](int i) {
       // entries[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
-      insert_pts[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
+      insert_pts[i] = { Entry::GetKey(P[i]), Entry::GetVal(P[i]) };
       // insert_pts[i] = {P[i]->id, P[i]};
     });
 
@@ -159,13 +163,15 @@ class PamRaw {
   // }
 
   // APIs
-  template <typename Range>
-  void Build(Range In) {
+  template<typename Range>
+  void Build(Range In)
+  {
     EntrySlice A = parlay::make_slice(In);
     cpam_aug_map_ = std::move(map_init(A));
   }
 
-  void BatchInsert(EntrySlice In) {
+  void BatchInsert(EntrySlice In)
+  {
     if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
       return Build(std::forward<EntrySlice>(In));
     }
@@ -200,13 +206,15 @@ class PamRaw {
   //   return std::make_pair(size, logger);
   // }
 
-  auto Contain(K const k) const {
+  auto Contain(K const k) const
+  {
     pmos::RangeQueryLogger logger;
     auto res = this->cpam_aug_map_.contains(k);
     return std::make_pair(res, logger);
   }
 
-  void DeleteTree() {
+  void DeleteTree()
+  {
     cpam_aug_map_.clear();
     return;
   }
@@ -217,4 +225,4 @@ class PamRaw {
   zmap cpam_aug_map_;
 };
 
-}  // namespace PAMTree
+} // namespace PAMTree

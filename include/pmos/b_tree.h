@@ -10,16 +10,19 @@
 
 namespace pmos {
 // Template definition for the operator
-template <typename T1, typename T2>
-auto operator<<(std::ostream& os, std::pair<T1, T2> const& p) -> std::ostream& {
+template<typename T1, typename T2>
+auto
+operator<<(std::ostream& os, std::pair<T1, T2> const& p) -> std::ostream&
+{
   os << "(" << p.first << ", " << p.second << ")";
   return os;
 }
 
 // NOTE: Basetree
-template <class TypeTrait>
-class BTree {
- public:
+template<class TypeTrait>
+class BTree
+{
+public:
   using TT = TypeTrait;
   // TODO: Do we really need to define these types again?
 
@@ -33,7 +36,7 @@ class BTree {
   using EntrySlice = typename TT::EntrySlice;
   using Split = typename TT::Split;
   using NodeSplitSeqPair =
-      std::pair<typename TT::NodeSeq, typename TT::SplitSeq>;
+    std::pair<typename TT::NodeSeq, typename TT::SplitSeq>;
 
   using NodeSplitPair = std::pair<Node*, Split>;
   using NodeSplitPairSeq = parlay::sequence<NodeSplitPair>;
@@ -60,7 +63,8 @@ class BTree {
   // NOTE: tree structure
   static constexpr uint_fast16_t const kSerialBuildCutoff = 512;
 
-  struct BTreeInteriorNode : MultiNode<TT> {
+  struct BTreeInteriorNode : MultiNode<TT>
+  {
     using TT = TT;
     using BaseNode = MultiNode<TT>;
     // using BTreeNodeArr = typename BaseNode::NodeArr;
@@ -68,27 +72,34 @@ class BTree {
 
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split)
-        : BaseNode(_tree_nodes, _split, typename TT::InteriorAug()) {
-    }  // TODO:finish AT
+      : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
+    {
+    } // TODO:finish AT
 
     BTreeInteriorNode(TT::NodeSlice _tree_nodes_slice,
                       TT::SplitSlice _split_slice)
-        : BaseNode(_tree_nodes_slice, _split_slice,
-                   typename TT::InteriorAug()) {}  // TODO:finish AT
+      : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
+    {
+    } // TODO:finish AT
 
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
-                      TT::SplitSeq const& _split, TT::InteriorAug const& _aug)
-        : BaseNode(_tree_nodes, _split, _aug) {}
+                      TT::SplitSeq const& _split,
+                      TT::InteriorAug const& _aug)
+      : BaseNode(_tree_nodes, _split, _aug)
+    {
+    }
 
     void SetParallelFlag(bool const flag) { this->aug.SetParallelFlag(flag); }
 
     void ResetParallelFlag() { this->aug.ResetParallelFlag(); }
 
-    auto GetParallelFlagIniStatus() -> bool {
+    auto GetParallelFlagIniStatus() -> bool
+    {
       return this->aug.GetParallelFlagIniStatus();
     }
 
-    [[nodiscard]] auto ForceParallel() const -> bool {
+    [[nodiscard]] auto ForceParallel() const -> bool
+    {
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
@@ -99,20 +110,23 @@ class BTree {
   using Interior = BTreeInteriorNode;
 
   // NOTE: array based inner tree for batch insertion and deletion
-  template <typename Leaf, typename Interior>
+  template<typename Leaf, typename Interior>
   struct InnerTree;
 
-  static auto GetBktNum(SizeT const item_n) -> SizeT {
+  static auto GetBktNum(SizeT const item_n) -> SizeT
+  {
     return item_n / TT::kBufMD;
   }
 
   static auto GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
-      -> SizeT {
+    -> SizeT
+  {
     return (n * i) / bkt_n;
   };
 
   static auto GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
-      -> SizeT {
+    -> SizeT
+  {
     return (n * (i + 1)) / bkt_n;
   };
 
@@ -125,19 +139,20 @@ class BTree {
   // }
 
   // NOTE: build tree
-  template <typename Range>
+  template<typename Range>
   void Build(Range&& In);
 
   void Build_(EntrySlice In);
 
   Node* BuildRecursive(EntrySlice In);
 
-  template <typename Range>
+  template<typename Range>
   void BatchInsert(Range&& In);
 
   void BatchInsert_(EntrySlice In);
 
-  SizeT BatchInsertRecursive(Node* T, EntrySlice In,
+  SizeT BatchInsertRecursive(Node* T,
+                             EntrySlice In,
                              NodeSplitPairSlice node_split_slice);
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
@@ -152,29 +167,33 @@ class BTree {
   //                                   NodeBox const& R);
   //
   static Node* UpdateInterior(
-      Node* T, NodeSplitPairSlice node_split_slice,
-      std::array<SizeT, TT::kBufUB> const& split_pos_arr, SizeT new_node_n,
-      std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
+    Node* T,
+    NodeSplitPairSlice node_split_slice,
+    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+    SizeT new_node_n,
+    std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
 
   // PARA: return bucket_num
-  static SizeT GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
+  static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
+                                 TT::SplitSlice key_out,
                                  TT::NodeSlice node_out);
 
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
                                  NodeSplitPairSlice node_split_out);
 
   // PARA: return bucket_num
-  template <typename KeyFunc, typename NodeFunc>
-  struct GenNodesOutputHandler {
+  template<typename KeyFunc, typename NodeFunc>
+  struct GenNodesOutputHandler
+  {
     KeyFunc set_key;
     NodeFunc set_node;
   };
 
-  template <typename OutputHandler>
+  template<typename OutputHandler>
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
                                  OutputHandler&& output_handler);
 
-  template <typename OutputHandler>
+  template<typename OutputHandler>
   static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
                                      TT::SplitSlice key_in,
                                      OutputHandler&& output_handler);
@@ -197,15 +216,19 @@ class BTree {
                                        // parlay::sequence<int>& split_pos_seq,
                                        auto& split_pos_seq,
                                        EntrySlice entry_seq_s,
-                                       size_t split_offset, size_t In_offset);
+                                       size_t split_offset,
+                                       size_t In_offset);
 
-  static SizeT HandlingLeafSplitOverflow(Node* T, EntrySlice In,
+  static SizeT HandlingLeafSplitOverflow(Node* T,
+                                         EntrySlice In,
                                          NodeSplitPairSlice node_split_slice);
 
   static SizeT HandlingInteriorSplitOverflow(
-      Node* T, NodeSplitPairSlice node_split_slice,
-      std::array<SizeT, TT::kBufUB> const& split_pos_arr, SizeT new_node_n,
-      std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
+    Node* T,
+    NodeSplitPairSlice node_split_slice,
+    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+    SizeT new_node_n,
+    std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
 
   //
   // template <typename Leaf, typename RT>
@@ -217,7 +240,8 @@ class BTree {
 
   static inline BucketType RetriveTag(E e, TT::SplitSeq const& split_seq);
 
-  static TT::BallSeq SeievePoints(EntrySlice A, EntrySlice B,
+  static TT::BallSeq SeievePoints(EntrySlice A,
+                                  EntrySlice B,
                                   TT::SplitSeq const& split_seq);
   //
   // template <typename Leaf, typename Interior, typename PrepareFunc,
@@ -251,12 +275,12 @@ class BTree {
   //
   // // NOTE: delete tree
   // template <SupportsForceParallel Interior, bool granularity>
-  template <bool granularity>
+  template<bool granularity>
   inline static bool ForceParallelRecursion(Interior const* T);
 
   void DeleteTree();
 
-  template <bool granularity = true>
+  template<bool granularity = true>
   static void DeleteTreeRecursive(Node* T);
 
   // // NOTE: KNN query stuffs
@@ -374,10 +398,10 @@ class BTree {
   //
   // NOTE: utility
   // TODO: better evaluate the parallel recursion function
-  template <typename Range, bool granularity = true>
+  template<typename Range, bool granularity = true>
   static void FlattenRec(Node* T, Range Out);
 
-  template <typename Range>
+  template<typename Range>
   static void ExtractPointsInLeaf(Node* T, Range Out);
 
   // template <typename Leaf, IsMultiNode Interior, typename Range,
@@ -418,16 +442,16 @@ class BTree {
 
   TT::Box GetEmptyBox();
 
-  template <typename Leaf, typename Interior>
+  template<typename Leaf, typename Interior>
   TT::Box VerifyTreeProperty(Node const* T);
 
-  template <typename Leaf, typename Interior>
+  template<typename Leaf, typename Interior>
   int CheckHeight(Node const* T);
 
-  template <typename Leaf, typename Interior>
+  template<typename Leaf, typename Interior>
   int GetHeight(Node const* T);
 
-  template <typename Leaf, typename Interior>
+  template<typename Leaf, typename Interior>
   int GetTreeNodesNum(Node const* T);
   //
   // template <typename Leaf, typename Interior>
@@ -441,7 +465,7 @@ class BTree {
   // template <typename Leaf, typename Interior>
   // void CheckTreeSameSequential(Node* T, int dim);
   //
-  template <typename Leaf, typename Interior>
+  template<typename Leaf, typename Interior>
   void Validate();
 
   auto Contain(K k) const -> std::pair<bool, MembershipLogger>;
@@ -479,7 +503,7 @@ class BTree {
 
   constexpr static char const* GetTreeName() { return "BTree"; }
 
- private:
+private:
   Node* root_ = nullptr;
   parlay::internal::timer insert_leaf_timer;
   parlay::internal::timer lower_bound_timer;
@@ -495,7 +519,7 @@ class BTree {
   int vis_inter_num = 0;
 };
 
-}  // namespace pmos
+} // namespace pmos
 
 #include "b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
@@ -508,4 +532,4 @@ class BTree {
 #include "b_tree_impl/tree_op/node_op.hpp"
 #include "b_tree_impl/validation.hpp"
 
-#endif  // PMOS_B_TREE_H_
+#endif // PMOS_B_TREE_H_

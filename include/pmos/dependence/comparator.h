@@ -12,10 +12,12 @@ namespace pmos {
 //*----------- double precision comparision ----------------
 //* God made the integers, all else is the work of man.
 //* -- Leopold Kronecker
-template <typename T>
-class Num_Comparator {
- public:
-  static inline bool Gt(T const a, T const b) {
+template<typename T>
+class Num_Comparator
+{
+public:
+  static inline bool Gt(T const a, T const b)
+  {
     if constexpr (std::is_floating_point_v<T>) {
       return a - b > eps;
     } else {
@@ -23,7 +25,8 @@ class Num_Comparator {
     }
   }
 
-  static inline bool Lt(T const a, T const b) {
+  static inline bool Lt(T const a, T const b)
+  {
     if constexpr (std::is_floating_point_v<T>) {
       return a - b < -eps;
     } else {
@@ -31,7 +34,8 @@ class Num_Comparator {
     }
   }
 
-  static inline bool Eq(T const a, T const b) {
+  static inline bool Eq(T const a, T const b)
+  {
     if constexpr (std::is_floating_point_v<T>) {
       return std::abs(a - b) < eps;
     } else {
@@ -51,7 +55,8 @@ class Num_Comparator {
 
   static inline bool IsZero(T const a) { return Eq(a, static_cast<T>(0)); }
 
-  static inline T DivideTwoCeil(T const a) {
+  static inline T DivideTwoCeil(T const a)
+  {
     if constexpr (std::is_floating_point_v<T>) {
       return std::ceil(a / 2.0);
     } else {
@@ -59,21 +64,24 @@ class Num_Comparator {
     }
   }
 
-  static inline T integer_log2_upper(T const a) {
+  static inline T integer_log2_upper(T const a)
+  {
     if constexpr (std::is_floating_point_v<T>) {
       return static_cast<T>(std::ceil(std::log2(a)));
     } else {
-      if (a == 0) return 0;  // BUG: this is a bug, should return -1
+      if (a == 0)
+        return 0; // BUG: this is a bug, should return -1
       T r = 0, b = a;
-      while (b >>= 1) r++;
+      while (b >>= 1)
+        r++;
       return r + static_cast<T>((1 << r) != a);
     }
   }
 
- private:
+private:
   static constexpr T eps = std::numeric_limits<T>::epsilon();
 };
 
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_DEPENDENCE_COMPARATOR_H_
+#endif // PMOS_DEPENDENCE_COMPARATOR_H_

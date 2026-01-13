@@ -5,12 +5,14 @@
 
 namespace pmos {
 
-struct MembershipLogger {
+struct MembershipLogger
+{
   size_t vis_leaf_num = 0;
   size_t vis_interior_num = 0;
 };
 
-struct KNNLogger {
+struct KNNLogger
+{
   size_t vis_leaf_num = 0;
   size_t vis_interior_num = 0;
   size_t generate_box_num = 0;
@@ -18,7 +20,8 @@ struct KNNLogger {
   size_t skip_box_num = 0;
 };
 
-struct RangeQueryLogger {
+struct RangeQueryLogger
+{
   size_t vis_leaf_num = 0;
   size_t vis_interior_num = 0;
   size_t generate_box_num = 0;
@@ -26,6 +29,6 @@ struct RangeQueryLogger {
   size_t skip_box_num = 0;
 };
 
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_DEPENDENCE_LOGGERS_H_
+#endif // PMOS_DEPENDENCE_LOGGERS_H_

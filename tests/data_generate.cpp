@@ -2,8 +2,9 @@
 
 #include "data_op.h"
 
-parlay::sequence<double> ParseParam(std::string const& input,
-                                    double defaultValue = 1.0) {
+parlay::sequence<double>
+ParseParam(std::string const& input, double defaultValue = 1.0)
+{
   if (input.empty()) {
     return {};
   }
@@ -35,8 +36,11 @@ parlay::sequence<double> ParseParam(std::string const& input,
   return result.empty() ? parlay::sequence<double>{} : result;
 }
 
-int main(int argc, char* argv[]) {
-  commandLine P(argc, argv,
+int
+main(int argc, char* argv[])
+{
+  commandLine P(argc,
+                argv,
                 "[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
                 "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
                 "<_insertFile>] [-s <kSummary>]");
@@ -65,9 +69,11 @@ int main(int argc, char* argv[]) {
   std::cout << "base_n: " << base_n << " batch_n: " << batch_n
             << " pts_dim: " << val_n << " file_num: " << file_n
             << " distribution_type: " << dis_type << " batch_param: ";
-  for (auto const& p : batch_param_seq) std::cout << p << " ";
+  for (auto const& p : batch_param_seq)
+    std::cout << p << " ";
   std::cout << " base_param: ";
-  for (auto const& p : base_param_seq) std::cout << p << " ";
+  for (auto const& p : base_param_seq)
+    std::cout << p << " ";
   std::cout << std::endl;
 
   // NOTE: ../kdtree/
@@ -99,20 +105,17 @@ int main(int argc, char* argv[]) {
     std::cout << "Generating... " << std::endl;
     EntrySeq base_seq, batch_seq;
     std::tie(base_seq, batch_seq) =
-        dis_type == 0
-            ? Generator<E, UniformGenerator<>, UniformGenerator<>>::GenBatch(
-                  batch_op, base_n, batch_n, base_param_seq, batch_param_seq)
-        : dis_type == 1
-            ? Generator<E, UniformGenerator<>,
-                        ExponentialGenerator<>>::GenBatch(batch_op, base_n,
-                                                          batch_n,
-                                                          base_param_seq,
-                                                          batch_param_seq)
-        : dis_type == 2
-            ? Generator<E, UniformGenerator<>, NormalGenerator<>>::GenBatch(
-                  batch_op, base_n, batch_n, base_param_seq, batch_param_seq)
-            : Generator<E, NormalGenerator<>, NormalGenerator<>>::GenBatch(
-                  batch_op, base_n, batch_n, base_param_seq, batch_param_seq);
+      dis_type == 0
+        ? Generator<E, UniformGenerator<>, UniformGenerator<>>::GenBatch(
+            batch_op, base_n, batch_n, base_param_seq, batch_param_seq)
+      : dis_type == 1
+        ? Generator<E, UniformGenerator<>, ExponentialGenerator<>>::GenBatch(
+            batch_op, base_n, batch_n, base_param_seq, batch_param_seq)
+      : dis_type == 2
+        ? Generator<E, UniformGenerator<>, NormalGenerator<>>::GenBatch(
+            batch_op, base_n, batch_n, base_param_seq, batch_param_seq)
+        : Generator<E, NormalGenerator<>, NormalGenerator<>>::GenBatch(
+            batch_op, base_n, batch_n, base_param_seq, batch_param_seq);
     std::cout << "Writing... " << std::endl;
     PrintToFile(new_path + ".base.in", base_seq);
     PrintToFile(new_path + ".batch.in", batch_seq);

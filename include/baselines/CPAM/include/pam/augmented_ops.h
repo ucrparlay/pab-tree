@@ -6,8 +6,9 @@
 //   AUGMENTED MAP OPERATIONS
 // *******************************************
 
-template <class Map>
-struct augmented_ops : Map {
+template<class Map>
+struct augmented_ops : Map
+{
   using Entry = typename Map::Entry;
   using node = typename Map::node;
   using ET = typename Map::ET;
@@ -15,23 +16,31 @@ struct augmented_ops : Map {
   using K = typename Map::K;
   using aug_t = typename Entry::aug_t;
 
-  static inline aug_t aug_val(node* b) {
-    if (!b) return Entry::get_empty();
+  static inline aug_t aug_val(node* b)
+  {
+    if (!b)
+      return Entry::get_empty();
     return b->entry.second;
   }
 
-  struct aug_sum_t {
+  struct aug_sum_t
+  {
     aug_t result;
-    aug_sum_t() : result(Entry::get_empty()) {}
-    void add_entry(ET e) {
+    aug_sum_t()
+      : result(Entry::get_empty())
+    {
+    }
+    void add_entry(ET e)
+    {
       result = Entry::combine(result, Entry::from_entry(e));
     }
     void add_aug_val(aug_t av) { result = Entry::combine(result, av); }
   };
 
-  template <class aug>
+  template<class aug>
   // the sum right of or at key
-  static void aug_sum_right(node* b, K const& key, aug& a) {
+  static void aug_sum_right(node* b, K const& key, aug& a)
+  {
     while (b) {
       // std::cout << "Size b = " << Map::size(b) << " aug_stats: " <<
       // b->entry.second.size() << " " << b->entry.second.ref_cnt() <<
@@ -40,7 +49,8 @@ struct augmented_ops : Map {
         // std::cout << "key (gt) = " << Map::get_key(b).first << " " <<
         // Map::get_key(b).second << std::endl;
         a.add_entry(Map::get_entry(b));
-        if (b->rc) a.add_aug_val(b->rc->entry.second);
+        if (b->rc)
+          a.add_aug_val(b->rc->entry.second);
         b = b->lc;
       } else {
         // std::cout << "key (lt) = " << Map::get_key(b).first << " " <<
@@ -50,61 +60,74 @@ struct augmented_ops : Map {
     }
   }
 
-  template <typename F>
-  static void iterate_aug(node* a, F const& f) {
-    if (!a) return;
+  template<typename F>
+  static void iterate_aug(node* a, F const& f)
+  {
+    if (!a)
+      return;
     iterate_aug(a->lc, f);
     f(Map::get_entry(a), aug_val(a));
     iterate_aug(a->rc, f);
   }
 
-  template <class aug>
+  template<class aug>
   // the sum left of or at key
-  static void aug_sum_left(node* b, K const& key, aug& a) {
+  static void aug_sum_left(node* b, K const& key, aug& a)
+  {
     while (b) {
       if (!Map::comp(key, Map::get_key(b))) {
         a.add_entry(Map::get_entry(b));
         // if (b->lc) a.add_aug_val(aug_val(b->lc));
-        if (b->lc) a.add_aug_val(b->lc->entry.second);
+        if (b->lc)
+          a.add_aug_val(b->lc->entry.second);
         b = b->rc;
       } else
         b = b->lc;
     }
   }
 
-  template <class aug>
-  static void aug_sum_range(node* b, K const& key_left, K const& key_right,
-                            aug& a) {
+  template<class aug>
+  static void aug_sum_range(node* b,
+                            K const& key_left,
+                            K const& key_right,
+                            aug& a)
+  {
     node* r = Map::range_root(b, key_left, key_right);
     if (r) {
       // add in left side (right of or at key_left)
       aug_sum_right(r->lc, key_left, a);
-      a.add_entry(Map::get_entry(r));  // add in middle
+      a.add_entry(Map::get_entry(r)); // add in middle
       // add in right side (left of or at key_right)
       aug_sum_left(r->rc, key_right, a);
     }
   }
 
-  template <typename Func>
-  static node* aug_select(node* b, Func const& f) {
-    if (b == NULL) return NULL;
+  template<typename Func>
+  static node* aug_select(node* b, Func const& f)
+  {
+    if (b == NULL)
+      return NULL;
     if (f(aug_val(b->lc))) {
-      if (f(Entry::from_entry(Map::get_entry(b)))) return aug_select(b->rc, f);
+      if (f(Entry::from_entry(Map::get_entry(b))))
+        return aug_select(b->rc, f);
       return b;
     }
     return aug_select(b->lc, f);
   }
 
-  template <class Func>
-  static node* aug_filter(node* b, Func const& f, bool extra_ptr = false) {
-    if (!b) return NULL;
-    if (!f(aug_val(b))) return NULL;
+  template<class Func>
+  static node* aug_filter(node* b, Func const& f, bool extra_ptr = false)
+  {
+    if (!b)
+      return NULL;
+    if (!f(aug_val(b)))
+      return NULL;
     bool copy = extra_ptr || (b->ref_cnt > 1);
 
     auto P = utils::fork<node*>(
-        Map::size(b) >= utils::node_limit,
-        [&]() { return aug_filter(b->lc, f, copy); },
-        [&]() { return aug_filter(b->rc, f, copy); });
+      Map::size(b) >= utils::node_limit,
+      [&]() { return aug_filter(b->lc, f, copy); },
+      [&]() { return aug_filter(b->rc, f, copy); });
 
     if (f(Entry::from_entry(Map::get_entry(b)))) {
       return Map::node_join(P.first, P.second, GC::copy_if(b, copy, extra_ptr));
@@ -114,8 +137,9 @@ struct augmented_ops : Map {
     }
   }
 
-  template <class Func>
-  static node* insert_lazy(node* b, const ET& e, Func const& f) {
+  template<class Func>
+  static node* insert_lazy(node* b, const ET& e, Func const& f)
+  {
     aug_t av = Entry::from_entry(e);
     auto g = [&](aug_t const& a) { return Entry::combine(av, a); };
 

@@ -1,7 +1,9 @@
 #include "parlay/internal/get_time.h"
 
-template <class F, class G, class H>
-double time_loop(int rounds, double delay, F initf, G runf, H endf) {
+template<class F, class G, class H>
+double
+time_loop(int rounds, double delay, F initf, G runf, H endf)
+{
   parlay::internal::timer t;
   // run for delay seconds to "warm things up"
   // will skip if delay is zero
@@ -15,7 +17,8 @@ double time_loop(int rounds, double delay, F initf, G runf, H endf) {
     t.start();
     runf();
     t.next_time();
-    if (i == rounds) t.stop();
+    if (i == rounds)
+      t.stop();
     endf();
   }
   return t.total_time() / rounds;

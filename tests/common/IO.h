@@ -53,12 +53,15 @@ auto is_space = [](char c) {
 
 // parallel code for converting a string to word pointers
 // side effects string by setting to null after each word
-template <class Seq>
-parlay::sequence<char*> stringToWords(Seq& Str) {
+template<class Seq>
+parlay::sequence<char*>
+stringToWords(Seq& Str)
+{
   size_t n = Str.size();
 
   parlay::parallel_for(0, n, [&](long i) {
-    if (is_space(Str[i])) Str[i] = 0;
+    if (is_space(Str[i]))
+      Str[i] = 0;
   });
 
   // mark start of words
@@ -70,9 +73,8 @@ parlay::sequence<char*> stringToWords(Seq& Str) {
   auto Offsets = parlay::pack_index<long>(FL);
 
   // pointer to each start of word
-  auto SA = parlay::tabulate(Offsets.size(), [&](long j) -> char* {
-    return Str.begin() + Offsets[j];
-  });
+  auto SA = parlay::tabulate(
+    Offsets.size(), [&](long j) -> char* { return Str.begin() + Offsets[j]; });
 
   return SA;
 }
@@ -81,44 +83,105 @@ parlay::sequence<char*> stringToWords(Seq& Str) {
 // desired
 using charstring = typename parlay::sequence<char>;
 
-inline int xToStringLen(charstring const& a) { return a.size(); }
-inline void xToString(char* s, charstring const& a) {
-  for (int i = 0; std::cmp_less(i, a.size()); i++) s[i] = a[i];
+inline int
+xToStringLen(charstring const& a)
+{
+  return a.size();
+}
+inline void
+xToString(char* s, charstring const& a)
+{
+  for (int i = 0; std::cmp_less(i, a.size()); i++)
+    s[i] = a[i];
 }
 
-inline int xToStringLen([[maybe_unused]] long a) { return 21; }
-inline void xToString(char* s, long a) { sprintf(s, "%ld", a); }
+inline int
+xToStringLen([[maybe_unused]] long a)
+{
+  return 21;
+}
+inline void
+xToString(char* s, long a)
+{
+  sprintf(s, "%ld", a);
+}
 
-inline int xToStringLen([[maybe_unused]] unsigned long a) { return 21; }
-inline void xToString(char* s, unsigned long a) { sprintf(s, "%lu", a); }
+inline int
+xToStringLen([[maybe_unused]] unsigned long a)
+{
+  return 21;
+}
+inline void
+xToString(char* s, unsigned long a)
+{
+  sprintf(s, "%lu", a);
+}
 
-inline uint xToStringLen([[maybe_unused]] uint a) { return 12; }
-inline void xToString(char* s, uint a) { sprintf(s, "%u", a); }
+inline uint
+xToStringLen([[maybe_unused]] uint a)
+{
+  return 12;
+}
+inline void
+xToString(char* s, uint a)
+{
+  sprintf(s, "%u", a);
+}
 
-inline int xToStringLen([[maybe_unused]] int a) { return 12; }
-inline void xToString(char* s, int a) { sprintf(s, "%d", a); }
+inline int
+xToStringLen([[maybe_unused]] int a)
+{
+  return 12;
+}
+inline void
+xToString(char* s, int a)
+{
+  sprintf(s, "%d", a);
+}
 
-inline int xToStringLen([[maybe_unused]] double a) { return 18; }
-inline void xToString(char* s, double a) { sprintf(s, "%.11le", a); }
+inline int
+xToStringLen([[maybe_unused]] double a)
+{
+  return 18;
+}
+inline void
+xToString(char* s, double a)
+{
+  sprintf(s, "%.11le", a);
+}
 
-inline int xToStringLen(char* a) { return strlen(a) + 1; }
-inline void xToString(char* s, char* a) { sprintf(s, "%s", a); }
+inline int
+xToStringLen(char* a)
+{
+  return strlen(a) + 1;
+}
+inline void
+xToString(char* s, char* a)
+{
+  sprintf(s, "%s", a);
+}
 
-template <class A, class B>
-inline int xToStringLen(pair<A, B> a) {
+template<class A, class B>
+inline int
+xToStringLen(pair<A, B> a)
+{
   return xToStringLen(a.first) + xToStringLen(a.second) + 1;
 }
 
-template <class A, class B>
-inline void xToString(char* s, pair<A, B> a) {
+template<class A, class B>
+inline void
+xToString(char* s, pair<A, B> a)
+{
   int l = xToStringLen(a.first);
   xToString(s, a.first);
   s[l] = ' ';
   xToString(s + l + 1, a.second);
 }
 
-template <class Seq>
-charstring seqToString(Seq const& A) {
+template<class Seq>
+charstring
+seqToString(Seq const& A)
+{
   size_t n = A.size();
   auto L = parlay::tabulate(n, [&](size_t i) -> long {
     typename Seq::value_type x = A[i];
@@ -142,8 +205,10 @@ charstring seqToString(Seq const& A) {
   return C;
 }
 
-template <class T>
-void writeSeqToStream(ofstream& os, parlay::sequence<T> const& A) {
+template<class T>
+void
+writeSeqToStream(ofstream& os, parlay::sequence<T> const& A)
+{
   size_t bsize = 10000000;
   size_t offset = 0;
   size_t n = A.size();
@@ -156,9 +221,12 @@ void writeSeqToStream(ofstream& os, parlay::sequence<T> const& A) {
   }
 }
 
-template <class T>
-int writeSeqToFile(string header, parlay::sequence<T> const& A,
-                   char const* fileName) {
+template<class T>
+int
+writeSeqToFile(string header,
+               parlay::sequence<T> const& A,
+               char const* fileName)
+{
   auto a = A[0];
   // xToStringLena(a);
   ofstream file(fileName, ios::out | ios::binary);
@@ -172,9 +240,13 @@ int writeSeqToFile(string header, parlay::sequence<T> const& A,
   return 0;
 }
 
-template <class T1, class T2>
-int write2SeqToFile(string header, parlay::sequence<T1> const& A,
-                    parlay::sequence<T2> const& B, char const* fileName) {
+template<class T1, class T2>
+int
+write2SeqToFile(string header,
+                parlay::sequence<T1> const& A,
+                parlay::sequence<T2> const& B,
+                char const* fileName)
+{
   ofstream file(fileName, ios::out | ios::binary);
   if (!file.is_open()) {
     std::cout << "Unable to open file: " << fileName << std::endl;
@@ -187,7 +259,9 @@ int write2SeqToFile(string header, parlay::sequence<T1> const& A,
   return 0;
 }
 
-charstring readStringFromFile(char const* fileName) {
+charstring
+readStringFromFile(char const* fileName)
+{
   ifstream file(fileName, ios::in | ios::binary | ios::ate);
   if (!file.is_open()) {
     std::cout << "Unable to open file: " << fileName << std::endl;
@@ -204,12 +278,16 @@ charstring readStringFromFile(char const* fileName) {
 
 string intHeaderIO = "sequenceInt";
 
-template <class T>
-int writeIntSeqToFile(parlay::sequence<T> const& A, char const* fileName) {
+template<class T>
+int
+writeIntSeqToFile(parlay::sequence<T> const& A, char const* fileName)
+{
   return writeSeqToFile(intHeaderIO, A, fileName);
 }
 
-sequence<sequence<char>> get_tokens(char const* fileName) {
+sequence<sequence<char>>
+get_tokens(char const* fileName)
+{
   // parlay::internal::timer t("get_tokens");
   // auto S = parlay::chars_from_file(fileName);
   auto S = parlay::file_map(fileName);
@@ -219,8 +297,10 @@ sequence<sequence<char>> get_tokens(char const* fileName) {
   return r;
 }
 
-template <class T>
-parlay::sequence<T> readIntSeqFromFile(char const* fileName) {
+template<class T>
+parlay::sequence<T>
+readIntSeqFromFile(char const* fileName)
+{
   auto W = get_tokens(fileName);
   string header(W[0].begin(), W[0].end());
   if (header != intHeaderIO) {
@@ -229,7 +309,7 @@ parlay::sequence<T> readIntSeqFromFile(char const* fileName) {
   }
   long n = W.size() - 1;
   auto A = parlay::tabulate(
-      n, [&](long i) -> T { return parlay::chars_to_long(W[i + 1]); });
+    n, [&](long i) -> T { return parlay::chars_to_long(W[i + 1]); });
   return A;
 }
-};  // namespace benchIO
+}; // namespace benchIO

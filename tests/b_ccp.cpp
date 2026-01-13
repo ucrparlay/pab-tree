@@ -12,8 +12,10 @@ double const kBatchInsertCheckRatio = 0.1;
 double const kCCPBatchDiffTotalRatio = 1.0;
 double const kCCPBatchDiffOverlapRatio = 0.5;
 
-template <typename TT, typename TreeDesc>
-void CheckCorrectness(Wrapper::Options opts) {
+template<typename TT, typename TreeDesc>
+void
+CheckCorrectness(Wrapper::Options opts)
+{
   using Tree = TreeDesc::TreeType;
   using EntrySeq = typename TT::EntrySeq;
 
@@ -120,7 +122,7 @@ void CheckCorrectness(Wrapper::Options opts) {
   // }
 
   EntrySeq new_wp;
-  if (opts.tag == (1 << 0)) {  // insert
+  if (opts.tag == (1 << 0)) { // insert
     new_wp = wp;
     new_wp.append(wi);
   }
@@ -150,7 +152,7 @@ void CheckCorrectness(Wrapper::Options opts) {
   }
 
   // // NOTE: query phase
-  if (opts.query_type & (1 << 0)) {  // NOTE: membership
+  if (opts.query_type & (1 << 0)) { // NOTE: membership
     size_t batch_size = static_cast<size_t>(wp.size() * kBatchInsertCheckRatio);
     auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
     auto res = parlay::sequence<bool>(query_ele.size(), false);
@@ -186,12 +188,14 @@ void CheckCorrectness(Wrapper::Options opts) {
   return;
 }
 
-int main(int argc, char* argv[]) {
+int
+main(int argc, char* argv[])
+{
   commandLine params(argc, argv);
   Wrapper::Options opts(params);
 
   auto run = [&]<typename TreeWrapper, typename TypeTrait>(
-                 Wrapper::Options opts) -> void {
+               Wrapper::Options opts) -> void {
     // NOTE: run the test
     CheckCorrectness<TypeTrait, TreeWrapper>(opts);
   };

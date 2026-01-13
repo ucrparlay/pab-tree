@@ -31,8 +31,10 @@ namespace utils {
 //  // processed sequentially instead of in parallel
 //  constexpr const size_t node_limit = compression_block_size*4;
 
-template <class E>
-E* new_array_no_init(size_t n) {
+template<class E>
+E*
+new_array_no_init(size_t n)
+{
 #ifndef PARLAY_USE_STD_ALLOC
   auto allocator = parlay::allocator<E>();
 #else
@@ -41,8 +43,10 @@ E* new_array_no_init(size_t n) {
   return allocator.allocate(n);
 }
 
-template <class E>
-void free_array(E* e, size_t n) {
+template<class E>
+void
+free_array(E* e, size_t n)
+{
 #ifndef PARLAY_USE_STD_ALLOC
   auto allocator = parlay::allocator<E>();
 #else
@@ -52,9 +56,11 @@ void free_array(E* e, size_t n) {
 }
 
 // fork-join parallel call, returning a pair of values
-template <class RT, class Lf, class Rf>
-static std::pair<RT, RT> fork(bool do_parallel, Lf left, Rf right) {
-  if (do_parallel) {  // do_parallel) {
+template<class RT, class Lf, class Rf>
+static std::pair<RT, RT>
+fork(bool do_parallel, Lf left, Rf right)
+{
+  if (do_parallel) { // do_parallel) {
     RT r, l;
     auto do_right = [&]() { r = right(); };
     auto do_left = [&]() { l = left(); };
@@ -68,8 +74,10 @@ static std::pair<RT, RT> fork(bool do_parallel, Lf left, Rf right) {
 }
 
 // fork-join parallel call, returning nothing
-template <class Lf, class Rf>
-static void fork_no_result(bool do_parallel, Lf left, Rf right) {
+template<class Lf, class Rf>
+static void
+fork_no_result(bool do_parallel, Lf left, Rf right)
+{
   if (do_parallel)
     parlay::par_do(left, right);
   else {
@@ -78,43 +86,49 @@ static void fork_no_result(bool do_parallel, Lf left, Rf right) {
   }
 }
 
-template <class V>
-struct get_left {
+template<class V>
+struct get_left
+{
   V operator()(V const& a, V const& b) const { return a; }
 };
 
-template <class V>
-struct get_right {
+template<class V>
+struct get_right
+{
   V operator()(V const& a, V const& b) const { return b; }
 };
 
 // should update the following to use more portable implementation
-template <typename ET>
-inline bool atomic_compare_and_swap(ET* a, ET oldval, ET newval) {
+template<typename ET>
+inline bool
+atomic_compare_and_swap(ET* a, ET oldval, ET newval)
+{
   static_assert(sizeof(ET) <= 8, "Bad CAS length");
   if (sizeof(ET) == 1) {
     uint8_t r_oval, r_nval;
     memcpy(&r_oval, &oldval, sizeof(ET));
     memcpy(&r_nval, &newval, sizeof(ET));
-    return __sync_bool_compare_and_swap(reinterpret_cast<uint8_t*>(a), r_oval,
-                                        r_nval);
+    return __sync_bool_compare_and_swap(
+      reinterpret_cast<uint8_t*>(a), r_oval, r_nval);
   } else if (sizeof(ET) == 4) {
     uint32_t r_oval, r_nval;
     memcpy(&r_oval, &oldval, sizeof(ET));
     memcpy(&r_nval, &newval, sizeof(ET));
-    return __sync_bool_compare_and_swap(reinterpret_cast<uint32_t*>(a), r_oval,
-                                        r_nval);
-  } else {  // if (sizeof(ET) == 8) {
+    return __sync_bool_compare_and_swap(
+      reinterpret_cast<uint32_t*>(a), r_oval, r_nval);
+  } else { // if (sizeof(ET) == 8) {
     uint64_t r_oval, r_nval;
     memcpy(&r_oval, &oldval, sizeof(ET));
     memcpy(&r_nval, &newval, sizeof(ET));
-    return __sync_bool_compare_and_swap(reinterpret_cast<uint64_t*>(a), r_oval,
-                                        r_nval);
+    return __sync_bool_compare_and_swap(
+      reinterpret_cast<uint64_t*>(a), r_oval, r_nval);
   }
 }
 
-template <typename E, typename EV>
-inline E fetch_and_add(E* a, EV b) {
+template<typename E, typename EV>
+inline E
+fetch_and_add(E* a, EV b)
+{
   E volatile newV, oldV;
   do {
     oldV = *a;
@@ -123,8 +137,10 @@ inline E fetch_and_add(E* a, EV b) {
   return oldV;
 }
 
-template <typename E, typename EV>
-inline void write_add(E* a, EV b) {
+template<typename E, typename EV>
+inline void
+write_add(E* a, EV b)
+{
   // volatile E newV, oldV;
   // if (start_logging) {
   //   assert(false);
@@ -137,16 +153,21 @@ inline void write_add(E* a, EV b) {
   } while (!atomic_compare_and_swap(a, oldV, newV));
 }
 
-template <typename F, typename AT>
-static size_t PAM_linear_search(AT* A, size_t size, F const& less) {
+template<typename F, typename AT>
+static size_t
+PAM_linear_search(AT* A, size_t size, F const& less)
+{
   for (size_t i = 0; i < size; i++)
-    if (!less(A[i])) return i;
+    if (!less(A[i]))
+      return i;
   return size;
 }
 
 // ?? why does PAM have its own binary search?
-template <typename F, typename AT>
-static size_t PAM_binary_search(AT* A, size_t n, F const& less) {
+template<typename F, typename AT>
+static size_t
+PAM_binary_search(AT* A, size_t n, F const& less)
+{
   size_t start = 0;
   size_t end = n;
   while (end - start > parlay::internal::_binary_search_base) {
@@ -160,5 +181,5 @@ static size_t PAM_binary_search(AT* A, size_t n, F const& less) {
   return x;
 }
 
-}  // namespace utils
-}  // namespace cpam
+} // namespace utils
+} // namespace cpam

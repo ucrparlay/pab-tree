@@ -9,12 +9,16 @@
 
 namespace pmos {
 // NOTE: orthogonal range count in leaf
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf>
-size_t BTree<Point, DerivedTree, kSkHeight,
-                kImbaRatio>::RangeCountRectangleLeaf(Node* T,
-                                                     Box const& query_box) {
+template<typename Point,
+         typename DerivedTree,
+         uint_fast8_t kSkHeight,
+         uint_fast8_t kImbaRatio>
+template<typename Leaf>
+size_t
+BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangleLeaf(
+  Node* T,
+  Box const& query_box)
+{
   assert(T->is_leaf);
 
   Leaf* TL = static_cast<Leaf*>(T);
@@ -22,18 +26,25 @@ size_t BTree<Point, DerivedTree, kSkHeight,
     return WithinBox(TL->pts[0], query_box) ? TL->size : 0;
   } else {
     return std::ranges::count_if(
-        TL->pts.begin(), TL->pts.begin() + TL->size,
-        [&](auto const& p) { return WithinBox(p, query_box); });
+      TL->pts.begin(), TL->pts.begin() + TL->size, [&](auto const& p) {
+        return WithinBox(p, query_box);
+      });
   }
 }
 
 // NOTE: recursive orthogonal range count for bianry node
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, IsBinaryNode Interior>
-size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
-    Node* T, Box const& query_box, Box const& node_box,
-    RangeQueryLogger& logger) {
+template<typename Point,
+         typename DerivedTree,
+         uint_fast8_t kSkHeight,
+         uint_fast8_t kImbaRatio>
+template<typename Leaf, IsBinaryNode Interior>
+size_t
+BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
+  Node* T,
+  Box const& query_box,
+  Box const& node_box,
+  RangeQueryLogger& logger)
+{
   if (T->is_leaf) {
     // PERF: no need to check box because we already check it before we
     // recursion
@@ -57,12 +68,12 @@ size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
     }
   };
 
-  if constexpr (!HasBox<typename Interior::AT>) {  // use hyperplane
+  if constexpr (!HasBox<typename Interior::AT>) { // use hyperplane
     BoxCut box_cut(node_box, TI->split, true);
     logger.generate_box_num++;
     recurse(TI->left, box_cut.GetFirstBoxCut(), left_cnt);
     recurse(TI->right, box_cut.GetSecondBoxCut(), right_cnt);
-  } else if constexpr (HasBox<typename Interior::AT>) {  // use bounding box
+  } else if constexpr (HasBox<typename Interior::AT>) { // use bounding box
     recurse(TI->left, RetriveBox<Leaf, Interior>(TI->left), left_cnt);
     recurse(TI->right, RetriveBox<Leaf, Interior>(TI->right), right_cnt);
   } else {
@@ -73,12 +84,20 @@ size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
 }
 
 // NOTE: orthogonal range count for multi node
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, IsMultiNode Interior>
-size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
-    Node* T, Box const& query_box, Box const& node_box, DimsType dim,
-    BucketType idx, RangeQueryLogger& logger) {
+template<typename Point,
+         typename DerivedTree,
+         uint_fast8_t kSkHeight,
+         uint_fast8_t kImbaRatio>
+template<typename Leaf, IsMultiNode Interior>
+size_t
+BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
+  Node* T,
+  Box const& query_box,
+  Box const& node_box,
+  DimsType dim,
+  BucketType idx,
+  RangeQueryLogger& logger)
+{
   if (T->is_leaf) {
     logger.vis_leaf_num++;
     return RangeCountRectangleLeaf<Leaf>(T, query_box);
@@ -87,8 +106,10 @@ size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
   logger.vis_interior_num++;
   Interior* TI = static_cast<Interior*>(T);
 
-  auto recurse = [&query_box, &logger](Node* Ts, Box const& box,
-                                       size_t& counter, DimsType next_dim,
+  auto recurse = [&query_box, &logger](Node* Ts,
+                                       Box const& box,
+                                       size_t& counter,
+                                       DimsType next_dim,
                                        DimsType next_idx) -> void {
     if (!BoxIntersectBox(box, query_box)) {
       logger.skip_box_num++;
@@ -98,8 +119,8 @@ size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
       // NOTE: when reach leaf, Ts is the children
       counter = static_cast<Interior*>(Ts)->MergeSize(next_idx);
     } else {
-      counter = RangeCountRectangle<Leaf, Interior>(Ts, query_box, box,
-                                                    next_dim, next_idx, logger);
+      counter = RangeCountRectangle<Leaf, Interior>(
+        Ts, query_box, box, next_dim, next_idx, logger);
     }
   };
 
@@ -113,11 +134,17 @@ size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
   assert(TI->split[dim].second == dim);
 
   recurse(reach_leaf ? TI->tree_nodes[idx - Interior::GetRegions()] : T,
-          box_cut.GetFirstBoxCut(), l, (dim + 1) % kDim, reach_leaf ? 1 : idx);
+          box_cut.GetFirstBoxCut(),
+          l,
+          (dim + 1) % kDim,
+          reach_leaf ? 1 : idx);
 
   idx |= 1;
   recurse(reach_leaf ? TI->tree_nodes[idx - Interior::GetRegions()] : T,
-          box_cut.GetSecondBoxCut(), r, (dim + 1) % kDim, reach_leaf ? 1 : idx);
+          box_cut.GetSecondBoxCut(),
+          r,
+          (dim + 1) % kDim,
+          reach_leaf ? 1 : idx);
 
   return l + r;
 }
@@ -164,11 +191,18 @@ size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeCountRectangle(
 // };
 
 // NOTE: orthogonal range query in leaf
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, typename Range>
-void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeQueryLeaf(
-    Node* T, Range Out, size_t& s, Box const& query_box) {
+template<typename Point,
+         typename DerivedTree,
+         uint_fast8_t kSkHeight,
+         uint_fast8_t kImbaRatio>
+template<typename Leaf, typename Range>
+void
+BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeQueryLeaf(
+  Node* T,
+  Range Out,
+  size_t& s,
+  Box const& query_box)
+{
   assert(T->is_leaf);
 
   Leaf* TL = static_cast<Leaf*>(T);
@@ -179,23 +213,30 @@ void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeQueryLeaf(
     }
   } else {
     auto result = std::ranges::copy_if(
-        TL->pts.begin(), TL->pts.begin() + TL->size, Out.begin() + s,
-        [&](auto const& p) { return WithinBox(p, query_box); });
+      TL->pts.begin(),
+      TL->pts.begin() + TL->size,
+      Out.begin() + s,
+      [&](auto const& p) { return WithinBox(p, query_box); });
     s += std::ranges::distance(Out.begin() + s, result.out);
   }
   return;
 }
 
 // NOTE: orthogonal range query recusively
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, IsBinaryNode Interior, typename Range>
-void BTree<Point, DerivedTree, kSkHeight,
-              kImbaRatio>::RangeQuerySerialRecursive(Node* T, Range Out,
-                                                     size_t& s,
-                                                     Box const& query_box,
-                                                     Box const& node_box,
-                                                     RangeQueryLogger& logger) {
+template<typename Point,
+         typename DerivedTree,
+         uint_fast8_t kSkHeight,
+         uint_fast8_t kImbaRatio>
+template<typename Leaf, IsBinaryNode Interior, typename Range>
+void
+BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeQuerySerialRecursive(
+  Node* T,
+  Range Out,
+  size_t& s,
+  Box const& query_box,
+  Box const& node_box,
+  RangeQueryLogger& logger)
+{
   if (T->is_leaf) {
     logger.vis_leaf_num++;
     RangeQueryLeaf<Leaf>(T, Out, s, query_box);
@@ -215,18 +256,18 @@ void BTree<Point, DerivedTree, kSkHeight,
       s += Ts->size;
       return;
     } else {
-      RangeQuerySerialRecursive<Leaf, Interior>(Ts, Out, s, query_box, box,
-                                                logger);
+      RangeQuerySerialRecursive<Leaf, Interior>(
+        Ts, Out, s, query_box, box, logger);
       return;
     }
   };
 
-  if constexpr (!HasBox<typename Interior::AT>) {  // use hyperplane
+  if constexpr (!HasBox<typename Interior::AT>) { // use hyperplane
     BoxCut box_cut(node_box, TI->split, true);
     logger.generate_box_num++;
     recurse(TI->left, box_cut.GetFirstBoxCut());
     recurse(TI->right, box_cut.GetSecondBoxCut());
-  } else if constexpr (HasBox<typename Interior::AT>) {  // use bounding box
+  } else if constexpr (HasBox<typename Interior::AT>) { // use bounding box
     recurse(TI->left, RetriveBox<Leaf, Interior>(TI->left));
     recurse(TI->right, RetriveBox<Leaf, Interior>(TI->right));
   } else {
@@ -236,17 +277,22 @@ void BTree<Point, DerivedTree, kSkHeight,
   return;
 }
 
-template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-          uint_fast8_t kImbaRatio>
-template <typename Leaf, IsMultiNode Interior, typename Range>
-void BTree<Point, DerivedTree, kSkHeight,
-              kImbaRatio>::RangeQuerySerialRecursive(Node* T, Range Out,
-                                                     size_t& s,
-                                                     Box const& query_box,
-                                                     Box const& node_box,
-                                                     DimsType dim,
-                                                     BucketType idx,
-                                                     RangeQueryLogger& logger) {
+template<typename Point,
+         typename DerivedTree,
+         uint_fast8_t kSkHeight,
+         uint_fast8_t kImbaRatio>
+template<typename Leaf, IsMultiNode Interior, typename Range>
+void
+BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::RangeQuerySerialRecursive(
+  Node* T,
+  Range Out,
+  size_t& s,
+  Box const& query_box,
+  Box const& node_box,
+  DimsType dim,
+  BucketType idx,
+  RangeQueryLogger& logger)
+{
   if (T->is_leaf) {
     logger.vis_leaf_num++;
     RangeQueryLeaf<Leaf>(T, Out, s, query_box);
@@ -256,7 +302,8 @@ void BTree<Point, DerivedTree, kSkHeight,
   logger.vis_interior_num++;
   Interior* TI = static_cast<Interior*>(T);
 
-  auto recurse = [&query_box, &s, &Out, &logger](Node* Ts, Box const& box,
+  auto recurse = [&query_box, &s, &Out, &logger](Node* Ts,
+                                                 Box const& box,
                                                  DimsType next_dim,
                                                  BucketType next_idx) -> void {
     if (!BoxIntersectBox(box, query_box)) {
@@ -265,13 +312,13 @@ void BTree<Point, DerivedTree, kSkHeight,
     } else if (WithinBox(box, query_box)) {
       logger.full_box_num++;
       size_t candidate_size = static_cast<Interior*>(Ts)->MergeSize(next_idx);
-      PartialFlatten<Leaf, Interior>(Ts, Out.cut(s, s + candidate_size),
-                                     next_idx);
+      PartialFlatten<Leaf, Interior>(
+        Ts, Out.cut(s, s + candidate_size), next_idx);
       s += candidate_size;
       return;
     } else {
-      RangeQuerySerialRecursive<Leaf, Interior>(Ts, Out, s, query_box, box,
-                                                next_dim, next_idx, logger);
+      RangeQuerySerialRecursive<Leaf, Interior>(
+        Ts, Out, s, query_box, box, next_dim, next_idx, logger);
       return;
     }
   };
@@ -282,15 +329,19 @@ void BTree<Point, DerivedTree, kSkHeight,
   BoxCut box_cut(node_box, TI->split[dim], true);
 
   recurse(reach_leaf ? TI->tree_nodes[idx - Interior::GetRegions()] : T,
-          box_cut.GetFirstBoxCut(), (dim + 1) % kDim, reach_leaf ? 1 : idx);
+          box_cut.GetFirstBoxCut(),
+          (dim + 1) % kDim,
+          reach_leaf ? 1 : idx);
 
   // NOTE: visit right
   idx |= 1;
   recurse(reach_leaf ? TI->tree_nodes[idx - Interior::GetRegions()] : T,
-          box_cut.GetSecondBoxCut(), (dim + 1) % kDim, reach_leaf ? 1 : idx);
+          box_cut.GetSecondBoxCut(),
+          (dim + 1) % kDim,
+          reach_leaf ? 1 : idx);
 
   return;
 }
-}  // namespace pmos
+} // namespace pmos
 
-#endif  // PMOS_B_TREE_IMPL_RANGE_QUERY_HPP_
+#endif // PMOS_B_TREE_IMPL_RANGE_QUERY_HPP_
