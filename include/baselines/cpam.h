@@ -43,10 +43,22 @@ public:
     using val_t = val_type;
     using aug_t = aug_type;
 
-    static inline bool comp(key_t a, key_t b) { return a < b; }
-    static aug_t get_empty() { return 0; }
-    static aug_t from_entry(key_t k, val_t v) { return 1; }
-    static aug_t combine(aug_t a, aug_t b) { return a + b; }
+    static inline bool comp(key_t a, key_t b)
+    {
+      return a < b;
+    }
+    static aug_t get_empty()
+    {
+      return 0;
+    }
+    static aug_t from_entry(key_t k, val_t v)
+    {
+      return 1;
+    }
+    static aug_t combine(aug_t a, aug_t b)
+    {
+      return a + b;
+    }
   };
 
   using zmap = cpam::aug_map<entry, 32>;
@@ -220,9 +232,18 @@ public:
     return;
   }
 
-  size_t GetSize() const { return cpam_aug_map_.size(); }
-  constexpr static char const* GetTreeName() { return "CPAM"; }
-  constexpr static char const* CheckHasBox() { return "HasBox"; }
+  size_t GetSize() const
+  {
+    return cpam_aug_map_.size();
+  }
+  constexpr static char const* GetTreeName()
+  {
+    return "CPAM";
+  }
+  constexpr static char const* CheckHasBox()
+  {
+    return "HasBox";
+  }
   zmap cpam_aug_map_;
 };
 

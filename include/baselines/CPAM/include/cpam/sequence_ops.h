@@ -407,7 +407,10 @@ struct sequence_ops : Tree
     }
   }
 
-  static node* join2(node* b1, node* b2) { return join2_i(ptr(b1), ptr(b2)); }
+  static node* join2(node* b1, node* b2)
+  {
+    return join2_i(ptr(b1), ptr(b2));
+  }
 
   template<class InTree, class Func>
   static node* map_compressed(typename InTree::ptr b, Func const& f)

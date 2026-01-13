@@ -53,6 +53,9 @@ struct weight_balanced_tree
       return balance <= beta * weight(t);
     }
 
-    static double weight(node* t) { return (double)(Node::size(t) + 1); }
+    static double weight(node* t)
+    {
+      return (double)(Node::size(t) + 1);
+    }
   };
 };

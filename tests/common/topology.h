@@ -100,7 +100,10 @@ struct vertex
   int id;
   int reserve;
   size_t counter;
-  void print() { cout << id << " (" << pt.x << "," << pt.y << ") " << endl; }
+  void print()
+  {
+    cout << id << " (" << pt.x << "," << pt.y << ") " << endl;
+  }
   vertex(point p, size_t i)
     : pt(p)
     , id(i)
@@ -108,7 +111,9 @@ struct vertex
     , badT(NULL)
   {
   }
-  vertex() {}
+  vertex()
+  {
+  }
 };
 
 inline int
@@ -187,13 +192,28 @@ struct simplex
   }
 
   // depending on initial triangle this could be counterclockwise
-  simplex rotClockwise() { return simplex(t, mod3(o + 1)); }
+  simplex rotClockwise()
+  {
+    return simplex(t, mod3(o + 1));
+  }
 
-  bool valid() { return (!boundary); }
-  bool isTriangle() { return (!boundary); }
-  bool isBoundary() { return boundary; }
+  bool valid()
+  {
+    return (!boundary);
+  }
+  bool isTriangle()
+  {
+    return (!boundary);
+  }
+  bool isBoundary()
+  {
+    return boundary;
+  }
 
-  vtx_t* firstVertex() { return t->vtx[o]; }
+  vtx_t* firstVertex()
+  {
+    return t->vtx[o];
+  }
 
   bool inCirc(vtx_t* v)
   {

@@ -52,21 +52,42 @@ public:
     return vector(x - op2.x, y - op2.y, z - op2.z);
   }
   point operator+(point op2);
-  vector operator*(coord s) { return vector(x * s, y * s, z * s); }
-  vector operator/(coord s) { return vector(x / s, y / s, z / s); }
-  coord& operator[](int i) { return (i == 0) ? x : (i == 1) ? y : z; }
-  coord dot(vector v) { return x * v.x + y * v.y + z * v.z; }
+  vector operator*(coord s)
+  {
+    return vector(x * s, y * s, z * s);
+  }
+  vector operator/(coord s)
+  {
+    return vector(x / s, y / s, z / s);
+  }
+  coord& operator[](int i)
+  {
+    return (i == 0) ? x : (i == 1) ? y : z;
+  }
+  coord dot(vector v)
+  {
+    return x * v.x + y * v.y + z * v.z;
+  }
   vector cross(vector v)
   {
     return vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
   }
-  coord maxDim() { return max(x, max(y, z)); }
+  coord maxDim()
+  {
+    return max(x, max(y, z));
+  }
   void print()
   {
     cout << std::setprecision(10) << ":(" << x << "," << y << "," << z << "):";
   }
-  coord Length(void) { return sqrt(x * x + y * y + z * z); }
-  coord sqLength(void) { return x * x + y * y + z * z; }
+  coord Length(void)
+  {
+    return sqrt(x * x + y * y + z * z);
+  }
+  coord sqLength(void)
+  {
+    return x * x + y * y + z * z;
+  }
   static int const dim = 3;
 };
 
@@ -80,7 +101,10 @@ public:
   coord x;
   coord y;
   coord z;
-  int dimension() { return 3; }
+  int dimension()
+  {
+    return 3;
+  }
   point3d(coord x, coord y, coord z)
     : x(x)
     , y(y)
@@ -101,12 +125,18 @@ public:
     : x(p[0])
     , y(p[1])
     , z(p[2]) {};
-  void print() { cout << ":(" << x << "," << y << "," << z << "):"; }
+  void print()
+  {
+    cout << ":(" << x << "," << y << "," << z << "):";
+  }
   vector operator-(point op2)
   {
     return vector(x - op2.x, y - op2.y, z - op2.z);
   }
-  point operator+(vector op2) { return point(x + op2.x, y + op2.y, z + op2.z); }
+  point operator+(vector op2)
+  {
+    return point(x + op2.x, y + op2.y, z + op2.z);
+  }
   point MinCoords(point b)
   {
     return point(min(x, b.x), min(y, b.y), min(z, b.z));
@@ -115,7 +145,10 @@ public:
   {
     return point(max(x, b.x), max(y, b.y), max(z, b.z));
   }
-  coord& operator[](int i) { return (i == 0) ? x : (i == 1) ? y : z; }
+  coord& operator[](int i)
+  {
+    return (i == 0) ? x : (i == 1) ? y : z;
+  }
   int quadrant(point center)
   {
     int index = 0;
@@ -136,7 +169,10 @@ public:
     coord zz = z + ((dir & 4) ? offset : -offset);
     return point(xx, yy, zz);
   }
-  point changeCoords(std::vector<coord> v) { return point(v[0], v[1], v[2]); }
+  point changeCoords(std::vector<coord> v)
+  {
+    return point(v[0], v[1], v[2]);
+  }
   // checks if pt is outside of a box centered at this point with
   // radius hsize
   bool outOfBox(point pt, coord hsize)
@@ -192,18 +228,51 @@ public:
   vector2d(parlay::slice<coord*, coord*> p)
     : x(p[0])
     , y(p[1]) {};
-  vector operator+(vector op2) { return vector(x + op2.x, y + op2.y); }
-  vector operator-(vector op2) { return vector(x - op2.x, y - op2.y); }
+  vector operator+(vector op2)
+  {
+    return vector(x + op2.x, y + op2.y);
+  }
+  vector operator-(vector op2)
+  {
+    return vector(x - op2.x, y - op2.y);
+  }
   point operator+(point op2);
-  vector operator*(coord s) { return vector(x * s, y * s); }
-  vector operator/(coord s) { return vector(x / s, y / s); }
-  coord operator[](int i) { return (i == 0) ? x : y; };
-  coord dot(vector v) { return x * v.x + y * v.y; }
-  coord cross(vector v) { return x * v.y - y * v.x; }
-  coord maxDim() { return max(x, y); }
-  void print() { cout << ":(" << x << "," << y << "):"; }
-  coord Length(void) { return sqrt(x * x + y * y); }
-  coord sqLength(void) { return x * x + y * y; }
+  vector operator*(coord s)
+  {
+    return vector(x * s, y * s);
+  }
+  vector operator/(coord s)
+  {
+    return vector(x / s, y / s);
+  }
+  coord operator[](int i)
+  {
+    return (i == 0) ? x : y;
+  };
+  coord dot(vector v)
+  {
+    return x * v.x + y * v.y;
+  }
+  coord cross(vector v)
+  {
+    return x * v.y - y * v.x;
+  }
+  coord maxDim()
+  {
+    return max(x, y);
+  }
+  void print()
+  {
+    cout << ":(" << x << "," << y << "):";
+  }
+  coord Length(void)
+  {
+    return sqrt(x * x + y * y);
+  }
+  coord sqLength(void)
+  {
+    return x * x + y * y;
+  }
   static int const dim = 2;
 };
 
@@ -230,7 +299,10 @@ public:
   using point = point2d;
   coord x;
   coord y;
-  int dimension() { return 2; }
+  int dimension()
+  {
+    return 2;
+  }
   point2d(coord x, coord y)
     : x(x)
     , y(y)
@@ -247,12 +319,30 @@ public:
   point2d(parlay::slice<coord*, coord*> p)
     : x(p[0])
     , y(p[1]) {};
-  void print() { cout << ":(" << x << "," << y << "):"; }
-  vector operator-(point op2) { return vector(x - op2.x, y - op2.y); }
-  point operator+(vector op2) { return point(x + op2.x, y + op2.y); }
-  coord operator[](int i) { return (i == 0) ? x : y; };
-  point MinCoords(point b) { return point(min(x, b.x), min(y, b.y)); }
-  point MaxCoords(point b) { return point(max(x, b.x), max(y, b.y)); }
+  void print()
+  {
+    cout << ":(" << x << "," << y << "):";
+  }
+  vector operator-(point op2)
+  {
+    return vector(x - op2.x, y - op2.y);
+  }
+  point operator+(vector op2)
+  {
+    return point(x + op2.x, y + op2.y);
+  }
+  coord operator[](int i)
+  {
+    return (i == 0) ? x : y;
+  };
+  point MinCoords(point b)
+  {
+    return point(min(x, b.x), min(y, b.y));
+  }
+  point MaxCoords(point b)
+  {
+    return point(max(x, b.x), max(y, b.y));
+  }
   int quadrant(point center)
   {
     int index = 0;
@@ -378,11 +468,19 @@ using tri = std::array<int, 3>;
 template<class point>
 struct triangles
 {
-  size_t numPoints() { return P.size(); };
-  size_t numTriangles() { return T.size(); }
+  size_t numPoints()
+  {
+    return P.size();
+  };
+  size_t numTriangles()
+  {
+    return T.size();
+  }
   parlay::sequence<point> P;
   parlay::sequence<tri> T;
-  triangles() {}
+  triangles()
+  {
+  }
   triangles(parlay::sequence<point> P, parlay::sequence<tri> T)
     : P(std::move(P))
     , T(std::move(T))
@@ -401,7 +499,9 @@ struct ray
     , d(_d)
   {
   }
-  ray() {}
+  ray()
+  {
+  }
 };
 
 template<class coord>

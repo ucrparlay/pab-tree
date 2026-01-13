@@ -27,9 +27,14 @@ struct BasicPoint
   using DimsType = uint_fast8_t;
   using BP = BasicPoint<T, d>;
 
-  BasicPoint() {}
+  BasicPoint()
+  {
+  }
 
-  explicit BasicPoint(T const val) { this->pnt.fill(val); }
+  explicit BasicPoint(T const val)
+  {
+    this->pnt.fill(val);
+  }
 
   explicit BasicPoint(Coords const& _pnt)
     : pnt(_pnt)
@@ -91,12 +96,24 @@ struct BasicPoint
     return p;
   }
 
-  static consteval auto GetDim() { return d; }
+  static consteval auto GetDim()
+  {
+    return d;
+  }
 
-  Coords& GetCoords() { return pnt; }
-  Coords const& GetCoords() const { return pnt; }
+  Coords& GetCoords()
+  {
+    return pnt;
+  }
+  Coords const& GetCoords() const
+  {
+    return pnt;
+  }
 
-  bool SameDimension(BasicPoint const& b) const { return *this == b; }
+  bool SameDimension(BasicPoint const& b) const
+  {
+    return *this == b;
+  }
 
   bool operator==(BasicPoint const& x) const
   {
@@ -120,9 +137,15 @@ struct BasicPoint
     return false;
   }
 
-  Coord& operator[](DimsType i) { return pnt[i]; }
+  Coord& operator[](DimsType i)
+  {
+    return pnt[i];
+  }
 
-  Coord const& operator[](DimsType i) const { return pnt[i]; }
+  Coord const& operator[](DimsType i) const
+  {
+    return pnt[i];
+  }
 
   friend std::ostream& operator<<(std::ostream& o, BasicPoint const& a)
   {
@@ -150,9 +173,13 @@ struct AugPoint : BasicPoint<T, d>
     return !std::is_same_v<AugType, std::monostate>;
   }
 
-  void AugPointTag() {}
+  void AugPointTag()
+  {
+  }
 
-  AugPoint() {}
+  AugPoint()
+  {
+  }
 
   explicit AugPoint(T const val)
     : BasicPoint<T, d>(val)
@@ -247,9 +274,15 @@ struct AugPoint : BasicPoint<T, d>
     return static_cast<BP const&>(*this).MaxCoords(static_cast<BP const&>(b));
   }
 
-  AugType& GetAug() { return aug; }
+  AugType& GetAug()
+  {
+    return aug;
+  }
 
-  AugType const& GetAug() const { return aug; }
+  AugType const& GetAug() const
+  {
+    return aug;
+  }
 
   template<typename... Args>
   void SetAugMember(Args&&... args)

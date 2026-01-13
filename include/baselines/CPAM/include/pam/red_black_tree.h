@@ -131,9 +131,15 @@ struct red_black_tree
     }
 
   private:
-    static int height(node* a) { return (a == NULL) ? 1 : a->height; }
+    static int height(node* a)
+    {
+      return (a == NULL) ? 1 : a->height;
+    }
 
-    static int color(node* a) { return (a == NULL) ? BLACK : a->color; }
+    static int color(node* a)
+    {
+      return (a == NULL) ? BLACK : a->color;
+    }
 
     // a version without rotation
     static node* balanced_join(node* l, node* r, node* e, Color color)

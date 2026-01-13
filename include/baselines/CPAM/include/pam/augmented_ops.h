@@ -34,7 +34,10 @@ struct augmented_ops : Map
     {
       result = Entry::combine(result, Entry::from_entry(e));
     }
-    void add_aug_val(aug_t av) { result = Entry::combine(result, av); }
+    void add_aug_val(aug_t av)
+    {
+      result = Entry::combine(result, av);
+    }
   };
 
   template<class aug>

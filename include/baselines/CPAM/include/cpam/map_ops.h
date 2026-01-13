@@ -25,9 +25,18 @@ struct map_ops : Seq
   using Seq::B;
   using Seq::kBaseCaseSize;
 
-  static bool comp(K a, K b) { return Entry::comp(a, b); }
-  static K get_key(node* s) { return Entry::get_key(*Seq::get_entry_p(s)); }
-  static V get_val(node* s) { return Entry::get_val(*Seq::get_entry_p(s)); }
+  static bool comp(K a, K b)
+  {
+    return Entry::comp(a, b);
+  }
+  static K get_key(node* s)
+  {
+    return Entry::get_key(*Seq::get_entry_p(s));
+  }
+  static V get_val(node* s)
+  {
+    return Entry::get_val(*Seq::get_entry_p(s));
+  }
   // static K get_key(node *s) { return Entry::get_key(Seq::get_entry(s));}
   // static V get_val(node *s) { return Entry::get_val(Seq::get_entry(s));}
 

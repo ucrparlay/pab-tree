@@ -89,13 +89,19 @@ fork_no_result(bool do_parallel, Lf left, Rf right)
 template<class V>
 struct get_left
 {
-  V operator()(V const& a, V const& b) const { return a; }
+  V operator()(V const& a, V const& b) const
+  {
+    return a;
+  }
 };
 
 template<class V>
 struct get_right
 {
-  V operator()(V const& a, V const& b) const { return b; }
+  V operator()(V const& a, V const& b) const
+  {
+    return b;
+  }
 };
 
 // should update the following to use more portable implementation

@@ -23,9 +23,18 @@ struct aug_node
   using basic = basic_node<balance, std::pair<ET, AT>>;
   using node = typename basic::node;
 
-  static ET& get_entry(node* a) { return a->entry.first; }
-  static ET* get_entry_p(node* a) { return &a->entry.first; }
-  static void set_entry(node* a, ET e) { a->entry.first = e; }
+  static ET& get_entry(node* a)
+  {
+    return a->entry.first;
+  }
+  static ET* get_entry_p(node* a)
+  {
+    return &a->entry.first;
+  }
+  static void set_entry(node* a, ET e)
+  {
+    a->entry.first = e;
+  }
 
   static AT aug_val(node* a)
   {

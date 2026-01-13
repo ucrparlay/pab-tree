@@ -23,7 +23,9 @@ struct diffencoded_entry_encoder
                                      // default_val in set is empty)
     static constexpr bool is_trivial = false; // to test
 
-    static inline void print_info(const ET& et) {}
+    static inline void print_info(const ET& et)
+    {
+    }
 
     static inline size_t encoded_size(ET* data, size_t size)
     {
@@ -228,7 +230,9 @@ struct default_entry_encoder
     using ET = typename Entry::entry_t;
     static constexpr bool is_trivial = false; // to test
 
-    static inline void print_info(const ET& et) {}
+    static inline void print_info(const ET& et)
+    {
+    }
 
     // TODO remove ET* data
     static inline size_t encoded_size(ET* data, size_t size)

@@ -39,7 +39,10 @@ struct vertex_subset
   using dense_t = parlay::sequence<bool>;
   bool is_sparse;
   size_t n;
-  size_t size() const { return n; }
+  size_t size() const
+  {
+    return n;
+  }
   sparse_t sparse;
   dense_t dense;
   vertex_subset(sparse_t x)

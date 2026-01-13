@@ -1554,13 +1554,21 @@ public:
     {
     }
 
-    void Reset() {}
+    void Reset()
+    {
+    }
   };
 
   struct InteriorAugEmpty
   {
-    InteriorAugEmpty() { force_par_indicator.reset(); }
-    InteriorAugEmpty(bool /*flag*/) { force_par_indicator.reset(); }
+    InteriorAugEmpty()
+    {
+      force_par_indicator.reset();
+    }
+    InteriorAugEmpty(bool /*flag*/)
+    {
+      force_par_indicator.reset();
+    }
 
     // use a bool to reload default constructor
     // template <typename Leaf, typename Interior>
@@ -1579,7 +1587,10 @@ public:
       this->force_par_indicator.emplace(flag);
     }
 
-    void ResetParallelFlag() { this->force_par_indicator.reset(); }
+    void ResetParallelFlag()
+    {
+      this->force_par_indicator.reset();
+    }
 
     [[nodiscard]] bool GetParallelFlagIniStatus() const
     {
@@ -1604,9 +1615,15 @@ public:
       return;
     }
 
-    void Update() { return; }
+    void Update()
+    {
+      return;
+    }
 
-    void Reset() { this->force_par_indicator.reset(); }
+    void Reset()
+    {
+      this->force_par_indicator.reset();
+    }
 
     // NOTE: use a tri-state bool to indicate whether a subtree needs to be
     // rebuilt. If aug is not INITIALIZED, then it means there is no need to
@@ -1638,8 +1655,14 @@ public:
     using IdType = int;
     IdType id;
 
-    bool operator<(AugId const& rhs) const { return id < rhs.id; }
-    bool operator==(AugId const& rhs) const { return id == rhs.id; }
+    bool operator<(AugId const& rhs) const
+    {
+      return id < rhs.id;
+    }
+    bool operator==(AugId const& rhs) const
+    {
+      return id == rhs.id;
+    }
     friend std::ostream& operator<<(std::ostream& os, AugId const& rhs)
     {
       os << rhs.id;
@@ -1661,7 +1684,10 @@ public:
     {
     }
 
-    void SetMember(CurveCode const& val) { code = val; }
+    void SetMember(CurveCode const& val)
+    {
+      code = val;
+    }
 
     bool operator<(AugIdCode const& rhs) const
     {
@@ -1815,8 +1841,14 @@ public:
     using K = KeyType;
     using V = ValType;
 
-    K GetKey() const { return key; }
-    V GetVal() const { return val; }
+    K GetKey() const
+    {
+      return key;
+    }
+    V GetVal() const
+    {
+      return val;
+    }
 
     template<typename StrRange>
     void ReadKey(StrRange str, size_t i)
@@ -1836,7 +1868,10 @@ public:
       this->val = std::stol(In);
     }
 
-    bool operator<(Element const& rhs) const { return this->key < rhs.key; }
+    bool operator<(Element const& rhs) const
+    {
+      return this->key < rhs.key;
+    }
 
     friend std::ostream& operator<<(std::ostream& o, Element const& a)
     {
@@ -1859,8 +1894,14 @@ public:
     using V = typename E::V;
 
     // differs from different entry, interface for pmos structure
-    static auto GetKey(E const e) { return e.GetKey(); }
-    static auto GetVal(E const e) { return e.GetVal(); }
+    static auto GetKey(E const e)
+    {
+      return e.GetKey();
+    }
+    static auto GetVal(E const e)
+    {
+      return e.GetVal();
+    }
     static E ToEntry(K const& k, V const& v)
     {
       return E{ .key = k, .val = v };

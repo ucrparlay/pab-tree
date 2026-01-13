@@ -44,7 +44,9 @@ struct edge
 {
   intV u;
   intV v;
-  edge() {}
+  edge()
+  {
+  }
   edge(intV f, intV s)
     : u(f)
     , v(s)
@@ -66,8 +68,13 @@ struct edgeArray
     , nonZeros(E.size())
   {
   }
-  edgeArray() {}
-  edge<intV> operator[](size_t const i) const { return E[i]; }
+  edgeArray()
+  {
+  }
+  edge<intV> operator[](size_t const i) const
+  {
+    return E[i];
+  }
 };
 
 // **************************************************************
@@ -79,7 +86,9 @@ struct wghEdge
 {
   intV u, v;
   Weight weight;
-  wghEdge() {}
+  wghEdge()
+  {
+  }
   wghEdge(intV _u, intV _v, Weight w)
     : u(_u)
     , v(_v)
@@ -101,8 +110,13 @@ struct wghEdgeArray
     , m(E.size())
   {
   }
-  wghEdgeArray() {}
-  wghEdge<intV> operator[](size_t const i) const { return E[i]; }
+  wghEdgeArray()
+  {
+  }
+  wghEdge<intV> operator[](size_t const i) const
+  {
+    return E[i];
+  }
 };
 
 // **************************************************************
@@ -155,7 +169,10 @@ struct graph
   parlay::sequence<intV> degrees; // not always used
   size_t n;
   size_t m;
-  size_t numVertices() const { return n; }
+  size_t numVertices() const
+  {
+    return n;
+  }
   size_t numEdges() const
   {
     if (degrees.size() == 0)
@@ -168,7 +185,10 @@ struct graph
     }
   }
 
-  parlay::sequence<intE> const& get_offsets() const { return offsets; }
+  parlay::sequence<intE> const& get_offsets() const
+  {
+    return offsets;
+  }
 
   void addDegrees()
   {
@@ -233,12 +253,21 @@ struct wghGraph
   parlay::sequence<Weight> weights;
   size_t n;
   size_t m;
-  size_t numVertices() const { return n; }
-  size_t numEdges() const { return m; }
+  size_t numVertices() const
+  {
+    return n;
+  }
+  size_t numEdges() const
+  {
+    return m;
+  }
   // const parlay::sequence<intV>& get_offsets() const {
   //   return offsets;
   // }
-  parlay::sequence<intV> get_offsets() { return offsets; }
+  parlay::sequence<intV> get_offsets()
+  {
+    return offsets;
+  }
   VT operator[](size_t const i)
   {
     return VT(edges.begin() + offsets[i],
@@ -273,6 +302,12 @@ struct FlowGraph
     , sink(sink)
   {
   }
-  FlowGraph copy() { return FlowGraph(g.copy(), source, sink); }
-  void del() { g.del(); }
+  FlowGraph copy()
+  {
+    return FlowGraph(g.copy(), source, sink);
+  }
+  void del()
+  {
+    g.del();
+  }
 };

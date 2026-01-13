@@ -211,6 +211,21 @@ BTree<TT>::HandlingInteriorSplitOverflow(
   return rt_bkt_n;
 }
 
+template<typename TT>
+TT::Node*
+BTree<TT>::CopyTreeRecursive(Node* T)
+{
+  if (T->is_leaf) {
+    auto const TL = static_cast<Leaf const*>(T);
+    return AllocNormalLeafNode<TT::EntrySlice, Leaf>(TL->GetEle());
+  }
+  auto const TI = static_cast<Interior const*>(T);
+  auto new_nodes = parlay::tabulate(TI->GetNodeN(), [&](size_t i) {
+    return CopyTreeRecursive(TI->tree_nodes[i]);
+  });
+  return AllocInteriorNode(parlay::make_slice(new_nodes), TI->GetSplitSlice());
+}
+
 } // namespace pmos
 
 #endif // PMOS_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_

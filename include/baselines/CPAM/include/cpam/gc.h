@@ -19,8 +19,14 @@ struct gc
   using ET = typename Node::ET;
   static constexpr size_t B = Node::B;
 
-  static void init() { alloc::init(); }
-  static bool initialized() { return alloc::initialized; }
+  static void init()
+  {
+    alloc::init();
+  }
+  static bool initialized()
+  {
+    return alloc::initialized;
+  }
   static void reserve(size_t n, bool randomize = false)
   {
     alloc::reserve(n / B);
@@ -30,12 +36,24 @@ struct gc
     // std::cout << "Reserving.... " << (n/B) << " complex nodes with size = "
     // << sizeof(typename Node::complex_bytes) << std::endl;
   }
-  static void finish() { alloc::finish(); }
-  static size_t num_used_nodes() { return alloc::num_used_blocks(); }
+  static void finish()
+  {
+    alloc::finish();
+  }
+  static size_t num_used_nodes()
+  {
+    return alloc::num_used_blocks();
+  }
 
-  static void decrement(node* t) { Node::decrement(t); }
+  static void decrement(node* t)
+  {
+    Node::decrement(t);
+  }
 
-  static void decrement_recursive(node* t) { Node::decrement_recursive(t); }
+  static void decrement_recursive(node* t)
+  {
+    Node::decrement_recursive(t);
+  }
 
   // atomically increment the reference count
   static void increment(node* t)
@@ -142,7 +160,10 @@ struct gc
     }
     node* p;
 
-    bool empty() { return !p; }
+    bool empty()
+    {
+      return !p;
+    }
   };
 
   struct ptr
@@ -179,9 +200,15 @@ struct gc
       return *this;
     }
 
-    node_size_t ref_cnt() { return Node::ref_cnt(strip_flag(p)); }
+    node_size_t ref_cnt()
+    {
+      return Node::ref_cnt(strip_flag(p));
+    }
 
-    bool empty() { return (strip_flag(p) == nullptr); }
+    bool empty()
+    {
+      return (strip_flag(p) == nullptr);
+    }
 
     // Equivalent to GC::inc_if(r, extra_ptr);
     // This destructs the underlying pointer.
@@ -194,14 +221,20 @@ struct gc
       return r;
     }
 
-    node* unsafe_ptr() { return strip_flag(p); }
+    node* unsafe_ptr()
+    {
+      return strip_flag(p);
+    }
 
     bool requires_copy()
     {
       return has_flag(p) || Node::ref_cnt(strip_flag(p)) > 1;
     }
 
-    size_t size() const { return Node::size(strip_flag(p)); }
+    size_t size() const
+    {
+      return Node::size(strip_flag(p));
+    }
 
     ET entry()
     {
@@ -220,16 +253,31 @@ struct gc
     /* Should be private */
     node* p;
 
-    static node* set_flag(node* x, bool f) { return (node*)(((size_t)x) + f); }
-    static bool has_flag(node* x) { return ((size_t)x) & 1; }
+    static node* set_flag(node* x, bool f)
+    {
+      return (node*)(((size_t)x) + f);
+    }
+    static bool has_flag(node* x)
+    {
+      return ((size_t)x) & 1;
+    }
     static node* strip_flag(node* x)
     {
       return (node*)(((size_t)x) & ~((size_t)1));
     }
-    bool extra() { return has_flag(p); }
+    bool extra()
+    {
+      return has_flag(p);
+    }
 
-    bool is_compressed() { return Node::is_compressed(strip_flag(p)); }
-    bool is_regular() { return Node::is_regular(strip_flag(p)); }
+    bool is_compressed()
+    {
+      return Node::is_compressed(strip_flag(p));
+    }
+    bool is_regular()
+    {
+      return Node::is_regular(strip_flag(p));
+    }
   };
 };
 

@@ -39,12 +39,30 @@ struct reservation
     : r(max_idx)
   {
   }
-  idxT get() const { return r.load(); }
-  bool reserve(idxT i) { return parlay::write_min(&r, i, std::less<idxT>()); }
-  bool reserved() const { return (r.load() < max_idx); }
-  void reset() { r = max_idx; }
-  void freeze() { r = -1; }
-  bool check(idxT i) const { return (r.load() == i); }
+  idxT get() const
+  {
+    return r.load();
+  }
+  bool reserve(idxT i)
+  {
+    return parlay::write_min(&r, i, std::less<idxT>());
+  }
+  bool reserved() const
+  {
+    return (r.load() < max_idx);
+  }
+  void reset()
+  {
+    r = max_idx;
+  }
+  void freeze()
+  {
+    r = -1;
+  }
+  bool check(idxT i) const
+  {
+    return (r.load() == i);
+  }
   bool checkReset(idxT i)
   {
     if (r == i) {

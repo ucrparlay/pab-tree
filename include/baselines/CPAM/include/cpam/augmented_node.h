@@ -67,7 +67,10 @@ struct aug_node
   {
     return !a || ((regular_node*)a)->r & basic::kTopBit;
   }
-  static bool is_compressed(node* a) { return !is_regular(a); }
+  static bool is_compressed(node* a)
+  {
+    return !is_regular(a);
+  }
   static regular_node* cast_to_regular(node* a)
   {
     assert(is_regular(a));

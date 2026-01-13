@@ -19,8 +19,14 @@ struct EleWrapper : EleType
   using V = typename EleType::V;
   // using Entry = std::tuple<KeyType, ValType>;
 
-  static inline auto GetKey(E const e) { return EleType::GetKey(e); }
-  static inline auto GetVal(E const e) { return EleType::GetVal(e); }
+  static inline auto GetKey(E const e)
+  {
+    return EleType::GetKey(e);
+  }
+  static inline auto GetVal(E const e)
+  {
+    return EleType::GetVal(e);
+  }
   static inline E ToEntry(K const& k, V const& v)
   {
     return EleType::ToEntry(k, v);

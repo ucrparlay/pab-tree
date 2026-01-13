@@ -12,11 +12,26 @@ struct gc
   using node = typename Node::node;
   using alloc = typename Node::allocator;
 
-  static void init() { alloc::init(); }
-  static bool initialized() { return alloc::initialized; }
-  static void reserve(size_t n, bool randomize = false) { alloc::reserve(n); }
-  static void finish() { alloc::finish(); }
-  static size_t num_used_nodes() { return alloc::num_used_blocks(); }
+  static void init()
+  {
+    alloc::init();
+  }
+  static bool initialized()
+  {
+    return alloc::initialized;
+  }
+  static void reserve(size_t n, bool randomize = false)
+  {
+    alloc::reserve(n);
+  }
+  static void finish()
+  {
+    alloc::finish();
+  }
+  static size_t num_used_nodes()
+  {
+    return alloc::num_used_blocks();
+  }
 
   // atomically decrement ref count and delete node if zero
   static bool decrement(node* t)

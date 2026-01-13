@@ -24,11 +24,20 @@ struct basic_node
 
   using allocator = parlay::type_allocator<node>;
 
-  static node_size_t size(node* a) { return (a == NULL) ? 0 : a->s; }
+  static node_size_t size(node* a)
+  {
+    return (a == NULL) ? 0 : a->s;
+  }
 
-  static void update(node* a) { a->s = size(a->lc) + size(a->rc) + 1; }
+  static void update(node* a)
+  {
+    a->s = size(a->lc) + size(a->rc) + 1;
+  }
 
-  static node_size_t ref_cnt(node* a) { return (a) ? a->ref_cnt : 0; }
+  static node_size_t ref_cnt(node* a)
+  {
+    return (a) ? a->ref_cnt : 0;
+  }
 
   static node* make_node(ET e)
   {
@@ -53,12 +62,30 @@ struct basic_node
     allocator::free(a);
   }
 
-  static node* empty() { return NULL; }
-  inline static ET& get_entry(node* a) { return a->entry; }
-  inline static ET* get_entry_p(node* a) { return &(a->entry); }
-  static void set_entry(node* a, ET e) { a->entry = e; }
-  static node* left(node a) { return a.lc; }
-  static node* right(node a) { return a.rc; }
+  static node* empty()
+  {
+    return NULL;
+  }
+  inline static ET& get_entry(node* a)
+  {
+    return a->entry;
+  }
+  inline static ET* get_entry_p(node* a)
+  {
+    return &(a->entry);
+  }
+  static void set_entry(node* a, ET e)
+  {
+    a->entry = e;
+  }
+  static node* left(node a)
+  {
+    return a.lc;
+  }
+  static node* right(node a)
+  {
+    return a.rc;
+  }
 };
 
 // template <class E>

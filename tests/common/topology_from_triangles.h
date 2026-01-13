@@ -53,9 +53,18 @@ struct hashEdges
 {
   using kType = index_pair;
   using eType = edge*;
-  eType empty() { return NULL; }
-  kType getKey(eType v) { return v->first; }
-  size_t hash(kType s) { return hash64(s.first) + 3 * (hash64(s.second)); }
+  eType empty()
+  {
+    return NULL;
+  }
+  kType getKey(eType v)
+  {
+    return v->first;
+  }
+  size_t hash(kType s)
+  {
+    return hash64(s.first) + 3 * (hash64(s.second));
+  }
   int cmp(kType s1, kType s2)
   {
     return ((s1.first > s2.first)     ? 1
@@ -68,7 +77,10 @@ struct hashEdges
   {
     return pbbs::atomic_compare_and_swap(p, o, n);
   }
-  bool replaceQ(eType s, eType s2) { return 0; }
+  bool replaceQ(eType s, eType s2)
+  {
+    return 0;
+  }
 };
 
 using EdgeTable = hashtable<hashEdges>;

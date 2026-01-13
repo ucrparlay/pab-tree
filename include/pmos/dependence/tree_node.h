@@ -89,7 +89,10 @@ struct LeafNode : TypeTrait::Node
     });
   }
 
-  bool CapacityFull() const { return this->size >= TT::kBufUB; }
+  bool CapacityFull() const
+  {
+    return this->size >= TT::kBufUB;
+  }
 
   bool Contain(K const k) const
   {
@@ -100,18 +103,30 @@ struct LeafNode : TypeTrait::Node
                                 }) != this->elements.begin() + this->size;
   }
 
-  EntrySeq GetEle() const { return elements.substr(0, this->size); }
+  EntrySeq GetEle() const
+  {
+    return elements.substr(0, this->size);
+  }
 
-  EntrySeq const& GetEleContainer() const { return this->elements; }
+  EntrySeq const& GetEleContainer() const
+  {
+    return this->elements;
+  }
 
-  EntrySeq& GetEleContainer() { return this->elements; }
+  EntrySeq& GetEleContainer()
+  {
+    return this->elements;
+  }
 
   void InitializeEleSeq()
   {
     this->elements = EntrySeq::uninitialized(TT::kBufUB);
   }
 
-  AT& GetAug() const { return aug; }
+  AT& GetAug() const
+  {
+    return aug;
+  }
 
   // TODO: should put this one in the aug as well and don't use the monostate
   template<typename Range>
@@ -120,7 +135,10 @@ struct LeafNode : TypeTrait::Node
     return aug.UpdateAug(In);
   }
 
-  auto ResetAug() { return aug.Reset(); }
+  auto ResetAug()
+  {
+    return aug.Reset();
+  }
 
   EntrySeq elements;
   AT aug;
@@ -247,11 +265,20 @@ struct MultiNode : TypeTrait::Node
     }
   }
 
-  TT::BufSizeT GetNodeN() const { return node_n; }
+  TT::BufSizeT GetNodeN() const
+  {
+    return node_n;
+  }
 
-  TT::BufSizeT GetSplitN() const { return node_n - 1; }
+  TT::BufSizeT GetSplitN() const
+  {
+    return node_n - 1;
+  }
 
-  SplitArr const& GetSplit() const { return split; }
+  SplitArr const& GetSplit() const
+  {
+    return split;
+  }
 
   auto GetNodeSlice() const
   {

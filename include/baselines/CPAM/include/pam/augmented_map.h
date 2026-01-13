@@ -34,7 +34,10 @@ public:
   }
 
   // extract the augmented values
-  A aug_val() const { return Tree::aug_val(Map::root); }
+  A aug_val() const
+  {
+    return Tree::aug_val(Map::root);
+  }
 
   A aug_left(K const& key)
   {
@@ -91,7 +94,10 @@ public:
   // install Map's constructors
   using Map::Map;
 
-  static size_t size(node* r) { return Map::size(r); }
+  static size_t size(node* r)
+  {
+    return Map::size(r);
+  }
 
   template<class Func>
   static M insert(M m, E const& p, Func const& f)
@@ -190,14 +196,23 @@ public:
   {
     return to_aug(Map::join2(std::move(a), std::move(b)));
   }
-  static M range(M& a, K kl, K kr) { return to_aug(Map::range(a, kl, kr)); }
-  static M upTo(M& a, K kr) { return to_aug(Map::upTo(a, kr)); }
+  static M range(M& a, K kl, K kr)
+  {
+    return to_aug(Map::range(a, kl, kr));
+  }
+  static M upTo(M& a, K kr)
+  {
+    return to_aug(Map::upTo(a, kr));
+  }
   template<class Ma, class F>
   static M map(Ma a, F const f)
   {
     return to_aug(Map::map(a, f));
   }
-  static void entries(M m, E* out) { Map::entries(std::move(m), out); }
+  static void entries(M m, E* out)
+  {
+    Map::entries(std::move(m), out);
+  }
   template<class outItter>
   static void keys(M m, outItter out)
   {
@@ -211,7 +226,10 @@ public:
   {
     return Map::keys(m, granularity);
   }
-  bool operator==(M const& m) { return Map::operator==(m); }
+  bool operator==(M const& m)
+  {
+    return Map::operator==(m);
+  }
   template<class R, class F>
   static typename R::T map_reduce(M const& m,
                                   F const& f,
@@ -293,9 +311,18 @@ struct aug_map_full_entry : entry
   using key_t = typename entry::key_t;
   using aug_t = typename entry::aug_t;
   using entry_t = std::pair<key_t, val_t>;
-  static inline key_t get_key(entry_t const& e) { return e.first; }
-  static inline val_t get_val(entry_t const& e) { return e.second; }
-  static inline void set_val(entry_t& e, val_t const& v) { e.second = v; }
+  static inline key_t get_key(entry_t const& e)
+  {
+    return e.first;
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return e.second;
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+    e.second = v;
+  }
   static inline aug_t from_entry(entry_t const& e)
   {
     return entry::from_entry(e.first, e.second);
@@ -316,9 +343,17 @@ struct aug_set_full_entry : entry
   using key_t = typename entry::key_t;
   using aug_t = typename entry::aug_t;
   using entry_t = key_t;
-  static inline key_t get_key(entry_t const& e) { return e; }
-  static inline val_t get_val(entry_t const& e) { return 0; }
-  static inline void set_val(entry_t& e, val_t const& v) {}
+  static inline key_t get_key(entry_t const& e)
+  {
+    return e;
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return 0;
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+  }
 };
 
 // _Entry needs:

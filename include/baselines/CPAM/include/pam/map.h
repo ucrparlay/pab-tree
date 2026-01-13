@@ -29,14 +29,23 @@ public:
   using maybe_E = std::optional<E>;
 
   // initializing, reserving and finishing
-  static void init() { GC::init(); }
+  static void init()
+  {
+    GC::init();
+  }
   static void reserve(size_t n, bool randomize = false)
   {
     GC::reserve(n, randomize);
   };
-  static void finish() { GC::finish(); }
+  static void finish()
+  {
+    GC::finish();
+  }
 
-  void swap(map_& b) { std::swap(root, b.root); }
+  void swap(map_& b)
+  {
+    std::swap(root, b.root);
+  }
 
   // empty constructor
   map_()
@@ -96,7 +105,10 @@ public:
   // }
 
   // destruct.
-  ~map_() { clear(); }
+  ~map_()
+  {
+    clear();
+  }
 
   // singleton
   map_(E const& e)
@@ -167,11 +179,20 @@ public:
 
   // some basic functions
   // tree size
-  size_t size() const { return Tree::size(root); }
+  size_t size() const
+  {
+    return Tree::size(root);
+  }
 
-  static size_t size(node* r) { return Tree::size(r); }
+  static size_t size(node* r)
+  {
+    return Tree::size(r);
+  }
 
-  size_t ref_cnt() const { return Tree::ref_cnt(root); }
+  size_t ref_cnt() const
+  {
+    return Tree::ref_cnt(root);
+  }
 
   // equality
   bool operator==(M const& m) const
@@ -281,7 +302,10 @@ public:
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
-  bool operator!=(M const& m) const { return !(*this == m); }
+  bool operator!=(M const& m) const
+  {
+    return !(*this == m);
+  }
 
   template<class Func>
   static M insert(M m, E const& p, Func const& f)
@@ -319,14 +343,20 @@ public:
     root = Tree::insert(root, p, replace);
   }
 
-  static M remove(M m, K const& k) { return M(Tree::deletet(m.get_root(), k)); }
+  static M remove(M m, K const& k)
+  {
+    return M(Tree::deletet(m.get_root(), k));
+  }
 
   static M join2(M a, M b)
   {
     return M(Tree::join2(a.get_root(), b.get_root()));
   }
 
-  bool is_empty() { return root == NULL; }
+  bool is_empty()
+  {
+    return root == NULL;
+  }
 
   // filters elements that satisfy the predicate when applied to the elements.
   template<class F>
@@ -366,9 +396,18 @@ public:
       using entry_t = EE;
       using key_t = EE;
       using val_t = bool;
-      static bool comp(key_t const& a, key_t const& b) { return a < b; }
-      static inline key_t get_key(entry_t const& e) { return e; }
-      static inline val_t get_val(entry_t const& e) { return false; }
+      static bool comp(key_t const& a, key_t const& b)
+      {
+        return a < b;
+      }
+      static inline key_t get_key(entry_t const& e)
+      {
+        return e;
+      }
+      static inline val_t get_val(entry_t const& e)
+      {
+        return false;
+      }
     };
 
     using BD = build<e_type>;
@@ -434,10 +473,22 @@ public:
       using entry_t = EE;
       using key_t = K;
       using val_t = VV;
-      static bool comp(key_t const& a, key_t const& b) { return a < b; }
-      static inline key_t get_key(entry_t const& e) { return e.first; }
-      static inline val_t get_val(entry_t const& e) { return e.second; }
-      static inline void set_val(entry_t& e, val_t const& v) { e.second = v; }
+      static bool comp(key_t const& a, key_t const& b)
+      {
+        return a < b;
+      }
+      static inline key_t get_key(entry_t const& e)
+      {
+        return e.first;
+      }
+      static inline val_t get_val(entry_t const& e)
+      {
+        return e.second;
+      }
+      static inline void set_val(entry_t& e, val_t const& v)
+      {
+        e.second = v;
+      }
     };
 
     using BD = build<e_type>;
@@ -574,16 +625,25 @@ public:
   }
 
   // rank and select
-  size_t rank(K const& key) { return Tree::rank(root, key); }
+  size_t rank(K const& key)
+  {
+    return Tree::rank(root, key);
+  }
 
   maybe_E select(size_t const rank) const
   {
     return node_to_entry(Tree::select(root, rank));
   }
 
-  maybe_E last() const { return select(size() - 1); }
+  maybe_E last() const
+  {
+    return select(size() - 1);
+  }
 
-  M take(size_t const k) { return M(Tree::take(root, k)); }
+  M take(size_t const k)
+  {
+    return M(Tree::take(root, k));
+  }
 
   template<class F>
   static M map_union(M a, M b, F const& op, bool extra = false)
@@ -618,7 +678,10 @@ public:
     return M(Tree::difference(a.get_root(), b.get_root()));
   }
 
-  static M range(M& a, K kl, K kr) { return M(Tree::range(a.root, kl, kr)); }
+  static M range(M& a, K kl, K kr)
+  {
+    return M(Tree::range(a.root, kl, kr));
+  }
 
   static M range_number(M& a, K kl, size_t r)
   {
@@ -636,9 +699,15 @@ public:
     return x.first;
   }
 
-  static M upTo(M& a, K kr) { return M(Tree::left(a.root, kr)); }
+  static M upTo(M& a, K kr)
+  {
+    return M(Tree::left(a.root, kr));
+  }
 
-  static M downTo(M& a, K kr) { return M(Tree::right(a.root, kr)); }
+  static M downTo(M& a, K kr)
+  {
+    return M(Tree::right(a.root, kr));
+  }
 
   template<class Ma, class F>
   static M map(Ma a, F const& f)
@@ -688,8 +757,14 @@ public:
     struct do_nothing
     {
       using T = bool;
-      static T identity() { return false; }
-      static T add(T a, T b) { return false; }
+      static T identity()
+      {
+        return false;
+      }
+      static T add(T a, T b)
+      {
+        return false;
+      }
     };
     auto g = [&](E v) {
       f(v);
@@ -740,7 +815,10 @@ public:
       return maybe_E();
   }
 
-  bool check_balance() { return Seq_Tree::check_balance(root); }
+  bool check_balance()
+  {
+    return Seq_Tree::check_balance(root);
+  }
 
   template<class F>
   size_t size_in_bytes(F const& f) const
@@ -762,9 +840,18 @@ struct map_full_entry : entry
   using val_t = typename entry::val_t;
   using key_t = typename entry::key_t;
   using entry_t = std::pair<key_t, val_t>;
-  static inline key_t get_key(entry_t const& e) { return e.first; }
-  static inline val_t get_val(entry_t const& e) { return e.second; }
-  static inline void set_val(entry_t& e, val_t const& v) { e.second = v; }
+  static inline key_t get_key(entry_t const& e)
+  {
+    return e.first;
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return e.second;
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+    e.second = v;
+  }
 };
 
 template<class _Entry, class Balance = weight_balanced_tree>
@@ -780,9 +867,17 @@ struct set_full_entry : entry
   using key_t = typename entry::key_t;
   using val_t = bool; // not used
   using entry_t = key_t;
-  static inline key_t get_key(entry_t const& e) { return e; }
-  static inline val_t get_val(entry_t const& e) { return 0; }
-  static inline void set_val(entry_t& e, val_t const& v) {}
+  static inline key_t get_key(entry_t const& e)
+  {
+    return e;
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return 0;
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+  }
 };
 
 template<class _Entry, class Balance = weight_balanced_tree>
@@ -798,10 +893,21 @@ struct seq_full_entry
   using key_t = data;
   using val_t = bool; // not used
   using entry_t = data;
-  static bool comp(key_t const& a, key_t const& b) { return true; }
-  static inline key_t get_key(entry_t const& e) { return e; }
-  static inline val_t get_val(entry_t const& e) { return 0; }
-  static inline void set_val(entry_t& e, val_t const& v) {}
+  static bool comp(key_t const& a, key_t const& b)
+  {
+    return true;
+  }
+  static inline key_t get_key(entry_t const& e)
+  {
+    return e;
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return 0;
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+  }
 };
 
 // data can be any type

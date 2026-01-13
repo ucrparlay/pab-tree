@@ -43,17 +43,35 @@ public:
     }
   }
 
-  static inline bool Geq(T const a, T const b) { return !Lt(a, b); }
+  static inline bool Geq(T const a, T const b)
+  {
+    return !Lt(a, b);
+  }
 
-  static inline bool Leq(T const a, T const b) { return !Gt(a, b); }
+  static inline bool Leq(T const a, T const b)
+  {
+    return !Gt(a, b);
+  }
 
-  static inline T Min(T const a, T const b) { return Lt(a, b) ? a : b; }
+  static inline T Min(T const a, T const b)
+  {
+    return Lt(a, b) ? a : b;
+  }
 
-  static inline T Max(T const a, T const b) { return Gt(a, b) ? a : b; }
+  static inline T Max(T const a, T const b)
+  {
+    return Gt(a, b) ? a : b;
+  }
 
-  static inline T Abs(T const a) { return Lt(a, 0) ? -a : a; }
+  static inline T Abs(T const a)
+  {
+    return Lt(a, 0) ? -a : a;
+  }
 
-  static inline bool IsZero(T const a) { return Eq(a, static_cast<T>(0)); }
+  static inline bool IsZero(T const a)
+  {
+    return Eq(a, static_cast<T>(0));
+  }
 
   static inline T DivideTwoCeil(T const a)
   {

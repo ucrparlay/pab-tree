@@ -91,7 +91,10 @@ struct timer
     total_time = 0.0;
   }
 
-  void reportTotal(std::string str) { report(get_total(), str); }
+  void reportTotal(std::string str)
+  {
+    report(get_total(), str);
+  }
 
   void next(std::string str)
   {

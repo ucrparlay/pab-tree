@@ -23,7 +23,10 @@ struct augmented_ops : Map
   using Map::kBaseCaseSize;
   using Map::kNodeLimit;
 
-  static inline aug_t aug_val(node* b) { return Seq::aug_val(b); }
+  static inline aug_t aug_val(node* b)
+  {
+    return Seq::aug_val(b);
+  }
 
   struct aug_sum_t
   {
@@ -36,7 +39,10 @@ struct augmented_ops : Map
     {
       result = Entry::combine(result, Entry::from_entry(e));
     }
-    void add_aug_val(aug_t av) { result = Entry::combine(result, av); }
+    void add_aug_val(aug_t av)
+    {
+      result = Entry::combine(result, av);
+    }
   };
 
   // the sum left of or at key

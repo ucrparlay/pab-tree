@@ -38,7 +38,10 @@ public:
   }
 
   // extract the augmented values
-  A aug_val() const { return Tree::aug_val(Map::root); }
+  A aug_val() const
+  {
+    return Tree::aug_val(Map::root);
+  }
 
   A aug_left(K const& key)
   {
@@ -195,7 +198,10 @@ public:
     return to_aug(Map::map_difference(std::move(a), std::move(b)));
   }
 
-  static M range(M& a, K kl, K kr) { return to_aug(Map::range(a, kl, kr)); }
+  static M range(M& a, K kl, K kr)
+  {
+    return to_aug(Map::range(a, kl, kr));
+  }
   template<class Ma, class F>
   static M map(Ma& a, F const f)
   {
@@ -206,9 +212,15 @@ public:
     return to_aug(Map::subseq(a, left, right));
   }
 
-  static size_t size(node* r) { return Map::size(r); }
+  static size_t size(node* r)
+  {
+    return Map::size(r);
+  }
 
-  static void entries(M m, E* out) { Map::entries(std::move(m), out); }
+  static void entries(M m, E* out)
+  {
+    Map::entries(std::move(m), out);
+  }
   static parlay::sequence<E> entries(M m, size_t granularity = kNodeLimit)
   {
     return Map::entries(std::move(m));
@@ -226,7 +238,10 @@ public:
   {
     return Map::keys(m, granularity);
   }
-  bool operator==(M const& m) { return Map::operator==(m); }
+  bool operator==(M const& m)
+  {
+    return Map::operator==(m);
+  }
 
   template<class R, class F>
   static typename R::T map_reduce(M const& m,
@@ -317,9 +332,18 @@ struct aug_map_full_entry : entry
   using key_t = typename entry::key_t;
   using aug_t = typename entry::aug_t;
   using entry_t = std::tuple<key_t, val_t>;
-  static inline key_t get_key(entry_t const& e) { return std::get<0>(e); }
-  static inline val_t get_val(entry_t const& e) { return std::get<1>(e); }
-  static inline void set_val(entry_t& e, val_t const& v) { std::get<1>(e) = v; }
+  static inline key_t get_key(entry_t const& e)
+  {
+    return std::get<0>(e);
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return std::get<1>(e);
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+    std::get<1>(e) = v;
+  }
   static inline entry_t to_entry(key_t const& k, val_t const& v)
   {
     return std::make_tuple(k, v);
@@ -357,9 +381,17 @@ struct aug_set_full_entry : entry
   using key_t = typename entry::key_t;
   using aug_t = typename entry::aug_t;
   using entry_t = key_t;
-  static inline key_t get_key(entry_t const& e) { return e; }
-  static inline val_t get_val(entry_t const& e) { return 0; }
-  static inline void set_val(entry_t& e, val_t const& v) {}
+  static inline key_t get_key(entry_t const& e)
+  {
+    return e;
+  }
+  static inline val_t get_val(entry_t const& e)
+  {
+    return 0;
+  }
+  static inline void set_val(entry_t& e, val_t const& v)
+  {
+  }
 };
 
 // _Entry needs:

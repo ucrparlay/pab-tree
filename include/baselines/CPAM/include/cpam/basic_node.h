@@ -61,13 +61,19 @@ public:
     assert(is_regular(a));
     return size(a) > 2 * B;
   }
-  static bool is_simplex(node* a) { return size(a) <= 2 * B; }
+  static bool is_simplex(node* a)
+  {
+    return size(a) <= 2 * B;
+  }
 
   static inline bool is_regular(node* a)
   {
     return !a || ((regular_node*)a)->r & kTopBit;
   }
-  static inline bool is_compressed(node* a) { return !is_regular(a); }
+  static inline bool is_compressed(node* a)
+  {
+    return !is_regular(a);
+  }
 
   // Useful if running in debug mode for catching bugs.
   static regular_node* cast_to_regular(node* a)
@@ -80,7 +86,10 @@ public:
     assert(is_compressed(a));
     return (compressed_node*)a;
   }
-  static regular_node* generic_node(node* a) { return (regular_node*)a; }
+  static regular_node* generic_node(node* a)
+  {
+    return (regular_node*)a;
+  }
   static node_size_t size(node* a)
   {
     return (a == NULL) ? 0 : generic_node(a)->s;
@@ -114,14 +123,23 @@ public:
     return r;
   }
 
-  static node* empty() { return NULL; }
+  static node* empty()
+  {
+    return NULL;
+  }
 
-  inline static ET& get_entry(node* a) { return cast_to_regular(a)->entry; }
+  inline static ET& get_entry(node* a)
+  {
+    return cast_to_regular(a)->entry;
+  }
   inline static ET* get_entry_p(node* a)
   {
     return &(cast_to_regular(a)->entry);
   }
-  static void set_entry(node* a, ET e) { cast_to_regular(a)->entry = e; }
+  static void set_entry(node* a, ET e)
+  {
+    cast_to_regular(a)->entry = e;
+  }
 
   static constexpr node_size_t kTopBit = ((node_size_t)1)
                                          << (sizeof(node_size_t) * 8 - 1);
@@ -384,7 +402,9 @@ public:
     std::cout << std::endl;
   }
 
-  static void print_rec_impl(node* a) {}
+  static void print_rec_impl(node* a)
+  {
+  }
 
   static void print_rec(node* a)
   {
