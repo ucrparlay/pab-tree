@@ -1700,7 +1700,7 @@ public:
       this->dis_type = std::string(params.getOptionValue("-D"));
     }
 
-    void const PrintOptions() const
+    void PrintOptions() const
     {
       std::cout << "InputFile: "
                 << std::filesystem::path(input_file_path).filename().string()
@@ -1708,20 +1708,25 @@ public:
       std::cout << "Dis: " << this->dis_type << "; ";
     }
 
-    std::pair<std::string, std::string> ExtractPrefixes(std::string const& path)
+    static auto ExtractPrefixes(std::string const& path)
+      -> std::pair<std::string, std::string>
     {
       // locate pivot: first occurrence of "/ins/" or "/del/"
       size_t posIns = path.find("/ins/");
       size_t posDel = path.find("/del/");
       size_t pivot = std::string::npos;
-      if (posIns != std::string::npos)
+      if (posIns != std::string::npos) {
         pivot = posIns;
+      }
       if (posDel != std::string::npos &&
-          (pivot == std::string::npos || posDel < pivot))
+          (pivot == std::string::npos || posDel < pivot)) {
         pivot = posDel;
+      }
 
-      if (pivot == std::string::npos)
-        return { "", "" }; // pattern not found
+      if (pivot == std::string::npos) {
+        // pattern not found
+        return { "", "" };
+      }
 
       // directory prefix (up to just before /ins/ or /del/)
       std::string dirPrefix = path.substr(0, pivot) + "/";
@@ -1743,7 +1748,8 @@ public:
       return { dirPrefix, filename };
     }
 
-    std::pair<std::string, std::string> ParseInsertBatchPath(double batch_ratio)
+    [[nodiscard]] auto ParseInsertBatchPath(double batch_ratio) const
+      -> std::pair<std::string, std::string>
     {
       // PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
       // PARA: dir_pre: ../kdtree/uni/1000000_1/
@@ -1759,7 +1765,8 @@ public:
       return std::make_pair(base_path, batch_path);
     }
 
-    std::pair<std::string, std::string> ParseDeleteBatchPath(double batch_ratio)
+    [[nodiscard]] auto ParseDeleteBatchPath(double batch_ratio) const
+      -> std::pair<std::string, std::string>
     {
       // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
       auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
@@ -1829,10 +1836,7 @@ public:
       this->val = std::stol(In);
     }
 
-    bool const operator<(Element const& rhs) const
-    {
-      return this->key < rhs.key;
-    }
+    bool operator<(Element const& rhs) const { return this->key < rhs.key; }
 
     friend std::ostream& operator<<(std::ostream& o, Element const& a)
     {
@@ -1855,9 +1859,9 @@ public:
     using V = typename E::V;
 
     // differs from different entry, interface for pmos structure
-    static inline auto GetKey(E const e) { return e.GetKey(); }
-    static inline auto GetVal(E const e) { return e.GetVal(); }
-    static inline E ToEntry(K const& k, V const& v)
+    static auto GetKey(E const e) { return e.GetKey(); }
+    static auto GetVal(E const e) { return e.GetVal(); }
+    static E ToEntry(K const& k, V const& v)
     {
       return E{ .key = k, .val = v };
     };
