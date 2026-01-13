@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../../parlaylib/include/parlay/primitives.h"
+#include "parlay/primitives.h"
 #include "sequence_ops.h"
 #include "utils.h"
 

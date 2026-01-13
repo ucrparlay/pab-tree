@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 
+# CompileFlags:
+#   Add:
+#     - -I/home/ziyang/code/ParallelMultiwayOrderedSet/include/parlaylib/include
+#     - -I/home/ziyang/code/ParallelMultiwayOrderedSet/include/pmos
+#     - -I/home/ziyang/code/ParallelMultiwayOrderedSet/include/
+
 project(
 	PMOS
 	VERSION 0.1

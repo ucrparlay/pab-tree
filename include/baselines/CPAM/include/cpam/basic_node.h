@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../../parlaylib/include/parlay/alloc.h"
+#include "parlay/alloc.h"
 #include "basic_node_helpers.h"
 #include "byte_encode.h"
 #include "compression.h"

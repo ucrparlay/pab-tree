@@ -3,7 +3,7 @@
 
 #include <optional>
 
-#include "../../../../parlaylib/include/parlay/primitives.h"
+#include "parlay/primitives.h"
 
 // *******************************************
 //   Utils

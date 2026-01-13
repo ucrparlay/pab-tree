@@ -13,6 +13,7 @@
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
 #include "dependence/concepts.h"
+#include "dependence/tree_node.h"
 #include "dependence/type_trait.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/monoid.h"

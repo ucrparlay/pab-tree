@@ -9,6 +9,7 @@
 /script/plots
 run_transfer.sh
 transfer.sh
+.clangd
 
 # Debug files
 # *.log
