@@ -12,7 +12,7 @@ tag=$((2#000))
 summary=1
 query_type=$((2#00))
 instance_n=1
-round=4
+round=1
 
 log_path="logs/mem"
 mkdir -p "${log_path}"
@@ -57,7 +57,7 @@ function run_cmake() {
 
 	local cur_path=$(pwd)
 	cd ../build || exit
-	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DMEMCHECK=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
 	make ${solver}
 	cd "${cur_path}" || exit
 }

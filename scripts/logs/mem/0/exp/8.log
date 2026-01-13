@@ -1,0 +1,24 @@
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 415.85
+	System time (seconds): 99.20
+	Percent of CPU this job got: 308%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.08
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 63592292
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 397060
+	Voluntary context switches: 186682
+	Involuntary context switches: 1402
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

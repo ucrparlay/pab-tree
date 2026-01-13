@@ -58,14 +58,13 @@ def combine(P) -> List:
             buf_value = int(lin_sep[3].strip(";"))
             benchmark = str(lin_sep[7].strip(";"))
 
-            index += 1
+            index += 10
 
         else:
             # parse result - summarize by Buf value
-            all_data.append([benchmark, tree, buf_value] + lin_sep)
-            index += 9
-            lin_sep = " ".join(lines[index].split())
-            all_data.append(float(lin_sep[1]) / (1024 * 1024))
+            # lin_sep = " ".join(lines[index].split())
+            all_data.append([benchmark, tree, buf_value] +
+                            [float(lin_sep[-1]) / (1024 * 1024)])
             index += 14
 
     return all_data

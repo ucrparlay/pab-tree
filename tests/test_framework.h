@@ -1028,9 +1028,35 @@ auto read_points(char const* iFile, parlay::sequence<E>& wp,
   parlay::parallel_for(0, n, [&](size_t i) -> void {
     // wp[i].ReadKey(pts[i], i + id_offset);
     wp[i].ReadKey(pts[i * dim]);
-    wp[i].ReadVal(pts.cut(
-        (i * dim) + 1, (i + 1) * dim));  // WARN: assume the val is a singleton
+    wp[i].ReadVal(pts[(i * dim) + 1]);
+    // wp[i].ReadVal(pts.cut(
+    //     (i * dim) + 1, (i + 1) * dim));  // WARN: assume the val is a
+    //     singleton
   });
+  return std::make_pair(N, dim);
+}
+
+template <typename E>
+auto read_points_serial(char const* iFile, parlay::sequence<E>& wp,
+                        [[maybe_unused]] int id_offset = 0)
+    -> std::pair<size_t, int> {
+  std::ifstream fs;
+  fs.open(iFile);
+  size_t N(0);
+  int dim(0);
+  string str;
+  fs >> str, N = stol(str);
+  fs >> str, dim = stoi(str);
+  // LOG << N << " " << Dim << ENDL;
+  wp.resize(N);
+  for (size_t i = 0; i < N; i++) {
+    fs >> str;
+    wp[i].ReadKey(str);
+    for (int j = 1; j < dim; j++) {
+      fs >> str;
+      wp[i].ReadVal(str);
+    }
+  }
   return std::make_pair(N, dim);
 }
 
@@ -1052,14 +1078,15 @@ static auto constexpr DefaultTestFunc =
 
       Tree tree;
       constexpr bool kTestTime = true;
-      read_points<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
 
 #ifdef MEMCHECK
+      read_points_serial<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
       tree.Build(wp.cut(0, wp.size()));
       tree.DeleteTree();
       return;
 #endif  // MEMCHECK
 
+      read_points<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
       BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
       // // NOTE: batch insert
@@ -1650,20 +1677,19 @@ class Wrapper {
     K GetKey() const { return key; }
     V GetVal() const { return val; }
 
-    void ReadKey(char* str, size_t i) {
+    template <typename StrRange>
+    void ReadKey(StrRange str, size_t i) {
       this->key = {std::stol(str), i};
-      return;
     }
 
-    void ReadKey(char* str) {
+    template <typename StrRange>
+    void ReadKey(StrRange str) {
       this->key = std::stol(str);
-      return;
     }
 
     template <typename StrRange>
     void ReadVal(StrRange In) {
-      this->val = std::stol(In[0]);
-      return;
+      this->val = std::stol(In);
     }
 
     bool const operator<(Element const& rhs) const {

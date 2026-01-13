@@ -1,0 +1,1100 @@
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 428.60
+	System time (seconds): 82.72
+	Percent of CPU this job got: 310%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.51
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57322148
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 7
+	Minor (reclaiming a frame) page faults: 251925
+	Voluntary context switches: 149556
+	Involuntary context switches: 1302
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 428.15
+	System time (seconds): 92.71
+	Percent of CPU this job got: 314%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.41
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 58629412
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 359715
+	Voluntary context switches: 200020
+	Involuntary context switches: 1137
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 421.53
+	System time (seconds): 101.98
+	Percent of CPU this job got: 317%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.85
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 60980880
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 5
+	Minor (reclaiming a frame) page faults: 418637
+	Voluntary context switches: 200730
+	Involuntary context switches: 1255
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 961.70
+	System time (seconds): 110.35
+	Percent of CPU this job got: 639%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.64
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 82774580
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 449795
+	Voluntary context switches: 195993
+	Involuntary context switches: 2534
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 420.68
+	System time (seconds): 91.31
+	Percent of CPU this job got: 310%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.67
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59888848
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 387766
+	Voluntary context switches: 190040
+	Involuntary context switches: 1225
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 543.42
+	System time (seconds): 104.13
+	Percent of CPU this job got: 391%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.57
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 70049540
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 442184
+	Voluntary context switches: 190576
+	Involuntary context switches: 1600
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 426.12
+	System time (seconds): 95.31
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.24
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57532516
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 5
+	Minor (reclaiming a frame) page faults: 272413
+	Voluntary context switches: 156635
+	Involuntary context switches: 1402
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 427.33
+	System time (seconds): 97.12
+	Percent of CPU this job got: 317%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.01
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59038928
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 449595
+	Voluntary context switches: 225333
+	Involuntary context switches: 1306
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D dual_norm"
+	User time (seconds): 418.60
+	System time (seconds): 88.59
+	Percent of CPU this job got: 309%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:43.95
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 63674704
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 398069
+	Voluntary context switches: 182744
+	Involuntary context switches: 1234
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 438.97
+	System time (seconds): 88.72
+	Percent of CPU this job got: 319%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.99
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57601828
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 233258
+	Voluntary context switches: 138471
+	Involuntary context switches: 1187
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 429.05
+	System time (seconds): 96.53
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:46.58
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 58530764
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 336431
+	Voluntary context switches: 190282
+	Involuntary context switches: 1227
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 422.26
+	System time (seconds): 95.88
+	Percent of CPU this job got: 313%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.03
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 60931828
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 406389
+	Voluntary context switches: 205061
+	Involuntary context switches: 1428
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 1035.08
+	System time (seconds): 106.86
+	Percent of CPU this job got: 671%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:50.03
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 82817256
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 428847
+	Voluntary context switches: 191204
+	Involuntary context switches: 3039
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 423.34
+	System time (seconds): 96.04
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.58
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59774948
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 8
+	Minor (reclaiming a frame) page faults: 408113
+	Voluntary context switches: 202292
+	Involuntary context switches: 1236
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 528.49
+	System time (seconds): 107.96
+	Percent of CPU this job got: 381%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:46.68
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 69957548
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 428708
+	Voluntary context switches: 198650
+	Involuntary context switches: 1489
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 423.73
+	System time (seconds): 85.58
+	Percent of CPU this job got: 308%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.96
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57533852
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 267089
+	Voluntary context switches: 156093
+	Involuntary context switches: 1286
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 419.63
+	System time (seconds): 92.12
+	Percent of CPU this job got: 309%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.21
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59404100
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 400188
+	Voluntary context switches: 204989
+	Involuntary context switches: 1235
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D exp"
+	User time (seconds): 415.85
+	System time (seconds): 99.20
+	Percent of CPU this job got: 308%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.08
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 63592292
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 397060
+	Voluntary context switches: 186682
+	Involuntary context switches: 1402
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 421.44
+	System time (seconds): 88.20
+	Percent of CPU this job got: 309%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.80
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57415616
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 247187
+	Voluntary context switches: 146390
+	Involuntary context switches: 1261
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 428.25
+	System time (seconds): 90.13
+	Percent of CPU this job got: 311%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:46.45
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 58595304
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 335422
+	Voluntary context switches: 188986
+	Involuntary context switches: 1496
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 414.57
+	System time (seconds): 92.63
+	Percent of CPU this job got: 302%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.51
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 60759980
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 3
+	Minor (reclaiming a frame) page faults: 400853
+	Voluntary context switches: 201566
+	Involuntary context switches: 1187
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 950.04
+	System time (seconds): 111.66
+	Percent of CPU this job got: 633%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.49
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 82725784
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 455557
+	Voluntary context switches: 199126
+	Involuntary context switches: 2723
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 420.26
+	System time (seconds): 99.25
+	Percent of CPU this job got: 314%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.40
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59790020
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 3
+	Minor (reclaiming a frame) page faults: 389445
+	Voluntary context switches: 206074
+	Involuntary context switches: 1314
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 543.28
+	System time (seconds): 99.01
+	Percent of CPU this job got: 387%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.89
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 70102860
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 394445
+	Voluntary context switches: 183108
+	Involuntary context switches: 1575
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 429.96
+	System time (seconds): 91.20
+	Percent of CPU this job got: 313%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:46.39
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57561604
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 277076
+	Voluntary context switches: 159118
+	Involuntary context switches: 1351
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 427.07
+	System time (seconds): 87.76
+	Percent of CPU this job got: 308%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:46.79
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59197256
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 409459
+	Voluntary context switches: 209421
+	Involuntary context switches: 1196
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D norm"
+	User time (seconds): 411.48
+	System time (seconds): 92.26
+	Percent of CPU this job got: 305%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.89
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 63671740
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 403658
+	Voluntary context switches: 188391
+	Involuntary context switches: 1061
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 421.21
+	System time (seconds): 97.62
+	Percent of CPU this job got: 314%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.98
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57686728
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 240228
+	Voluntary context switches: 133406
+	Involuntary context switches: 1257
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 429.78
+	System time (seconds): 91.05
+	Percent of CPU this job got: 314%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.51
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 58447356
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 362405
+	Voluntary context switches: 209288
+	Involuntary context switches: 1229
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 430.11
+	System time (seconds): 93.70
+	Percent of CPU this job got: 316%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.42
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 60817532
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 414612
+	Voluntary context switches: 203677
+	Involuntary context switches: 1191
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 992.22
+	System time (seconds): 110.30
+	Percent of CPU this job got: 659%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.14
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 82619740
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 204
+	Minor (reclaiming a frame) page faults: 417143
+	Voluntary context switches: 181051
+	Involuntary context switches: 2881
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 423.61
+	System time (seconds): 99.58
+	Percent of CPU this job got: 317%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.97
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59874124
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 412833
+	Voluntary context switches: 198566
+	Involuntary context switches: 1206
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 537.01
+	System time (seconds): 98.54
+	Percent of CPU this job got: 385%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.96
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 70023772
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 408054
+	Voluntary context switches: 186407
+	Involuntary context switches: 1592
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 420.35
+	System time (seconds): 87.57
+	Percent of CPU this job got: 308%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.89
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 57737876
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 243330
+	Voluntary context switches: 147147
+	Involuntary context switches: 1252
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 429.43
+	System time (seconds): 91.82
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.18
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 59034372
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 412853
+	Voluntary context switches: 204938
+	Involuntary context switches: 1270
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 0 -D uni"
+	User time (seconds): 417.61
+	System time (seconds): 104.53
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:45.24
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 63616424
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 461136
+	Voluntary context switches: 207629
+	Involuntary context switches: 1199
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: CPAM; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 1 -D dual_norm"
+	User time (seconds): 418.13
+	System time (seconds): 95.57
+	Percent of CPU this job got: 312%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.46
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 43498292
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 270816
+	Voluntary context switches: 92210
+	Involuntary context switches: 1115
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: CPAM; Buf: 16; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 1 -D exp"
+	User time (seconds): 420.43
+	System time (seconds): 88.82
+	Percent of CPU this job got: 310%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.04
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 43628164
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 3
+	Minor (reclaiming a frame) page faults: 241331
+	Voluntary context switches: 77525
+	Involuntary context switches: 1228
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: CPAM; Buf: 16; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 1 -D norm"
+	User time (seconds): 423.47
+	System time (seconds): 91.68
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:43.53
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 43473804
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 13
+	Minor (reclaiming a frame) page faults: 263022
+	Voluntary context switches: 98106
+	Involuntary context switches: 1217
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: CPAM; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 1 -D uni"
+	User time (seconds): 425.45
+	System time (seconds): 93.47
+	Percent of CPU this job got: 315%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:44.54
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 43550100
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 3
+	Minor (reclaiming a frame) page faults: 259221
+	Voluntary context switches: 88028
+	Involuntary context switches: 1303
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: PAM; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/dual_norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 2 -D dual_norm"
+	User time (seconds): 575.41
+	System time (seconds): 117.23
+	Percent of CPU this job got: 392%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:56.29
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 74530728
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 395208
+	Voluntary context switches: 160467
+	Involuntary context switches: 1675
+	Swaps: 0
+	File system inputs: 40594896
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: PAM; Buf: 16; InputFile: 1.base.in; Dis: exp; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/exp/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 2 -D exp"
+	User time (seconds): 578.54
+	System time (seconds): 103.45
+	Percent of CPU this job got: 380%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:59.36
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 74336532
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 5
+	Minor (reclaiming a frame) page faults: 413791
+	Voluntary context switches: 168729
+	Involuntary context switches: 1699
+	Swaps: 0
+	File system inputs: 40620936
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: PAM; Buf: 16; InputFile: 1.base.in; Dis: norm; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/norm/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 2 -D norm"
+	User time (seconds): 578.95
+	System time (seconds): 112.49
+	Percent of CPU this job got: 386%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:58.99
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 74171020
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 228
+	Minor (reclaiming a frame) page faults: 384851
+	Voluntary context switches: 160589
+	Involuntary context switches: 1781
+	Swaps: 0
+	File system inputs: 40601848
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Tree: PAM; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 2 -D uni"
+	User time (seconds): 574.49
+	System time (seconds): 128.81
+	Percent of CPU this job got: 392%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:59.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 74248988
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 4
+	Minor (reclaiming a frame) page faults: 437343
+	Voluntary context switches: 181146
+	Involuntary context switches: 1677
+	Swaps: 0
+	File system inputs: 40620032
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+

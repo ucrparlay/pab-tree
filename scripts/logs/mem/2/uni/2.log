@@ -1,0 +1,24 @@
+Tree: PAM; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+	Command being timed: "../build/baselines -p /data/zmen002/kv_pair/uni/1000000000_1/ins/100/1.base.in -r 1 -s 1 -t 0 -q 0 -b 0.01 -T 2 -D uni"
+	User time (seconds): 574.49
+	System time (seconds): 128.81
+	Percent of CPU this job got: 392%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:59.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 74248988
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 4
+	Minor (reclaiming a frame) page faults: 437343
+	Voluntary context switches: 181146
+	Involuntary context switches: 1677
+	Swaps: 0
+	File system inputs: 40620032
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
