@@ -1,8 +1,7 @@
 #ifndef PMOS_B_TREE_IMPL_BOX_OP_HPP_
 #define PMOS_B_TREE_IMPL_BOX_OP_HPP_
 
-#include "b_tree.h"
-#include "pmos/dependence/concepts.h"
+#include "../b_tree.h"
 
 namespace pmos {
 template <typename TT>

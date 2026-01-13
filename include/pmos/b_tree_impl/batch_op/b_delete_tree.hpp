@@ -5,8 +5,7 @@
 #include <parlay/slice.h>
 #include <parlay/type_traits.h>
 
-#include "b_tree.h"
-#include "b_tree_impl/tree_op/flatten.hpp"
+#include "../../b_tree.h"
 
 namespace pmos {
 template <typename TT>

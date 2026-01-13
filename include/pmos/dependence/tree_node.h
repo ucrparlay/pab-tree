@@ -15,7 +15,7 @@
 
 #include "basic_point.h"
 #include "comparator.h"
-#include "dependence/concepts.h"
+#include "concepts.h"
 #include "parlay/utilities.h"
 
 namespace pmos {

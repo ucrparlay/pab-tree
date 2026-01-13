@@ -7,11 +7,10 @@
 
 #include <cstddef>
 
+#include "../../b_tree.h"
 #include "parlay/delayed_sequence.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
-#include "pmos/b_tree.h"
-#include "pmos/dependence/tree_node.h"
 
 namespace pmos {
 template <typename TT>
