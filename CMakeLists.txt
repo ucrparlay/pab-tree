@@ -75,7 +75,7 @@ elseif(JEMA)
 	set(CMAKE_BUILD_RPATH "/usr/local/lib")
 endif()
 
-add_subdirectory(include/parlaylib)
+add_subdirectory(external/parlaylib)
 
 # NOTE: clear CMAKE_MODULE_PATH to avoid finding parlay's cmake files
 list(REMOVE_ITEM CMAKE_MODULE_PATH "${PARLAY_SOURCE_DIR}/cmake")

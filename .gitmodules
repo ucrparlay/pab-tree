@@ -1,5 +1,5 @@
-[submodule "include/parlaylib"]
-	path = include/parlaylib
+[submodule "external/parlaylib"]
+	path = external/parlaylib
 	url = https://github.com/cmuparlay/parlaylib
 [submodule "external/googletest"]
 	path = external/googletest
