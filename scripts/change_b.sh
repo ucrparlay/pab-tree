@@ -71,9 +71,9 @@ tree=1
 run_cmake 4 "${solver}"
 run_test 4 "${solver}" "${tree}"
 
-solver="b_test"
-tree=0
-for idx in "${!leaf_wrap_seq[@]}"; do
-	run_cmake "${idx}" "${solver}"
-	run_test "${idx}" "${solver}" "${tree}"
-done
+# solver="b_test"
+# tree=0
+# for idx in "${!leaf_wrap_seq[@]}"; do
+# 	run_cmake "${idx}" "${solver}"
+# 	run_test "${idx}" "${solver}" "${tree}"
+# done

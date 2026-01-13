@@ -1,6 +1,6 @@
 #pragma once
-#include "parlay/primitives.h"
 #include "get_time.h"
+#include "parlay/primitives.h"
 
 template <class Entry>
 struct build {
