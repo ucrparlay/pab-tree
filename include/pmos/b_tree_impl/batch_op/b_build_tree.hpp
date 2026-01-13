@@ -45,16 +45,16 @@ TT::Node* BTree<TT>::BuildRecursive(EntrySlice In) {
   }
 
   auto tree_node_seq_in =
-      parlay::sequence<Node*>::uninitialized(In.size() / TT::kBufMD + 1);
+      parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
   auto tree_node_seq_out =
-      parlay::sequence<Node*>::uninitialized(In.size() / TT::kBufMD + 1);
+      parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
   auto node_in = parlay::make_slice(tree_node_seq_in);
   auto node_out = parlay::make_slice(tree_node_seq_out);
 
   auto key_seq_in = parlay::sequence<typename TT::K>::uninitialized(
-      In.size() / TT::kBufMD + 1);
+      (In.size() / TT::kBufMD) + 1);
   auto key_seq_out = parlay::sequence<typename TT::K>::uninitialized(
-      In.size() / TT::kBufMD + 1);
+      (In.size() / TT::kBufMD) + 1);
   auto key_in = parlay::make_slice(key_seq_in);
   auto key_out = parlay::make_slice(key_seq_out);
 

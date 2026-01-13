@@ -11,7 +11,7 @@
 namespace pmos {
 // Template definition for the operator
 template <typename T1, typename T2>
-std::ostream& operator<<(std::ostream& os, std::pair<T1, T2> const& p) {
+auto operator<<(std::ostream& os, std::pair<T1, T2> const& p) -> std::ostream& {
   os << "(" << p.first << ", " << p.second << ")";
   return os;
 }
@@ -80,17 +80,15 @@ class BTree {
                       TT::SplitSeq const& _split, TT::InteriorAug const& _aug)
         : BaseNode(_tree_nodes, _split, _aug) {}
 
-    inline void SetParallelFlag(bool const flag) {
-      this->aug.SetParallelFlag(flag);
-    }
+    void SetParallelFlag(bool const flag) { this->aug.SetParallelFlag(flag); }
 
-    inline void ResetParallelFlag() { this->aug.ResetParallelFlag(); }
+    void ResetParallelFlag() { this->aug.ResetParallelFlag(); }
 
-    inline bool GetParallelFlagIniStatus() {
+    auto GetParallelFlagIniStatus() -> bool {
       return this->aug.GetParallelFlagIniStatus();
     }
 
-    inline bool ForceParallel() const {
+    [[nodiscard]] auto ForceParallel() const -> bool {
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
@@ -104,13 +102,17 @@ class BTree {
   template <typename Leaf, typename Interior>
   struct InnerTree;
 
-  static SizeT GetBktNum(SizeT const item_n) { return item_n / TT::kBufMD; }
+  static auto GetBktNum(SizeT const item_n) -> SizeT {
+    return item_n / TT::kBufMD;
+  }
 
-  static SizeT GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n) {
+  static auto GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
+      -> SizeT {
     return (n * i) / bkt_n;
   };
 
-  static SizeT GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n) {
+  static auto GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
+      -> SizeT {
     return (n * (i + 1)) / bkt_n;
   };
 
@@ -136,7 +138,7 @@ class BTree {
   void BatchInsert_(EntrySlice In);
 
   SizeT BatchInsertRecursive(Node* T, EntrySlice In,
-                             NodeSplitPairSlice node_split_seq);
+                             NodeSplitPairSlice node_split_slice);
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
   // static inline BucketType FindBucket(Point const& p,
@@ -151,9 +153,8 @@ class BTree {
   //
   static Node* UpdateInterior(
       Node* T, NodeSplitPairSlice node_split_slice,
-      std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-      std::array<SizeT, TT::kBufUB> const& return_node_n_arr,
-      size_t new_node_n);
+      std::array<SizeT, TT::kBufUB> const& split_pos_arr, SizeT new_node_n,
+      std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in, TT::SplitSlice key_out,
@@ -203,8 +204,8 @@ class BTree {
 
   static SizeT HandlingInteriorSplitOverflow(
       Node* T, NodeSplitPairSlice node_split_slice,
-      std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-      std::array<SizeT, TT::kBufUB> const& return_node_n_arr, SizeT new_node_n);
+      std::array<SizeT, TT::kBufUB> const& split_pos_arr, SizeT new_node_n,
+      std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
 
   //
   // template <typename Leaf, typename RT>
@@ -213,12 +214,9 @@ class BTree {
   // template <typename Leaf, typename RT>
   // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
-  // template <IsBinaryNode Interior>
-  // static inline BucketType RetriveTag(Point const& p, NodeTagSeq const&
-  // tags);
-  //
-  static inline BucketType RetriveTag(E const e, TT::SplitSeq const& split_seq);
-  //
+
+  static inline BucketType RetriveTag(E e, TT::SplitSeq const& split_seq);
+
   static TT::BallSeq SeievePoints(EntrySlice A, EntrySlice B,
                                   TT::SplitSeq const& split_seq);
   //
@@ -446,9 +444,9 @@ class BTree {
   template <typename Leaf, typename Interior>
   void Validate();
 
-  std::pair<bool, MembershipLogger> Contain(K const k) const;
+  auto Contain(K k) const -> std::pair<bool, MembershipLogger>;
 
-  bool ContainRec(Node const* T, K const k) const;
+  bool ContainRec(Node const* T, K k) const;
   //
   // template <typename Leaf, typename Interior>
   // size_t GetTreeHeight();
@@ -481,7 +479,7 @@ class BTree {
 
   constexpr static char const* GetTreeName() { return "BTree"; }
 
- protected:
+ private:
   Node* root_ = nullptr;
   parlay::internal::timer insert_leaf_timer;
   parlay::internal::timer lower_bound_timer;

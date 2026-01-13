@@ -65,12 +65,12 @@ TT::SizeT BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 template <typename TT>
 TT::Node* BTree<TT>::UpdateInterior(
     Node* T, NodeSplitPairSlice node_split_slice,
-    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-    std::array<SizeT, TT::kBufUB> const& return_node_n_arr, size_t new_node_n) {
+    std::array<SizeT, TT::kBufUB> const& split_pos_arr, SizeT new_node_n,
+    std::array<SizeT, TT::kBufUB> const& return_node_n_arr) {
   assert(!T->is_leaf);
   assert(new_node_n <= TT::kBufUB);
 
-  Interior* TI = static_cast<Interior*>(T);
+  auto TI = static_cast<Interior*>(T);
 
   // merge node
   assert(std::numeric_limits<BufSizeT>::max() >= new_node_n);
@@ -139,10 +139,10 @@ TT::Node* BTree<TT>::UpdateInterior(
 template <typename TT>
 TT::SizeT BTree<TT>::HandlingInteriorSplitOverflow(
     Node* T, NodeSplitPairSlice node_split_slice,
-    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-    std::array<SizeT, TT::kBufUB> const& return_node_n_arr, SizeT new_node_n) {
+    std::array<SizeT, TT::kBufUB> const& split_pos_arr, SizeT new_node_n,
+    std::array<SizeT, TT::kBufUB> const& return_node_n_arr) {
   assert(!T->is_leaf);
-  Interior* TI = static_cast<Interior*>(T);
+  auto TI = static_cast<Interior*>(T);
   typename TT::NodeSeq flatten_node_seq =
       TT::NodeSeq::uninitialized(new_node_n);
   typename TT::SplitSeq flatten_split_seq =

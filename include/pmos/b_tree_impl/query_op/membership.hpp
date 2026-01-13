@@ -6,7 +6,7 @@
 
 namespace pmos {
 template <typename TT>
-std::pair<bool, MembershipLogger> BTree<TT>::Contain(K const k) const {
+auto BTree<TT>::Contain(K const k) const -> std::pair<bool, MembershipLogger> {
   MembershipLogger logger;
   return {ContainRec(this->root_, k), logger};
 }
@@ -17,7 +17,7 @@ bool BTree<TT>::ContainRec(Node const* T, K const k) const {
     return static_cast<Leaf const*>(T)->Contain(k);
   }
 
-  Interior const* TI = static_cast<Interior const*>(T);
+  auto const* TI = static_cast<Interior const*>(T);
   auto pos = parlay::internal::binary_search(
       parlay::make_slice(TI->split.begin(),
                          TI->split.begin() + TI->GetSplitN()),

@@ -20,7 +20,6 @@ void BTree<TT>::BatchInsert(Range&& In) {
 
   EntrySlice A = parlay::make_slice(In);
   BatchInsert_(A);
-  return;
 }
 
 template <typename TT>
@@ -44,8 +43,6 @@ void BTree<TT>::BatchInsert_(EntrySlice In) {
     this->root_ =
         AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
   }
-
-  return;
 }
 
 template <typename TT>
@@ -54,7 +51,9 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
   assert(In.size() == node_split_slice.size());
 
   SizeT n = In.size();
-  if (n == 0) return 0;
+  if (n == 0) {
+    return 0;
+  }
 
   if (T->is_leaf) {
     Leaf* TL = static_cast<Leaf*>(T);
@@ -62,12 +61,11 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
       [[maybe_unused]] Node* updated_node = InsertPoints2Leaf(T, In);
       assert(updated_node == T);
       return 0;
-    } else {
-      return HandlingLeafSplitOverflow(T, In, node_split_slice);
     }
+    return HandlingLeafSplitOverflow(T, In, node_split_slice);
   }
 
-  Interior* TI = static_cast<Interior*>(T);
+  auto TI = static_cast<Interior*>(T);
 
   std::array<SizeT, TT::kBufUB> split_pos_seq;
   // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
@@ -125,12 +123,11 @@ TT::SizeT BTree<TT>::BatchInsertRecursive(Node* T, EntrySlice In,
   }
   if (new_node_n <= TT::kBufUB) {
     [[maybe_unused]] Node* new_inter_node = UpdateInterior(
-        T, node_split_slice, split_pos_seq, new_split_node_n_arr, new_node_n);
+        T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
     return 0;
-  } else {
-    return HandlingInteriorSplitOverflow(T, node_split_slice, split_pos_seq,
-                                         new_split_node_n_arr, new_node_n);
   }
+  return HandlingInteriorSplitOverflow(T, node_split_slice, split_pos_seq,
+                                       new_node_n, new_split_node_n_arr);
 }
 
 }  // namespace pmos
