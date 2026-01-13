@@ -1009,81 +1009,9 @@ void RangeQuerySerialWithLog(Tree& pkd, Typename* kdknn, int const& rounds,
   return;
 }
 
-template <typename T>
-class counter_iterator {
- private:
-  struct accept_any {
-    template <typename U>
-    accept_any& operator=(U const&) {
-      return *this;
-    }
-  };
-
- public:
-  typedef std::output_iterator_tag iterator_category;
-
-  counter_iterator(T& counter) : counter(counter) {}
-  counter_iterator& operator=(counter_iterator const& other) {
-    if (this != &other) {  // Check for self-assignment
-      counter = other.counter;
-    }
-    return *this;
-  }
-  counter_iterator(counter_iterator const& other) : counter(other.counter) {}
-
-  bool operator==(counter_iterator const& rhs) const {
-    return counter == rhs.counter;
-  }
-  bool operator!=(counter_iterator const& rhs) const {
-    return counter != rhs.counter;
-  }
-
-  accept_any operator*() const {
-    ++counter.get();
-    return {};
-  }
-
-  counter_iterator& operator++() {  // ++a
-    return *this;
-  }
-  counter_iterator operator++(int) {  // a++
-    return *this;
-  }
-
- protected:
-  std::reference_wrapper<T> counter;
-};
-
-//*---------- generate Points within a 0-box_size --------------------
-template <typename Point>
-void generate_random_points(parlay::sequence<Point>& wp, Coord _box_size,
-                            long n, int Dim) {
-  Coord box_size = _box_size;
-
-  std::random_device rd;      // a seed source for the random number engine
-  std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
-  std::uniform_int_distribution<int> distrib(1, box_size);
-
-  parlay::random_generator gen(distrib(gen_mt));
-  std::uniform_int_distribution<int> dis(0, box_size);
-
-  wp.resize(n);
-  // generate n random Points in a cube
-  parlay::parallel_for(
-      0, n,
-      [&](long i) {
-        auto r = gen[i];
-        for (int j = 0; j < Dim; j++) {
-          wp[i][j] = dis(r);
-        }
-      },
-      1000);
-  return;
-}
-
 template <typename E>
-std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
-                                   [[maybe_unused]] int id_offset = 0) {
+auto read_points(char const* iFile, parlay::sequence<E>& wp,
+                 [[maybe_unused]] int id_offset = 0) -> std::pair<size_t, int> {
   using K = E::K;
   using V = E::V;
 
@@ -1097,11 +1025,11 @@ std::pair<size_t, int> read_points(char const* iFile, parlay::sequence<E>& wp,
   assert(pts.size() % dim == 0);
   size_t n = pts.size() / dim;
   wp.resize(N);
-  parlay::parallel_for(0, n, [&](size_t i) {
+  parlay::parallel_for(0, n, [&](size_t i) -> void {
     // wp[i].ReadKey(pts[i], i + id_offset);
     wp[i].ReadKey(pts[i * dim]);
     wp[i].ReadVal(pts.cut(
-        i * dim + 1, (i + 1) * dim));  // WARN: assume the val is a singleton
+        (i * dim) + 1, (i + 1) * dim));  // WARN: assume the val is a singleton
   });
   return std::make_pair(N, dim);
 }
@@ -1111,7 +1039,6 @@ void PrintTreeParam() {
   std::cout << "Tree: " << TreeWrapper::TreeType::GetTreeName() << "; ";
   std::cout << "Buf: " << static_cast<int>(TreeWrapper::TreeType::TT::kBuf)
             << "; ";
-  return;
 }
 
 // NOTE: default test functions for all custom tree
@@ -1120,12 +1047,19 @@ static auto constexpr DefaultTestFunc =
       using Tree = TreeDesc::TreeType;
       using TT = TypeTrait;
       using EntrySeq = TT::EntrySeq;
-      EntrySeq wp, wi;
+      EntrySeq wp;
+      EntrySeq wi;
 
       Tree tree;
       constexpr bool kTestTime = true;
-
       read_points<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+
+#ifdef MEMCHECK
+      tree.Build(wp.cut(0, wp.size()));
+      tree.DeleteTree();
+      return;
+#endif  // MEMCHECK
+
       BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
       // // NOTE: batch insert

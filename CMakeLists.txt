@@ -43,7 +43,11 @@ else()
 endif()
 
 if(LEAF)
-  add_compile_definitions(LEAF${LEAF})
+	add_compile_definitions(LEAF${LEAF})
+endif()
+
+if(MEMCHECK)
+	add_compile_definitions(MEMCHECK)
 endif()
 
 if(DEBUG)
@@ -87,7 +91,7 @@ add_library(PMOS INTERFACE)
 set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos")
 target_link_libraries(PMOS INTERFACE parlay)
 target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
 target_link_libraries(b_test PUBLIC PMOS)
@@ -141,7 +145,7 @@ add_test(NAME UnitTest COMMAND unit_test)
 # target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 file(GLOB_RECURSE all_files
-  ${PROJECT_SOURCE_DIR}/include/pmos/*
+	${PROJECT_SOURCE_DIR}/include/pmos/*
 )
 
 

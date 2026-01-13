@@ -6,7 +6,7 @@ Checks:            'bugprone-*,
                     modernize-*,
                     readability-*,
                       -readability-identifier-length,
-                      -magic-numbers,
+                      -readability-magic-numbers,
                     cppcoreguidelines-*,
                     concurrency-*,
                     misc-*'
