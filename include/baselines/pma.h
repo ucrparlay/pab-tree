@@ -32,34 +32,32 @@ public:
   using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
   using PmaPointer = PmaLeaf::element_ptr_type;
   static_assert(!PmaLeaf::binary);
-  CPMA<PmosPmaSettings> pma_tree_;
+  static_assert(PmosPmaSettings::parallel);
+  using PMA = CPMA<PmosPmaSettings>;
+  PMA pma_tree_;
 
   template<class PT>
   void map_init(PT P)
   {
-    // auto v = parlay::map(P, [&](auto e) -> std::tuple<K, V> {
-    //   {
-    //     return { Entry::GetKey(e), Entry::GetVal(e) };
-    //   }
-    // });
+    auto k = parlay::map(P, [&](auto e) { return Entry::GetKey(e); });
+    auto v = parlay::map(P, [&](auto e) { return Entry::GetVal(e); });
 
-    // auto* p_elem0 = &std::get<0>(v[0]); // type is pointer to element0
-    // auto* p_elem1 = &std::get<1>(v[0]);
-
-    auto* p_elem0 = &P[0].key;
-    auto* p_elem1 = &P[0].val;
+    std::cout << "Building PMA Tree with " << " elements." << std::endl;
+    auto* p_elem0 = k.data();
+    auto* p_elem1 = v.data();
     PmaPointer it(p_elem0, p_elem1);
     // basically should return the insert num
-    pma_tree_.insert_batch(it, P.size());
+    pma_tree_.insert_batch(it, P.size(), false);
+    std::cout << "finish build" << std::endl;
   }
 
   template<typename PT>
   void map_insert(PT P)
   {
-    auto* p_elem0 = &P[0].key;
-    auto* p_elem1 = &P[0].val;
-    PmaPointer it(p_elem0, p_elem1);
-    pma_tree_.insert_batch(it, P.size());
+    // auto* p_elem0 = &P[0].key;
+    // auto* p_elem1 = &P[0].val;
+    // PmaPointer it(p_elem0, p_elem1);
+    // pma_tree_.insert_batch(it, P.size());
   }
   //
   // template <typename PT, typename M>
@@ -166,7 +164,9 @@ public:
 
   void DeleteTree()
   {
+    // auto tmp = std::move(this->pma_tree_);
     this->pma_tree_.~CPMA();
+    this->pma_tree_ = PMA();
   }
 
   auto GetSize() const
