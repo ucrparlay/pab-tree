@@ -4,11 +4,13 @@
 
 #include "PMA/CPMA.hpp"
 #include "PMA/internal/leaf.hpp"
+#include "StructOfArrays/multipointer.hpp"
+#include "pmos/b_tree.h"
 
 namespace PMA {
 
 template<class TypeTrait>
-class PMA
+class PmaWrapper
 {
 public:
   using TT = TypeTrait;
@@ -26,32 +28,38 @@ public:
   using Leaf = TT::Node*;
   using Interior = TT::Node*;
 
-  using PMA_Leaf = uncompressed_leaf<K, V>;
-  using pmos_pma_settings = PMA_traits<PMA_Leaf, InPlace, 0, false, false>;
-  static_assert(!PMA_Leaf::binary);
-  CPMA<pmos_pma_settings> pma_tree_;
+  using PmaLeaf = uncompressed_leaf<K, V>;
+  using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
+  using PmaPointer = PmaLeaf::element_ptr_type;
+  static_assert(!PmaLeaf::binary);
+  CPMA<PmosPmaSettings> pma_tree_;
 
   template<class PT>
-  void map_init(PT& P)
+  void map_init(PT P)
   {
-    auto entries = parlay::map(P, [&](auto e) -> std::tuple<K, V> {
-      {
-        return { Entry::GetKey(e), Entry::GetValue(e) };
-      }
-    });
+    // auto v = parlay::map(P, [&](auto e) -> std::tuple<K, V> {
+    //   {
+    //     return { Entry::GetKey(e), Entry::GetVal(e) };
+    //   }
+    // });
+
+    // auto* p_elem0 = &std::get<0>(v[0]); // type is pointer to element0
+    // auto* p_elem1 = &std::get<1>(v[0]);
+
+    auto* p_elem0 = &P[0].key;
+    auto* p_elem1 = &P[0].val;
+    PmaPointer it(p_elem0, p_elem1);
     // basically should return the insert num
-    pma_tree_.insert_batch(entries.begin(), entries.size());
+    pma_tree_.insert_batch(it, P.size());
   }
 
-  template<typename PT, typename M>
-  void map_insert(PT& P)
+  template<typename PT>
+  void map_insert(PT P)
   {
-    auto entries = parlay::map(P, [&](auto e) -> std::tuple<K, V> {
-      {
-        return { Entry::GetKey(e), Entry::GetValue(e) };
-      }
-    });
-    pma_tree_.insert_batch(entries.begin(), entries.size());
+    auto* p_elem0 = &P[0].key;
+    auto* p_elem1 = &P[0].val;
+    PmaPointer it(p_elem0, p_elem1);
+    pma_tree_.insert_batch(it, P.size());
   }
   //
   // template <typename PT, typename M>
@@ -110,14 +118,15 @@ public:
 
   // APIs
   template<typename Range>
-  void Build(Range In)
+  void Build(Range&& In)
   {
-    map_init(In);
+    map_init(std::forward<Range>(In));
   }
 
-  void BatchInsert(EntrySlice In)
+  template<typename Range>
+  void BatchInsert(Range&& In)
   {
-    map_insert(In);
+    map_insert(std::forward<Range>(In));
   }
   //
   // void BatchDelete(Slice In) {
@@ -138,7 +147,9 @@ public:
 
   auto Contain(K const k) const
   {
-    this->pma_tree_.has(k);
+    pmos::RangeQueryLogger logger;
+    auto res = this->pma_tree_.has(k);
+    return std::make_pair(res, logger);
   }
   // auto RangeCount(Box const& q) {
   //   psi::RangeQueryLogger logger;

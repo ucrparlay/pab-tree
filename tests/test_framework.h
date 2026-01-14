@@ -1641,6 +1641,11 @@ public:
   {
     using TreeType = typename PAMTree::PamRaw<TypeTrait>;
   };
+  template<typename TypeTrait>
+  struct PmaWrapper
+  {
+    using TreeType = typename PMA::PmaWrapper<TypeTrait>;
+  };
 
   // NOTE: Apply the dim and split rule
   struct AugId
@@ -1968,6 +1973,8 @@ public:
       Run<CpamWrapper<TypeTrait>>(params, test_func);
     } else if (tree_type == 2) {
       Run<PamWrapper<TypeTrait>>(params, test_func);
+    } else if (tree_type == 3) {
+      Run<PmaWrapper<TypeTrait>>(params, test_func);
     }
   }
 };
