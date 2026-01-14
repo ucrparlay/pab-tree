@@ -4,6 +4,8 @@
 #include "augmented_node.h"
 #include "augmented_ops.h"
 #include "map.h"
+namespace pam {
+
 using namespace std;
 
 // *******************************************
@@ -367,3 +369,6 @@ using aug_set =
   aug_map_<aug_set_full_entry<_Entry>,
            typename Balance::template balance<
              aug_node<typename Balance::data, aug_set_full_entry<_Entry>>>>;
+
+
+} // namespace pam

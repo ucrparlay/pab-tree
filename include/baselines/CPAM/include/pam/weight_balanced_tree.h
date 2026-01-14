@@ -9,6 +9,8 @@
 //   SPAA 2016
 // *******************************************
 
+namespace pam {
+
 struct weight_balanced_tree
 {
   // no additional balance criterial needed for weight balanced trees
@@ -59,3 +61,6 @@ struct weight_balanced_tree
     }
   };
 };
+
+
+} // namespace pam

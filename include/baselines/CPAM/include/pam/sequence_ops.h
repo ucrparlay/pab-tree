@@ -6,6 +6,8 @@
 //   SEQUENCES
 // *******************************************
 
+namespace pam {
+
 template<class Tree>
 struct sequence_ops : Tree
 {
@@ -381,3 +383,6 @@ struct sequence_ops : Tree
     }
   }
 };
+
+
+} // namespace pam

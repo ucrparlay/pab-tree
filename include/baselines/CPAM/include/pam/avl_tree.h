@@ -9,6 +9,8 @@
 //   SPAA 2016
 // *******************************************
 
+namespace pam {
+
 struct avl_tree
 {
   struct data
@@ -80,3 +82,6 @@ struct avl_tree
     // }
   };
 };
+
+
+} // namespace pam

@@ -3,12 +3,13 @@
 #include <cstdint>
 
 #include "CPAM/include/cpam/cpam.h"
-#include "b_tree.h"
+#include "pmos/b_tree.h"
 // #include "geobase.h"
 // #include "hilbert.h"
 
 namespace CPAMTree {
 using namespace std;
+using namespace cpam;
 // using namespace geobase;
 using parlay::par_do;
 using parlay::par_do_if;

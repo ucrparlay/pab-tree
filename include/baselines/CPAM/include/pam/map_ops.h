@@ -7,6 +7,8 @@
 //   MAPS and SETS
 // *******************************************
 
+namespace pam {
+
 template<class Seq, class EntryT>
 struct map_ops : Seq
 {
@@ -903,3 +905,6 @@ struct map_ops : Seq
     return Seq::template map_filter<Seq1>(b, g, granularity);
   }
 };
+
+
+} // namespace pam

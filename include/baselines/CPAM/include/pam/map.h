@@ -5,6 +5,8 @@
 #include "parlay/sequence.h"
 #include "sequence_ops.h"
 #include "weight_balanced_tree.h"
+namespace pam {
+
 using namespace std;
 
 // *******************************************
@@ -915,3 +917,6 @@ template<typename data, class Balance = weight_balanced_tree>
 using pam_seq = map_<
   seq_full_entry<data>,
   typename Balance::template balance<basic_node<typename Balance::data, data>>>;
+
+
+} // namespace pam

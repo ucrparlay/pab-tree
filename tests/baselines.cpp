@@ -21,20 +21,6 @@ main(int argc, char* argv[])
   int summary = params.getOptionIntValue("-s", 0);
   int tree_type = params.getOptionIntValue("-T", 0);
 
-  auto test_func =
-    []<class TreeDesc, typename Point>(int const& kDim,
-                                       parlay::sequence<Point> const& wp,
-                                       parlay::sequence<Point> const& wi,
-                                       size_t const& N,
-                                       int const& K,
-                                       int const& kRounds,
-                                       string const& kInsertFile,
-                                       int const& kTag,
-                                       int const& kQueryType,
-                                       int const kSummary) {
-
-    };
-
   Wrapper::ApplyBaselines(tree_type, dims, params, DefaultTestFunc);
 
   return 0;

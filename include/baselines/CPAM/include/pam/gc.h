@@ -6,6 +6,8 @@
 //   GC
 // *******************************************
 
+namespace pam {
+
 template<class Node>
 struct gc
 {
@@ -183,3 +185,6 @@ struct gc
     }
   }
 };
+
+
+} // namespace pam

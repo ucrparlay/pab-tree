@@ -9,6 +9,8 @@
 //   SPAA 2016
 // *******************************************
 
+namespace pam {
+
 struct red_black_tree
 {
   typedef enum
@@ -200,3 +202,6 @@ struct red_black_tree
     }
   };
 };
+
+
+} // namespace pam

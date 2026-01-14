@@ -5,6 +5,8 @@
 //   TREAPS
 // *******************************************
 
+namespace pam {
+
 template<class Entry>
 struct treap
 {
@@ -54,3 +56,6 @@ struct treap
     }
   };
 };
+
+
+} // namespace pam

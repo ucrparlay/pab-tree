@@ -7,6 +7,8 @@
 //   Utils
 // *******************************************
 
+namespace pam {
+
 namespace utils {
 // for granularity control
 // if the size of a node is smaller than this number then it
@@ -123,3 +125,6 @@ write_add(E* a, EV b)
   } while (!atomic_compare_and_swap(a, oldV, newV));
 }
 } // namespace utils
+
+
+} // namespace pam

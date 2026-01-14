@@ -27,6 +27,8 @@
 #include <iostream>
 #include <string>
 
+namespace pam {
+
 struct commandLine
 {
   int argc;
@@ -140,3 +142,6 @@ struct commandLine
     return defaultValue;
   }
 };
+
+
+} // namespace pam

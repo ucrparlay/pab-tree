@@ -13,6 +13,8 @@
 //   get_empty() -> aug_t;
 //   from_entry(entry_t) -> aug_t;
 //   combine(aut_t, aug_t) -> aug_t;
+namespace pam {
+
 template<class balance, class Entry>
 struct aug_node
   : basic_node<balance,
@@ -76,3 +78,6 @@ struct aug_node
     return basic::single(std::make_pair(e, av));
   }
 };
+
+
+} // namespace pam

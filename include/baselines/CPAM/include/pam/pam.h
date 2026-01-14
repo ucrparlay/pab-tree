@@ -15,3 +15,8 @@
 #include "treap.h"
 #include "utils.h"
 #include "weight_balanced_tree.h"
+
+namespace pam {
+
+
+} // namespace pam

@@ -6,6 +6,8 @@
 //   AUGMENTED MAP OPERATIONS
 // *******************************************
 
+namespace pam {
+
 template<class Map>
 struct augmented_ops : Map
 {
@@ -159,3 +161,6 @@ struct augmented_ops : Map
     return Map::insert_j(b, e, f, lazy_join, false);
   }
 };
+
+
+} // namespace pam

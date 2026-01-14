@@ -7,6 +7,8 @@
 #include <iostream>
 #include <string>
 
+namespace pam {
+
 struct timer
 {
   double total_time;
@@ -104,3 +106,6 @@ struct timer
 static timer _tm;
 #define startTime() _tm.start();
 #define nextTime(_string) _tm.next(_string);
+
+
+} // namespace pam

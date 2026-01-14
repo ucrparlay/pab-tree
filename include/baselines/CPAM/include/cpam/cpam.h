@@ -12,3 +12,8 @@
 #include "sequence_ops.h"
 #include "utils.h"
 #include "weight_balanced_tree.h"
+
+namespace cpam {
+
+
+} // namespace cpam

@@ -9,6 +9,7 @@
 
 #include "baselines/cpam.h"
 #include "baselines/pam.h"
+#include "baselines/pma.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
@@ -251,8 +252,6 @@ BuildTree(typename TypeTrait::EntrySeq const& WP,
     parlay::copy(WP.cut(0, n / remaining_frac), wp.cut(0, n / remaining_frac));
     pkd.Build(wp.cut(0, n / remaining_frac));
   }
-
-  return;
 }
 
 template<typename TypeTrait,
@@ -263,7 +262,7 @@ void
 BatchInsert(Tree& pkd,
             typename TypeTrait::EntrySeq const& WP,
             typename TypeTrait::EntrySeq const& WI,
-            int const& rounds,
+            int const rounds,
             double ratio = 1.0)
 {
   auto wp = WP;
@@ -291,8 +290,6 @@ BatchInsert(Tree& pkd,
     pkd.BatchInsert(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
     std::cout << "finish ccp insert" << std::endl;
   }
-
-  return;
 }
 
 template<typename Point,
@@ -303,7 +300,7 @@ void
 BatchDelete(Tree& pkd,
             parlay::sequence<Point> const& WP,
             parlay::sequence<Point> const& WI,
-            int const& rounds,
+            int const rounds,
             double ratio = 1.0)
 {
   using Points = typename Tree::Points;
@@ -329,8 +326,6 @@ BatchDelete(Tree& pkd,
     parlay::copy(WI, wi);
     pkd.BatchDelete(wi.cut(0, batchSize));
   }
-
-  return;
 }
 
 template<typename Point, typename Tree, bool kTestTime = true>
@@ -380,8 +375,6 @@ BatchDiff(Tree& pkd,
     parlay::copy(WI, wi);
     pkd.BatchDiff(wi.cut(0, total_batch_size));
   }
-
-  return;
 }
 
 struct StepUpdateLogger

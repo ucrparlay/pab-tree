@@ -9,6 +9,7 @@
 
 namespace PAMTree {
 using namespace std;
+using namespace pam;
 // using namespace geobase;
 using parlay::par_do;
 using parlay::par_do_if;

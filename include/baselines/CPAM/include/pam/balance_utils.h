@@ -6,6 +6,8 @@
 //   although not all schemes use these functions
 // *******************************************
 
+namespace pam {
+
 template<class Node>
 struct balance_utils
 {
@@ -113,3 +115,6 @@ struct balance_utils
     return balanced_join(t1, t2, k);
   }
 };
+
+
+} // namespace pam

@@ -88,35 +88,48 @@ enable_testing()
 
 # NOTE: PMOS
 add_library(PMOS INTERFACE)
-set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos")
+set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos" "${PMOS_SOURCE_DIR}/include/")
 target_link_libraries(PMOS INTERFACE parlay)
 target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
-target_link_libraries(b_test PUBLIC PMOS)
-target_include_directories(b_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
+# add_executable(b_ccp ${PROJECT_SOURCE_DIR}/tests/b_ccp.cpp)
+# target_link_libraries(b_ccp PUBLIC PMOS)
+# target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
-add_executable(b_ccp ${PROJECT_SOURCE_DIR}/tests/b_ccp.cpp)
-target_link_libraries(b_ccp PUBLIC PMOS)
-target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
-#
-# add_executable(p_test ${PROJECT_SOURCE_DIR}/tests/p_test.cpp)
-# target_link_libraries(p_test PUBLIC PMOS)
-# target_include_directories(p_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
-add_library(cpam INTERFACE)
-set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/baselines/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/baselines/CPAM/include/pam")
-target_link_libraries(cpam INTERFACE parlay PMOS)
-target_include_directories(cpam INTERFACE $<BUILD_INTERFACE:${CPAM_INCLUDE_DIR}>
-	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}> ${PROJECT_SOURCE_DIR}/include/parlaylib/include)
-#
+# NOTE: CPAM
+add_library(CPAM INTERFACE)
+set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/baselines/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/include/baselines/CPAM/include/pam")
+target_link_libraries(CPAM INTERFACE parlay PMOS)
+target_include_directories(CPAM INTERFACE ${CPAM_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
+
+# NOTE: PMA
+add_library(PMA INTERFACE)
+set(PMA_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
+target_link_libraries(PMA INTERFACE parlay PMOS)
+target_include_directories(PMA INTERFACE ${PMA_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
+
+# NOTE: TEST_FRAME
+add_library(TEST_FRAME INTERFACE)
+set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PMOS_INCLUDE_DIR} ${CPAM_INCLUDE_DIR} ${PMA_INCLUDE_DIR})
+target_link_libraries(TEST_FRAME INTERFACE parlay PMOS CPAM PMA)
+target_include_directories(PMA INTERFACE ${TEST_FRAME_INCLUDE_DIR})
+
+# NOTE: executables for tests
+add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
+target_link_libraries(b_test PUBLIC TEST_FRAME)
+target_include_directories(b_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
 add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
-target_link_libraries(baselines PUBLIC cpam)
-target_include_directories(baselines PUBLIC ${PROJECT_SOURCE_DIR}/include)
-#
-# add_executable(testers ${PROJECT_SOURCE_DIR}/tests/testers.cpp)
-# target_link_libraries(testers PUBLIC PMOS)
-# target_include_directories(testers PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(baselines PUBLIC TEST_FRAME)
+target_include_directories(baselines PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
+# NOTE: GoogleTest for b_ccp
+add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
+target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
+target_include_directories(unit_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+add_test(NAME UnitTest COMMAND unit_test)
+# ctest -R BCCPTest -V
 
 if(JEMA)
 	target_link_libraries(b_test PUBLIC libjemalloc.so)
@@ -125,39 +138,20 @@ if(JEMA)
 endif()
 
 add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
-target_link_libraries(data_generator PUBLIC PMOS)
-target_include_directories(data_generator PUBLIC ${PROJECT_SOURCE_DIR}/include)
-
-# NOTE: GoogleTest for b_ccp
-add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
-target_link_libraries(unit_test PUBLIC PMOS gtest_main)
-target_include_directories(unit_test PUBLIC ${PROJECT_SOURCE_DIR}/include)
-if(JEMA)
-	target_link_libraries(unit_test PUBLIC libjemalloc.so)
-endif()
-add_test(NAME UnitTest COMMAND unit_test)
-# ctest -R BCCPTest -V
-
+target_link_libraries(data_generator PUBLIC TEST_FRAME)
+target_include_directories(data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
 
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
 # target_link_libraries(data_washer PUBLIC PMOS)
 # target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
-file(GLOB_RECURSE all_files
-	${PROJECT_SOURCE_DIR}/include/pmos/*
+# Generate .clangd configuration from compile_commands.json
+execute_process(
+	COMMAND ${CMAKE_COMMAND} -E echo "Generating .clangd configuration..."
 )
-
-
-FIND_PROGRAM(CLANG_FORMAT "clang-format")
-
-IF(CLANG_FORMAT)
-	add_custom_target(
-		format
-		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-		COMMAND ${CLANG_FORMAT}
-		-style=file
-		-i
-		${all_files}
-	)
-endif()
+execute_process(
+	COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_clangd.py
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+	RESULT_VARIABLE CLANGD_RESULT
+)

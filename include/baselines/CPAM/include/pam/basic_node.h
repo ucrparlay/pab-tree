@@ -1,6 +1,8 @@
 #pragma once
 #include "parlay/alloc.h"
 
+namespace pam {
+
 using node_size_t = unsigned int;
 // using node_size_t = size_t;
 
@@ -90,3 +92,6 @@ struct basic_node
 
 // template <class E>
 // using node_type = basic_node<weight_balanced_tree, E>;
+
+
+} // namespace pam

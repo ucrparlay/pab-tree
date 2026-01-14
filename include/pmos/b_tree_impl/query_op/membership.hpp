@@ -1,8 +1,8 @@
 #ifndef PMOS_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
 #define PMOS_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
 
-#include "b_tree.h"
 #include "parlay/slice.h"
+#include "pmos/b_tree.h"
 
 namespace pmos {
 template<typename TT>

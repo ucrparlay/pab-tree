@@ -2,6 +2,8 @@
 #include "get_time.h"
 #include "parlay/primitives.h"
 
+namespace pam {
+
 template<class Entry>
 struct build
 {
@@ -177,3 +179,6 @@ struct build
     return A.cut(0, j + 1);
   }
 };
+
+
+} // namespace pam
