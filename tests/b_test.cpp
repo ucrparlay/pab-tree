@@ -6,7 +6,7 @@ main(int argc, char* argv[])
   commandLine params(argc, argv);
   Wrapper::Options opts(params);
 
-  auto test_func = []<class TreeDesc, typename Point>(Wrapper::Options opts) {
+  auto test_func = []<class TreeDesc, typename Point>(Wrapper::Options& opts) {
 
   };
 

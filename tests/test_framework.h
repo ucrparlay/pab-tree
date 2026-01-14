@@ -1951,10 +1951,7 @@ public:
   }
 
   template<typename RunFunc>
-  static void ApplyBaselines(int const tree_type,
-                             int const dim,
-                             commandLine& params,
-                             RunFunc test_func)
+  static void ApplyBaselines(Options const& opts, RunFunc test_func)
   {
     // using K = std::pair<uint32_t, uint32_t>;
     using K = uint32_t;
@@ -1967,14 +1964,14 @@ public:
                                            InteriorAugEmpty,
                                            8,
                                            pmos::ProtoNode>;
-    if (tree_type == 0) {
+    if (opts.tree_type == 0) {
       // B-tree
-    } else if (tree_type == 1) {
-      Run<CpamWrapper<TypeTrait>>(params, test_func);
-    } else if (tree_type == 2) {
-      Run<PamWrapper<TypeTrait>>(params, test_func);
-    } else if (tree_type == 3) {
-      Run<PmaWrapper<TypeTrait>>(params, test_func);
+    } else if (opts.tree_type == 1) {
+      Run<CpamWrapper<TypeTrait>>(opts, test_func);
+    } else if (opts.tree_type == 2) {
+      Run<PamWrapper<TypeTrait>>(opts, test_func);
+    } else if (opts.tree_type == 3) {
+      Run<PmaWrapper<TypeTrait>>(opts, test_func);
     }
   }
 };
