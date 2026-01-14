@@ -43,7 +43,7 @@ function run_test() {
 					echo ">>>${dest}"
 
 					for ((j = 1; j <= instance_n; j++)); do
-						numactl -i all ${exe} -p "${file_prefix}/${j}.base.in" -r "${round}" -s ${summary} -t ${tag} -q ${query_type} -b "${batch_ratio}" -T ${tree} -D "${dis}" 2>&1 | tee -a "${dest}"
+						numactl -i all "${exe}" -p "${file_prefix}/${j}.base.in" -r "${round}" -s ${summary} -t ${tag} -q ${query_type} -b "${batch_ratio}" -T "${tree}" -D "${dis}" 2>&1 | tee -a "${dest}"
 					done
 				done
 			done
@@ -55,21 +55,30 @@ function run_cmake() {
 	local leaf_idx="$1"
 	local solver="$2"
 
-	local cur_path=$(pwd)
+	local cur_path
+	cur_path=$(pwd)
 	cd ../build || exit
 	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
-	make ${solver}
+	make "${solver}"
 	cd "${cur_path}" || exit
 }
 
 solver="baselines"
-tree=2
+
+# PMA
+tree=3
 run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
 
-tree=1
-run_cmake 4 "${solver}"
-run_test 4 "${solver}" "${tree}"
+# PAM
+# tree=2
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
+
+# CPAM
+# tree=1
+# run_cmake 4 "${solver}"
+# run_test 4 "${solver}" "${tree}"
 
 # solver="b_test"
 # tree=0

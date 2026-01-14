@@ -19,15 +19,15 @@ struct EleWrapper : EleType
   using V = typename EleType::V;
   // using Entry = std::tuple<KeyType, ValType>;
 
-  static inline auto GetKey(E const e)
+  static auto GetKey(E const e)
   {
     return EleType::GetKey(e);
   }
-  static inline auto GetVal(E const e)
+  static auto GetVal(E const e)
   {
     return EleType::GetVal(e);
   }
-  static inline E ToEntry(K const& k, V const& v)
+  static E ToEntry(K const& k, V const& v)
   {
     return EleType::ToEntry(k, v);
   };
@@ -104,7 +104,7 @@ public:
   static uint const kBufMDFac = 2;
   static uint const kBufUBFac = 4;
   using SizeT = uint_fast32_t;
-  using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 255u),
+  using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 255U),
                                       uint_fast16_t,
                                       uint_fast8_t>;
   static constexpr BufSizeT kBuf = kBufferSize;
