@@ -44,7 +44,7 @@ public:
     using val_t = val_type;
     using aug_t = aug_type;
 
-    static inline bool comp(key_t a, key_t b)
+    static bool comp(key_t a, key_t b)
     {
       return a < b;
     }
@@ -52,7 +52,7 @@ public:
     {
       return 0;
     }
-    static aug_t from_entry(key_t k, val_t v)
+    static aug_t from_entry([[maybe_unused]] key_t k, [[maybe_unused]] val_t v)
     {
       return 1;
     }
@@ -68,6 +68,14 @@ public:
   using Leaf = zmap::Tree::node;
   using Interior = zmap::Tree::node;
 
+  using InputRangeT = parlay::sequence<par>;
+
+  static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
+  {
+    return parlay::map(input_seq, [&](auto e) -> par {
+      return { Entry::GetKey(e), Entry::GetVal(e) };
+    });
+  }
   // template <typename T>
   // auto knn(T& tree, Point const& query_point, auto k, auto& vis_leaf) {
   //   auto f = [&](auto cur_pt) {
@@ -85,18 +93,10 @@ public:
   //   return nn_res.top().second;
   // }
 
-  template<class PT>
-  auto map_init(PT& P)
+  template<typename Range>
+  auto map_init(Range entries)
   {
-    size_t n = P.size();
-    // parlay::internal::timer t("map_init");
-    parlay::sequence<par> entries(n);
-    parlay::parallel_for(0, n, [&](int i) {
-      entries[i] = { Entry::GetKey(P[i]), Entry::GetVal(P[i]) };
-    });
-    // t.next("map_init: prepare entries");
     zmap m1(entries);
-    // t.next("map_init: build map");
     return std::move(m1);
   }
 
@@ -107,19 +107,10 @@ public:
   //   return make_tuple(add, remove);
   // }
   //
-  template<typename PT, typename M>
-  auto map_insert(PT& P, M&& mmp)
+  template<typename Range, typename M>
+  auto map_insert(Range P, M&& mmp)
   {
-    size_t n = P.size();
-
-    parlay::sequence<par> insert_pts(n);
-    parlay::parallel_for(0, n, [&](int i) {
-      // entries[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
-      insert_pts[i] = { Entry::GetKey(P[i]), Entry::GetVal(P[i]) };
-      // insert_pts[i] = {P[i]->id, P[i]};
-    });
-
-    return std::move(zmap::multi_insert(std::forward<M>(mmp), insert_pts));
+    return std::move(zmap::multi_insert(std::forward<M>(mmp), P));
   }
   //
   // template <typename PT, typename M>
@@ -178,16 +169,16 @@ public:
 
   // APIs
   template<typename Range>
-  void Build(Range In)
+  void Build(Range&& In)
   {
-    EntrySlice A = parlay::make_slice(In);
-    cpam_aug_map_ = std::move(map_init(A));
+    cpam_aug_map_ = std::move(map_init(std::forward<Range>(In)));
   }
 
-  void BatchInsert(EntrySlice In)
+  template<typename Range>
+  void BatchInsert(Range&& In)
   {
     if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
-      return Build(std::forward<EntrySlice>(In));
+      return Build(std::forward<Range>(In));
     }
     cpam_aug_map_ = map_insert(In, std::move(cpam_aug_map_));
   }
@@ -230,10 +221,9 @@ public:
   void DeleteTree()
   {
     cpam_aug_map_.clear();
-    return;
   }
 
-  size_t GetSize() const
+  [[nodiscard]] size_t GetSize() const
   {
     return cpam_aug_map_.size();
   }

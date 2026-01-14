@@ -217,10 +217,7 @@ template<typename TypeTrait,
          bool kTestTime = true,
          int kPrint = 1>
 void
-BuildTree(typename TypeTrait::EntrySeq const& WP,
-          int const& rounds,
-          Tree& pkd,
-          int remaining_frac = 1)
+BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
 {
   using TT = TypeTrait;
   using EntrySeq = typename TT::EntrySeq;
@@ -230,7 +227,9 @@ BuildTree(typename TypeTrait::EntrySeq const& WP,
   double loop_late = rounds > 1 ? 0.01 : -100;
   size_t n = WP.size();
   // size_t n = 100;
-  EntrySeq wp = EntrySeq::uninitialized(n);
+  // EntrySeq wp = EntrySeq::uninitialized(n);
+  auto parsed_input = Tree::ParseInput(WP);
+  auto wp = parsed_input;
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -238,19 +237,18 @@ BuildTree(typename TypeTrait::EntrySeq const& WP,
     double aveBuild = time_loop(
       rounds,
       loop_late,
-      [&]() { parlay::copy(WP.cut(0, n), wp.cut(0, n)); },
-      [&]() { pkd.Build(wp.cut(0, n)); },
+      [&]() { wp = parsed_input; },
+      [&]() { pkd.Build(wp); },
       [&]() { pkd.DeleteTree(); });
 
-    parlay::copy(WP.cut(0, n / remaining_frac), wp.cut(0, n / remaining_frac));
-    pkd.Build(wp.cut(0, n / remaining_frac));
-
+    wp = parsed_input;
+    pkd.Build(wp);
     std::cout << aveBuild << " " << std::flush;
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
-    parlay::copy(WP.cut(0, n / remaining_frac), wp.cut(0, n / remaining_frac));
-    pkd.Build(wp.cut(0, n / remaining_frac));
+    wp = parsed_input;
+    pkd.Build(wp);
   }
 }
 
@@ -262,11 +260,12 @@ void
 BatchInsert(Tree& pkd,
             typename TypeTrait::EntrySeq const& WP,
             typename TypeTrait::EntrySeq const& WI,
-            int const rounds,
-            double ratio = 1.0)
+            int const rounds)
 {
-  auto wp = WP;
-  auto wi = WI;
+  typename Tree::InputRangeT parsed_base = Tree::ParseInput(WP);
+  typename Tree::InputRangeT parsed_batch = Tree::ParseInput(WI);
+  auto wp = parsed_base;
+  auto wi = parsed_batch;
   double loop_late = rounds > 1 ? 0.01 : -100;
 
   if constexpr (kTestTime) { // NOTE: clean and measure time
@@ -274,10 +273,12 @@ BatchInsert(Tree& pkd,
     double aveInsert = time_loop(
       rounds,
       loop_late,
-      [&]() { pkd.Build(wp); },
       [&]() {
-        pkd.BatchInsert(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
+        wp = parsed_base;
+        wi = parsed_batch;
+        pkd.Build(wp);
       },
+      [&]() { pkd.BatchInsert(wi); },
       [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
@@ -285,9 +286,8 @@ BatchInsert(Tree& pkd,
   } else { // NOTE: insert the points from previous tree
     pkd.DeleteTree();
     pkd.Build(wp);
-    parlay::copy(WI, wi);
-    std::cout << "Insert " << wi.size() * ratio << " elements\n" << std::flush;
-    pkd.BatchInsert(wi.cut(0, static_cast<size_t>(wi.size() * ratio)));
+    std::cout << "Insert " << wi.size() << " elements\n" << std::flush;
+    pkd.BatchInsert(wi);
     std::cout << "finish ccp insert" << std::endl;
   }
 }
@@ -1128,7 +1128,7 @@ read_points(char const* iFile,
   parlay::sequence<char> S = readStringFromFile(iFile);
   parlay::sequence<char*> W = stringToWords(S);
   size_t N = std::stoul(W[0], nullptr, 10);
-  int dim = atoi(W[1]);
+  int dim = std::stoi(W[1]);
   assert(N > 0 && dim >= 1);
 
   auto pts = W.cut(2, W.size());
@@ -1136,12 +1136,8 @@ read_points(char const* iFile,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
-    // wp[i].ReadKey(pts[i], i + id_offset);
     wp[i].ReadKey(pts[i * dim]);
-    wp[i].ReadVal(pts[(i * dim) + 1]);
-    // wp[i].ReadVal(pts.cut(
-    //     (i * dim) + 1, (i + 1) * dim));  // WARN: assume the val is a
-    //     singleton
+    wp[i].ReadVal(pts[(i * dim) + 1]); // WARN: assume #val = 1
   });
   return std::make_pair(N, dim);
 }
@@ -1206,9 +1202,9 @@ static auto constexpr DefaultTestFunc =
     // // NOTE: batch insert
     if (opts.tag & (1 << 0)) {
       if (opts.summary) {
-        parlay::sequence<double> const ratios = { 0.0001, 0.001, 0.01, 0.1 };
-        for (size_t i = 0; i < ratios.size(); i++) {
-          auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratios[i]);
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        for (auto ratio : ratio_seq) {
+          auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
           auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
           auto [n2, d2] =
@@ -1240,7 +1236,7 @@ static auto constexpr DefaultTestFunc =
     // }
 
     if (opts.query_type & (1 << 0)) { // NOTE: membership
-      size_t batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+      auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele = wp.subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);

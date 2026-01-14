@@ -37,28 +37,29 @@ public:
   using PMA = CPMA<PmosPmaSettings>;
   PMA pma_tree_;
 
+  using InputRangeT = std::pair<parlay::sequence<K>, parlay::sequence<V>>;
+
+  static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
+  {
+    return { parlay::map(input_seq, [&](auto e) { return Entry::GetKey(e); }),
+             parlay::map(input_seq, [&](auto e) { return Entry::GetVal(e); }) };
+  }
+
   template<class PT>
   void map_init(PT P)
   {
-    auto k = parlay::map(P, [&](auto e) { return Entry::GetKey(e); });
-    auto v = parlay::map(P, [&](auto e) { return Entry::GetVal(e); });
-
-    auto* p_elem0 = k.data();
-    auto* p_elem1 = v.data();
-    PmaPointer it(p_elem0, p_elem1);
-    pma_tree_.insert_batch(it, P.size(), false);
+    size_t n = P.first.size();
+    PmaPointer it(P.first.data(), P.second.data());
+    pma_tree_.insert_batch(it, n, false);
     // std::cout << "PMA build done. size: " << pma_tree_.size() << std::endl;
   }
 
   template<typename PT>
   void map_insert(PT P)
   {
-    auto k = parlay::map(P, [&](auto e) { return Entry::GetKey(e); });
-    auto v = parlay::map(P, [&](auto e) { return Entry::GetVal(e); });
-    auto* p_elem0 = k.data();
-    auto* p_elem1 = v.data();
-    PmaPointer it(p_elem0, p_elem1);
-    pma_tree_.insert_batch(it, P.size(), false);
+    size_t n = P.first.size();
+    PmaPointer it(P.first.data(), P.second.data());
+    pma_tree_.insert_batch(it, n, false);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
   //

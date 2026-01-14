@@ -47,6 +47,8 @@ public:
   using LeafAug = typename TT::LeafAug;
   using InteriorAug = typename TT::InteriorAug;
 
+  using InputRangeT = TT::EntrySeq;
+
   // NOTE: Const variables
   // NOTE: uint32t handle up to 4e9 at least
   // WARN: bucket num should smaller than 1<<8 to handle type overflow
@@ -550,6 +552,12 @@ public:
   // // NOTE: param interfaces
   // void SetRoot(Node* root) { this->root_ = root; }
   //
+
+  static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
+  {
+    return input_seq;
+  }
+
   Node* GetRoot()
   {
     return this->root_;
@@ -559,12 +567,6 @@ public:
   {
     return this->root_ ? this->root_->size : 0;
   }
-  //
-  // Box GetRootBox() { return this->tree_box_; }
-  //
-  // consteval static auto GetBuildDepthOnce() {
-  //   return static_cast<int>(kBuildDepthOnce);
-  // }
 
   constexpr static char const* GetTreeName()
   {

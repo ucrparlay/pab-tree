@@ -68,6 +68,13 @@ public:
   using Leaf = zmap::Tree::node;
   using Interior = zmap::Tree::node;
 
+  using InputRangeT = parlay::sequence<par>;
+  static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
+  {
+    return parlay::map(input_seq, [&](auto e) -> par {
+      return { Entry::GetKey(e), Entry::GetVal(e) };
+    });
+  }
   // template <typename T>
   // auto knn(T& tree, Point const& query_point, auto k, auto& vis_leaf) {
   //   auto f = [&](auto cur_pt) {
@@ -85,18 +92,10 @@ public:
   //   return nn_res.top().second;
   // }
 
-  template<class PT>
-  auto map_init(PT& P)
+  template<typename Range>
+  auto map_init(Range entries)
   {
-    size_t n = P.size();
-    // parlay::internal::timer t("map_init");
-    parlay::sequence<par> entries(n);
-    parlay::parallel_for(0, n, [&](int i) {
-      entries[i] = { Entry::GetKey(P[i]), Entry::GetVal(P[i]) };
-    });
-    // t.next("map_init: prepare entries");
     zmap m1(entries);
-    // t.next("map_init: build map");
     return std::move(m1);
   }
 
@@ -107,19 +106,10 @@ public:
   //   return make_tuple(add, remove);
   // }
   //
-  template<typename PT, typename M>
-  auto map_insert(PT& P, M&& mmp)
+  template<typename Range, typename M>
+  auto map_insert(Range P, M&& mmp)
   {
-    size_t n = P.size();
-
-    parlay::sequence<par> insert_pts(n);
-    parlay::parallel_for(0, n, [&](int i) {
-      // entries[i] = {Entry::GetKey(P[i]), Entry::GetVal(P[i])};
-      insert_pts[i] = { Entry::GetKey(P[i]), Entry::GetVal(P[i]) };
-      // insert_pts[i] = {P[i]->id, P[i]};
-    });
-
-    return std::move(zmap::multi_insert(std::forward<M>(mmp), insert_pts));
+    return std::move(zmap::multi_insert(std::forward<M>(mmp), P));
   }
   //
   // template <typename PT, typename M>
@@ -177,18 +167,18 @@ public:
 
   // APIs
   template<typename Range>
-  void Build(Range In)
+  void Build(Range&& In)
   {
-    EntrySlice A = parlay::make_slice(In);
-    cpam_aug_map_ = std::move(map_init(A));
+    pam_aug_map_ = std::move(map_init(std::forward<Range>(In)));
   }
 
-  void BatchInsert(EntrySlice In)
+  template<typename Range>
+  void BatchInsert(Range&& In)
   {
-    if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
-      return Build(std::forward<EntrySlice>(In));
+    if (!this->pam_aug_map_.root || !zmap::size(this->pam_aug_map_.root)) {
+      return Build(std::forward<Range>(In));
     }
-    cpam_aug_map_ = map_insert(In, std::move(cpam_aug_map_));
+    pam_aug_map_ = map_insert(std::forward<Range>(In), std::move(pam_aug_map_));
   }
   //
   // void BatchDelete(Slice In) {
@@ -222,19 +212,18 @@ public:
   auto Contain(K const k) const
   {
     pmos::RangeQueryLogger logger;
-    auto res = this->cpam_aug_map_.contains(k);
+    auto res = this->pam_aug_map_.contains(k);
     return std::make_pair(res, logger);
   }
 
   void DeleteTree()
   {
-    cpam_aug_map_.clear();
-    return;
+    pam_aug_map_.clear();
   }
 
   size_t GetSize() const
   {
-    return cpam_aug_map_.size();
+    return pam_aug_map_.size();
   }
   constexpr static char const* GetTreeName()
   {
@@ -244,7 +233,7 @@ public:
   {
     return "HasBox";
   }
-  zmap cpam_aug_map_;
+  zmap pam_aug_map_;
 };
 
 } // namespace PAMTree
