@@ -3,20 +3,15 @@
 #include <cstdint>
 
 #include "PMA/CPMA.hpp"
-#include "b_tree.h"
-// #include "geobase.h"
-// #include "hilbert.h"
+#include "PMA/internal/leaf.hpp"
 
-namespace PAM {
-// using namespace std;
-// using namespace geobase;
+namespace PMA {
 
 template<class TypeTrait>
 class PMA
 {
 public:
   using TT = TypeTrait;
-  // TODO: Do we really need to define these types again?
 
   using E = typename TT::E;
   using K = typename TT::K;
@@ -31,40 +26,32 @@ public:
   using Leaf = TT::Node*;
   using Interior = TT::Node*;
 
-  CPMA<pma_settings<K>> pma_tree_;
-
-  // template <typename T>
-  // auto knn(T& tree, Point const& query_point, auto k, auto& vis_leaf) {
-  //   auto f = [&](auto cur_pt) {
-  //     return BT::P2PDistanceSquare(cur_pt, query_point);
-  //     // return point_point_sqrdis(cur_pt, query_point);
-  //   };
-  //
-  //   auto f2 = [&](auto cur_mbr) {
-  //     return BT::P2BMinDistanceSquare(query_point, cur_mbr);
-  //     // return point_mbr_sqrdis(query_point, cur_mbr);
-  //   };
-  //
-  //   std::priority_queue<nn_pair, vector<nn_pair>, nn_pair_cmp> nn_res;
-  //   zmap::knn_filter(tree, f, f2, k, nn_res, vis_leaf);
-  //   return nn_res.top().second;
-  // }
+  using PMA_Leaf = uncompressed_leaf<K, V>;
+  using pmos_pma_settings = PMA_traits<PMA_Leaf, InPlace, 0, false, false>;
+  static_assert(!PMA_Leaf::binary);
+  CPMA<pmos_pma_settings> pma_tree_;
 
   template<class PT>
-  auto map_init(PT& P)
+  void map_init(PT& P)
   {
+    auto entries = parlay::map(P, [&](auto e) -> std::tuple<K, V> {
+      {
+        return { Entry::GetKey(e), Entry::GetValue(e) };
+      }
+    });
+    // basically should return the insert num
+    pma_tree_.insert_batch(entries.begin(), entries.size());
   }
 
-  // template <typename M>
-  // auto map_diff(M& lhs, M& rhs) {
-  //   auto add = zmap::values(zmap::map_difference(rhs, lhs));
-  //   auto remove = zmap::values(zmap::map_difference(lhs, rhs));
-  //   return make_tuple(add, remove);
-  // }
-  //
   template<typename PT, typename M>
-  auto map_insert(PT& P, M&& mmp)
+  void map_insert(PT& P)
   {
+    auto entries = parlay::map(P, [&](auto e) -> std::tuple<K, V> {
+      {
+        return { Entry::GetKey(e), Entry::GetValue(e) };
+      }
+    });
+    pma_tree_.insert_batch(entries.begin(), entries.size());
   }
   //
   // template <typename PT, typename M>
@@ -125,10 +112,12 @@ public:
   template<typename Range>
   void Build(Range In)
   {
+    map_init(In);
   }
 
   void BatchInsert(EntrySlice In)
   {
+    map_insert(In);
   }
   //
   // void BatchDelete(Slice In) {
@@ -149,6 +138,7 @@ public:
 
   auto Contain(K const k) const
   {
+    this->pma_tree_.has(k);
   }
   // auto RangeCount(Box const& q) {
   //   psi::RangeQueryLogger logger;
@@ -165,16 +155,19 @@ public:
 
   void DeleteTree()
   {
+    this->pma_tree_.~CPMA();
   }
 
-  size_t GetSize() const
+  auto GetSize() const
   {
-    return 0;
+    return this->pma_tree_.size();
   }
+
   constexpr static char const* GetTreeName()
   {
     return "PMA";
   }
+
   constexpr static char const* CheckHasBox()
   {
     return "HasBox";
