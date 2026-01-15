@@ -210,9 +210,16 @@ public:
 
   void BatchInsert_(EntrySlice In);
 
+  void BatchInsertSieve(EntrySlice In);
+
   SizeT BatchInsertRecursive(Node* T,
                              EntrySlice In,
                              NodeSplitPairSlice node_split_slice);
+
+  SizeT BatchInsertSieveRecursive(Node* T,
+                                  EntrySlice In,
+                                  EntrySlice Out,
+                                  NodeSplitPairSlice node_split_slice);
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
   // static inline BucketType FindBucket(Point const& p,
@@ -297,11 +304,11 @@ public:
   // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
 
-  static inline BucketType RetriveTag(E e, TT::SplitSeq const& split_seq);
+  static inline BucketType RetriveTag(E e, TT::SplitSlice split_slice);
 
   static TT::BallSeq SeievePoints(EntrySlice A,
                                   EntrySlice B,
-                                  TT::SplitSeq const& split_seq);
+                                  TT::SplitSlice split_seq);
   //
   // template <typename Leaf, typename Interior, typename PrepareFunc,
   //           typename... Args>

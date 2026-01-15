@@ -169,10 +169,10 @@ BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
 
 template<typename TT>
 typename TT::BucketType
-BTree<TT>::RetriveTag(E const e, TT::SplitSeq const& split_seq)
+BTree<TT>::RetriveTag(E const e, TT::SplitSlice split_slice)
 {
   return parlay::internal::binary_search(
-    split_seq, [&](K const key) { return key <= Entry::GetKey(e); });
+    split_slice, [&](K const key) { return key <= Entry::GetKey(e); });
 }
 
 // NOTE: seieve Points from range A to range B, using the skeleton tags. The
@@ -180,9 +180,7 @@ BTree<TT>::RetriveTag(E const e, TT::SplitSeq const& split_seq)
 // number of buckets in the skeleton
 template<typename TT>
 typename TT::BallSeq
-BTree<TT>::SeievePoints(EntrySlice A,
-                        EntrySlice B,
-                        TT::SplitSeq const& split_seq)
+BTree<TT>::SeievePoints(EntrySlice A, EntrySlice B, TT::SplitSlice split_seq)
 {
   size_t n = A.size();
   size_t num_block = (n + kBlockSize - 1) >> kLog2Base;
@@ -210,7 +208,8 @@ BTree<TT>::SeievePoints(EntrySlice A,
 
   parlay::parallel_for(0, num_block, [&](size_t i) {
     auto v = parlay::sequence<typename TT::BallsType>::uninitialized(tags_num);
-    size_t tot = 0, s_offset = 0;
+    size_t tot = 0;
+    size_t s_offset = 0;
     for (BucketType k = 0; k < tags_num - 1; ++k) {
       v[k] = tot + offset[i][k];
       tot += sums[k];
