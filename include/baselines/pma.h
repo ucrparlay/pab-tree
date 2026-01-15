@@ -6,6 +6,7 @@
 #include "PMA/internal/leaf.hpp"
 #include "StructOfArrays/multipointer.hpp"
 #include "dependence/loggers.h"
+#include "parlay/primitives.h"
 #include "pmos/b_tree.h"
 
 namespace PMA {
@@ -29,13 +30,14 @@ public:
   using Leaf = TT::Node*;
   using Interior = TT::Node*;
 
+  // using PmaLeaf = uncompressed_leaf<K>;
   using PmaLeaf = uncompressed_leaf<K, V>;
   using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
   using PmaPointer = PmaLeaf::element_ptr_type;
-  static_assert(!PmaLeaf::binary);
-  static_assert(PmosPmaSettings::parallel);
+  // static_assert(!PmaLeaf::binary);
+  // static_assert(PmosPmaSettings::parallel);
   using PMA = CPMA<PmosPmaSettings>;
-  PMA pma_tree_;
+  std::shared_ptr<PMA> pma_tree_;
 
   using InputRangeT = std::pair<parlay::sequence<K>, parlay::sequence<V>>;
 
@@ -48,18 +50,27 @@ public:
   template<class PT>
   void map_init(PT P)
   {
+    // auto k = P.first;
+    // auto v = P.second;
+    // std::cout << "PMA build started..." << pma_tree_->size() << std::endl;
+    // auto k = P.first;
     size_t n = P.first.size();
-    PmaPointer it(P.first.data(), P.second.data());
-    pma_tree_.insert_batch(it, n, false);
-    // std::cout << "PMA build done. size: " << pma_tree_.size() << std::endl;
+    // parlay::sort_inplace(parlay::make_slice(P.first));
+    // parlay::sort_inplace(parlay::make_slice(P.second));
+    // PmaPointer it(k.data());
+    PmaPointer it(P.first.begin(), P.second.begin());
+    pma_tree_->insert_batch(it, n, false);
+    // std::cout << "PMA build done. size: " << pma_tree_->size() << std::endl;
   }
 
   template<typename PT>
   void map_insert(PT P)
   {
     size_t n = P.first.size();
-    PmaPointer it(P.first.data(), P.second.data());
-    pma_tree_.insert_batch(it, n, false);
+    // parlay::sort_inplace(parlay::make_slice(P.first));
+    // parlay::sort_inplace(parlay::make_slice(P.second));
+    PmaPointer it(P.first.begin(), P.second.begin());
+    pma_tree_->insert_batch(it, n, false);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
   //
@@ -140,15 +151,15 @@ public:
   auto Contain(K const k) const
   {
     pmos::MembershipLogger logger;
-    auto res = this->pma_tree_.has(k);
+    auto res = this->pma_tree_->has(k);
     return std::make_pair(res, logger);
   }
 
   void DeleteTree()
   {
     // auto tmp = std::move(this->pma_tree_);
-    this->pma_tree_.~CPMA();
-    this->pma_tree_ = PMA();
+    this->pma_tree_.reset();
+    this->pma_tree_ = std::make_shared<PMA>();
   }
 
   auto GetSize() const

@@ -1243,6 +1243,7 @@ static auto constexpr DefaultTestFunc =
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
     }
+
     // Typename* kdknn = nullptr;
     // auto run_batch_knn = [&](Points const& query_pts, int kth) {
     //   kdknn = new Typename[query_pts.size()];
