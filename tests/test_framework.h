@@ -1202,7 +1202,9 @@ static auto constexpr DefaultTestFunc =
     // // NOTE: batch insert
     if (opts.tag & (1 << 0)) {
       if (opts.summary) {
-        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        parlay::sequence<double> const ratio_seq = {
+          0.0001, 0.001, 0.01, 0.1, 1.0
+        };
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;

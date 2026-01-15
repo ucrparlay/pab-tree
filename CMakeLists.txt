@@ -28,6 +28,7 @@ option(OPENCILK "" OFF)
 option(SERIAL "" OFF)
 option(STDALLOC "" OFF)
 option(MEMCHECK "" OFF)
+option(SIEVE "" OFF)
 option(JEMA "" ON)
 option(CCP "" OFF)
 
@@ -44,6 +45,10 @@ endif()
 
 if(LEAF)
 	add_compile_definitions(LEAF${LEAF})
+endif()
+
+if(SIEVE)
+	add_compile_definitions(SIEVE)
 endif()
 
 if(MEMCHECK)

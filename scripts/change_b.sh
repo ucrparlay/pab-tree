@@ -70,15 +70,15 @@ solver="baselines"
 # run_cmake 0 "${solver}"
 # run_test 0 "${solver}" "${tree}"
 
-# PAM
-tree=2
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
-
-# CPAM
-tree=1
-run_cmake 4 "${solver}"
-run_test 4 "${solver}" "${tree}"
+# # PAM
+# tree=2
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
+#
+# # CPAM
+# tree=1
+# run_cmake 4 "${solver}"
+# run_test 4 "${solver}" "${tree}"
 
 # solver="b_test"
 # tree=0

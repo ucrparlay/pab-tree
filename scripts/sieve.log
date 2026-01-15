@@ -1,0 +1,459 @@
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/2.log
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: uni; 
+1.6304 0.00419367 0.008276 0.051523 0.566067 7.07233 0.096153 
+>>>logs/sieve/0/exp/sieve/2.log
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: exp; 
+1.64356 0.00511167 0.00776967 0.0625887 0.646292 7.58219 0.0942537 
+>>>logs/sieve/0/norm/sieve/2.log
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: norm; 
+1.65066 0.00437633 0.00981967 0.0520793 0.596158 6.84722 0.094297 
+>>>logs/sieve/0/dual_norm/sieve/2.log
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: dual_norm; 
+1.64163 0.00356233 0.0128433 0.0634163 0.700022 7.69609 0.098874 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/4.log
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: uni; 
+1.44586 0.00356233 0.004106 0.0340187 0.354554 3.79325 0.08237 
+>>>logs/sieve/0/exp/sieve/4.log
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: exp; 
+1.45086 0.00250433 0.00488833 0.0420833 0.412016 4.5 0.0834597 
+>>>logs/sieve/0/norm/sieve/4.log
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: norm; 
+1.4489 0.00275767 0.004796 0.0361473 0.36914 3.86005 0.0851687 
+>>>logs/sieve/0/dual_norm/sieve/4.log
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: dual_norm; 
+1.44437 0.00235667 0.00521033 0.041339 0.421908 4.56793 0.0831953 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/8.log
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: uni; 
+1.31383 0.00276133 0.003452 0.031683 0.334854 3.48284 0.071871 
+>>>logs/sieve/0/exp/sieve/8.log
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: exp; 
+1.31793 0.00238067 0.00433167 0.0362063 0.374504 4.04919 0.0719447 
+>>>logs/sieve/0/norm/sieve/8.log
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: norm; 
+1.31351 0.00368567 0.00472067 0.0310617 0.348108 3.53883 0.0720037 
+>>>logs/sieve/0/dual_norm/sieve/8.log
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: dual_norm; 
+1.31586 0.00301733 0.004559 0.0351247 0.368061 4.02149 0.071909 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/16.log
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+1.30504 0.00124033 0.00331167 0.0280607 0.270795 2.73802 0.0665423 
+>>>logs/sieve/0/exp/sieve/16.log
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: exp; 
+1.31711 0.000862667 0.00366933 0.0290017 0.278278 3.23846 0.0664667 
+>>>logs/sieve/0/norm/sieve/16.log
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: norm; 
+1.31642 0.001496 0.00396133 0.0286837 0.289164 2.76271 0.066412 
+>>>logs/sieve/0/dual_norm/sieve/16.log
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
+1.30696 0.001682 0.004028 0.0298497 0.29948 3.18801 0.0657453 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/32.log
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: uni; 
+1.27904 0.000753 0.00364233 0.031836 0.250582 2.73474 0.067743 
+>>>logs/sieve/0/exp/sieve/32.log
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: exp; 
+1.27632 0.000866667 0.003791 0.029595 0.277337 3.08383 0.0681217 
+>>>logs/sieve/0/norm/sieve/32.log
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: norm; 
+1.28175 0.00154933 0.00376367 0.03129 0.268256 2.99432 0.0676617 
+>>>logs/sieve/0/dual_norm/sieve/32.log
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: dual_norm; 
+1.28529 0.00183367 0.00425133 0.0290937 0.295534 3.16248 0.067718 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: uni; 
+1.30217 0.00237533 0.006742 0.0297357 0.290575 2.99052 0.0816993 
+>>>logs/sieve/0/exp/sieve/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: exp; 
+1.30168 0.00303633 0.00488 0.044341 0.374368 3.65957 0.081925 
+>>>logs/sieve/0/norm/sieve/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: norm; 
+1.30742 0.00211767 0.00540467 0.0290627 0.288339 3.32848 0.0824217 
+>>>logs/sieve/0/dual_norm/sieve/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: dual_norm; 
+1.30741 0.00280333 0.00536967 0.037676 0.345777 3.6591 0.0812217 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/128.log
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: uni; 
+1.27796 0.00106033 0.00502567 0.0259723 0.259203 2.55147 0.123474 
+>>>logs/sieve/0/exp/sieve/128.log
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: exp; 
+1.28579 0.001067 0.00342167 0.026276 0.276858 2.6593 0.123745 
+>>>logs/sieve/0/norm/sieve/128.log
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: norm; 
+1.29321 0.00231267 0.005028 0.0289633 0.257236 2.79693 0.123012 
+>>>logs/sieve/0/dual_norm/sieve/128.log
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: dual_norm; 
+1.29073 0.001607 0.00530933 0.036347 0.286605 2.91555 0.122983 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/512.log
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: uni; 
+1.27939 0.001812 0.00671933 0.062454 0.462806 4.49175 0.321722 
+>>>logs/sieve/0/exp/sieve/512.log
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: exp; 
+1.27642 0.001537 0.00900067 0.0585417 0.469247 4.60863 0.321819 
+>>>logs/sieve/0/norm/sieve/512.log
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: norm; 
+1.28029 0.00184867 0.00902367 0.0619513 0.451767 4.60298 0.32191 
+>>>logs/sieve/0/dual_norm/sieve/512.log
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: dual_norm; 
+1.27731 0.00255567 0.00901467 0.0652017 0.496431 4.74384 0.32185 
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+Generating .clangd configuration...
+Reading /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json...
+
+Generating /home/zmen002/ParallelMultiwayOrderedSet/.clangd...
+  C++ Standard: -std=c++20
+  Include paths: 11
+
+✓ Generated /home/zmen002/ParallelMultiwayOrderedSet/.clangd
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/sieve/0/uni/sieve/1024.log
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: uni; 
+1.2749 0.00128567 0.00734433 0.04697 0.361338 3.40366 0.544599 
+>>>logs/sieve/0/exp/sieve/1024.log
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: exp; 
+1.29111 0.00228333 0.00695633 0.0563857 0.452247 4.29451 0.548246 
+>>>logs/sieve/0/norm/sieve/1024.log
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: norm; 
+1.29212 0.00121167 0.00721567 0.0437767 0.364206 3.5175 0.544027 
+>>>logs/sieve/0/dual_norm/sieve/1024.log
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: dual_norm; 
+1.27829 0.00254167 0.0136407 0.121994 1.12949 10.9039 0.544923 

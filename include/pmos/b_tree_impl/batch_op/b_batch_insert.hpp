@@ -21,8 +21,12 @@ BTree<TT>::BatchInsert(Range&& In)
                                         parlay::range_reference_type_t<Range>>);
 
   EntrySlice A = parlay::make_slice(std::forward<Range>(In));
-  // BatchInsert_(A);
+
+#ifndef SIEVE
+  BatchInsert_(A);
+#else
   BatchInsertSieve(A);
+#endif // !SIEVE
 }
 
 template<typename TT>
@@ -202,18 +206,32 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
   //   split_pos_seq[i] = offset;
   // }
 
-  auto sums = SeievePoints(
-    In,
-    Out,
-    parlay::make_slice(TI->split.begin(), TI->split.begin() + TI->GetSplitN()));
-  assert(sums.size() == TI->GetNodeN());
-  assert(std::accumulate(sums.begin(), sums.end(), 0) == n);
-
   std::array<SizeT, TT::kBufUB> split_pos_seq;
-  SizeT offset = 0;
-  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    offset += sums[i];
-    split_pos_seq[i] = offset;
+
+  if (n <= 2048) {
+    SizeT offset = 0;
+    for (int i = 0; i < TI->GetSplitN(); i++) {
+      // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
+      SizeT pos = parlay::internal::binary_search(
+        In.cut(i == 0 ? 0 : split_pos_seq[i - 1], In.size()),
+        [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
+      offset += pos;
+      split_pos_seq[i] = offset;
+    }
+  } else {
+    auto sums =
+      SeievePoints(In,
+                   Out,
+                   parlay::make_slice(TI->split.begin(),
+                                      TI->split.begin() + TI->GetSplitN()));
+    assert(sums.size() == TI->GetNodeN());
+    assert(std::accumulate(sums.begin(), sums.end(), 0) == n);
+
+    SizeT offset = 0;
+    for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+      offset += sums[i];
+      split_pos_seq[i] = offset;
+    }
   }
 
 #ifdef DEBUG
@@ -239,10 +257,8 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
     }
   }
 
-  parlay::parallel_for(
-    0,
-    cnt,
-    [&](BufSizeT i) {
+  if (n <= 2048) {
+    for (SizeT i = 0; i < cnt; i++) {
       SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
       SizeT r =
         nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
@@ -251,8 +267,23 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
                                   Out.cut(l, r),
                                   In.cut(l, r),
                                   node_split_slice.cut(l, r));
-    },
-    1);
+    }
+  } else {
+    parlay::parallel_for(
+      0,
+      cnt,
+      [&](BufSizeT i) {
+        SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+        SizeT r =
+          nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
+        new_split_node_n_arr[nodes_map[i]] =
+          BatchInsertSieveRecursive(TI->tree_nodes[nodes_map[i]],
+                                    Out.cut(l, r),
+                                    In.cut(l, r),
+                                    node_split_slice.cut(l, r));
+      },
+      1);
+  }
 
   SizeT new_node_n = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {

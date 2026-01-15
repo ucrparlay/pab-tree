@@ -1,0 +1,108 @@
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: dual_norm; 
+1.30016 0.00130133 0.00345367 0.0159037 0.127798 1.54261 0.543666 
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: dual_norm; 
+1.27534 0.00181367 0.00419233 0.0158903 0.121867 1.39482 0.123533 
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
+1.27664 0.00189433 0.00701333 0.025436 0.140057 1.39746 0.06825 
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: dual_norm; 
+1.6568 0.00288067 0.0122197 0.0470193 0.27158 2.07004 0.093269 
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: dual_norm; 
+1.28017 0.00213833 0.00658633 0.020402 0.128929 1.36522 0.067286 
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: dual_norm; 
+1.43647 0.001536 0.00755867 0.0364237 0.201512 1.72699 0.082636 
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: dual_norm; 
+1.29415 0.00156367 0.003457 0.0155207 0.129408 1.49202 0.32234 
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: dual_norm; 
+1.28121 0.00194133 0.005217 0.017968 0.122667 1.35893 0.0816403 
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: dual_norm; 
+1.29968 0.00173467 0.00735667 0.029661 0.162796 1.5026 0.07293 
+
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: exp; 
+1.29583 0.001291 0.00292567 0.0154643 0.127666 1.48885 0.547478 
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: exp; 
+1.27097 0.00125033 0.00308667 0.013682 0.125276 1.33916 0.122942 
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: exp; 
+1.29312 0.00201133 0.00568267 0.0205903 0.137915 1.37421 0.0666567 
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: exp; 
+1.64894 0.00175933 0.0103517 0.0435893 0.234787 1.99616 0.0941253 
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: exp; 
+1.27817 0.00186133 0.00439667 0.016701 0.129031 1.36429 0.0672823 
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: exp; 
+1.43112 0.002819 0.008324 0.031187 0.183673 1.67044 0.081462 
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: exp; 
+1.29279 0.00129833 0.00285067 0.016134 0.126485 1.40074 0.32241 
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: exp; 
+1.28936 0.00149933 0.00370433 0.0144463 0.124975 1.32803 0.0815637 
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: exp; 
+1.32968 0.0102973 0.022642 0.08381 0.152984 1.46237 0.074275 
+
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: norm; 
+1.30653 0.00142567 0.00348233 0.0154723 0.113821 1.47889 0.545356 
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: norm; 
+1.27242 0.00249867 0.00450333 0.016382 0.110994 1.45426 0.123251 
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: norm; 
+1.27807 0.00282667 0.011742 0.0328057 0.136052 1.49489 0.0666127 
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: norm; 
+1.65577 0.00180633 0.0125227 0.0684433 0.326406 2.38071 0.0937807 
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: norm; 
+1.27603 0.00315 0.00941567 0.0236337 0.122023 1.43103 0.068372 
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: norm; 
+1.43407 0.00297367 0.011367 0.057295 0.225985 1.89227 0.0822067 
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: norm; 
+1.29904 0.00169533 0.00372967 0.0150993 0.114368 1.45374 0.322236 
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: norm; 
+1.28638 0.00331267 0.00648267 0.0201407 0.117008 1.39722 0.082922 
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: norm; 
+1.29813 0.00224033 0.011473 0.0420547 0.168606 1.61965 0.072267 
+
+Tree: BTree; Buf: 1024; InputFile: 1.base.in; Dis: uni; 
+1.30277 0.00151067 0.003881 0.0137273 0.11092 1.23786 0.543028 
+
+Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: uni; 
+1.27397 0.00276733 0.00517333 0.0164657 0.11268 1.27424 0.122979 
+
+Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+1.29781 0.00322167 0.0149227 0.0338087 0.140694 1.29682 0.066833 
+
+Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: uni; 
+1.6553 0.00217933 0.0142463 0.084273 0.359234 2.03134 0.0936247 
+
+Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: uni; 
+1.27463 0.003967 0.0111757 0.0253337 0.126 1.25192 0.0675937 
+
+Tree: BTree; Buf: 4; InputFile: 1.base.in; Dis: uni; 
+1.42718 0.002939 0.0152687 0.0687993 0.244658 1.57064 0.0826887 
+
+Tree: BTree; Buf: 512; InputFile: 1.base.in; Dis: uni; 
+1.29395 0.00174433 0.00422333 0.0156693 0.113916 1.26048 0.322616 
+
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: uni; 
+1.29438 0.00423167 0.00665733 0.0203647 0.112821 1.24437 0.08136 
+
+Tree: BTree; Buf: 8; InputFile: 1.base.in; Dis: uni; 
+1.29629 0.00268567 0.0147083 0.0486573 0.177702 1.3788 0.073488 
+
