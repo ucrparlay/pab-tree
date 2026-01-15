@@ -9,7 +9,8 @@ set -o xtrace
 path_prefix=/data/zmen002/kv_pair
 base_n_seq=(1000000000)
 file_num=1
-batch_ratio_seq=(10000 1000 100 10)
+# batch_ratio_seq=(10000 1000 100 10)
+batch_ratio_seq=(1)
 
 dis_seq=(0 1 2 3)
 # dis_seq=(3)
