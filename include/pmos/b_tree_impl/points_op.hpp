@@ -155,9 +155,6 @@ BTree<TT>::SplitBatchSieve(SizeBufUBArr& split_pos_arr,
   }
 
   auto num = std::accumulate(sums.begin(), sums.begin() + bkt_n, 0);
-  if (num != In.size()) {
-    std::cout << "num:" << num << ", In.size():" << In.size() << std::endl;
-  }
   assert(std::accumulate(sums.begin(), sums.begin() + bkt_n, 0) == In.size());
 
   SizeT cnt = 0;

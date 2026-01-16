@@ -25,6 +25,7 @@ BTree<TT>::BatchInsert(Range&& In)
 #ifndef SIEVE
   BatchInsert_(A);
 #else
+  std::cout << "using sieve" << std::endl;
   BatchInsertSieve(A);
 #endif // !SIEVE
 }
@@ -36,8 +37,9 @@ BTree<TT>::BatchInsert_(EntrySlice In)
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
   }
-
+  // parlay::internal::timer t("BatchInsert_Sort");
   auto sorted_seq = parlay::sort(In);
+  // t.next("Sorted");
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
   SizeT new_node_n = BatchInsertRecursive(this->root_,
@@ -82,14 +84,18 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   auto TI = static_cast<Interior*>(T);
 
   SizeBufUBArr split_pos_seq;
-  if (TI->GetSplitN() > TT::kSplitFactor * In.size()) {
+  if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
     SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
-  } else if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
-    SplitBatchSieve(split_pos_seq, In, TI->GetSplitSlice());
   } else {
     SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
   }
 
+  // if (In.size() < TT::kSplitFactor * TI->GetSplitN()) {
+  //   SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
+  //   // SplitBatchSieve(split_pos_seq, In, TI->GetSplitSlice());
+  // } else {
+  //   SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
+  // }
 #ifdef DEBUG
   for (int i = 1; i < TI->GetSplitN(); i++) {
     assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
@@ -123,6 +129,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
       new_split_node_n_arr[nodes_map[i]] = BatchInsertRecursive(
         TI->tree_nodes[nodes_map[i]], In.cut(l, r), node_split_slice.cut(l, r));
     },
+    // In.size() > 2048 ? 1 : cnt);
     1);
 
   SizeT new_node_n = 0;
@@ -138,6 +145,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
     T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
 }
 
+// NOTE: Start as sieve
 template<typename TT>
 void
 BTree<TT>::BatchInsertSieve(EntrySlice In)
@@ -166,6 +174,7 @@ BTree<TT>::BatchInsertSieve(EntrySlice In)
   }
 }
 
+// NOTE: Start as sieve
 template<typename TT>
 TT::SizeT
 BTree<TT>::BatchInsertSieveRecursive(Node* T,
