@@ -66,8 +66,8 @@ BTree<TT>::SeievePoints(EntrySlice A,
   size_t n = A.size();
   size_t num_block = (n + kBlockSize - 1) >> kLog2Base;
   typename TT::BucketType tags_num = split_seq.size() + 1;
-  parlay::sequence<parlay::sequence<typename TT::BallsType>> offset(
-    num_block, parlay::sequence<typename TT::BallsType>(tags_num));
+  parlay::sequence<parlay::sequence<SizeT>> offset(
+    num_block, parlay::sequence<SizeT>(tags_num));
   assert(offset.size() == num_block && offset[0].size() == tags_num &&
          offset[0][0] == 0);
   parlay::parallel_for(0, num_block, [&](size_t i) {
@@ -88,7 +88,7 @@ BTree<TT>::SeievePoints(EntrySlice A,
   }
 
   parlay::parallel_for(0, num_block, [&](size_t i) {
-    auto v = parlay::sequence<typename TT::BallsType>::uninitialized(tags_num);
+    auto v = parlay::sequence<SizeT>::uninitialized(tags_num);
     size_t tot = 0;
     size_t s_offset = 0;
     for (BucketType k = 0; k < tags_num - 1; ++k) {

@@ -219,11 +219,7 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
       split_pos_seq[i] = offset;
     }
   } else {
-    auto sums =
-      SeievePoints(In,
-                   Out,
-                   parlay::make_slice(TI->split.begin(),
-                                      TI->split.begin() + TI->GetSplitN()));
+    auto sums = SeievePoints(In, Out, TI->GetSplitSlice());
     assert(sums.size() == TI->GetNodeN());
     assert(std::accumulate(sums.begin(), sums.end(), 0) == n);
 
