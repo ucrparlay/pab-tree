@@ -94,14 +94,20 @@ public:
 
   static uint const kBufMDFac = 2;
   static uint const kBufUBFac = 4;
+
   using SizeT = uint_fast32_t;
-  using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 255U),
-                                      uint_fast16_t,
-                                      uint_fast8_t>;
+  using BufSizeT =
+    std::conditional_t<(kBufferSize * kBufUBFac > 65535U),
+                       uint_fast32_t,
+                       std::conditional_t<(kBufferSize * kBufUBFac > 255U),
+                                          uint_fast16_t,
+                                          uint_fast8_t>>;
   static constexpr BufSizeT kBuf = kBufferSize;
   static constexpr BufSizeT kBufLB = kBufferSize;
   static constexpr BufSizeT kBufMD = kBufMDFac * kBufferSize;
   static constexpr BufSizeT kBufUB = kBufUBFac * kBufferSize;
+
+  using SizeBufUBArr = std::array<SizeT, kBufUB>;
 
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;

@@ -68,12 +68,11 @@ BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 
 template<typename TT>
 TT::Node*
-BTree<TT>::UpdateInterior(
-  Node* T,
-  NodeSplitPairSlice node_split_slice,
-  std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-  SizeT new_node_n,
-  std::array<SizeT, TT::kBufUB> const& return_node_n_arr)
+BTree<TT>::UpdateInterior(Node* T,
+                          NodeSplitPairSlice node_split_slice,
+                          SizeBufUBArr const& split_pos_arr,
+                          SizeT new_node_n,
+                          SizeBufUBArr const& return_node_n_arr)
 {
   assert(!T->is_leaf);
   assert(new_node_n <= TT::kBufUB);
@@ -146,12 +145,11 @@ BTree<TT>::UpdateInterior(
 
 template<typename TT>
 TT::SizeT
-BTree<TT>::HandlingInteriorSplitOverflow(
-  Node* T,
-  NodeSplitPairSlice node_split_slice,
-  std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-  SizeT new_node_n,
-  std::array<SizeT, TT::kBufUB> const& return_node_n_arr)
+BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
+                                         NodeSplitPairSlice node_split_slice,
+                                         SizeBufUBArr const& split_pos_arr,
+                                         SizeT new_node_n,
+                                         SizeBufUBArr const& return_node_n_arr)
 {
   assert(!T->is_leaf);
   auto TI = static_cast<Interior*>(T);
@@ -195,18 +193,23 @@ BTree<TT>::HandlingInteriorSplitOverflow(
   }
 
   assert(node_idx == split_idx + 1);
-  assert(parlay::is_sorted(flatten_split_seq,
-                           [&](TT::K a, TT::K b) { return a < b; }));
+  assert(parlay::is_sorted(flatten_split_seq, [&](TT::K a, TT::K b) {
+    return a < b;
+  }));
 
   // launch rebuild
   FreeNode<Interior>(T);
   [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
     parlay::make_slice(flatten_node_seq),
     parlay::make_slice(flatten_split_seq),
-    GenNodesOutputHandler{
-      .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
-      .set_node = [&](SizeT i,
-                      auto node) { node_split_slice[i].first = node; } });
+    GenNodesOutputHandler{ .set_key =
+                             [&](SizeT i, auto key) {
+                               node_split_slice[i].second = key;
+                             },
+                           .set_node =
+                             [&](SizeT i, auto node) {
+                               node_split_slice[i].first = node;
+                             } });
 
   return rt_bkt_n;
 }

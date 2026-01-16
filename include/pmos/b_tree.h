@@ -59,6 +59,7 @@ public:
   static constexpr uint_fast8_t const kLog2Base = TT::kLog2Base;
   static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
+  using SizeBufUBArr = typename TT::SizeBufUBArr;
   using BufSizeT = TT::BufSizeT;
   using SizeT = TT::SizeT;
 
@@ -232,12 +233,11 @@ public:
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  static Node* UpdateInterior(
-    Node* T,
-    NodeSplitPairSlice node_split_slice,
-    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
-    SizeT new_node_n,
-    std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
+  static Node* UpdateInterior(Node* T,
+                              NodeSplitPairSlice node_split_slice,
+                              SizeBufUBArr const& split_pos_arr,
+                              SizeT new_node_n,
+                              SizeBufUBArr const& return_node_n_arr);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
@@ -292,9 +292,9 @@ public:
   static SizeT HandlingInteriorSplitOverflow(
     Node* T,
     NodeSplitPairSlice node_split_slice,
-    std::array<SizeT, TT::kBufUB> const& split_pos_arr,
+    SizeBufUBArr const& split_pos_arr,
     SizeT new_node_n,
-    std::array<SizeT, TT::kBufUB> const& return_node_n_arr);
+    SizeBufUBArr const& return_node_n_arr);
 
   //
   // template <typename Leaf, typename RT>
@@ -304,16 +304,15 @@ public:
   // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
 
-  static void SplitBatchBinarySearch(
-    std::array<SizeT, TT::kBufUB>& split_pos_arr,
-    EntrySlice In,
-    TT::SplitSliceConst split_slice);
+  static void SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
+                                     EntrySlice In,
+                                     TT::SplitSliceConst split_slice);
 
-  static void SplitBatchSieve(std::array<SizeT, TT::kBufUB>& split_pos_arr,
+  static void SplitBatchSieve(SizeBufUBArr& split_pos_arr,
                               EntrySlice In,
                               TT::SplitSliceConst split_slice);
 
-  static void SplitBatchMerge(std::array<SizeT, TT::kBufUB>& split_pos_arr,
+  static void SplitBatchMerge(SizeBufUBArr& split_pos_arr,
                               EntrySlice In,
                               TT::SplitSliceConst split_slice);
 

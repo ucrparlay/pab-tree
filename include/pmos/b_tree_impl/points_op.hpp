@@ -109,10 +109,9 @@ BTree<TT>::SeievePoints(EntrySlice A,
 
 template<typename TT>
 void
-BTree<TT>::SplitBatchBinarySearch(
-  std::array<typename TT::SizeT, TT::kBufUB>& split_pos_arr,
-  EntrySlice In,
-  TT::SplitSliceConst split_slice)
+BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
+                                  EntrySlice In,
+                                  TT::SplitSliceConst split_slice)
 {
   // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
   // TODO: maybe we can decide it by skewed distribution
@@ -129,16 +128,14 @@ BTree<TT>::SplitBatchBinarySearch(
 
 template<typename TT>
 void
-BTree<TT>::SplitBatchSieve(
-  std::array<typename TT::SizeT, TT::kBufUB>& split_pos_arr,
-  EntrySlice In,
-  TT::SplitSliceConst split_slice)
+BTree<TT>::SplitBatchSieve(SizeBufUBArr& split_pos_arr,
+                           EntrySlice In,
+                           TT::SplitSliceConst split_slice)
 {
   SizeT n = In.size();
   SizeT num_block = (n + kBlockSize - 1) >> kLog2Base;
   BufSizeT bkt_n = split_slice.size() + 1;
-  parlay::sequence<std::array<SizeT, TT::kBufUB>> offset(
-    num_block, std::array<SizeT, TT::kBufUB>{ 0 });
+  parlay::sequence<SizeBufUBArr> offset(num_block, SizeBufUBArr{ 0 });
   assert(offset.size() == num_block && bkt_n < offset[0].size() &&
          offset[0][0] == 0);
   parlay::parallel_for(0, num_block, [&](SizeT i) {
@@ -148,7 +145,7 @@ BTree<TT>::SplitBatchSieve(
     }
   });
 
-  std::array<SizeT, TT::kBufUB> sums{ 0 };
+  SizeBufUBArr sums{ 0 };
   for (SizeT i = 0; i < num_block; i++) {
     auto t = offset[i];
     offset[i] = sums;
@@ -172,10 +169,9 @@ BTree<TT>::SplitBatchSieve(
 
 template<typename TT>
 void
-BTree<TT>::SplitBatchMerge(
-  std::array<typename TT::SizeT, TT::kBufUB>& split_pos_arr,
-  EntrySlice In,
-  TT::SplitSliceConst split_slice)
+BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
+                           EntrySlice In,
+                           TT::SplitSliceConst split_slice)
 {
   assert(parlay::is_sorted(In, [&](auto e1, auto e2) {
     return Entry::GetKey(e1) < Entry::GetKey(e2);

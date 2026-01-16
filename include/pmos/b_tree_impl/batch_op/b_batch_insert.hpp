@@ -81,7 +81,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
 
   auto TI = static_cast<Interior*>(T);
 
-  std::array<SizeT, TT::kBufUB> split_pos_seq;
+  SizeBufUBArr split_pos_seq;
   if (TI->GetSplitN() > TT::kSplitFactor * In.size()) {
     SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
   } else if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
@@ -89,16 +89,6 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   } else {
     SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
   }
-
-  // SizeT offset = 0;
-  // for (int i = 0; i < TI->GetSplitN(); i++) {
-  //   // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
-  //   SizeT pos = parlay::internal::binary_search(
-  //     In.cut(i == 0 ? 0 : split_pos_seq[i - 1], In.size()),
-  //     [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
-  //   offset += pos;
-  //   split_pos_seq[i] = offset;
-  // }
 
 #ifdef DEBUG
   for (int i = 1; i < TI->GetSplitN(); i++) {
@@ -110,8 +100,8 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   }
 #endif // DEBUG
 
-  std::array<SizeT, TT::kBufUB> new_split_node_n_arr;
-  std::array<SizeT, TT::kBufUB> nodes_map;
+  SizeBufUBArr new_split_node_n_arr;
+  SizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
@@ -130,7 +120,6 @@ BTree<TT>::BatchInsertRecursive(Node* T,
       SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
       SizeT r =
         nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
-      // std::tie(node_seq_list[nodes_map[i]], split_seq_list[nodes_map[i]]) =
       new_split_node_n_arr[nodes_map[i]] = BatchInsertRecursive(
         TI->tree_nodes[nodes_map[i]], In.cut(l, r), node_split_slice.cut(l, r));
     },
@@ -203,7 +192,7 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
 
   auto TI = static_cast<Interior*>(T);
 
-  // std::array<SizeT, TT::kBufUB> split_pos_seq;
+  // SizeBufUBArr split_pos_seq;
   // // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
   // // TODO: maybe we can decide it by skewed distribution
   // SizeT offset = 0;
@@ -216,7 +205,7 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
   //   split_pos_seq[i] = offset;
   // }
 
-  std::array<SizeT, TT::kBufUB> split_pos_seq;
+  SizeBufUBArr split_pos_seq;
 
   if (n <= 2048) {
     SizeT offset = 0;
@@ -255,8 +244,8 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
   }
 #endif // DEBUG
 
-  std::array<SizeT, TT::kBufUB> new_split_node_n_arr;
-  std::array<SizeT, TT::kBufUB> nodes_map;
+  SizeBufUBArr new_split_node_n_arr;
+  SizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
