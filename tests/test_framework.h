@@ -974,11 +974,14 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
 {
   using Entry = typename TT::Entry;
   int query_num = query_ele.size();
-  parlay::sequence<size_t> vis_leaf(query_num), vis_inter(query_num);
+  parlay::sequence<size_t> vis_leaf(query_num);
+  parlay::sequence<size_t> vis_inter(query_num);
+
+  double loop_late = kRounds > 1 ? 0.01 : -100;
 
   double ave_query = time_loop(
     kRounds,
-    0.01,
+    loop_late,
     [&]() {},
     [&]() {
       parlay::parallel_for(0, query_num, [&](size_t i) {
@@ -995,15 +998,6 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
 
   // std::cout << query_num << " ";
   std::cout << ave_query << " " << std::flush;
-  // std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0,
-  // query_num))) /
-  //                  static_cast<double>(query_num)
-  //           << " " << std::flush;
-  // std::cout << static_cast<double>(
-  //                  parlay::reduce(vis_inter.cut(0, query_num))) /
-  //                  static_cast<double>(query_num)
-  //           << " " << std::flush;
-  return;
 }
 
 template<typename Point, typename Tree>
@@ -1202,9 +1196,7 @@ static auto constexpr DefaultTestFunc =
     // // NOTE: batch insert
     if (opts.tag & (1 << 0)) {
       if (opts.summary) {
-        parlay::sequence<double> const ratio_seq = {
-          0.0001, 0.001, 0.01, 0.1, 1.0
-        };
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
