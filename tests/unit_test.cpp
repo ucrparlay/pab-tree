@@ -17,6 +17,7 @@ class ParTreeCorrectTest : public ::testing::Test
 {
 public:
   static std::string file_filter;
+  static bool redirect_output;
 
 protected:
   static constexpr char const* kDataPrefix = "/ssd1/zmen002/kv_pair";
@@ -71,7 +72,9 @@ protected:
       auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
-      ASSERT_TRUE(parlay::all_of(res, [&](auto r) { return r == true; }));
+      ASSERT_TRUE(parlay::all_of(res, [&](auto r) {
+        return r == true;
+      }));
     }
 
     tree.DeleteTree();
@@ -134,10 +137,13 @@ protected:
     commandLine params(argv_mutable.size(), argv_mutable.data());
     Wrapper::Options opts(params);
 
-    // Redirect stdout to suppress output from test execution
-    std::streambuf* old_cout = std::cout.rdbuf();
+    // Redirect stdout to suppress output from test execution (if enabled)
+    std::streambuf* old_cout = nullptr;
     std::ostringstream null_stream;
-    std::cout.rdbuf(null_stream.rdbuf());
+    if (redirect_output) {
+      old_cout = std::cout.rdbuf();
+      std::cout.rdbuf(null_stream.rdbuf());
+    }
 
     auto run = [&]<typename TreeWrapper, typename TypeTrait>(
                  Wrapper::Options opts) -> void {
@@ -146,8 +152,10 @@ protected:
 
     Wrapper::ApplyOrthogonal(opts, run);
 
-    // Restore stdout
-    std::cout.rdbuf(old_cout);
+    // Restore stdout (if it was redirected)
+    if (old_cout) {
+      std::cout.rdbuf(old_cout);
+    }
   }
 
   static void BTreeTest(std::string const& distribution, size_t node_size)
@@ -253,11 +261,13 @@ TEST_F(ParTreeCorrectTest, DualNorm50M)
   BTreeTest("dual_norm", 50000000);
 }
 
-// Define the static member
+// Define the static members
 std::string ParTreeCorrectTest::file_filter = "";
+bool ParTreeCorrectTest::redirect_output = true;
 
 // ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M
 // ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --file_filter=1.base.in
+// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --no_redirect
 int
 main(int argc, char** argv)
 {
@@ -271,6 +281,9 @@ main(int argc, char** argv)
         arg.substr(14); // Length of "--file_filter="
       std::cout << "Filtering files containing: "
                 << ParTreeCorrectTest::file_filter << std::endl;
+    } else if (arg == "--no_redirect") {
+      ParTreeCorrectTest::redirect_output = false;
+      std::cout << "Output redirection disabled" << std::endl;
     }
   }
 
