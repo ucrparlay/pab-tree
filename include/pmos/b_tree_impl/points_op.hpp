@@ -137,8 +137,9 @@ BTree<TT>::SplitBatchSieve(
   SizeT n = In.size();
   SizeT num_block = (n + kBlockSize - 1) >> kLog2Base;
   BufSizeT bkt_n = split_slice.size() + 1;
-  parlay::sequence<std::array<SizeT, TT::kBufUB>> offset(num_block);
-  assert(offset.size() == num_block && offset[0].size() == bkt_n &&
+  parlay::sequence<std::array<SizeT, TT::kBufUB>> offset(
+    num_block, std::array<SizeT, TT::kBufUB>{ 0 });
+  assert(offset.size() == num_block && bkt_n < offset[0].size() &&
          offset[0][0] == 0);
   parlay::parallel_for(0, num_block, [&](SizeT i) {
     for (SizeT j = i << kLog2Base; j < std::min((i + 1) << kLog2Base, n); j++) {
@@ -147,7 +148,7 @@ BTree<TT>::SplitBatchSieve(
     }
   });
 
-  std::array<SizeT, TT::kBufUB> sums;
+  std::array<SizeT, TT::kBufUB> sums{ 0 };
   for (SizeT i = 0; i < num_block; i++) {
     auto t = offset[i];
     offset[i] = sums;
@@ -156,6 +157,10 @@ BTree<TT>::SplitBatchSieve(
     }
   }
 
+  auto num = std::accumulate(sums.begin(), sums.begin() + bkt_n, 0);
+  if (num != In.size()) {
+    std::cout << "num:" << num << ", In.size():" << In.size() << std::endl;
+  }
   assert(std::accumulate(sums.begin(), sums.begin() + bkt_n, 0) == In.size());
 
   SizeT cnt = 0;
