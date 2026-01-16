@@ -304,11 +304,24 @@ public:
   // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
 
-  static inline BucketType RetriveTag(E e, TT::SplitSlice split_slice);
+  static void SplitBatchBinarySearch(
+    std::array<SizeT, TT::kBufUB>& split_pos_arr,
+    EntrySlice In,
+    TT::SplitSliceConst split_slice);
+
+  static void SplitBatchSieve(std::array<SizeT, TT::kBufUB>& split_pos_arr,
+                              EntrySlice In,
+                              TT::SplitSliceConst split_slice);
+
+  static void SplitBatchMerge(std::array<SizeT, TT::kBufUB>& split_pos_arr,
+                              EntrySlice In,
+                              TT::SplitSliceConst split_slice);
+
+  static inline BucketType RetriveTag(E e, TT::SplitSliceConst split_slice);
 
   static TT::BallSeq SeievePoints(EntrySlice A,
                                   EntrySlice B,
-                                  TT::SplitSlice split_seq);
+                                  TT::SplitSliceConst split_seq);
   //
   // template <typename Leaf, typename Interior, typename PrepareFunc,
   //           typename... Args>

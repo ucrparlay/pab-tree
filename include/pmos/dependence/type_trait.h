@@ -64,20 +64,6 @@ public:
   using Node = NodeType;
   using NodeSeq = parlay::sequence<Node*>;
   using NodeSlice = parlay::slice<Node**, Node**>;
-
-  // NOTE: block param in point sieving
-  static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
-  // TODO:: needs to check this value as well
-  using BucketType =
-    std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
-  using BallsType = uint_fast32_t;
-  static constexpr BucketType const kPivotNum = (1 << kSkeletonHeight) - 1;
-  static constexpr BucketType const kBucketNum = 1 << kSkeletonHeight;
-  static constexpr uint_fast8_t const kLog2Base = 10;
-  static constexpr uint_fast16_t const kBlockSize = 1 << kLog2Base;
-
-  using BucketSeq = parlay::sequence<BucketType>;
-  using BallSeq = parlay::sequence<BallsType>;
 };
 
 template<typename EleType,
@@ -101,6 +87,11 @@ public:
                        InteriorAugType,
                        kSkHeightVal,
                        NodeType>;
+  using Split = BT::K;
+  using SplitSeq = parlay::sequence<Split>;
+  using SplitSlice = parlay::slice<Split*, Split*>;
+  using SplitSliceConst = parlay::slice<Split const*, Split const*>;
+
   static uint const kBufMDFac = 2;
   static uint const kBufUBFac = 4;
   using SizeT = uint_fast32_t;
@@ -112,9 +103,19 @@ public:
   static constexpr BufSizeT kBufMD = kBufMDFac * kBufferSize;
   static constexpr BufSizeT kBufUB = kBufUBFac * kBufferSize;
 
-  using Split = BT::K;
-  using SplitSeq = parlay::sequence<Split>;
-  using SplitSlice = parlay::slice<Split*, Split*>;
+  // NOTE: block param in point sieving
+  static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
+  // using BucketType =
+  //   std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
+  using BucketType = BufSizeT; // WARN: Assume sieve one node at a time
+  // static constexpr BucketType const kPivotNum = (1 << kSkeletonHeight) - 1;
+  // static constexpr BucketType const kBucketNum = 1 << kSkeletonHeight;
+  static constexpr uint_fast8_t const kLog2Base = 10;
+  static constexpr uint_fast16_t const kBlockSize = 1 << kLog2Base;
+  static constexpr uint_fast8_t const kSplitFactor = 8;
+
+  using BucketSeq = parlay::sequence<BucketType>;
+  using BallSeq = parlay::sequence<SizeT>;
 };
 
 } // namespace pmos
