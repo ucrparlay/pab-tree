@@ -60,6 +60,9 @@ static constexpr int summaryRangeQueryType = 2;
 // NOTE: range query num in summary
 static constexpr int kSummaryRangeQueryNum = 50000;
 
+int perf_ctl_fd = 0;
+int perf_ctl_ack_fd = 0;
+
 // NOTE: helper for delete type
 enum DeleteType
 {
@@ -268,28 +271,28 @@ BatchInsert(Tree& pkd,
   auto wi = parsed_batch;
   double loop_late = rounds > 1 ? 0.01 : -100;
 
-  if constexpr (kTestTime) { // NOTE: clean and measure time
-    pkd.DeleteTree();
-    double aveInsert = time_loop(
-      rounds,
-      loop_late,
-      [&]() {
-        wp = parsed_base;
-        wi = parsed_batch;
-        pkd.Build(wp);
-      },
-      [&]() { pkd.BatchInsert(wi); },
-      [&]() { pkd.DeleteTree(); });
-    std::cout << aveInsert << " " << std::flush;
-    // std::cout << ratio << " " << aveInsert << " " << std::endl;
-    BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
-  } else { // NOTE: insert the points from previous tree
-    pkd.DeleteTree();
-    pkd.Build(wp);
-    std::cout << "Insert " << wi.size() << " elements\n" << std::flush;
-    pkd.BatchInsert(wi);
-    std::cout << "finish ccp insert" << std::endl;
+  wp = parsed_base;
+  wi = parsed_batch;
+  pkd.Build(wp);
+
+  char ack[5];
+  if (perf_ctl_fd && perf_ctl_ack_fd) {
+    write(perf_ctl_fd, "enable", 7);
+    read(perf_ctl_ack_fd, ack, 5);
+    fprintf(stderr, "ack: %s\n", ack);
+    assert(strcmp(ack, "ack\n") == 0);
   }
+
+  pkd.BatchInsert(wi);
+
+  if (perf_ctl_fd && perf_ctl_ack_fd) {
+    write(perf_ctl_fd, "disable", 8);
+    read(perf_ctl_ack_fd, ack, 5);
+    fprintf(stderr, "ack: %s\n", ack);
+    assert(strcmp(ack, "ack\n") == 0);
+  }
+  pkd.DeleteTree();
+  // BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
 }
 
 template<typename Point,
@@ -979,25 +982,25 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
 
   double loop_late = kRounds > 1 ? 0.01 : -100;
 
-  double ave_query = time_loop(
-    kRounds,
-    loop_late,
-    [&]() {},
-    [&]() {
-      parlay::parallel_for(0, query_num, [&](size_t i) {
-        // for (int i = 0; i < query_num; i++) {
-        auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
+  char ack[5];
+  if (perf_ctl_fd && perf_ctl_ack_fd) {
+    write(perf_ctl_fd, "enable", 7);
+    read(perf_ctl_ack_fd, ack, 5);
+    fprintf(stderr, "ack: %s\n", ack);
+    assert(strcmp(ack, "ack\n") == 0);
+  }
 
-        res[i] = contain;
-        // vis_leaf[i] = logger.vis_leaf_num;
-        // vis_inter[i] = logger.vis_interior_num;
-        // }
-      });
-    },
-    [&]() {});
+  parlay::parallel_for(0, query_num, [&](size_t i) {
+    auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
+    res[i] = contain;
+  });
 
-  // std::cout << query_num << " ";
-  std::cout << ave_query << " " << std::flush;
+  if (perf_ctl_fd && perf_ctl_ack_fd) {
+    write(perf_ctl_fd, "disable", 8);
+    read(perf_ctl_ack_fd, ack, 5);
+    fprintf(stderr, "ack: %s\n", ack);
+    assert(strcmp(ack, "ack\n") == 0);
+  }
 }
 
 template<typename Point, typename Tree>
@@ -1713,6 +1716,8 @@ public:
       this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
       this->tree_type = params.getOptionIntValue("-T", 0);
       this->dis_type = std::string(params.getOptionValue("-D"));
+      perf_ctl_fd = params.getOptionIntValue("-pcf", 0);
+      perf_ctl_ack_fd = params.getOptionIntValue("-pcaf", 0);
     }
 
     void PrintOptions() const

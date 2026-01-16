@@ -1,0 +1,231 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cycles'
+# Event count (approx.): 3395289441
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    99.97%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d302b7
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'instructions'
+# Event count (approx.): 227654850
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    98.26%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.17%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     0.15%  baselines  [unknown]         [k] 0xffffffffa2c77296
+     0.10%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2f78157
+     0.07%  baselines  [unknown]         [k] 0xffffffffa3627122
+     0.07%  baselines  [unknown]         [k] 0xffffffffa3627181
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d59c4a
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2c3293b
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d331ce
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2ef1765
+     0.03%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3627960
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c327a5
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d99310
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d332da
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d331f4
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d001f5
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a568
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e3fbf7
+     0.02%  baselines  [unknown]         [k] 0xffffffffc090577c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d52b20
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3800ab9
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53b65
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e3fbf0
+     0.02%  baselines  [unknown]         [k] 0xffffffffa30ed65e
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9933b
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a60b
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3bc10
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53248
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d52b6b
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d531fc
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96e70
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d99ffb
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53cb3
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c64b87
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9802f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d97533
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d52ee6
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2f40e3d
+     0.02%  baselines  [unknown]         [k] 0xffffffffa36275c4
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d20f59
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c63759
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a608
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9931c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96d50
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3800bd3
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e9005c
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+
+
+# Samples: 4K of event 'cache-references'
+# Event count (approx.): 30008727
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    97.90%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.47%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     0.10%  baselines  [unknown]         [k] 0xffffffffa3800ab9
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2d59c4a
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2d332da
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2d53cb3
+     0.07%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.06%  baselines  libc-2.28.so      [.] vfprintf
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d96d5c
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d3328d
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d59c90
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d53b78
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2e8ff62
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d9afca
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d33293
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d331ce
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d9b010
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2c770f5
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2da974b
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d2af7e
+     0.03%  baselines  baselines         [.] __tls_init
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96897
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da975a
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9b61c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d32a40
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da849e
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d32b80
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96d59
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3b90d
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c6377c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d99431
+     0.02%  baselines  [unknown]         [k] 0xffffffffa36274d7
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e8fe5d
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d993a0
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a568
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e8ff05
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d43382
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a3b5
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e8febe
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e3fc02
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da7c9f
+     0.02%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d332f2
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d000e4
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3b9a1
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d4344f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f78157
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8aa5b
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'cache-misses'
+# Event count (approx.): 18332753
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    99.78%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2da974b
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d9a5e3
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d99382
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3801da0
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3627122
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96f90
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a012
+     0.00%  baselines  ld-2.28.so        [.] strcmp
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f7822e
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'branch-instructions'
+# Event count (approx.): 74223058
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    98.21%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.20%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2da974b
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2e3fbf7
+     0.07%  baselines  [unknown]         [k] 0xffffffffa36274d7
+     0.07%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.05%  baselines  [unknown]         [k] 0xffffffffa3603505
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2c327a5
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d59c4a
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d9a012
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2e8fe5d
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f40658
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9b61c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3602b20
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3800ab9
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d59c3f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d2af3f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53288
+     0.02%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d434b0
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a608
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a60b
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d35055
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2cfffe9
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e9005c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e8fef6
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d2aeff
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3de9a
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d97566
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96eae
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96d59
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d97533
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d33293
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d52b20
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53218
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d970f6
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da7ca2
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9802f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3627181
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c770f5
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c3293b
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3e10a
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96897
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96db2
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d99376
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da7c90
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da85c0
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96d5c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d41766
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'branch-misses'
+# Event count (approx.): 13579919
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    99.99%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(PAMTree::PamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.01%  baselines  baselines         [.] main
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f8ed11
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+#
+# (Tip: To add Node.js USDT(User-Level Statically Defined Tracing): perf buildid-cache --add `which node`)
+#

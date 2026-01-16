@@ -1,0 +1,168 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles'
+# Event count (approx.): 2006327811
+#
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    99.33%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
+     0.66%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2e8b0dd
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 2K of event 'instructions'
+# Event count (approx.): 557513508
+#
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    94.97%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
+     2.32%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.29%  b_test   [unknown]         [k] 0xffffffffa2e8fecf
+     0.17%  b_test   [unknown]         [k] 0xffffffffa2e3fbf7
+     0.13%  b_test   [unknown]         [k] 0xffffffffa2c3293b
+     0.13%  b_test   [unknown]         [k] 0xffffffffa2d33556
+     0.09%  b_test   [unknown]         [k] 0xffffffffa2c77296
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d33221
+     0.08%  b_test   [unknown]         [k] 0xffffffffa3603505
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d9a648
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d99382
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d9a60b
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2da974b
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d99386
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3801da0
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2c6b95b
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d3da41
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2da849e
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3801daa
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a608
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d96897
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d97f37
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a35c
+     0.04%  b_test   [unknown]         [k] 0xffffffffa36274d7
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d33293
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d96e8e
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3627181
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9b010
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2e8fe5d
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d59c4a
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d97533
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2c327a5
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d83067
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d332da
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2e8ff62
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d52edb
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d20f59
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d80025
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d42afd
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a012
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3627470
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d331f4
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d85c98
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2e90069
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d20f2e
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2e85f8f
+
+
+# Samples: 2K of event 'cache-references'
+# Event count (approx.): 27016472
+#
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    93.79%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
+     3.52%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.87%  b_test   [unknown]         [k] 0xffffffffa2e8fecf
+     0.17%  b_test   [unknown]         [k] 0xffffffffa2d53cb3
+     0.13%  b_test   [unknown]         [k] 0xffffffffa2d59c90
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d33293
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2da974b
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d9a60b
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d33221
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d3b919
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3801daa
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d53b78
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d96e31
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3627470
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d97fbe
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3801da0
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3627111
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d331ce
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d53b55
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a055
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2c63759
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d302d0
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d332cf
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d3b8d7
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d3df49
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9802f
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d434b3
+     0.04%  b_test   [unknown]         [k] 0xffffffffa30ed373
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2e8fe9b
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d20f59
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2da7cae
+     0.04%  b_test   [unknown]         [k] 0xffffffffa36274c0
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d43349
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d96d5c
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3627122
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3606e90
+     0.04%  b_test   ld-2.28.so        [.] _dl_runtime_resolve_xsavec
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2d2a73d
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 2K of event 'cache-misses'
+# Event count (approx.): 17863820
+#
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    95.43%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
+     4.48%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3801da0
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9afca
+     0.01%  b_test   libc-2.28.so      [.] vfprintf
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e90b30
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8b0dd
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 2K of event 'branch-instructions'
+# Event count (approx.): 161575690
+#
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    96.12%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
+     3.88%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 2K of event 'branch-misses'
+# Event count (approx.): 10430902
+#
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    92.57%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
+     7.17%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2e90051
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2e3fbf7
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2c327a5
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d5336e
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a52e
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2d4de10
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
+
+
+#
+# (Tip: To change sampling frequency to 100 Hz: perf record -F 100)
+#

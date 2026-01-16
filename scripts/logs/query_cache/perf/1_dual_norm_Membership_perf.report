@@ -1,0 +1,208 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cycles'
+# Event count (approx.): 3498025599
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    97.20%  baselines  baselines         [.] cpam::map_ops<cpam::sequence_ops<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry> >::find
+     1.28%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     1.11%  baselines  baselines         [.] cpam::gc<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >::increment
+     0.31%  baselines  [unknown]         [k] 0xffffffffa2ef1c46
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2ef1a36
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ef1c55
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ee2040
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f93
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcde
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'instructions'
+# Event count (approx.): 2088714122
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    96.13%  baselines  baselines         [.] cpam::map_ops<cpam::sequence_ops<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry> >::find
+     1.58%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.87%  baselines  baselines         [.] cpam::gc<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >::increment
+     0.18%  baselines  [unknown]         [k] 0xffffffffa2ef1c62
+     0.17%  baselines  [unknown]         [k] 0xffffffffa2ee207a
+     0.16%  baselines  [unknown]         [k] 0xffffffffa2ef1c46
+     0.15%  baselines  [unknown]         [k] 0xffffffffa2ee2055
+     0.13%  baselines  [unknown]         [k] 0xffffffffa2ef1cf4
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2edfc60
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2ef1c39
+     0.08%  baselines  [unknown]         [k] 0xffffffffa2ef191e
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ef1c28
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2edfc7f
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ef1a36
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ef1c4a
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c77296
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9933b
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2d32a5a
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcde
+
+
+# Samples: 4K of event 'cache-references'
+# Event count (approx.): 32625423
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    92.89%  baselines  baselines         [.] cpam::map_ops<cpam::sequence_ops<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry> >::find
+     2.81%  baselines  baselines         [.] cpam::gc<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >::increment
+     0.52%  baselines  [unknown]         [k] 0xffffffffa2ef1c46
+     0.35%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     0.25%  baselines  [unknown]         [k] 0xffffffffa2ee207a
+     0.24%  baselines  [unknown]         [k] 0xffffffffa2edfc7f
+     0.21%  baselines  [unknown]         [k] 0xffffffffa2ef1c62
+     0.19%  baselines  [unknown]         [k] 0xffffffffa2edfc60
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2d9b010
+     0.11%  baselines  [unknown]         [k] 0xffffffffa2ef1c55
+     0.11%  baselines  [unknown]         [k] 0xffffffffa2ef1c58
+     0.10%  baselines  [unknown]         [k] 0xffffffffa2ef1a36
+     0.09%  baselines  [unknown]         [k] 0xffffffffa3627122
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2d9a60b
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2c327a5
+     0.09%  baselines  [unknown]         [k] 0xffffffffa3800ab9
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2d53cb3
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2c770f5
+     0.07%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2d332da
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2ef1cf4
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d96d59
+     0.05%  baselines  [unknown]         [k] 0xffffffffa38009f3
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2da8513
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d59c90
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d96d5c
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d3b8fb
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2da974b
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2e90071
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2d9b5fc
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2d53b65
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9b61c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da38f5
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3800abc
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c6377c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d52f0a
+     0.02%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e8fef6
+     0.02%  baselines  [unknown]         [k] 0xffffffffa30ed373
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d52ef9
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d33293
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3b919
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53cb6
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d332f2
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d41516
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d59c4a
+     0.02%  baselines  [unknown]         [k] 0xffffffffa36274d7
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d85e83
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da85ff
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3800b10
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d20f5f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d59c3f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3b90d
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d43382
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d33556
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d53385
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da38da
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ef1c4d
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d3e182
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a608
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d97502
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da849e
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d9a4c7
+     0.02%  baselines  [unknown]         [k] 0xffffffffc090577c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e90069
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3602df8
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d96e70
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da98c8
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3627181
+     0.02%  baselines  baselines         [.] main
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f78157
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f93
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcf0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcde
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'cache-misses'
+# Event count (approx.): 20169306
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    92.89%  baselines  baselines         [.] cpam::map_ops<cpam::sequence_ops<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry> >::find
+     5.46%  baselines  baselines         [.] cpam::gc<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >::increment
+     0.48%  baselines  [unknown]         [k] 0xffffffffa2ef1c46
+     0.32%  baselines  [unknown]         [k] 0xffffffffa2edfc7f
+     0.11%  baselines  [unknown]         [k] 0xffffffffa2ee207a
+     0.10%  baselines  [unknown]         [k] 0xffffffffa2ef191e
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ef1c4a
+     0.07%  baselines  [unknown]         [k] 0xffffffffa3627122
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ef1c62
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2edfc60
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2ef1cf4
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d9931c
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d41766
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d4344f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa35fc1a3
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d97549
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2da8513
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d99310
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d20f5f
+     0.02%  baselines  [unknown]         [k] 0xffffffffa3627181
+     0.02%  baselines  baselines         [.] __tls_init
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c327a3
+     0.02%  baselines  [unknown]         [k] 0xffffffffa30ed36f
+     0.01%  baselines  ld-2.28.so        [.] do_lookup_x
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e90b50
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f93
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcf0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'branch-instructions'
+# Event count (approx.): 468223355
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    96.06%  baselines  baselines         [.] cpam::map_ops<cpam::sequence_ops<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry> >::find
+     1.93%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.68%  baselines  baselines         [.] cpam::gc<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >::increment
+     0.45%  baselines  [unknown]         [k] 0xffffffffa2ef1c46
+     0.26%  baselines  [unknown]         [k] 0xffffffffa2ef1c81
+     0.13%  baselines  [unknown]         [k] 0xffffffffa2ef1c55
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2edfc60
+     0.12%  baselines  [unknown]         [k] 0xffffffffa2ef1a36
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2edfc7f
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ee2040
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ef1c39
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2d97f37
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcde
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 4K of event 'branch-misses'
+# Event count (approx.): 20354433
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .........  ................  ......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    91.14%  baselines  baselines         [.] cpam::map_ops<cpam::sequence_ops<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry> >::find
+     4.62%  baselines  baselines         [.] cpam::gc<cpam::weight_balanced_tree::balance<cpam::aug_node<cpam::weight_balanced_tree::data, cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, cpam::default_entry_encoder::encoder<cpam::aug_map_full_entry<CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::entry>, true>, 32ul> > >::increment
+     4.24%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(CPAMTree::CpamRaw<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 16u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f8c942
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcde
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+#
+# (Tip: For tracepoint events, try: perf report -s trace_fields)
+#
