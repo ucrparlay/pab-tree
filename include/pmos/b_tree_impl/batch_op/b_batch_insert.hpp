@@ -25,7 +25,6 @@ BTree<TT>::BatchInsert(Range&& In)
 #ifndef SIEVE
   BatchInsert_(A);
 #else
-  std::cout << "using sieve" << std::endl;
   BatchInsertSieve(A);
 #endif // !SIEVE
 }
@@ -217,6 +216,7 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
   SizeBufUBArr split_pos_seq;
 
   if (n <= 2048) {
+    std::sort(In.begin(), In.end());
     SizeT offset = 0;
     for (int i = 0; i < TI->GetSplitN(); i++) {
       // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
