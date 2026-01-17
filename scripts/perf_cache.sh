@@ -6,20 +6,20 @@ set -o xtrace
 
 Nodes=(100000000)
 Dim=(1)
-tag=$((2#0000))
-func_name="Membership"
+tag=$((2#0001))
+func_name="BatchInsert"
 summary=0
-query_type=$((2#001))
+query_type=$((2#000))
 instance_n=1
 round=1
 
-log_path="logs/query_cache"
+log_path="logs/p001_insert"
 mkdir -p "${log_path}"
 
 data_prefix="/ssd1/zmen002/kv_pair"
 batch_op_seq=("ins")
 dis_seq=("uni" "exp" "norm" "dual_norm")
-batch_ratio=0.01
+batch_ratio=0.001
 
 function run_test() {
 	local solver="$1"

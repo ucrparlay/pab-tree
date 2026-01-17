@@ -3,139 +3,673 @@
 #
 # Total Lost Samples: 0
 #
-# Samples: 2K of event 'cycles'
-# Event count (approx.): 2069328767
+# Samples: 3K of event 'cycles'
+# Event count (approx.): 3189763125
 #
-# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+# Overhead  Command  Shared Object        Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ...................  .....................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
 #
-    99.27%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
-     0.72%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
-     0.01%  b_test   [unknown]         [k] 0xffffffffa2e8b070
-     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fcde
-     0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
+    28.70%  b_test   b_test               [.] parlay::internal::split3<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    24.77%  b_test   b_test               [.] parlay::internal::quicksort_serial<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    16.37%  b_test   b_test               [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    10.40%  b_test   b_test               [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     6.11%  b_test   b_test               [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive
+     2.67%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3}>(unsigned long, unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3} const&, unsigned int)::{lambda(unsigned long)#1}>
+     2.59%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)::{lambda(unsigned long)#1}>
+     1.51%  b_test   b_test               [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.91%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}>
+     0.53%  b_test   [vdso]               [.] __vdso_clock_gettime
+     0.52%  b_test   b_test               [.] parlay::internal::quicksort_serial<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.50%  b_test   [unknown]            [k] 0xffffffffa38011e0
+     0.34%  b_test   b_test               [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}::operator()
+     0.29%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}>
+     0.29%  b_test   b_test               [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}::operator()
+     0.26%  b_test   [unknown]            [k] 0xffffffffa3627470
+     0.21%  b_test   b_test               [.] parlay::internal::transpose<parlay::uninitialized_copy_tag, unsigned int*, unsigned int*>::transR
+     0.18%  b_test   b_test               [.] __tls_init
+     0.16%  b_test   b_test               [.] parlay::internal::base_sort<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.13%  b_test   [unknown]            [k] 0xffffffffa2c28111
+     0.13%  b_test   [unknown]            [k] 0xffffffffa2f5063e
+     0.13%  b_test   b_test               [.] parlay::internal::quicksort<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.10%  b_test   b_test               [.] parlay::ThreadSpecific<parlay::internal::block_allocator::local_list>::get
+     0.10%  b_test   [unknown]            [k] 0xffffffffa2f5142c
+     0.08%  b_test   b_test               [.] parlay::internal::pool_allocator::deallocate
+     0.08%  b_test   b_test               [.] parlay::internal::pool_allocator::allocate
+     0.08%  b_test   libstdc++.so.6.0.25  [.] std::chrono::_V2::steady_clock::now
+     0.08%  b_test   libc-2.28.so         [.] clock_gettime@GLIBC_2.2.5
+     0.05%  b_test   b_test               [.] parlay::internal::block_allocator::free
+     0.05%  b_test   b_test               [.] parlay::internal::block_allocator::alloc
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2c2810e
+     0.05%  b_test   libc-2.28.so         [.] __memset_evex_unaligned_erms
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2f50653
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2f5263c
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2f51425
+     0.05%  b_test   [unknown]            [k] 0xffffffffa360f287
+     0.05%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.05%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.04%  b_test   [unknown]            [k] 0xffffffffa30f98e0
+     0.04%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::sequence<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}>(unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}&&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::_from_function_tag, unsigned long)::{lambda(unsigned long)#1}>
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ee8754
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2dc86f0
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f04f55
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2dc86fe
+     0.03%  b_test   libc-2.28.so         [.] __memmove_evex_unaligned_erms
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4f180
+     0.03%  b_test   b_test               [.] parlay::internal::get_default_allocator
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4f0a0
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2eb4245
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4bdea
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f04e32
+     0.03%  b_test   b_test               [.] parlay::internal::split3<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ec81b9
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f51447
+     0.03%  b_test   b_test               [.] std::chrono::_V2::steady_clock::now@plt
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2eb4151
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4b8e2
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4e059
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ee5f70
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4f183
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f525f4
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f02b27
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2d5da71
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f140f1
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4f150
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4bde0
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f07f87
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4ef10
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f07fe6
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4bdec
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4bdee
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2d1fb40
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ee8059
+     0.03%  b_test   [unknown]            [k] 0xffffffffa30f98ed
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ee80ea
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f14101
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ec6ed5
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f50668
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f514a9
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f21036
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f05278
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4aa78
+     0.03%  b_test   [unknown]            [k] 0xffffffffa3801427
+     0.03%  b_test   b_test               [.] parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4e08c
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2e8fce2
+     0.00%  b_test   [unknown]            [k] 0xffffffffa2e8fcde
+     0.00%  b_test   [unknown]            [k] 0xffffffffa2c77296
 
 
-# Samples: 2K of event 'instructions'
-# Event count (approx.): 558953708
+# Samples: 3K of event 'instructions'
+# Event count (approx.): 4095341117
 #
 # Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+# ........  .......  ................  .....................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
 #
-    95.79%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
-     3.08%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
-     0.16%  b_test   [unknown]         [k] 0xffffffffa2e8fecf
-     0.08%  b_test   [unknown]         [k] 0xffffffffa2d96897
-     0.06%  b_test   [unknown]         [k] 0xffffffffa2edfc7f
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2ee2055
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d331ce
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d33556
-     0.04%  b_test   [unknown]         [k] 0xffffffffa3800b86
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2e90033
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2c64b87
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d434b3
-     0.04%  b_test   [unknown]         [k] 0xffffffffa3627470
-     0.04%  b_test   [unknown]         [k] 0xffffffffa3800b83
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9931c
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d53b78
-     0.04%  b_test   [unknown]         [k] 0xffffffffa3800a28
-     0.04%  b_test   [unknown]         [k] 0xffffffffa36275c4
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d34a7d
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d53cb3
-     0.04%  b_test   [unknown]         [k] 0xffffffffa36274c6
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2ef1c62
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d96d59
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a4b0
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2e3fbf7
-     0.03%  b_test   [unknown]         [k] 0xffffffffa2e90b3f
+    33.42%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    22.14%  b_test   b_test            [.] parlay::internal::quicksort_serial<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    13.77%  b_test   b_test            [.] parlay::internal::split3<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     6.82%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive
+     5.62%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3}>(unsigned long, unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3} const&, unsigned int)::{lambda(unsigned long)#1}>
+     5.50%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     2.94%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)::{lambda(unsigned long)#1}>
+     2.89%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     1.00%  b_test   [vdso]            [.] __vdso_clock_gettime
+     0.74%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}>
+     0.51%  b_test   b_test            [.] parlay::internal::quicksort_serial<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.41%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}::operator()
+     0.31%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.23%  b_test   [unknown]         [k] 0xffffffffa3627470
+     0.21%  b_test   b_test            [.] __tls_init
+     0.19%  b_test   b_test            [.] parlay::internal::to_balanced_tree<parlay::copy_assign_tag, unsigned long*, unsigned long*>
+     0.18%  b_test   b_test            [.] parlay::ThreadSpecific<parlay::internal::block_allocator::local_list>::get
+     0.14%  b_test   b_test            [.] parlay::internal::transpose<parlay::uninitialized_copy_tag, unsigned int*, unsigned int*>::transR
+     0.12%  b_test   libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     0.11%  b_test   b_test            [.] parlay::internal::block_allocator::alloc
+     0.11%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}>
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2f5142c
+     0.08%  b_test   [unknown]         [k] 0xffffffffa38011e0
+     0.08%  b_test   b_test            [.] parlay::internal::base_sort<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.08%  b_test   b_test            [.] parlay::sequence_internal::sequence_base<unsigned long, parlay::allocator<unsigned long>, false>::storage_impl::clear
+     0.07%  b_test   libc-2.28.so      [.] clock_gettime@GLIBC_2.2.5
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f04dd5
+     0.06%  b_test   b_test            [.] parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR
+     0.06%  b_test   b_test            [.] std::chrono::_V2::steady_clock::now@plt
+     0.06%  b_test   b_test            [.] parlay::internal::pool_allocator::deallocate
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2c81b4d
+     0.06%  b_test   b_test            [.] parlay::internal::split3<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f051c6
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2d5da71
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2d5d6c3
+     0.05%  b_test   b_test            [.] parlay::internal::quicksort<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2eb4339
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2ee8059
+     0.05%  b_test   b_test            [.] parlay::internal::block_allocator::free
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2eb4123
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2ee57d5
+     0.05%  b_test   b_test            [.] parlay::internal::pool_allocator::allocate
+     0.05%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}::operator()
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f140e0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee81f0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee8076
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f04ef7
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4e059
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f514a9
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2eb4120
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee86e0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30f98e0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2c81b3d
+     0.03%  b_test   b_test            [.] parlay::internal::get_default_allocator
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f5063e
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f21112
+     0.03%  b_test   libc-2.28.so      [.] __memset_evex_unaligned_erms
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f07fae
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ec819f
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4f179
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f05212
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4b8d9
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4e09f
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4e077
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2eb411a
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4e070
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2d9b5fc
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4b8dd
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee09d2
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f21102
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30f9886
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f04d26
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2d9940f
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f04e89
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f14119
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f50966
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2e8fe82
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee8712
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f5143b
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f05221
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2e8fe40
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee8754
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2d5da77
+     0.03%  b_test   [unknown]         [k] 0xffffffffa360f287
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f2113f
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee54df
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ef1d20
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d96d59
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee8461
+     0.02%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::sequence<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}>(unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}&&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::_from_function_tag, unsigned long)::{lambda(unsigned long)#1}>
+     0.02%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2c088d7
      0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fcde
      0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
 
 
 # Samples: 2K of event 'cache-references'
-# Event count (approx.): 27197619
+# Event count (approx.): 13274721
 #
-# Overhead  Command  Shared Object       Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-# ........  .......  ..................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
 #
-    95.23%  b_test   b_test              [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
-     3.38%  b_test   b_test              [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
-     0.36%  b_test   [unknown]           [k] 0xffffffffa2e8fecf
-     0.12%  b_test   [unknown]           [k] 0xffffffffa2d53cb3
-     0.08%  b_test   [unknown]           [k] 0xffffffffa2d43382
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2e3fbff
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2e3fc02
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d3df49
-     0.04%  b_test   b_test              [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
-     0.04%  b_test   [unknown]           [k] 0xffffffffa3802845
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d59c4a
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2da974b
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2e8fe91
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2e8fee8
-     0.04%  b_test   [unknown]           [k] 0xffffffffa30ed373
-     0.04%  b_test   [unknown]           [k] 0xffffffffa36277c0
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d33556
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2c77296
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d53b65
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d59c90
-     0.04%  b_test   [unknown]           [k] 0xffffffffa3800ab9
-     0.04%  b_test   [unknown]           [k] 0xffffffffa3627470
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d59c3f
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2ef1c46
-     0.04%  b_test   [unknown]           [k] 0xffffffffa2d302d0
-     0.02%  b_test   libpthread-2.28.so  [.] __libc_read
-     0.00%  b_test   [unknown]           [k] 0xffffffffa2d2a75d
-     0.00%  b_test   [unknown]           [k] 0xffffffffa2e85f8f
-     0.00%  b_test   [unknown]           [k] 0xffffffffa2e8fcf0
-     0.00%  b_test   [unknown]           [k] 0xffffffffa2e8fcde
+    24.26%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+    20.31%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)::{lambda(unsigned long)#1}>
+    15.25%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive
+    10.30%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     7.40%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3}>(unsigned long, unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3} const&, unsigned int)::{lambda(unsigned long)#1}>
+     2.08%  b_test   [unknown]         [k] 0xffffffffa3627470
+     1.80%  b_test   [unknown]         [k] 0xffffffffa38011e0
+     1.26%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}>
+     1.06%  b_test   b_test            [.] parlay::internal::transpose<parlay::uninitialized_copy_tag, unsigned int*, unsigned int*>::transR
+     0.99%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.79%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.68%  b_test   [unknown]         [k] 0xffffffffa2f5063e
+     0.66%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.64%  b_test   [unknown]         [k] 0xffffffffa2f5142c
+     0.59%  b_test   [unknown]         [k] 0xffffffffa2f51425
+     0.52%  b_test   [unknown]         [k] 0xffffffffa2f4bdec
+     0.51%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}::operator()
+     0.44%  b_test   b_test            [.] parlay::internal::split3<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.40%  b_test   b_test            [.] parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR
+     0.38%  b_test   [unknown]         [k] 0xffffffffa2f4f0b4
+     0.34%  b_test   [unknown]         [k] 0xffffffffa2f4f18b
+     0.32%  b_test   [unknown]         [k] 0xffffffffa2e8fecf
+     0.29%  b_test   [unknown]         [k] 0xffffffffa2f50653
+     0.28%  b_test   [unknown]         [k] 0xffffffffa2f4f0e2
+     0.27%  b_test   [unknown]         [k] 0xffffffffa2f14101
+     0.27%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long)#1}>
+     0.25%  b_test   [unknown]         [k] 0xffffffffa2f140e0
+     0.25%  b_test   b_test            [.] parlay::internal::quicksort_serial<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.23%  b_test   [unknown]         [k] 0xffffffffa2f50658
+     0.17%  b_test   [unknown]         [k] 0xffffffffa2f4f0d8
+     0.17%  b_test   [unknown]         [k] 0xffffffffa2f490a7
+     0.15%  b_test   b_test            [.] pmos::AllocNormalLeafNode<parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, pmos::LeafNode<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, parlay::move_assign_tag> >
+     0.15%  b_test   b_test            [.] parlay::internal::sort5<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.15%  b_test   [unknown]         [k] 0xffffffffa2dc86ff
+     0.15%  b_test   [unknown]         [k] 0xffffffffa2f4aa78
+     0.14%  b_test   b_test            [.] parlay::internal::block_allocator::alloc
+     0.14%  b_test   [unknown]         [k] 0xffffffffa2f140f1
+     0.13%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::sequence<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}>(unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}&&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::_from_function_tag, unsigned long)::{lambda(unsigned long)#1}>
+     0.12%  b_test   [unknown]         [k] 0xffffffffa2f14107
+     0.12%  b_test   [unknown]         [k] 0xffffffffa2f14119
+     0.11%  b_test   [unknown]         [k] 0xffffffffa2f1415e
+     0.11%  b_test   [unknown]         [k] 0xffffffffa2f4f0fa
+     0.10%  b_test   [unknown]         [k] 0xffffffffa2f4be15
+     0.10%  b_test   [unknown]         [k] 0xffffffffa2dc8718
+     0.10%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::GenerateLeafNodes<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::GenNodesOutputHandler<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#2}, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#3}> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::GenNodesOutputHandler<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#2}, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#3}>&&)::{lambda(unsigned long)#1}>
+     0.10%  b_test   [unknown]         [k] 0xffffffffa2f4f150
+     0.10%  b_test   [unknown]         [k] 0xffffffffa2d1fb54
+     0.09%  b_test   [unknown]         [k] 0xffffffffa2f50951
+     0.09%  b_test   [unknown]         [k] 0xffffffffa2f5263c
+     0.09%  b_test   [unknown]         [k] 0xffffffffa2f514a9
+     0.09%  b_test   [unknown]         [k] 0xffffffffa2d9a012
+     0.09%  b_test   [unknown]         [k] 0xffffffffa3627122
+     0.09%  b_test   [unknown]         [k] 0xffffffffa2d96c47
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2dc86fe
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2f51427
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d3b919
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d4337c
+     0.08%  b_test   [unknown]         [k] 0xffffffffa3801da0
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2da7cae
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2e90123
+     0.07%  b_test   [unknown]         [k] 0xffffffffa2f4f180
+     0.07%  b_test   [unknown]         [k] 0xffffffffa2c6b95b
+     0.07%  b_test   b_test            [.] parlay::internal::split3<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.07%  b_test   [unknown]         [k] 0xffffffffa2f4bdee
+     0.07%  b_test   [unknown]         [k] 0xffffffffa2f4bdf8
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f50668
+     0.06%  b_test   b_test            [.] parlay::internal::pool_allocator::allocate
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f50694
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f4b8cd
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2d43364
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f4be56
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f14113
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f50642
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f50687
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f140f0
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2ee5824
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f508bb
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f4f156
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2f50669
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2dc86f0
+     0.04%  b_test   [unknown]         [k] 0xffffffffa3606f2d
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f4b8dd
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2ee5834
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2ee5867
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f4f15f
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f4f16b
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f4bde7
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2c77296
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f4f166
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f14162
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2ee582f
+     0.04%  b_test   [unknown]         [k] 0xffffffffc04844b4
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f05221
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f5064b
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f140f4
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f51470
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2d9a5e3
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4f179
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4bde0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f140ef
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4aa7c
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4f127
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2eb4151
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4f107
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30f98e9
+     0.03%  b_test   [vdso]            [.] __vdso_clock_gettime
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2e8fe4b
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee5858
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4bdf7
+     0.03%  b_test   b_test            [.] parlay::internal::quicksort_serial<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4bdf4
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2d33556
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f51438
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f02b89
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f5149d
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d1fb66
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2da975a
+     0.02%  b_test   libc-2.28.so      [.] __memset_evex_unaligned_erms
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2edfc90
+     0.02%  b_test   [unknown]         [k] 0xffffffffa30f98ed
+     0.02%  b_test   b_test            [.] parlay::internal::hazptr_stack<void*>::pop
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d88390
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d96dee
+     0.02%  b_test   [unknown]         [k] 0xffffffffa30f9864
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f51492
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f07e61
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4ef10
+     0.02%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#3}>
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4f0a0
+     0.02%  b_test   b_test            [.] parlay::internal::pool_allocator::deallocate
+     0.02%  b_test   libjemalloc.so.2  [.] je_edata_heap_remove_first
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f05103
+     0.02%  b_test   [unknown]         [k] 0xffffffffa30f98b0
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f5184c
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d9a60b
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4f0e7
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4f159
+     0.02%  b_test   [unknown]         [k] 0xffffffffa3606f42
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4f0a6
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d85bfa
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2da849e
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee57e2
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2c03ab0
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee5818
+     0.02%  b_test   [unknown]         [k] 0xffffffffa360f287
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f50a16
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee582c
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee54d7
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2dc870a
+     0.02%  b_test   b_test            [.] parlay::internal::ThreadIdPool::instance
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f508c0
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f5095e
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f5148b
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2edfd79
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d97566
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee57fd
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4b8d9
+     0.02%  b_test   b_test            [.] std::chrono::_V2::steady_clock::now@plt
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2eb4339
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4bcad
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f51468
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2edfd63
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f05031
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2c2810e
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f508cf
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f52633
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4b8c1
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f508c9
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2edfcb0
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f1411d
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d1fb4e
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4be1d
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f49103
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f5142f
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4f0cf
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f05c58
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f4f10d
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d9a558
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2edfdc0
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ee8059
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ec81c7
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f51496
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2f23d27
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2e3fc02
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2ee5852
+     0.01%  b_test   libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     0.01%  b_test   b_test            [.] parlay::ThreadSpecific<parlay::internal::block_allocator::local_list>::get
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2f5142a
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2d97477
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2f505f0
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2edfd80
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2e8ffeb
+     0.01%  b_test   [unknown]         [k] 0xffffffffa3800c10
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2d3d9f4
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2d414f8
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2f776b0
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e85fa0
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fcde
 
 
 # Samples: 2K of event 'cache-misses'
-# Event count (approx.): 18300261
+# Event count (approx.): 6961503
+#
+# Overhead  Command  Shared Object        Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  .......  ...................  ..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    37.08%  b_test   b_test               [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+    23.20%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)::{lambda(unsigned long)#1}>
+    17.88%  b_test   b_test               [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive
+     5.11%  b_test   b_test               [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     2.69%  b_test   [unknown]            [k] 0xffffffffa38011e0
+     2.15%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3}>(unsigned long, unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3} const&, unsigned int)::{lambda(unsigned long)#1}>
+     1.50%  b_test   [unknown]            [k] 0xffffffffa2f5142c
+     1.41%  b_test   [unknown]            [k] 0xffffffffa2f51425
+     0.88%  b_test   [unknown]            [k] 0xffffffffa2f5063e
+     0.83%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}>
+     0.81%  b_test   b_test               [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.66%  b_test   b_test               [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}::operator()
+     0.63%  b_test   b_test               [.] parlay::internal::split3<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.55%  b_test   b_test               [.] parlay::internal::transpose<parlay::uninitialized_copy_tag, unsigned int*, unsigned int*>::transR
+     0.40%  b_test   b_test               [.] __tls_init
+     0.36%  b_test   [unknown]            [k] 0xffffffffa2f50653
+     0.28%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.23%  b_test   b_test               [.] parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR
+     0.21%  b_test   b_test               [.] parlay::internal::sort5<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.21%  b_test   [unknown]            [k] 0xffffffffa2f4f0e2
+     0.20%  b_test   [unknown]            [k] 0xffffffffa2f50658
+     0.17%  b_test   [unknown]            [k] 0xffffffffa3627470
+     0.17%  b_test   [unknown]            [k] 0xffffffffa2f50951
+     0.15%  b_test   [unknown]            [k] 0xffffffffa2f14107
+     0.13%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::sequence<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}>(unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}&&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::_from_function_tag, unsigned long)::{lambda(unsigned long)#1}>
+     0.11%  b_test   [unknown]            [k] 0xffffffffa2f4f0b4
+     0.08%  b_test   [unknown]            [k] 0xffffffffa360f287
+     0.07%  b_test   [unknown]            [k] 0xffffffffa2f5064b
+     0.07%  b_test   [unknown]            [k] 0xffffffffa2f50687
+     0.07%  b_test   [unknown]            [k] 0xffffffffa2dc86f7
+     0.06%  b_test   [unknown]            [k] 0xffffffffa2f50694
+     0.06%  b_test   [unknown]            [k] 0xffffffffa2f05221
+     0.06%  b_test   [unknown]            [k] 0xffffffffa2f4f150
+     0.06%  b_test   [unknown]            [k] 0xffffffffa2f4f18b
+     0.06%  b_test   [unknown]            [k] 0xffffffffa30f98ed
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2f02b89
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2f5263c
+     0.05%  b_test   b_test               [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::GenerateLeafNodes<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::GenNodesOutputHandler<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#2}, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#3}> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::GenNodesOutputHandler<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#2}, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long, auto:1)#3}>&&)::{lambda(unsigned long)#1}>
+     0.05%  b_test   [unknown]            [k] 0xffffffffa2f23d27
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2f14101
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2f04c3c
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2d3357b
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2f51427
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2c2810e
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2f4b8cd
+     0.04%  b_test   b_test               [.] parlay::internal::quicksort_serial<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.04%  b_test   [unknown]            [k] 0xffffffffa2f5142a
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2ee57d5
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f051a3
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f5142f
+     0.03%  b_test   [unknown]            [k] 0xffffffffa30e598b
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4bde0
+     0.03%  b_test   [unknown]            [k] 0xffffffffa2f4b906
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2f50662
+     0.02%  b_test   libc-2.28.so         [.] __strchrnul_evex
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2f5184c
+     0.02%  b_test   [unknown]            [k] 0xffffffffa3627122
+     0.02%  b_test   b_test               [.] parlay::internal::block_allocator::alloc
+     0.02%  b_test   [unknown]            [k] 0xffffffffa30f988b
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2f4f156
+     0.02%  b_test   libstdc++.so.6.0.25  [.] std::chrono::_V2::steady_clock::now
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2ee5824
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2d3289c
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2dc8718
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2f4b8dd
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2ee57c7
+     0.02%  b_test   [unknown]            [k] 0xffffffffa2dc870a
+     0.01%  b_test   b_test               [.] parlay::internal::split3<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.01%  b_test   [unknown]            [k] 0xffffffffa38013b1
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f052c2
+     0.01%  b_test   [unknown]            [k] 0xffffffffa30f9864
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f51860
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2dc86f0
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f4f0d8
+     0.01%  b_test   [unknown]            [k] 0xffffffffa30ed65e
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2ee57e2
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2d85bb4
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2eb4339
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f50606
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f490c5
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f0523a
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f51478
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f51468
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f051d4
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2c770f5
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f5142b
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f514a9
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f04f55
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f14113
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f508c9
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f0525f
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f4bde5
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f51447
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2ec6ed5
+     0.01%  b_test   [vdso]               [.] __vdso_clock_gettime
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f4bdee
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2dc86ff
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f4b8d9
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f4bdf8
+     0.01%  b_test   libjemalloc.so.2     [.] je_eset_remove
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2ed8ab9
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f5143b
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f4f0a0
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f05149
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2dc8712
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f51483
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2f14140
+     0.01%  b_test   [unknown]            [k] 0xffffffffa2d9a2f7
+     0.01%  b_test   b_test               [.] parlay::internal::quicksort_serial<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.00%  b_test   [unknown]            [k] 0xffffffffa2e90b37
+     0.00%  b_test   [unknown]            [k] 0xffffffffa2e8fcde
+     0.00%  b_test   [unknown]            [k] 0xffffffffa2c77296
+
+
+# Samples: 3K of event 'branch-instructions'
+# Event count (approx.): 592789914
 #
 # Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+# ........  .......  ................  .....................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
 #
-    94.92%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
-     4.99%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2edfc7f
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2d3cb80
-     0.01%  b_test   ld-2.28.so        [.] _dl_fixup
-     0.00%  b_test   [unknown]         [k] 0xffffffffa2e90b3f
-     0.00%  b_test   [unknown]         [k] 0xffffffffa2e85f8f
-     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fcf0
+    26.68%  b_test   b_test            [.] parlay::internal::quicksort_serial<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    20.41%  b_test   b_test            [.] parlay::internal::split3<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    18.56%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     9.73%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive
+     7.01%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3}>(unsigned long, unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3} const&, unsigned int)::{lambda(unsigned long)#1}>
+     5.78%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     1.98%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     1.91%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)::{lambda(unsigned long)#1}>
+     1.44%  b_test   [vdso]            [.] __vdso_clock_gettime
+     1.13%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}>
+     0.61%  b_test   b_test            [.] parlay::internal::quicksort_serial<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.30%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#2} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.29%  b_test   b_test            [.] parlay::internal::block_allocator::alloc
+     0.25%  b_test   b_test            [.] parlay::ThreadSpecific<parlay::internal::block_allocator::local_list>::get
+     0.24%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}>
+     0.20%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}::operator()
+     0.16%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}::operator()
+     0.15%  b_test   b_test            [.] parlay::internal::transpose<parlay::uninitialized_copy_tag, unsigned int*, unsigned int*>::transR
+     0.14%  b_test   [unknown]         [k] 0xffffffffa3627470
+     0.13%  b_test   b_test            [.] parlay::internal::pool_allocator::allocate
+     0.13%  b_test   libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     0.11%  b_test   b_test            [.] parlay::internal::split3<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.10%  b_test   b_test            [.] __tls_init
+     0.10%  b_test   b_test            [.] parlay::internal::block_allocator::free
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2d5d6c3
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2eb4339
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2f07f18
+     0.08%  b_test   b_test            [.] parlay::internal::to_balanced_tree<parlay::copy_assign_tag, unsigned long*, unsigned long*>
+     0.08%  b_test   [unknown]         [k] 0xffffffffa2e8fecf
+     0.06%  b_test   b_test            [.] parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2eb4120
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2d5da71
+     0.06%  b_test   [unknown]         [k] 0xffffffffa38011e0
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2ee8080
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2f51425
+     0.06%  b_test   [unknown]         [k] 0xffffffffa2eb407e
+     0.05%  b_test   b_test            [.] parlay::internal::pool_allocator::deallocate
+     0.05%  b_test   libc-2.28.so      [.] __memset_evex_unaligned_erms
+     0.05%  b_test   b_test            [.] parlay::internal::base_sort<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.05%  b_test   [unknown]         [k] 0xffffffffa2ee8762
+     0.05%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long)#1}>
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f05103
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2f4e08c
+     0.04%  b_test   [unknown]         [k] 0xffffffffa2eb4343
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ec8188
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee5867
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee5482
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f050c4
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee8072
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ec8110
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f49331
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2c2810e
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4e070
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f23b34
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30f98e0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f0804d
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f0526d
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f14119
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f07ef3
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4f0cf
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2edfd10
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f07f87
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4bde0
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee8730
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30ed429
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee54db
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4bdee
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2eb4359
+     0.03%  b_test   [unknown]         [k] 0xffffffffa3627181
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee8076
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2c81c4c
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4f150
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f508cf
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30f988b
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee09e3
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4aa78
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f05002
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f21135
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f490c5
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4b8cd
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f5142c
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2eb40dd
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ee82a2
+     0.03%  b_test   libc-2.28.so      [.] clock_gettime@GLIBC_2.2.5
+     0.03%  b_test   b_test            [.] parlay::internal::quicksort<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.02%  b_test   b_test            [.] parlay::internal::sort5<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2ec818c
+     0.02%  b_test   [unknown]         [k] 0xffffffffa30f98b3
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2d9931c
+     0.02%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1}>(unsigned long, unsigned long, parlay::internal::scan_<parlay::slice<unsigned int*, unsigned int*>, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&>(parlay::slice<unsigned int*, unsigned int*> const&, parlay::slice<unsigned int*, unsigned int*>, parlay::plus<unsigned int>&, unsigned int, bool)::{lambda(unsigned long, unsigned long, unsigned long)#1} const&, unsigned int)::{lambda(unsigned long)#1}>
+     0.02%  b_test   [unknown]         [k] 0xffffffffa2f04f55
+     0.01%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::sequence<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}>(unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long)#1}&&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>::_from_function_tag, unsigned long)::{lambda(unsigned long)#1}>
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fcde
      0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
 
 
-# Samples: 2K of event 'branch-instructions'
-# Event count (approx.): 161902802
+# Samples: 3K of event 'branch-misses'
+# Event count (approx.): 56637329
 #
 # Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+# ........  .......  ................  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
 #
-    96.29%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
-     3.55%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
-     0.08%  b_test   [unknown]         [k] 0xffffffffa2ef1c46
-     0.04%  b_test   [unknown]         [k] 0xffffffffa2c327a5
-     0.03%  b_test   [unknown]         [k] 0xffffffffa2e8fecf
-     0.01%  b_test   [unknown]         [k] 0xffffffffa2e8fcde
-     0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
-
-
-# Samples: 2K of event 'branch-misses'
-# Event count (approx.): 10438851
-#
-# Overhead  Command  Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-# ........  .......  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
-#
-    93.15%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::ContainRec
-     6.80%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<Membership<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode>, pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false>, parlay::sequence<bool, parlay::allocator<bool>, false> >(pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> > const&, parlay::sequence<Wrapper::Element<unsigned int, unsigned int>, parlay::allocator<Wrapper::Element<unsigned int, unsigned int> >, false> const&, int, parlay::sequence<bool, parlay::allocator<bool>, false>&)::{lambda(unsigned long)#1}>
-     0.04%  b_test   [unknown]         [k] 0xffffffffa380287f
-     0.01%  b_test   [unknown]         [k] 0xffffffffa2f8ed11
+    56.00%  b_test   b_test            [.] parlay::internal::split3<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+    31.52%  b_test   b_test            [.] parlay::internal::quicksort_serial<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     4.49%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive
+     2.27%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     1.61%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::sliced_for<parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3}>(unsigned long, unsigned long, parlay::internal::sample_sort_<unsigned int, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void> const&, bool)::{lambda(unsigned long, unsigned long, unsigned long)#3} const&, unsigned int)::{lambda(unsigned long)#1}>
+     1.48%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)::{lambda(unsigned long)#1}>
+     0.39%  b_test   b_test            [.] parlay::internal::base_sort<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.38%  b_test   b_test            [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.31%  b_test   b_test            [.] parlay::internal::quicksort_serial<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.23%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}>
+     0.21%  b_test   b_test            [.] parlay::internal::quicksort<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.20%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}>
+     0.18%  b_test   b_test            [.] pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::BatchInsertRecursive(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned char)#2}::operator()
+     0.13%  b_test   b_test            [.] parlay::internal::block_allocator::free
+     0.12%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >
+     0.06%  b_test   b_test            [.] parlay::ThreadSpecific<parlay::internal::block_allocator::local_list>::get
+     0.05%  b_test   b_test            [.] __tls_init
+     0.03%  b_test   b_test            [.] parlay::fork_join_scheduler::parfor_<pmos::BTree<pmos::BTreeTypeTrait<Wrapper::ElementWrapper<Wrapper::Element<unsigned int, unsigned int> >, 32u, Wrapper::LeafAugEmpty, Wrapper::InteriorAugEmpty, (unsigned char)8, pmos::ProtoNode> >::HandlingLeafSplitOverflow(pmos::ProtoNode*, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<std::pair<pmos::ProtoNode*, unsigned int>*, std::pair<pmos::ProtoNode*, unsigned int>*>)::{lambda(unsigned long)#1}>
+     0.03%  b_test   b_test            [.] parlay::internal::split3<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#1}>
+     0.03%  b_test   [unknown]         [k] 0xffffffffa30f9864
+     0.03%  b_test   b_test            [.] parlay::internal::block_allocator::alloc
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f4ff4c
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2f04f55
+     0.03%  b_test   b_test            [.] parlay::internal::quicksort<unsigned long*, parlay::internal::get_buckets<Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, unsigned char*, std::less<void>, unsigned long)::{lambda(unsigned long, unsigned long)#2}>
+     0.03%  b_test   b_test            [.] parlay::internal::pool_allocator::deallocate
+     0.03%  b_test   libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     0.03%  b_test   [unknown]         [k] 0xffffffffa2ec8100
+     0.03%  b_test   b_test            [.] parlay::internal::bucket_sort_r<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, std::less<void> >(parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, parlay::slice<Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*>, std::less<void>, bool, bool)::{lambda(unsigned long)#1}::operator()
+     0.01%  b_test   b_test            [.] parlay::internal::blockTrans<parlay::uninitialized_relocate_tag, Wrapper::Element<unsigned int, unsigned int>*, Wrapper::Element<unsigned int, unsigned int>*, unsigned int*, unsigned int*>::transR
+     0.01%  b_test   [unknown]         [k] 0xffffffffa2e3fbf7
+     0.00%  b_test   [unknown]         [k] 0xffffffffa2d4dcd0
      0.00%  b_test   [unknown]         [k] 0xffffffffa2e8fcde
      0.00%  b_test   [unknown]         [k] 0xffffffffa2c77296
 
 
 #
-# (Tip: Order by the overhead of source file name and line number: perf report -s srcline)
+# (Tip: System-wide collection from all CPUs: perf record -a)
 #

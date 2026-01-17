@@ -1,0 +1,140 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 190  of event 'cycles'
+# Event count (approx.): 153661071
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    43.14%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+    25.87%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+    13.71%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+     7.50%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     4.82%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     2.91%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     0.82%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     0.54%  baselines  baselines         [.] malloc@plt
+     0.54%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.13%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 188  of event 'instructions'
+# Event count (approx.): 117782350
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    42.06%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+    15.77%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+    15.04%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+    12.91%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     7.31%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     4.10%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     0.79%  baselines  libjemalloc.so.2  [.] je_te_event_trigger
+     0.72%  baselines  libjemalloc.so.2  [.] free
+     0.59%  baselines  baselines         [.] free@plt
+     0.55%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::spawn
+     0.15%  baselines  [unknown]         [k] 0xffffffffa36034e1
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 155  of event 'cache-references'
+# Event count (approx.): 1781796
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    41.63%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+    28.87%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     9.27%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     7.44%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     2.87%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     1.87%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+     1.76%  baselines  [unknown]         [k] 0xffffffffa360f287
+     1.47%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     1.27%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.74%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.74%  baselines  [unknown]         [k] 0xffffffffc090577c
+     0.74%  baselines  [unknown]         [k] 0xffffffffa2d532ba
+     0.73%  baselines  [unknown]         [k] 0xffffffffa2d97502
+     0.50%  baselines  ld-2.28.so        [.] do_lookup_x
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2f77c5a
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 163  of event 'cache-misses'
+# Event count (approx.): 1280792
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    43.53%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+    39.11%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     7.80%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     3.81%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     3.25%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.78%  baselines  [unknown]         [k] 0xffffffffa360f287
+     0.60%  baselines  libjemalloc.so.2  [.] je_edata_heap_insert
+     0.56%  baselines  libjemalloc.so.2  [.] free
+     0.48%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.07%  baselines  ld-2.28.so        [.] do_lookup_x
+     0.01%  baselines  [unknown]         [k] 0xffffffffa36034e1
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 184  of event 'branch-instructions'
+# Event count (approx.): 19031624
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    34.34%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+    25.45%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+    21.25%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     6.50%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     5.95%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     4.99%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     0.67%  baselines  libjemalloc.so.2  [.] malloc
+     0.47%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.31%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 161  of event 'branch-misses'
+# Event count (approx.): 1165584
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    57.11%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+    12.01%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     9.06%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     6.23%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     5.42%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     4.60%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     2.71%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     1.95%  baselines  baselines         [.] __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> >::operator()<MultiPointer<unsigned int, unsigned int>, MultiPointer<unsigned int, unsigned int> >
+     0.30%  baselines  libjemalloc.so.2  [.] je_malloc_default
+     0.24%  baselines  libjemalloc.so.2  [.] free
+     0.17%  baselines  libjemalloc.so.2  [.] je_free_default
+     0.12%  baselines  baselines         [.] parlay::scheduler<parlay::WorkStealingJob>::get_own_job
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2d202dc
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2f8ec60
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+#
+# (Tip: If you have debuginfo enabled, try: perf report -s sym,srcline)
+#

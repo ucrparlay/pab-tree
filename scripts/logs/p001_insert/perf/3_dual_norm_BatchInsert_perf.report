@@ -1,0 +1,503 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles'
+# Event count (approx.): 2741957703
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+# ........  .........  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    44.36%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::grow_list
+    29.31%  baselines  [unknown]         [k] 0xffffffffa360f287
+    10.28%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_density_count
+     6.47%  baselines  libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     3.11%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     1.63%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute_lookup_sibling_count
+     0.77%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+     0.64%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.42%  baselines  baselines         [.] memcpy@plt
+     0.36%  baselines  [unknown]         [k] 0xffffffffa2ee095b
+     0.36%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.21%  baselines  [unknown]         [k] 0xffffffffa2f01d14
+     0.18%  baselines  [unknown]         [k] 0xffffffffa2f056df
+     0.18%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     0.16%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     0.15%  baselines  [unknown]         [k] 0xffffffffa360f289
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2ee0963
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2d84e0d
+     0.09%  baselines  [unknown]         [k] 0xffffffffa2ee0936
+     0.09%  baselines  [unknown]         [k] 0xffffffffa360f280
+     0.06%  baselines  [unknown]         [k] 0xffffffffa30f98b3
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2ee0947
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2f02a95
+     0.05%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f07f87
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3620e80
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f493d0
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d5d6b2
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2c81b34
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d84e00
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ec81c7
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f01d3d
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4ef98
+     0.03%  baselines  libjemalloc.so.2  [.] je_large_dalloc
+     0.03%  baselines  libjemalloc.so.2  [.] free
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2dc8718
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4be62
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2edfe79
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ec8145
+     0.03%  baselines  [unknown]         [k] 0xffffffffa30f98ed
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4b8e6
+     0.03%  baselines  [unknown]         [k] 0xffffffffa38011e0
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f50951
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f01d10
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ee8722
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3620e8c
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f490a7
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4bf60
+     0.03%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute<CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch(MultiPointer<unsigned int, unsigned int>, unsigned long, bool)::{lambda(unsigned long, float)#1}>
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 3K of event 'instructions'
+# Event count (approx.): 3490927758
+#
+# Overhead  Command    Shared Object       Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ..................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    73.87%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::grow_list
+    11.78%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_density_count
+     5.96%  baselines  libc-2.28.so        [.] __memmove_evex_unaligned_erms
+     2.86%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute_lookup_sibling_count
+     1.01%  baselines  [unknown]           [k] 0xffffffffa360f287
+     0.98%  baselines  baselines           [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.61%  baselines  baselines           [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.49%  baselines  baselines           [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+     0.38%  baselines  baselines           [.] memcpy@plt
+     0.33%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     0.24%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     0.21%  baselines  [unknown]           [k] 0xffffffffa2f01d14
+     0.19%  baselines  [unknown]           [k] 0xffffffffa2f02a95
+     0.18%  baselines  [unknown]           [k] 0xffffffffa2f056df
+     0.13%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     0.05%  baselines  [unknown]           [k] 0xffffffffa2f01d47
+     0.05%  baselines  [unknown]           [k] 0xffffffffa2f05702
+     0.05%  baselines  [unknown]           [k] 0xffffffffa2f490c5
+     0.05%  baselines  [unknown]           [k] 0xffffffffa360f280
+     0.05%  baselines  [unknown]           [k] 0xffffffffa2ee86d0
+     0.05%  baselines  [unknown]           [k] 0xffffffffa2f056e7
+     0.04%  baselines  libpthread-2.28.so  [.] __pthread_mutex_unlock_usercnt
+     0.03%  baselines  [unknown]           [k] 0xffffffffa30f98e0
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2f4bfd6
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2f01d1d
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2f01d54
+     0.03%  baselines  libjemalloc.so.2    [.] malloc
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2ec81b9
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2e8fecf
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f4f6fe
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f05c61
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f4ef77
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2eec0a0
+     0.02%  baselines  [unknown]           [k] 0xffffffffa38011e0
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f056d3
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f4ef63
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2ec8175
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2ee88b0
+     0.02%  baselines  [unknown]           [k] 0xffffffffa38011fe
+     0.02%  baselines  baselines           [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.01%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.01%  baselines  libjemalloc.so.2    [.] free
+     0.01%  baselines  [unknown]           [k] 0xffffffffa360f740
+     0.00%  baselines  [unknown]           [k] 0xffffffffa2c77296
+
+
+# Samples: 3K of event 'cache-references'
+# Event count (approx.): 107128141
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    46.78%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::grow_list
+    32.89%  baselines  [unknown]         [k] 0xffffffffa360f287
+     7.76%  baselines  libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     6.99%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_density_count
+     0.77%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute_lookup_sibling_count
+     0.52%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     0.41%  baselines  baselines         [.] memcpy@plt
+     0.40%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.34%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     0.29%  baselines  [unknown]         [k] 0xffffffffa2f01d14
+     0.28%  baselines  [unknown]         [k] 0xffffffffa2f056df
+     0.18%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.14%  baselines  [unknown]         [k] 0xffffffffa3620e8c
+     0.08%  baselines  [unknown]         [k] 0xffffffffa2ee0947
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2f01d3d
+     0.07%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2f490c5
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2f07ecd
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2f490a7
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ec8113
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2ee092e
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2d5da71
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f0245c
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2eb4151
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2c81dc7
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2d331f4
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2d97fb0
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2e8ff62
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2ee8722
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2d84e0d
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f02a95
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2d9a78c
+     0.04%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f3ee29
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f056f2
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f056d0
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2ed8b0b
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f07eac
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f23e4d
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f14107
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f056f7
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2ed8b15
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2edfe9f
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f23ce2
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f01d34
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f01d10
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f01d61
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ef70cd
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ec6eda
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d9931c
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d9a3a2
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d53a26
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f056d3
+     0.03%  baselines  [unknown]         [k] 0xffffffffa38013a2
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f056ff
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d9a568
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3800a43
+     0.03%  baselines  libjemalloc.so.2  [.] free
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f04e71
+     0.03%  baselines  [unknown]         [k] 0xffffffffa38011e0
+     0.03%  baselines  [unknown]         [k] 0xffffffffa38011fe
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4e04f
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ec8175
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2c2810e
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ee9063
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2eb2a98
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ee0936
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ee911b
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2e95d8d
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ee095b
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ed8b05
+     0.01%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2d9b61c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f7789d
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e85f8f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fcf0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 3K of event 'cache-misses'
+# Event count (approx.): 27434930
+#
+# Overhead  Command    Shared Object       Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ..................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    39.64%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::grow_list
+    30.24%  baselines  [unknown]           [k] 0xffffffffa360f287
+    15.19%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_density_count
+     7.92%  baselines  libc-2.28.so        [.] __memmove_evex_unaligned_erms
+     1.54%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     1.45%  baselines  baselines           [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.83%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute_lookup_sibling_count
+     0.38%  baselines  baselines           [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     0.32%  baselines  [unknown]           [k] 0xffffffffa2f056df
+     0.32%  baselines  [unknown]           [k] 0xffffffffa2f01d14
+     0.27%  baselines  baselines           [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.27%  baselines  baselines           [.] memcpy@plt
+     0.18%  baselines  [unknown]           [k] 0xffffffffa2ee0963
+     0.15%  baselines  [unknown]           [k] 0xffffffffa2ee095b
+     0.12%  baselines  libjemalloc.so.2    [.] je_emap_update_edata_state
+     0.10%  baselines  [unknown]           [k] 0xffffffffa2ee0947
+     0.08%  baselines  [unknown]           [k] 0xffffffffa2f05702
+     0.07%  baselines  [unknown]           [k] 0xffffffffa30f98ed
+     0.07%  baselines  [unknown]           [k] 0xffffffffa30f98e0
+     0.07%  baselines  [unknown]           [k] 0xffffffffa2f51860
+     0.07%  baselines  [unknown]           [k] 0xffffffffa2d30893
+     0.06%  baselines  [unknown]           [k] 0xffffffffa3620e8c
+     0.06%  baselines  [unknown]           [k] 0xffffffffa2e8fecf
+     0.04%  baselines  libpthread-2.28.so  [.] __pthread_mutex_trylock
+     0.04%  baselines  [unknown]           [k] 0xffffffffa2eb2a9f
+     0.04%  baselines  [unknown]           [k] 0xffffffffa2f01d2c
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2f01d1d
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2f3eeb1
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2e8fec7
+     0.03%  baselines  [unknown]           [k] 0xffffffffa3627470
+     0.03%  baselines  [unknown]           [k] 0xffffffffa2e88fb2
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f490a7
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f056ff
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f056d3
+     0.02%  baselines  libjemalloc.so.2    [.] je_free_default
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2ec8188
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f056f7
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2d96d5c
+     0.02%  baselines  [unknown]           [k] 0xffffffffa3627181
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f056fb
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2f056ee
+     0.02%  baselines  [unknown]           [k] 0xffffffffa3620e90
+     0.02%  baselines  baselines           [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.02%  baselines  libjemalloc.so.2    [.] je_extent_commit_zero
+     0.02%  baselines  [unknown]           [k] 0xffffffffa2ee9116
+     0.00%  baselines  ld-2.28.so          [.] do_lookup_x
+     0.00%  baselines  [unknown]           [k] 0xffffffffa360f740
+     0.00%  baselines  [unknown]           [k] 0xffffffffa2e90b30
+     0.00%  baselines  [unknown]           [k] 0xffffffffa2e8fcf0
+     0.00%  baselines  [unknown]           [k] 0xffffffffa2c77296
+
+
+# Samples: 3K of event 'branch-instructions'
+# Event count (approx.): 389344313
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                        
+# ........  .........  ................  ..............................................................................................................................................................................................................................................................................................................................................................................................
+#
+    64.76%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::grow_list
+    12.99%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_density_count
+     9.60%  baselines  libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     3.50%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute_lookup_sibling_count
+     1.83%  baselines  [unknown]         [k] 0xffffffffa360f287
+     1.42%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     1.26%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+     0.98%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     0.79%  baselines  baselines         [.] memcpy@plt
+     0.44%  baselines  [unknown]         [k] 0xffffffffa2f01d14
+     0.32%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     0.29%  baselines  [unknown]         [k] 0xffffffffa2f056df
+     0.25%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     0.24%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     0.10%  baselines  [unknown]         [k] 0xffffffffa2f01d34
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2f05702
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2f48fd7
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2f01d54
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2ef864d
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2f01d2c
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f4917d
+     0.04%  baselines  [unknown]         [k] 0xffffffffa38011e0
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f056f7
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2ec81c7
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f020c4
+     0.03%  baselines  libjemalloc.so.2  [.] free
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3627470
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4bcbf
+     0.03%  baselines  [unknown]         [k] 0xffffffffa30f98b3
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f056d0
+     0.03%  baselines  [unknown]         [k] 0xffffffffa3800bd6
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d331b0
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f056e7
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ee0947
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ee90ac
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f23c46
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f02a95
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2e8fecf
+     0.03%  baselines  [unknown]         [k] 0xffffffffa38011fe
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4bd16
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d430c1
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f056ff
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2d84e0d
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f4be7a
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ec8175
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2c81dd2
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2eca310
+     0.03%  baselines  baselines         [.] parlay::fork_join_scheduler::parfor_<parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl::storage_impl(parlay::sequence_internal::sequence_base<unsigned int, parlay::allocator<unsigned int>, false>::storage_impl const&)::{lambda(unsigned long)#1}>
+     0.01%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.01%  baselines  baselines         [.] free@plt
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2d96897
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+
+
+# Samples: 1K of event 'branch-misses'
+# Event count (approx.): 2007965
+#
+# Overhead  Command    Shared Object     Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+# ........  .........  ................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    36.36%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute_lookup_sibling_count
+    34.15%  baselines  baselines         [.] std::__introsort_loop<MultiPointer<unsigned int, unsigned int>, unsigned long, __gnu_cxx::__ops::_Iter_comp_iter<std::less<void> > >
+     6.85%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch
+     5.37%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_density_count
+     4.16%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::merge_into_leaf<true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     4.16%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch_internal_small_batch<std::vector<std::pair<unsigned long, unsigned long>, std::allocator<std::pair<unsigned long, unsigned long> > > >
+     4.13%  baselines  baselines         [.] uncompressed_leaf<unsigned int, unsigned int>::insert<true, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> >, false, empty_type>
+     1.94%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::find_containing_leaf_index
+     0.65%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::grow_list
+     0.56%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_leaf
+     0.27%  baselines  libjemalloc.so.2  [.] malloc
+     0.11%  baselines  baselines         [.] CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::get_ranges_to_redistibute<CPMA<PMA_traits<uncompressed_leaf<unsigned int, unsigned int>, (HeadForm)0, 0ul, false, false, false, 4096ul, true, false, overwrite_on_insert<std::tuple<unsigned int&, unsigned int&>, std::tuple<unsigned int, unsigned int> > > >::insert_batch(MultiPointer<unsigned int, unsigned int>, unsigned long, bool)::{lambda(unsigned long, float)#1}>
+     0.11%  baselines  libjemalloc.so.2  [.] free
+     0.08%  baselines  [unknown]         [k] 0xffffffffa2f50669
+     0.07%  baselines  [unknown]         [k] 0xffffffffa30f98b3
+     0.07%  baselines  [unknown]         [k] 0xffffffffa2ee90ac
+     0.06%  baselines  [unknown]         [k] 0xffffffffa360f287
+     0.06%  baselines  [unknown]         [k] 0xffffffffa2f01de3
+     0.06%  baselines  [unknown]         [k] 0xffffffffa38011fe
+     0.05%  baselines  [unknown]         [k] 0xffffffffa2ee86d0
+     0.05%  baselines  libjemalloc.so.2  [.] je_arena_dalloc_bin_locked_handle_newly_empty
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f0215d
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f4bfd6
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f02ac1
+     0.04%  baselines  [unknown]         [k] 0xffffffffa2f8ebc9
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2f058bf
+     0.03%  baselines  [unknown]         [k] 0xffffffffa2ed8af3
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ee88a7
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2ee88b0
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c81dd2
+     0.02%  baselines  [unknown]         [k] 0xffffffffa2c81b48
+     0.02%  baselines  libjemalloc.so.2  [.] je_edata_heap_insert
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ec8113
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2c81dc7
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2c81b42
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ee87aa
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2f3eeac
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2f3ee29
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2f4bcbf
+     0.01%  baselines  [unknown]         [k] 0xffffffffa3620e80
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2eedbc0
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2eec0a0
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2d5da6c
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ed8afb
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ec8145
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ee3a95
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2ec8153
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2eec096
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2f02ab3
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2f4bca0
+     0.01%  baselines  [unknown]         [k] 0xffffffffa2d3359c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f3ee3a
+     0.00%  baselines  [unknown]         [k] 0xffffffffa36274d7
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ee861c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f3ecd0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f4bcb3
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ee8722
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f059b6
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ee9116
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f05056
+     0.00%  baselines  libc-2.28.so      [.] __memmove_evex_unaligned_erms
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2da38e8
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d85c80
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d9a3a2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d53aae
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8fed8
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ec81b9
+     0.00%  baselines  libjemalloc.so.2  [.] je_arena_dalloc_bin_locked_handle_newly_nonempty
+     0.00%  baselines  [unknown]         [k] 0xffffffffa3620e8c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f050c7
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d9a52e
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ed8ab9
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f058c9
+     0.00%  baselines  [unknown]         [k] 0xffffffffa30f98b0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d9a4c0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c77296
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d9a78c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ee888c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81b40
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81dd4
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d5369c
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d5da7f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d5da60
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f02abe
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f059c0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d5da71
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ee8621
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f21135
+     0.00%  baselines  [unknown]         [k] 0xffffffffa38014f1
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d9a551
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e3fbf7
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d85b52
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f4ff00
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d801ce
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d53a19
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81b1a
+     0.00%  baselines  [unknown]         [k] 0xffffffffa30f98ed
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d52e8d
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c64b87
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2da85c7
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2edfe79
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d85bb4
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d81e10
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d85e9a
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ee8628
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d59cbc
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d85bfa
+     0.00%  baselines  [unknown]         [k] 0xffffffffa35fc1a0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d80760
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d3340f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d42a55
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2df8315
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ec8100
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f3ee2e
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f4ef50
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81b4d
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d4338b
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d52ea3
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d8305d
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d9a3bd
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2da85fb
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e84ea0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f23cd3
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f49331
+     0.00%  baselines  [unknown]         [k] 0xffffffffa3801504
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d96830
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ed8b05
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f140f0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f23ce2
+     0.00%  baselines  [unknown]         [k] 0xffffffffa3627154
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81aca
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d3090b
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d96bf0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e8ffc4
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ed8b0e
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f04f55
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f0512e
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f056e7
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f4bd18
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f508e9
+     0.00%  baselines  [unknown]         [k] 0xffffffffa362714b
+     0.00%  baselines  [unknown]         [k] 0xffffffffa3800a43
+     0.00%  baselines  baselines         [.] free@plt
+     0.00%  baselines  libjemalloc.so.2  [.] je_large_dalloc
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81ad3
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81b5f
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2c81bee
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d53296
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d53a97
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d5b3a0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d85b61
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d96872
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2d970f6
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e3fb73
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e90127
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ed8b0b
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f02aaa
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f050dd
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f05c61
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f09810
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f490a7
+     0.00%  baselines  [unknown]         [k] 0xffffffffa30f98e0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa3800a04
+     0.00%  baselines  libjemalloc.so.2  [.] aligned_alloc
+     0.00%  baselines  libjemalloc.so.2  [.] je_edata_avail_remove
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2cfffc0
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2e3fb82
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2ed8b00
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f05737
+     0.00%  baselines  [unknown]         [k] 0xffffffffa2f05881
+     0.00%  baselines  [unknown]         [k] 0xffffffffa360f280
+     0.00%  baselines  [unknown]         [k] 0xffffffffa360f289
+
+
+#
+# (Tip: To show IPC for sampling periods use perf record -e '{cycles,instructions}:S' and then browse context)
+#

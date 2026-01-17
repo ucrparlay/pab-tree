@@ -12,7 +12,8 @@ from pathlib import Path
 solver = ""
 ratio_map = {}
 input_type = sys.argv[1]
-log_folder_name = "query_cache"
+# log_folder_name = "query_cache"
+log_folder_name = "p001_insert"
 # log_folder_name = "cache"
 
 subprocess.run(
