@@ -54,23 +54,28 @@ struct map_ops : Seq
     return ret;
   }
 
-  static std::optional<ET> find(ptr b, K const& key)
+  static std::optional<ET> find(node* b, K const& key)
   {
-    if (b.empty())
+    if (!b)
       return {};
-    if (b.is_compressed()) {
-      return find_compressed(std::move(b), key);
+    if (Seq::is_compressed(b)) {
+      return find_compressed(b, key);
     }
-    auto [lc, e, rc, m] = Seq::expose(std::move(b));
+    // auto [lc, e, rc, m] = Seq::expose(std::move(b));
+    auto rb = Seq::cast_to_regular(b);
+    auto rc = rb->rc;
+    auto lc = rb->lc;
+    auto e = rb->entry;
     std::optional<ET> ret = {};
-    if (Entry::comp(key, Entry::get_key(e))) {
-      ret = find(std::move(lc), key);
-    } else if (Entry::comp(Entry::get_key(e), key)) {
-      ret = find(std::move(rc), key);
+
+    if (Entry::comp(key, Entry::get_key(e.first))) {
+      ret = find(lc, key);
+    } else if (Entry::comp(Entry::get_key(e.first), key)) {
+      ret = find(rc, key);
     } else {
-      ret = { e };
+      ret = { e.first };
     }
-    GC::decrement(m);
+    // GC::decrement(m);
     return ret;
   }
 
@@ -164,7 +169,7 @@ struct map_ops : Seq
     split_info(node* l, std::optional<ET> mid, node* r)
       : l(l)
       , mid(mid)
-      , r(r) {};
+      , r(r){};
   };
 
   static split_info split(ptr a, K const& k)

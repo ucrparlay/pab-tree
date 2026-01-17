@@ -602,13 +602,13 @@ public:
   // returns default value if not found
   V find(K const& key, V defaultv) const
   {
-    auto et_opt = Tree::find(ptr(root, true), key);
+    auto et_opt = Tree::find(root, key);
     return et_opt.has_value() ? Entry::get_val(*et_opt) : defaultv;
   }
 
   bool contains(K const& key) const
   {
-    return Tree::find(ptr(root, true), key).has_value();
+    return Tree::find2(root, key).has_value();
   }
 
   // TODO
