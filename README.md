@@ -51,4 +51,5 @@ To test a baseline with exp distribution, e.g., PMA, try:
 ./build/baselines -p [path_to_data]/exp/50000000_1/ins/100/1.base.in -d 1 -t 1 -r 4 -q 1 -s 0 -b 0.01 -T 3 -D exp
 ```
 
+This will run the tree construction for 4 times, and batch insertion for 4 times, then the membership query.
 
