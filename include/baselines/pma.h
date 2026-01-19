@@ -43,8 +43,13 @@ public:
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
-    return { parlay::map(input_seq, [&](auto e) { return Entry::GetKey(e); }),
-             parlay::map(input_seq, [&](auto e) { return Entry::GetVal(e); }) };
+    return { parlay::map(input_seq,
+                         [&](auto e) {
+                           return Entry::GetKey(e) + 1;
+                         }),
+             parlay::map(input_seq, [&](auto e) {
+               return Entry::GetVal(e);
+             }) };
   }
 
   template<class PT>
@@ -54,6 +59,9 @@ public:
     // auto v = P.second;
     // std::cout << "PMA build started..." << pma_tree_->size() << std::endl;
     // auto k = P.first;
+    assert(parlay::all_of(P.first, [](auto x) {
+      return x != 0;
+    }));
     size_t n = P.first.size();
     // parlay::sort_inplace(parlay::make_slice(P.first));
     // parlay::sort_inplace(parlay::make_slice(P.second));
@@ -66,6 +74,9 @@ public:
   template<typename PT>
   void map_insert(PT P)
   {
+    assert(parlay::all_of(P.first, [](auto x) {
+      return x != 0;
+    }));
     size_t n = P.first.size();
     // parlay::sort_inplace(parlay::make_slice(P.first));
     // parlay::sort_inplace(parlay::make_slice(P.second));
@@ -73,60 +84,6 @@ public:
     pma_tree_->insert_batch(it, n, false);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
-  //
-  // template <typename PT, typename M>
-  // auto map_delete(PT P, M&& mmp) {
-  //   size_t n = P.size();
-  //
-  //   parlay::parallel_for(
-  //       0, n, [&](int i) { P[i].aug.code = SplitRule::Encode(P[i]); });
-  //   parlay::sequence<par> delete_pts(n);
-  //   // parlay::sequence<pair<unsigned long long, long long> > delete_pts(n);
-  //   parlay::parallel_for(0, n, [&](int i) {
-  //     delete_pts[i] = {{P[i].aug.code, P[i].aug.id}, P[i]};
-  //     // delete_pts[i] = {P[i]->morton_id, P[i]->id};
-  //     // insert_pts[i] = {P[i]->id, P[i]};
-  //   });
-  //
-  //   return std::move(zmap::multi_delete(std::forward<M>(mmp), delete_pts));
-  // }
-  //
-  // int mbr_mbr_relation(Box const& a, Box const& b) {
-  //   if (!BT::BoxIntersectBox(a, b)) {
-  //     return -1;  // disjoint
-  //   } else if (BT::WithinBox(a, b)) {
-  //     return 1;
-  //   } else {
-  //     return 0;  // overlap
-  //   }
-  // }
-  //
-
-  // template <class T, class MBR>
-  // auto range_count(T& zCPAM, MBR& query_mbr) {
-  //   // auto f = [&](auto& cur) { return mbr_mbr_relation(cur, query_mbr); };
-  //   // auto f2 = [&](auto& cur) { return point_in_mbr(cur, query_mbr); };
-  //   auto f = [&](auto& cur_mbr) {
-  //     return mbr_mbr_relation(cur_mbr, query_mbr);
-  //   };
-  //   auto f2 = [&](auto& cur_point) {
-  //     return BT::WithinBox(cur_point, query_mbr);
-  //   };
-  //
-  //   auto res = zmap::range_count_filter2(zCPAM, f, f2);
-  //   return res;
-  // }
-  //
-  // template <class T, class MBR, typename Out>
-  // auto range_report(T& tree, MBR query_mbr, Out&& out) {
-  //   // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
-  //   auto f = [&](auto cur) { return mbr_mbr_relation(cur, query_mbr); };
-  //
-  //   int64_t ret = 0;
-  //   // zmap::range_report_filter(tree, f, ret, out);
-  //   zmap::range_report_filter2(tree, f, ret, out);
-  //   return ret;
-  // }
 
   // APIs
   template<typename Range>
