@@ -128,7 +128,7 @@ target_include_directories(b_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
 target_link_libraries(baselines PUBLIC TEST_FRAME)
 target_include_directories(baselines PUBLIC ${TEST_FRAME_INCLUDE_DIR})
-target_compile_definitions(baselines PUBLIC)
+target_compile_definitions(baselines PUBLIC PARALLEL=1 PARLAY=1)
 
 # NOTE: GoogleTest for b_ccp
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
