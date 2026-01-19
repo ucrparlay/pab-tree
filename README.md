@@ -20,120 +20,35 @@ Try:
 1. Clone the repository.
 
 ```{bash}
-cd SpaceTreeLib
+git clone https://github.com/ucrparlay/ParallelMultiwayOrderedSet
+cd ParallelMultiwayOrderedSet
 ```
 
 2. Initialize the submodule:
 
 ```bash
-git submodule update --init
+git submodule update --init --recursive
 ```
-
-File structure:
-
-```bash
-├── benchmark
-├── include
-│   ├── parlaylib
-│   └── pmos
-│       ├── b_tree_impl
-│       │   └── tree_op
-│       ├── cover_tree_impl
-│       ├── dependence
-│       │   ├── cpam
-│       │   └── space_filling_curve
-│       ├── kd_tree_impl
-│       ├── orth_tree_impl
-│       ├── p_tree_impl
-│       └── r_tree_impl
-├── script
-├── static_analysis
-└── tests
-```
-
-|    Name     |          Usage          |
-| :---------: | :---------------------: |
-| `benchmark` | Stores sample benchmark |
-|  `include/pmos`  |  Source of `PMOS`   |
-| `include/parlaylib` |   Provide parallelism   |
-| `include/baselines` |   implmentation of baselines   |
-|  `scipts`   | Scripts for experiments |
-|   `tests`   |   Helpers for testing   |
 
 ## Compilation
 
 ```bash
 mkdir build && cd build
-cmake -DDEBUG=OFF -DCGAL=OFF -DJEMA=OFF ..
+cmake -DDEBUG=OFF -DJEMA=OFF ..
 make
 ```
 
-Useful flags:
-
-|   Name   |                 Usage                  | Default Value |
-| :------: | :------------------------------------: | :-----------: |
-| `DEBUG`  |         Compile in debug mode          |     `OFF`     |
-| `SERIAL` |        Disable the parallelism         |     `OFF`     |
-|  `CGAL`  | used to check the correctness |     `OFF`     |
-|  `JEMA`  |  Allocate the memory using `jemalloc`  |     `OFF`     |
-
-More options can be found in `CMakeLists.txt`.
-
-## Usage
-
-Implemented in `tests/*_test.cpp`. 
-
-### Command line
+## Generate data
 
 ```bash
-./${solver}$ -p [input_path] -d [dimension] -t [batch_mode] -r [rounds] -q [query_type] -i [read_insert_file_flag]
+./scripts/gen_graph.sh [path_for_data]
 ```
 
-Parameters:
 
-| Name |                       Usage                       |          Sample          |
-| :--: | :-----------------------------------------------: | :----------------------: |
-| `-p` |                 Input points path                 | `-p benchmark/sample.in` |
-| `-d` |                Dimension of points                |          `-d 3`          |
-| `-t` |  Batch mode, see [below](#test-framework-format)  |          `-t 0`          |
-| `-r` |         How many rounds one test case run         |          `-r 3`          |
-| `-q` | Query type, see [ below ](#test-framework-format) |          `-q 1`          |
-| `-i` |     Whether to read the file for batch update     |          `-i 0`          |
-| `-T` |     The tree type     |          `-T 0`          |
-| `-l` |     The split for the tree     |          `-l 0`          |
-
-### Example
-
-Under `build/` folder, first generate two inputs, $P_1$ for tree construction and $P_2$ for batch update:
-
+## Test 
+To test a baseline with exp distribution, e.g., PMA, try:
 ```{bash}
-./data_generator -p ../benchmark -n 10000 -d 2 -file_num 2 -varden 0
+./build/baselines -p [path_to_data]/exp/50000000_1/ins/100/1.base.in -d 1 -t 1 -r 4 -q 1 -s 0 -b 0.01 -T 3 -D exp
 ```
-
-which will generate two files named `1.in` and `2.in` in `benchmark/10000_3/`. Then to build a quad-tree $P_1$, insert $P_2$, after which perform the $10$-NN search, try:
-
-```{bash}
-./kd_test -p ../benchmark/uniform/10000_2/1.in -d 2 -t 1 -q 1 -r 3 -i 1 -T 1 -l 3 
-```
-
-To parse the output, see [ Test Framework Format ](#test-framework-format) below.
-
-## Test Framework Format
-
-Implemented in `tests/test_framework.h`.
-
-## Graph Generator
-PMOS provides two types of parallel data generator: `Uniform` and `Varden`.
-
-Usage:
-```{bash}
-# In the folder build
-make data_generator
-./data_generator -p [output_path] -d [dimension] -n [points_num] -file_num [files_num] -varden [0:uniform, 1:varden] 
-```
-It will create folders named as `uniform_bigint/` or `ss_varden_bigint/` under the directory specified by `output_path/`. The output file is numbered from `1.in` to `files_num`.
-
-The data file begins with two integer, namely `points_num` and the `dimension`, follows by `points_num` number of lines, each line contains the coordinates for each point, separated by space.
-
 
 
