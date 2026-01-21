@@ -106,7 +106,9 @@ recurse_box(parlay::slice<Point*, Point*> In,
           // (type == 2 && n < 2 * range.first) ||
           // parlay::all_of(
           In,
-          [&](Point const& p) { return p.SameDimension(In[0]); })) {
+          [&](Point const& p) {
+            return p.SameDimension(In[0]);
+          })) {
       // NOTE: handle the cose that all Points are the same which is
       // undivideable
       return In.size();
@@ -237,9 +239,15 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
     double aveBuild = time_loop(
       rounds,
       loop_late,
-      [&]() { wp = parsed_input; },
-      [&]() { pkd.Build(wp); },
-      [&]() { pkd.DeleteTree(); });
+      [&]() {
+        wp = parsed_input;
+      },
+      [&]() {
+        pkd.Build(wp);
+      },
+      [&]() {
+        pkd.DeleteTree();
+      });
 
     wp = parsed_input;
     pkd.Build(wp);
@@ -278,8 +286,12 @@ BatchInsert(Tree& pkd,
         wi = parsed_batch;
         pkd.Build(wp);
       },
-      [&]() { pkd.BatchInsert(wi); },
-      [&]() { pkd.DeleteTree(); });
+      [&]() {
+        pkd.BatchInsert(wi);
+      },
+      [&]() {
+        pkd.DeleteTree();
+      });
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
     BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
@@ -318,8 +330,12 @@ BatchDelete(Tree& pkd,
         BuildTree<Point, Tree, false>(WP, rounds, pkd);
         parlay::copy(WI, wi);
       },
-      [&]() { pkd.BatchDelete(wi.cut(0, batchSize)); },
-      [&]() { pkd.DeleteTree(); });
+      [&]() {
+        pkd.BatchDelete(wi.cut(0, batchSize));
+      },
+      [&]() {
+        pkd.DeleteTree();
+      });
     std::cout << aveDelete << " " << std::flush;
     BuildTree<Point, Tree, false>(WP, rounds, pkd);
   } else {
@@ -367,8 +383,12 @@ BatchDiff(Tree& pkd,
         BuildTree<Point, Tree, false>(WP, rounds, pkd);
         parlay::copy(WI, wi);
       },
-      [&]() { pkd.BatchDiff(wi.cut(0, total_batch_size)); },
-      [&]() { pkd.DeleteTree(); });
+      [&]() {
+        pkd.BatchDiff(wi.cut(0, total_batch_size));
+      },
+      [&]() {
+        pkd.DeleteTree();
+      });
     std::cout << aveDelete << " " << std::flush;
     BuildTree<Point, Tree, false>(WP, rounds, pkd);
   } else {
@@ -450,9 +470,15 @@ BatchInsertByStep(Tree& pkd,
   double ave_time = time_loop(
     rounds,
     loop_late,
-    [&]() { prepare_build(); },
-    [&]() { incre_build(slice_num + 1); },
-    [&]() { pkd.DeleteTree(); });
+    [&]() {
+      prepare_build();
+    },
+    [&]() {
+      incre_build(slice_num + 1);
+    },
+    [&]() {
+      pkd.DeleteTree();
+    });
 
   // begin count the time
   if (rounds != 1 && round_cnt - 1 != rounds) {
@@ -565,9 +591,15 @@ BatchDeleteByStep(Tree& pkd,
   double ave_time = time_loop(
     rounds,
     loop_late,
-    [&]() { build_tree_by_type(); },
-    [&]() { incre_delete(slice_num, wp.cut(0, slice_num * step)); },
-    [&]() { pkd.DeleteTree(); });
+    [&]() {
+      build_tree_by_type();
+    },
+    [&]() {
+      incre_delete(slice_num, wp.cut(0, slice_num * step));
+    },
+    [&]() {
+      pkd.DeleteTree();
+    });
 
   if (rounds != 1 && round_cnt - 1 != rounds) {
     throw std::runtime_error("rounds not match!");
@@ -718,14 +750,16 @@ RangeCount(parlay::sequence<Point> const& wp,
   double aveCount = time_loop(
     rounds,
     0.01,
-    [&]() {},
+    [&]() {
+    },
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
         kdknn[i] = size;
       });
     },
-    [&]() {});
+    [&]() {
+    });
 
   // NOTE: verify the solutions
   std::cout << "check range count: " << rec_num << " " << rec_type << std::endl;
@@ -761,7 +795,8 @@ rangeCountRadius(parlay::sequence<Point> const& wp,
   double aveCount = time_loop(
     rounds,
     0.01,
-    [&]() {},
+    [&]() {
+    },
     [&]() {
       parlay::parallel_for(0, queryNum, [&](size_t i) {
         Box query_box_seq = pkd.get_box(
@@ -772,7 +807,8 @@ rangeCountRadius(parlay::sequence<Point> const& wp,
         kdknn[i] = pkd.range_count(cl);
       });
     },
-    [&]() {});
+    [&]() {
+    });
 
   std::cout << aveCount << " " << std::flush;
 
@@ -794,9 +830,10 @@ RangeQuery(parlay::sequence<Point> const& wp,
   auto [query_box_seq, max_size] =
     gen_rectangles<Point, Tree, true>(rec_num, rec_type, wp, DIM);
   auto [offset, tot_size] = parlay::scan(
-    parlay::delayed_tabulate(
-      rec_num,
-      [&](size_t i) -> size_t { return query_box_seq[i].second.size(); }),
+    parlay::delayed_tabulate(rec_num,
+                             [&](size_t i) -> size_t {
+                               return query_box_seq[i].second.size();
+                             }),
     parlay::addm<size_t>());
   offset.push_back(tot_size);
   Points Out(tot_size);
@@ -807,7 +844,8 @@ RangeQuery(parlay::sequence<Point> const& wp,
   double ave_query = time_loop(
     rounds,
     0.01,
-    [&]() {},
+    [&]() {
+    },
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         auto [size, logger] = pkd.RangeQuery(query_box_seq[i].first,
@@ -820,7 +858,8 @@ RangeQuery(parlay::sequence<Point> const& wp,
         skip_box[i] = logger.skip_box_num;
       });
     },
-    [&]() {});
+    [&]() {
+    });
 
   std::cout << "check range query: " << rec_num << " " << rec_type << " "
             << max_size << std::endl;
@@ -836,12 +875,14 @@ RangeQuery(parlay::sequence<Point> const& wp,
     // std::cout << kdknn[i] << " " << query_box_seq[i].second.size() << " "
     //     << query_box_seq[i].first.first << query_box_seq[i].first.second
     //     << std::endl;
-    parlay::sort_inplace(
-      Out.cut(offset[i], offset[i + 1]),
-      [&](auto const& a, auto const& b) { return a.aug.id < b.aug.id; });
-    parlay::sort_inplace(
-      query_box_seq[i].second,
-      [&](auto const& a, auto const& b) { return a.aug.id < b.aug.id; });
+    parlay::sort_inplace(Out.cut(offset[i], offset[i + 1]),
+                         [&](auto const& a, auto const& b) {
+                           return a.aug.id < b.aug.id;
+                         });
+    parlay::sort_inplace(query_box_seq[i].second,
+                         [&](auto const& a, auto const& b) {
+                           return a.aug.id < b.aug.id;
+                         });
     for (size_t j = 0; j < query_box_seq[i].second.size(); j++) {
       if (Out[offset[i] + j] != query_box_seq[i].second.at(j)) {
         std::cout << "wrong" << query_box_seq[i].first.first
@@ -897,7 +938,8 @@ rangeCountFix(Tree& pkd,
   double aveCount = time_loop(
     rounds,
     0.01,
-    [&]() {},
+    [&]() {
+    },
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
@@ -913,7 +955,8 @@ rangeCountFix(Tree& pkd,
       //     kdknn[i] = pkd.RangeCount(query_box_seq[i].first);
       // }
     },
-    [&]() {});
+    [&]() {
+    });
 
   std::cout << aveCount << " " << std::flush;
   std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, rec_num))) /
@@ -982,7 +1025,8 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
   double ave_query = time_loop(
     kRounds,
     loop_late,
-    [&]() {},
+    [&]() {
+    },
     [&]() {
       parlay::parallel_for(0, query_num, [&](size_t i) {
         // for (int i = 0; i < query_num; i++) {
@@ -994,7 +1038,8 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
         // }
       });
     },
-    [&]() {});
+    [&]() {
+    });
 
   // std::cout << query_num << " ";
   std::cout << ave_query << " " << std::flush;
@@ -1016,10 +1061,12 @@ rangeQueryFix(Tree& pkd,
   //     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
   parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num),
     gen_box(rec_num), full_box(rec_num), skip_box(rec_num);
-  auto [offset, tot_size] = parlay::scan(
-    parlay::delayed_tabulate(
-      rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
-    parlay::addm<size_t>());
+  auto [offset, tot_size] =
+    parlay::scan(parlay::delayed_tabulate(rec_num,
+                                          [&](size_t i) -> size_t {
+                                            return query_box_seq[i].second;
+                                          }),
+                 parlay::addm<size_t>());
   offset.push_back(tot_size);
   // std::cout << "range query: " << rec_num << " " << rec_type << " " <<
   // tot_size
@@ -1034,7 +1081,8 @@ rangeQueryFix(Tree& pkd,
   double ave_query = time_loop(
     rounds,
     0.01,
-    [&]() {},
+    [&]() {
+    },
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         auto [size, logger] = pkd.RangeQuery(query_box_seq[i].first,
@@ -1048,7 +1096,8 @@ rangeQueryFix(Tree& pkd,
         skip_box[i] = logger.skip_box_num;
       });
     },
-    [&]() {});
+    [&]() {
+    });
 
   std::cout << ave_query << " " << std::flush;
   std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, rec_num))) /
@@ -1081,10 +1130,12 @@ RangeQuerySerialWithLog(Tree& pkd,
                         auto const& query_box_seq,
                         auto max_size)
 {
-  auto [offset, tot_size] = parlay::scan(
-    parlay::delayed_tabulate(
-      rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
-    parlay::addm<size_t>());
+  auto [offset, tot_size] =
+    parlay::scan(parlay::delayed_tabulate(rec_num,
+                                          [&](size_t i) -> size_t {
+                                            return query_box_seq[i].second;
+                                          }),
+                 parlay::addm<size_t>());
   offset.push_back(tot_size);
   // using ref_t = std::reference_wrapper<point>;
   // parlay::sequence<ref_t> out_ref( Out.size(), std::ref( Out[0] ) );
@@ -1231,8 +1282,9 @@ static auto constexpr DefaultTestFunc =
 
     if (opts.query_type & (1 << 0)) { // NOTE: membership
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
-      auto query_ele = wp.subseq(0, batch_size);
-      auto res = parlay::sequence<bool>(query_ele.size(), false);
+      auto query_ele =
+        wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
+      auto res = parlay::sequence<bool>(query_ele.size(), true);
       Membership<TT>(tree, query_ele, opts.rounds, res);
     }
 
