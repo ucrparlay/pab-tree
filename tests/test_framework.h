@@ -1281,6 +1281,10 @@ static auto constexpr DefaultTestFunc =
     // }
 
     if (opts.query_type & (1 << 0)) { // NOTE: membership
+      auto [base_path, batch_path] =
+        opts.ParseInsertBatchPath(kBatchQueryRatio);
+      auto [n2, d2] =
+        read_points<typename TT::E>(batch_path.c_str(), wi, wp.size());
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele =
         wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);

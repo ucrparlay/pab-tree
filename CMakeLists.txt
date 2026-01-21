@@ -139,7 +139,6 @@ add_test(NAME UnitTest COMMAND unit_test)
 
 if(JEMA)
 	target_link_libraries(b_test PUBLIC libjemalloc.so)
-	# target_link_libraries(baselines PUBLIC libjemalloc.so)
 endif()
 
 add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
