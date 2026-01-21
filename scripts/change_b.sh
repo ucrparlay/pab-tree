@@ -4,7 +4,7 @@ set -o xtrace
 
 /usr/bin/drop_caches
 
-declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 512 1024)
+declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
 
 Nodes=(1000000000)
 Dim=(1)
@@ -52,6 +52,7 @@ function run_test() {
 }
 
 function run_cmake() {
+	/usr/bin/drop_caches
 	local leaf_idx="$1"
 	local solver="$2"
 
@@ -65,24 +66,24 @@ function run_cmake() {
 
 solver="baselines"
 
-# # PMA
-# tree=3
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+# PMA
+tree=3
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
-# # PAM
-# tree=2
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
-#
-# # CPAM
-# tree=1
-# run_cmake 4 "${solver}"
-# run_test 4 "${solver}" "${tree}"
+# PAM
+tree=2
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
-# solver="b_test"
-# tree=0
-# for idx in "${!leaf_wrap_seq[@]}"; do
-# 	run_cmake "${idx}" "${solver}"
-# 	run_test "${idx}" "${solver}" "${tree}"
-# done
+# CPAM
+tree=1
+run_cmake 4 "${solver}"
+run_test 4 "${solver}" "${tree}"
+
+solver="b_test"
+tree=0
+for idx in "${!leaf_wrap_seq[@]}"; do
+	run_cmake "${idx}" "${solver}"
+	run_test "${idx}" "${solver}" "${tree}"
+done
