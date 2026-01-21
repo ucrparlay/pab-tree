@@ -20,8 +20,8 @@ mkdir -p "${log_path}"
 data_prefix="/data/zmen002/kv_pair"
 batch_op_seq=("ins")
 dis_seq=("uni" "exp" "norm" "dual_norm")
-insert_opt=("sort" "sieve")
-# insert_opt=("sieve")
+# insert_opt=("sort" "sieve")
+insert_opt=("sieve")
 batch_ratio=0.01
 
 function run_test() {
