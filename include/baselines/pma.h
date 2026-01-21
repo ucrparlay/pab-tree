@@ -60,7 +60,7 @@ public:
     }));
     size_t n = P.first.size();
     PmaPointer it(P.first.begin(), P.second.begin());
-    pma_tree_->insert_batch(it, n, true);
+    pma_tree_->insert_batch(it, n, false);
   }
 
   template<typename PT>
@@ -73,7 +73,7 @@ public:
     // parlay::sort_inplace(parlay::make_slice(P.first));
     // parlay::sort_inplace(parlay::make_slice(P.second));
     PmaPointer it(P.first.begin(), P.second.begin());
-    pma_tree_->insert_batch(it, n, true);
+    pma_tree_->insert_batch(it, n, false);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
 
