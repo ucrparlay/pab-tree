@@ -55,20 +55,12 @@ public:
   template<class PT>
   void map_init(PT P)
   {
-    // auto k = P.first;
-    // auto v = P.second;
-    // std::cout << "PMA build started..." << pma_tree_->size() << std::endl;
-    // auto k = P.first;
     assert(parlay::all_of(P.first, [](auto x) {
       return x != 0;
     }));
     size_t n = P.first.size();
-    // parlay::sort_inplace(parlay::make_slice(P.first));
-    // parlay::sort_inplace(parlay::make_slice(P.second));
-    // PmaPointer it(k.data());
     PmaPointer it(P.first.begin(), P.second.begin());
-    pma_tree_->insert_batch(it, n, false);
-    // std::cout << "PMA build done. size: " << pma_tree_->size() << std::endl;
+    pma_tree_->insert_batch(it, n, true);
   }
 
   template<typename PT>
@@ -81,7 +73,7 @@ public:
     // parlay::sort_inplace(parlay::make_slice(P.first));
     // parlay::sort_inplace(parlay::make_slice(P.second));
     PmaPointer it(P.first.begin(), P.second.begin());
-    pma_tree_->insert_batch(it, n, false);
+    pma_tree_->insert_batch(it, n, true);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
 
