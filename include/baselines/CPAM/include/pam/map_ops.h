@@ -254,8 +254,12 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       utils::do_parallel(n1, n2),
-      [&]() { return uniont(bsts.first, b2->lc, op, copy); },
-      [&]() { return uniont(bsts.second, b2->rc, op, copy); });
+      [&]() {
+        return uniont(bsts.first, b2->lc, op, copy);
+      },
+      [&]() {
+        return uniont(bsts.second, b2->rc, op, copy);
+      });
 
     if (copy && !extra_b2)
       GC::decrement_recursive(b2);
@@ -288,8 +292,12 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       utils::do_parallel(n1, n2),
-      [&]() { return intersect<Seq1, Seq2>(bsts.first, b2->lc, op, copy); },
-      [&]() { return intersect<Seq1, Seq2>(bsts.second, b2->rc, op, copy); });
+      [&]() {
+        return intersect<Seq1, Seq2>(bsts.first, b2->lc, op, copy);
+      },
+      [&]() {
+        return intersect<Seq1, Seq2>(bsts.second, b2->rc, op, copy);
+      });
 
     if (bsts.removed) {
       ET e(Seq2::get_key(b2),
@@ -321,8 +329,12 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       utils::do_parallel(n1, n2),
-      [&]() { return difference(b1->lc, bsts.first, copy); },
-      [&]() { return difference(b1->rc, bsts.second, copy); });
+      [&]() {
+        return difference(b1->lc, bsts.first, copy);
+      },
+      [&]() {
+        return difference(b1->rc, bsts.second, copy);
+      });
 
     if (bsts.removed) {
       GC::dec_if(b1, copy, extra_b1);
@@ -636,7 +648,9 @@ struct map_ops : Seq
     bool copy = extra_ptr || (b->ref_cnt > 1);
     K bk = get_key(b);
 
-    auto less_val = [&](K& a) -> bool { return Entry::comp(a, bk); };
+    auto less_val = [&](K& a) -> bool {
+      return Entry::comp(a, bk);
+    };
 
     //---
     // parlay::sequence<ET> stemp(A, n);
@@ -648,7 +662,9 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       utils::do_parallel(Seq::size(b), n),
-      [&]() { return multi_delete_sorted(b->lc, A, mid, copy); },
+      [&]() {
+        return multi_delete_sorted(b->lc, A, mid, copy);
+      },
       [&]() {
         return multi_delete_sorted(b->rc, A + mid + dup, n - mid - dup, copy);
       });
@@ -735,7 +751,9 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       utils::do_parallel(Seq::size(b), n),
-      [&]() { return multi_insert_sorted(b->lc, A, mid, op, copy); },
+      [&]() {
+        return multi_insert_sorted(b->lc, A, mid, op, copy);
+      },
       [&]() {
         return multi_insert_sorted(
           b->rc, A + mid + dup, n - mid - dup, op, copy);
@@ -764,8 +782,12 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       n >= utils::node_limit,
-      [&]() { return from_array_map(A, mid, map_op); },
-      [&]() { return from_array_map(A + mid + 1, n - mid - 1, map_op); });
+      [&]() {
+        return from_array_map(A, mid, map_op);
+      },
+      [&]() {
+        return from_array_map(A + mid + 1, n - mid - 1, map_op);
+      });
 
     return Seq::node_join(P.first, P.second, m);
   }
@@ -838,7 +860,9 @@ struct map_ops : Seq
 
     auto P = utils::fork<node*>(
       utils::do_parallel(Seq::size(b), n),
-      [&]() { return multi_update_sorted(b->lc, A, mid, op, copy); },
+      [&]() {
+        return multi_update_sorted(b->lc, A, mid, op, copy);
+      },
       [&]() {
         return multi_update_sorted(
           b->rc, A + mid + dup, n - mid - dup, op, copy);
@@ -857,13 +881,17 @@ struct map_ops : Seq
     if (n == 0)
       return true;
     K bk = get_key(b);
-    auto less_val = [&](K a) -> bool { return Entry::comp(a, bk); };
+    auto less_val = [&](K a) -> bool {
+      return Entry::comp(a, bk);
+    };
     size_t mid =
       parlay::internal::binary_search(parlay::make_slice(A, A + n), less_val);
     bool dup = (mid < n) && (!Entry::comp(bk, A[mid]));
     utils::fork<bool>(
       utils::do_parallel(Seq::size(b), n),
-      [&]() { return multi_find_sorted(b->lc, A, mid, ret, offset); },
+      [&]() {
+        return multi_find_sorted(b->lc, A, mid, ret, offset);
+      },
       [&]() {
         return multi_find_sorted(
           b->rc, A + mid + dup, n - mid - dup, ret, offset + mid + dup);
@@ -905,6 +933,5 @@ struct map_ops : Seq
     return Seq::template map_filter<Seq1>(b, g, granularity);
   }
 };
-
 
 } // namespace pam
