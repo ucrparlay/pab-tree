@@ -10,6 +10,7 @@
 #include "baselines/cpam.h"
 #include "baselines/pam.h"
 #include "baselines/pma.h"
+#include "baselines/spma.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
@@ -1693,6 +1694,11 @@ public:
   {
     using TreeType = typename PMA::PmaWrapper<TypeTrait>;
   };
+  template<typename TypeTrait>
+  struct SpmaWrapper
+  {
+    using TreeType = typename SPMA::SpmaWrapper<TypeTrait>;
+  };
 
   // NOTE: Apply the dim and split rule
   struct AugId
@@ -2021,6 +2027,8 @@ public:
       Run<PamWrapper<TypeTrait>>(opts, test_func);
     } else if (opts.tree_type == 3) {
       Run<PmaWrapper<TypeTrait>>(opts, test_func);
+    } else if (opts.tree_type == 4) {
+      Run<SpmaWrapper<TypeTrait>>(opts, test_func);
     }
   }
 };
