@@ -1978,6 +1978,8 @@ public:
     static constexpr uint const kBuf = 64;
 #elif defined(LEAF128)
     static constexpr uint const kBuf = 128;
+#elif defined(LEAF256)
+    static constexpr uint const kBuf = 256;
 #elif defined(LEAF512)
     static constexpr uint const kBuf = 512;
 #elif defined(LEAF1024)
