@@ -15,5 +15,4 @@
 
 namespace cpam {
 
-
 } // namespace cpam

@@ -42,7 +42,7 @@ public:
   vector3d(parlay::slice<coord*, coord*> p)
     : x(p[0])
     , y(p[1])
-    , z(p[2]) {};
+    , z(p[2]){};
   vector operator+(vector op2)
   {
     return vector(x + op2.x, y + op2.y, z + op2.z);
@@ -120,11 +120,11 @@ public:
   point3d(vector v)
     : x(v.x)
     , y(v.y)
-    , z(v.z) {};
+    , z(v.z){};
   point3d(parlay::slice<coord*, coord*> p)
     : x(p[0])
     , y(p[1])
-    , z(p[2]) {};
+    , z(p[2]){};
   void print()
   {
     cout << ":(" << x << "," << y << "," << z << "):";
@@ -227,7 +227,7 @@ public:
   vector2d(point p);
   vector2d(parlay::slice<coord*, coord*> p)
     : x(p[0])
-    , y(p[1]) {};
+    , y(p[1]){};
   vector operator+(vector op2)
   {
     return vector(x + op2.x, y + op2.y);
@@ -315,10 +315,10 @@ public:
   }
   point2d(vector v)
     : x(v.x)
-    , y(v.y) {};
+    , y(v.y){};
   point2d(parlay::slice<coord*, coord*> p)
     : x(p[0])
-    , y(p[1]) {};
+    , y(p[1]){};
   void print()
   {
     cout << ":(" << x << "," << y << "):";

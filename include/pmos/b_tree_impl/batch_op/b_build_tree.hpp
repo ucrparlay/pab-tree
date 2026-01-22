@@ -32,8 +32,11 @@ template<typename TT>
 void
 BTree<TT>::Build_(EntrySlice In)
 {
+  parlay::internal::timer t("BTree Build");
   auto sort_seq = parlay::sort(In);
+  t.next("Sorted Input");
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
+  t.next("Built Tree");
   assert(this->root_ != nullptr);
 }
 

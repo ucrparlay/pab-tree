@@ -44,20 +44,14 @@ public:
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return { parlay::map(input_seq,
-                         [&](auto e) {
-                           return Entry::GetKey(e) + 1;
-                         }),
-             parlay::map(input_seq, [&](auto e) {
-               return Entry::GetVal(e);
-             }) };
+                         [&](auto e) { return Entry::GetKey(e) + 1; }),
+             parlay::map(input_seq, [&](auto e) { return Entry::GetVal(e); }) };
   }
 
   template<class PT>
   void map_init(PT P)
   {
-    assert(parlay::all_of(P.first, [](auto x) {
-      return x != 0;
-    }));
+    assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
     size_t n = P.first.size();
     SpmaPointer it(P.first.begin(), P.second.begin());
     pma_tree_->insert_batch(it, n, false);
@@ -66,9 +60,7 @@ public:
   template<typename PT>
   void map_insert(PT P)
   {
-    assert(parlay::all_of(P.first, [](auto x) {
-      return x != 0;
-    }));
+    assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
     size_t n = P.first.size();
     // parlay::sort_inplace(parlay::make_slice(P.first));
     // parlay::sort_inplace(parlay::make_slice(P.second));

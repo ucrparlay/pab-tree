@@ -57,5 +57,4 @@ struct treap
   };
 };
 
-
 } // namespace pam

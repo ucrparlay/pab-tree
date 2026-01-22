@@ -164,7 +164,7 @@ struct map_ops : Seq
     split_info(node* l, std::optional<ET> mid, node* r)
       : l(l)
       , mid(mid)
-      , r(r) {};
+      , r(r){};
   };
 
   static split_info split(ptr a, K const& k)

@@ -203,5 +203,4 @@ struct red_black_tree
   };
 };
 
-
 } // namespace pam

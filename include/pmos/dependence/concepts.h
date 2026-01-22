@@ -95,7 +95,8 @@ InvokeWithOptionalArg(Func&& func, Arg&& arg)
 
 // NOTE: define the what is a binary node
 template<typename T,
-         template<typename, typename, typename> typename BinaryNodeT>
+         template<typename, typename, typename>
+         typename BinaryNodeT>
 concept CheckBinaryNode =
   std::is_base_of_v<BinaryNodeT<typename T::PT, typename T::ST, typename T::AT>,
                     T>;
@@ -106,7 +107,8 @@ concept CheckMultiNode = std::is_base_of_v<MultiNodeT<typename T::TT>, T>;
 
 // NOTE: define the what is a dynamic node
 template<typename T,
-         template<typename, typename, typename> typename DynamicNodeT>
+         template<typename, typename, typename>
+         typename DynamicNodeT>
 concept CheckDynamicNode = std::
   is_base_of_v<DynamicNodeT<typename T::PT, typename T::ST, typename T::AT>, T>;
 

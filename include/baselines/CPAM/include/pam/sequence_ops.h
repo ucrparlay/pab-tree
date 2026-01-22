@@ -384,5 +384,4 @@ struct sequence_ops : Tree
   }
 };
 
-
 } // namespace pam

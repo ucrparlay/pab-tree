@@ -126,5 +126,4 @@ write_add(E* a, EV b)
 }
 } // namespace utils
 
-
 } // namespace pam

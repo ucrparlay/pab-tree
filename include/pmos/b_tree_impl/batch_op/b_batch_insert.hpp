@@ -46,12 +46,10 @@ BTree<TT>::BatchInsert_(EntrySlice In)
                                           parlay::make_slice(node_split_seq));
 
   if (new_node_n > 0) {
-    auto updated_node_seq = parlay::tabulate(new_node_n, [&](SizeT i) {
-      return node_split_seq[i].first;
-    });
-    auto updated_split_seq = parlay::tabulate(new_node_n - 1, [&](SizeT i) {
-      return node_split_seq[i].second;
-    });
+    auto updated_node_seq = parlay::tabulate(
+      new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
+    auto updated_split_seq = parlay::tabulate(
+      new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
     this->root_ =
       AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
   }
@@ -162,12 +160,10 @@ BTree<TT>::BatchInsertSieve(EntrySlice In)
                               parlay::make_slice(node_split_seq));
 
   if (new_node_n > 0) {
-    auto updated_node_seq = parlay::tabulate(new_node_n, [&](SizeT i) {
-      return node_split_seq[i].first;
-    });
-    auto updated_split_seq = parlay::tabulate(new_node_n - 1, [&](SizeT i) {
-      return node_split_seq[i].second;
-    });
+    auto updated_node_seq = parlay::tabulate(
+      new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
+    auto updated_split_seq = parlay::tabulate(
+      new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
     this->root_ =
       AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
   }
@@ -221,9 +217,8 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
     for (int i = 0; i < TI->GetSplitN(); i++) {
       // split_pos_seq[i] = In.size() / TI->split.size() * (i + 1);
       SizeT pos = parlay::internal::binary_search(
-        In.cut(i == 0 ? 0 : split_pos_seq[i - 1], In.size()), [&](E const e) {
-          return Entry::GetKey(e) < TI->split[i];
-        });
+        In.cut(i == 0 ? 0 : split_pos_seq[i - 1], In.size()),
+        [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
       offset += pos;
       split_pos_seq[i] = offset;
     }

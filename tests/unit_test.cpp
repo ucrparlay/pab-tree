@@ -72,9 +72,7 @@ protected:
       auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
-      ASSERT_TRUE(parlay::all_of(res, [&](auto r) {
-        return r == true;
-      }));
+      ASSERT_TRUE(parlay::all_of(res, [&](auto r) { return r == true; }));
     }
 
     tree.DeleteTree();

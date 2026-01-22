@@ -79,5 +79,4 @@ struct aug_node
   }
 };
 
-
 } // namespace pam

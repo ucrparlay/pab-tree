@@ -62,5 +62,4 @@ struct weight_balanced_tree
   };
 };
 
-
 } // namespace pam

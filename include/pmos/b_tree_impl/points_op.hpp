@@ -49,9 +49,8 @@ template<typename TT>
 typename TT::BucketType
 BTree<TT>::RetriveTag(E const e, TT::SplitSliceConst split_slice)
 {
-  return parlay::internal::binary_search(split_slice, [&](K const key) {
-    return key <= Entry::GetKey(e);
-  });
+  return parlay::internal::binary_search(
+    split_slice, [&](K const key) { return key <= Entry::GetKey(e); });
 }
 
 // NOTE: seieve Points from range A to range B, using the skeleton tags. The
@@ -118,9 +117,8 @@ BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
   SizeT offset = 0;
   for (BufSizeT i = 0; i < split_slice.size(); i++) {
     SizeT pos = parlay::internal::binary_search(
-      In.cut(offset, In.size()), [&](E const e) {
-        return Entry::GetKey(e) < split_slice[i];
-      });
+      In.cut(offset, In.size()),
+      [&](E const e) { return Entry::GetKey(e) < split_slice[i]; });
     offset += pos;
     split_pos_arr[i] = offset;
   }
@@ -173,9 +171,8 @@ BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
   assert(parlay::is_sorted(In, [&](auto e1, auto e2) {
     return Entry::GetKey(e1) < Entry::GetKey(e2);
   }));
-  assert(parlay::is_sorted(split_slice, [&](auto k1, auto k2) {
-    return k1 < k2;
-  }));
+  assert(
+    parlay::is_sorted(split_slice, [&](auto k1, auto k2) { return k1 < k2; }));
 
   SizeT cnt = 0;
   auto split_iter = split_slice.begin();

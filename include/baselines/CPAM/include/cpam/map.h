@@ -266,18 +266,14 @@ public:
   // flatten all entries to an array
   static void entries(M m, E* out)
   {
-    auto f = [&](E& e, size_t i) {
-      out[i] = e;
-    };
+    auto f = [&](E& e, size_t i) { out[i] = e; };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
   // flatten all entries to a sequence
   static parlay::sequence<E> entries(M m, size_t granularity = kNodeLimit)
   {
-    auto f = [](E e) -> E {
-      return e;
-    };
+    auto f = [](E e) -> E { return e; };
     return to_seq<E>(std::move(m), f, granularity);
   }
 
@@ -285,9 +281,7 @@ public:
   template<class outIter>
   static void values(M m, outIter out)
   {
-    auto f = [&](E& e, size_t i) {
-      out[i] = Entry::get_val(e);
-    };
+    auto f = [&](E& e, size_t i) { out[i] = Entry::get_val(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
@@ -295,25 +289,19 @@ public:
   template<class outIter>
   static void keys(M m, outIter out)
   {
-    auto f = [&](E const& e, size_t const i) {
-      out[i] = Entry::get_key(e);
-    };
+    auto f = [&](E const& e, size_t const i) { out[i] = Entry::get_key(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
   static parlay::sequence<K> keys(M m, size_t granularity = kNodeLimit)
   {
-    auto f = [](E e) -> K {
-      return Entry::get_key(e);
-    };
+    auto f = [](E e) -> K { return Entry::get_key(e); };
     return to_seq<K>(std::move(m), f, granularity);
   }
 
   static void keys_to_array(M m, K* out)
   {
-    auto f = [&](E& e, size_t i) {
-      out[i] = Entry::get_key(e);
-    };
+    auto f = [&](E& e, size_t i) { out[i] = Entry::get_key(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
@@ -332,17 +320,13 @@ public:
 
   static M insert(M m, E const& p)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     return M(Tree::finalize(Tree::insert(m.get_root(), p, replace)));
   }
 
   void insert(E const& p)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     root = Tree::finalize(Tree::insert(root, p, replace));
   }
 
@@ -427,9 +411,7 @@ public:
   template<class Seq>
   static M multi_insert(M m, Seq const& SS)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     timer t("MI", false);
     parlay::sequence<E> A = Build::sort_remove_duplicates(SS);
     t.next("build time");
@@ -576,9 +558,7 @@ public:
   template<class Seq, class Reduce>
   static M multi_insert_reduce(M m, Seq const& S, Reduce g)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     parlay::sequence<E> A = Build::sort_reduce_duplicates(S, g);
     auto x =
       M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), replace));
@@ -592,9 +572,7 @@ public:
   template<class Val, class Reduce>
   static M multi_insert_reduce(M m, pair<K, Val>* A, size_t n, Reduce g)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     auto B = Build::sort_reduce_duplicates(A, n, g);
     auto x =
       M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, replace));
@@ -607,9 +585,7 @@ public:
     pair<K, Val>* A,
     size_t n,
     Reduce g,
-    Bin_Op& f = [](V const& a, V const& b) {
-      return b;
-    })
+    Bin_Op& f = [](V const& a, V const& b) { return b; })
   {
     auto B = Build::sort_reduce_duplicates(A, n, g);
     auto x = M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, f));
@@ -708,9 +684,7 @@ public:
 
   static M map_union(M a, M b, bool extra = false)
   {
-    auto get_right = [](V a, V b) {
-      return b;
-    };
+    auto get_right = [](V a, V b) { return b; };
     auto x = M(Tree::uniont(a.get_root(), ptr(b.get_root(), extra), get_right));
     return x;
   }
@@ -725,9 +699,7 @@ public:
 
   static M map_intersect(M a, M b)
   {
-    auto get_right = [](V a, V b) {
-      return b;
-    };
+    auto get_right = [](V a, V b) { return b; };
     return M(Tree::template intersect<Tree, Tree>(
       a.get_root(), b.get_root(), get_right));
   }

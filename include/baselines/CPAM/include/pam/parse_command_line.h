@@ -143,5 +143,4 @@ struct commandLine
   }
 };
 
-
 } // namespace pam

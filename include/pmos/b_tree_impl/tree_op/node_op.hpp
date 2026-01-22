@@ -193,23 +193,18 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
   }
 
   assert(node_idx == split_idx + 1);
-  assert(parlay::is_sorted(flatten_split_seq, [&](TT::K a, TT::K b) {
-    return a < b;
-  }));
+  assert(parlay::is_sorted(flatten_split_seq,
+                           [&](TT::K a, TT::K b) { return a < b; }));
 
   // launch rebuild
   FreeNode<Interior>(T);
   [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
     parlay::make_slice(flatten_node_seq),
     parlay::make_slice(flatten_split_seq),
-    GenNodesOutputHandler{ .set_key =
-                             [&](SizeT i, auto key) {
-                               node_split_slice[i].second = key;
-                             },
-                           .set_node =
-                             [&](SizeT i, auto node) {
-                               node_split_slice[i].first = node;
-                             } });
+    GenNodesOutputHandler{
+      .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
+      .set_node = [&](SizeT i,
+                      auto node) { node_split_slice[i].first = node; } });
 
   return rt_bkt_n;
 }

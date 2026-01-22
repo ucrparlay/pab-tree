@@ -18,5 +18,4 @@
 
 namespace pam {
 
-
 } // namespace pam

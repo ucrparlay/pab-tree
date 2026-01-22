@@ -264,9 +264,7 @@ public:
   // flatten all entries to an array
   static void entries(M m, E* out)
   {
-    auto f = [&](E& e, size_t i) {
-      out[i] = e;
-    };
+    auto f = [&](E& e, size_t i) { out[i] = e; };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
@@ -274,9 +272,7 @@ public:
   static parlay::sequence<E> entries(M m,
                                      size_t granularity = utils::node_limit)
   {
-    auto f = [](E e) -> E {
-      return e;
-    };
+    auto f = [](E e) -> E { return e; };
     return to_seq<E>(m, f, granularity);
   }
 
@@ -284,9 +280,7 @@ public:
   template<class outIter>
   static void values(M m, outIter out)
   {
-    auto f = [&](E& e, size_t i) {
-      out[i] = Entry::get_val(e);
-    };
+    auto f = [&](E& e, size_t i) { out[i] = Entry::get_val(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
@@ -294,25 +288,19 @@ public:
   template<class outIter>
   static void keys(M m, outIter out)
   {
-    auto f = [&](E const& e, size_t const i) {
-      out[i] = Entry::get_key(e);
-    };
+    auto f = [&](E const& e, size_t const i) { out[i] = Entry::get_key(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
   static parlay::sequence<K> keys(M m, size_t granularity = utils::node_limit)
   {
-    auto f = [](E e) -> K {
-      return Entry::get_key(e);
-    };
+    auto f = [](E e) -> K { return Entry::get_key(e); };
     return to_seq<K>(m, f, granularity);
   }
 
   static void keys_to_array(M m, K* out)
   {
-    auto f = [&](E& e, size_t i) {
-      out[i] = Entry::get_key(e);
-    };
+    auto f = [&](E& e, size_t i) { out[i] = Entry::get_key(e); };
     Tree::foreach_index(m.get_root(), 0, f);
   }
 
@@ -347,17 +335,13 @@ public:
 
   static M insert(M m, E const& p)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     return M(Tree::insert(m.get_root(), p, replace));
   }
 
   void insert(E const& p)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     root = Tree::insert(root, p, replace);
   }
 
@@ -453,9 +437,7 @@ public:
   template<class Seq>
   static M multi_insert(M m, Seq const& SS)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     parlay::sequence<E> A = Build::sort_remove_duplicates(SS);
     auto x =
       M(Tree::multi_insert_sorted(m.get_root(), A.data(), A.size(), replace));
@@ -520,9 +502,7 @@ public:
   static V* multi_find(M m, Seq const& SS)
   {
     using K = typename Seq::value_type;
-    auto less = [&](K& a, K& b) {
-      return Entry::comp(a, b);
-    };
+    auto less = [&](K& a, K& b) { return Entry::comp(a, b); };
     parlay::sequence<K> B = parlay::internal::sample_sort(SS, less);
     V* ret = new V[B.size()];
     Tree::multi_find_sorted(m.get_root(), B.data(), B.size(), ret, 0);
@@ -533,9 +513,7 @@ public:
   template<class Seq>
   static M multi_insert_sorted(M m, Seq const& SS)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     return M(
       Tree::multi_insert_sorted(m.get_root(), SS.data(), SS.size(), replace));
   }
@@ -588,9 +566,7 @@ public:
   static M multi_insert_reduce(M m, Seq const& S, Reduce g)
   {
     timer t("multi insert", false);
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     parlay::sequence<E> A = Build::sort_reduce_duplicates(S, g);
     t.next("sort");
     auto x =
@@ -602,9 +578,7 @@ public:
   template<class Val, class Reduce>
   static M multi_insert_reduce(M m, pair<K, Val>* A, size_t n, Reduce g)
   {
-    auto replace = [](V const& a, V const& b) {
-      return b;
-    };
+    auto replace = [](V const& a, V const& b) { return b; };
     auto B = Build::sort_reduce_duplicates(A, n, g);
     auto x =
       M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, replace));
@@ -617,9 +591,7 @@ public:
     pair<K, Val>* A,
     size_t n,
     Reduce g,
-    Bin_Op& f = [](V const& a, V const& b) {
-      return b;
-    })
+    Bin_Op& f = [](V const& a, V const& b) { return b; })
   {
     auto B = Build::sort_reduce_duplicates(A, n, g);
     auto x = M(Tree::multi_insert_sorted(m.get_root(), B.first, B.second, f));
@@ -683,9 +655,7 @@ public:
 
   static M map_union(M a, M b, bool extra = false)
   {
-    auto get_right = [](V a, V b) {
-      return b;
-    };
+    auto get_right = [](V a, V b) { return b; };
     auto x = M(Tree::uniont(a.get_root(), b.get_root(), get_right, extra));
     return x;
   }
@@ -700,9 +670,7 @@ public:
 
   static M map_intersect(M a, M b)
   {
-    auto get_right = [](V a, V b) {
-      return b;
-    };
+    auto get_right = [](V a, V b) { return b; };
     return M(Tree::template intersect<Tree, Tree>(
       a.get_root(), b.get_root(), get_right));
   }

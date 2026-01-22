@@ -162,5 +162,4 @@ struct augmented_ops : Map
   }
 };
 
-
 } // namespace pam

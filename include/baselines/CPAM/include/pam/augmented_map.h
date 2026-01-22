@@ -370,5 +370,4 @@ using aug_set =
            typename Balance::template balance<
              aug_node<typename Balance::data, aug_set_full_entry<_Entry>>>>;
 
-
 } // namespace pam

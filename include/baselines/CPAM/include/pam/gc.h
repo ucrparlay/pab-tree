@@ -186,5 +186,4 @@ struct gc
   }
 };
 
-
 } // namespace pam

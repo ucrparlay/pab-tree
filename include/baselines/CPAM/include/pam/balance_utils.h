@@ -116,5 +116,4 @@ struct balance_utils
   }
 };
 
-
 } // namespace pam
