@@ -19,7 +19,7 @@ main(int argc, char* argv[])
       using PmaPointer = PmaLeaf::element_ptr_type;
       using PMA = CPMA<PmosPmaSettings>;
 
-      read_points<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+      ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
 
       parlay::internal::timer t("PMA Batch Insert Test");
       for (int i = 0; i < 4; i++) {

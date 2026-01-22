@@ -1113,7 +1113,7 @@ RangeQuerySerialWithLog(Tree& pkd,
 
 template<typename E>
 auto
-read_points(char const* iFile,
+ReadEntries(char const* iFile,
             parlay::sequence<E>& wp,
             [[maybe_unused]] int id_offset = 0) -> std::pair<size_t, int>
 {
@@ -1191,7 +1191,7 @@ static auto constexpr DefaultTestFunc =
     return;
 #endif // MEMCHECK
 
-    read_points<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
     // // NOTE: batch insert
@@ -1201,17 +1201,17 @@ static auto constexpr DefaultTestFunc =
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
           auto [n2, d2] =
-            read_points<typename TT::E>(batch_path.c_str(), wi, n);
+            ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
           BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       } else {
         auto [base_path, batch_path] =
           opts.ParseInsertBatchPath(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
         BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
       }
     }
@@ -1233,13 +1233,23 @@ static auto constexpr DefaultTestFunc =
     if (opts.query_type & (1 << 0)) { // NOTE: membership
       auto [base_path, batch_path] =
         opts.ParseInsertBatchPath(kBatchQueryRatio);
+      auto [n, d] =
+        ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
       auto [n2, d2] =
-        read_points<typename TT::E>(batch_path.c_str(), wi, wp.size());
+        ReadEntries<typename TT::E>(batch_path.c_str(), wi, wp.size());
+      BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele =
         wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), true);
       Membership<TT>(tree, query_ele, opts.rounds, res);
+      for (auto e : res) {
+        if (e) {
+          std::cout << "wrong membership result!" << std::endl;
+          throw std::runtime_error("membership failed");
+        }
+      }
     }
 
     // Typename* kdknn = nullptr;

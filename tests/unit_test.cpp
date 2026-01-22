@@ -48,8 +48,8 @@ protected:
     if (opts.tag & (1 << 0)) {
       auto [base_path, batch_path] =
         opts.ParseInsertBatchPath(opts.batch_ratio);
-      auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
-      auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
 
       BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
