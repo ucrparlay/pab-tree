@@ -57,8 +57,8 @@ main(int argc, char* argv[])
       std::cout << "Test finished." << std::endl;
     };
 
-  Wrapper::ApplyBaselines(opts, test_func);
-  // Wrapper::ApplyBaselines(opts, DefaultTestFunc);
+  // Wrapper::ApplyBaselines(opts, test_func);
+  Wrapper::ApplyBaselines(opts, DefaultTestFunc);
 
   return 0;
 }

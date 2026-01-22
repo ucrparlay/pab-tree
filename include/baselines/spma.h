@@ -110,7 +110,7 @@ public:
 
   constexpr static char const* GetTreeName()
   {
-    return "PMA";
+    return "SPMA";
   }
 
   constexpr static char const* CheckHasBox()
