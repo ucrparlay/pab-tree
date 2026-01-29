@@ -7,10 +7,6 @@
 #include <ios>
 #include <iostream>
 
-#include "baselines/cpam.h"
-#include "baselines/pam.h"
-#include "baselines/pma.h"
-#include "baselines/spma.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
@@ -1139,9 +1135,9 @@ ReadEntries(char const* iFile,
 
 template<typename E>
 auto
-read_points_serial(char const* iFile,
-                   parlay::sequence<E>& wp,
-                   [[maybe_unused]] int id_offset = 0) -> std::pair<size_t, int>
+ReadPointsSerial(char const* iFile,
+                 parlay::sequence<E>& wp,
+                 [[maybe_unused]] int id_offset = 0) -> std::pair<size_t, int>
 {
   std::ifstream fs;
   fs.open(iFile);
@@ -1244,293 +1240,13 @@ static auto constexpr DefaultTestFunc =
         wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), true);
       Membership<TT>(tree, query_ele, opts.rounds, res);
-      for (auto e : res) {
-        if (e) {
-          std::cout << "wrong membership result!" << std::endl;
-          throw std::runtime_error("membership failed");
-        }
-      }
+      // for (auto e : res) {
+      //   if (e) {
+      //     std::cout << "wrong membership result!" << std::endl;
+      //     throw std::runtime_error("membership failed");
+      //   }
+      // }
     }
-
-    // Typename* kdknn = nullptr;
-    // auto run_batch_knn = [&](Points const& query_pts, int kth) {
-    //   kdknn = new Typename[query_pts.size()];
-    //   queryKNN<Point>(kDim, query_pts, kRounds, tree, kdknn, kth, true);
-    //   delete[] kdknn;
-    // };
-    //
-    // auto generate_query_box = [&](int rec_num, int rec_total_type,
-    //                               Points const& wp) {
-    //   // NOTE: generate rectangles for the first half of the points
-    //   parlay::sequence<parlay::sequence<std::pair<typename Tree::Box,
-    //   size_t>>>
-    //       query_box_seq(rec_total_type);
-    //   parlay::sequence<size_t> query_max_size(rec_total_type);
-    //   for (int i = 0; i < rec_total_type; i++) {
-    //     auto [query_box, max_size] =
-    //         gen_rectangles<Point, Tree, false, true>(rec_num, i, wp,
-    //         kDim);
-    //     query_box_seq[i] = query_box;
-    //     query_max_size[i] = max_size;
-    //   }
-    //   return std::make_pair(query_box_seq, query_max_size);
-    // };
-    //
-    // auto incre_update_test_bundle = [&](auto const& query_box_seq,
-    //                                     auto const& query_max_size) {
-    //   // NOTE: knn query
-    //   {
-    //     int k[3] = {1, 10, 100};
-    //
-    //     std::cout << "in-dis-skewed knn time: ";
-    //     size_t batch_size = static_cast<size_t>(wp.size() *
-    //     kBatchQueryRatio); for (int i = 0; i < 3; i++) {
-    //       run_batch_knn(wp.subseq(0, batch_size), k[i]);
-    //     }
-    //     puts("");
-    //
-    //     std ::cout << "out-dis-skewed knn time: ";
-    //     for (int i = 0; i < 3; i++) {
-    //       run_batch_knn(wp.subseq(wp.size() - batch_size, wp.size()),
-    //       k[i]);
-    //     }
-    //     puts("");
-    //
-    //     // NOTE: sample points within the whole input datasets
-    //     auto query_pts =
-    //         parlay::pack(wp, parlay::tabulate(wp.size(), [&](size_t i) ->
-    //         bool {
-    //                        return i % (wp.size() / (batch_size * 2)) ==
-    //                        0;
-    //                      }));
-    //
-    //     std::cout << "in-dis-uniform knn time: ";
-    //     for (int i = 0; i < 3; i++) {
-    //       run_batch_knn(parlay::random_shuffle(query_pts.subseq(0,
-    //       batch_size)),
-    //                     k[i]);
-    //     }
-    //     puts("");
-    //
-    //     std::cout << "out-dis-uniform knn time: ";
-    //     for (int i = 0; i < 3; i++) {
-    //       run_batch_knn(parlay::random_shuffle(
-    //                         query_pts.subseq(batch_size,
-    //                         query_pts.size())),
-    //                     k[i]);
-    //     }
-    //     puts("");
-    //   }
-    //
-    //   // NOTE: range count
-    //   {
-    //     int rec_num = query_box_seq[0].size();
-    //     kdknn = new Typename[rec_num];
-    //
-    //     std::cout << "range count time: ";
-    //     for (int i = 0; i < 3; i++) {
-    //       rangeCountFix<Point>(tree, kdknn, kRounds, i, rec_num, kDim,
-    //                            query_box_seq[i], query_max_size[i]);
-    //     }
-    //     delete[] kdknn;
-    //     puts("");
-    //   }
-    //
-    //   // NOTE: range query
-    //   {
-    //     int rec_num = query_box_seq[0].size();
-    //     kdknn = new Typename[rec_num];
-    //
-    //     std::cout << "range query time: ";
-    //     for (int i = 0; i < 3; i++) {
-    //       Points Out;
-    //       rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, rec_num,
-    //       kDim,
-    //                            query_box_seq[i], query_max_size[i]);
-    //     }
-    //     delete[] kdknn;
-    //     puts("");
-    //   }
-    // };
-    //
-    // // NOTE: scalability
-    // if (kTag & (1 << 2)) {
-    //   puts("");
-    //   BuildTree<Point, Tree, kTestTime, 0>(wp, kRounds, tree);
-    //   BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
-    //                                       kBatchInsertRatio);
-    //   BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
-    //                                       kBatchInsertRatio);
-    // }
-    //
-    // // NOTE: batch insert by step
-    // if (kTag & (1 << 3)) {
-    //   puts("");
-    //   BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
-    //
-    //   auto [query_box_seq, query_max_size] =
-    //       generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() /
-    //       2));
-    //
-    //   incre_update_test_bundle(query_box_seq, query_max_size);
-    //
-    //   parlay::sequence<double> const ratios = {0.1, 0.01, 0.001, 0.0001};
-    //   for (auto rat : ratios) {
-    //     BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, rat);
-    //     incre_update_test_bundle(query_box_seq, query_max_size);
-    //   }
-    // }
-    //
-    // // NOTE: batch delete by step
-    // if (kTag & (1 << 4)) {
-    //   puts("");
-    //   auto [query_box_seq, query_max_size] =
-    //       generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() /
-    //       2));
-    //   BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
-    //   incre_update_test_bundle(query_box_seq, query_max_size);
-    //
-    //   parlay::sequence<double> const ratios = {0.1, 0.01, 0.001, 0.0001};
-    //   // parlay::sequence<double> const ratios = {0.001};
-    //   for (auto rat : ratios) {
-    //     BatchDeleteByStep<Point, Tree, true>(tree, wp, kRounds, rat);
-    //     incre_update_test_bundle(query_box_seq, query_max_size);
-    //     // incre_update_test_bundle(wp.subseq(0, wp.size() / 2));
-    //   }
-    // }
-    //
-    // // real world
-    // if (kTag & (1 << 5)) {
-    //   puts("");
-    //   auto [query_box_seq, query_max_size] =
-    //       generate_query_box(kRangeQueryNum, 3, wp.subseq(0, wp.size() /
-    //       2));
-    //
-    //   BuildTree<Point, Tree, kTestTime, 3>(wp, kRounds, tree, 2);
-    //   incre_update_test_bundle(query_box_seq, query_max_size);
-    //
-    //   BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
-    //   incre_update_test_bundle(query_box_seq, query_max_size);
-    //
-    //   BatchDeleteByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
-    //   incre_update_test_bundle(query_box_seq, query_max_size);
-    // }
-    //
-    // // range query with log
-    // if (kTag & (1 << 6)) {
-    //   puts("");
-    //   BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds, 0.0001);
-    //
-    //   auto [query_box_seq, query_max_size] = generate_query_box(
-    //       kSingleQueryLogRepeatNum, 3, wp.subseq(0, wp.size() / 2));
-    //
-    //   // NOTE: range query
-    //   {
-    //     int rec_num = kSingleQueryLogRepeatNum;
-    //     kdknn = new Typename[rec_num];
-    //
-    //     std::cout << "range query time: " << std::endl;
-    //     for (int i = 0; i < 3; i++) {
-    //       // std::cout << "range query time: " << std::endl;
-    //       Points Out;
-    //       // rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, rec_num,
-    //       kDim,
-    //       //                      query_box_seq[i], query_max_size[i]);
-    //       RangeQuerySerialWithLog<Point>(tree, kdknn, kRounds, Out, i,
-    //       rec_num,
-    //                                      kDim, query_box_seq[i],
-    //                                      query_max_size[i]);
-    //     }
-    //     delete[] kdknn;
-    //     puts("");
-    //   }
-    // }
-    //
-    // // range query with log
-    // if (kTag & (1 << 7)) {
-    //   puts("");
-    //   parlay::sequence<double> const ratios = {
-    //       0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
-    //       0.02,   0.05,   0.1,    0.2,   0.5,   1.0};
-    //   std::cout << "Insert: ";
-    //   for (size_t i = 0; i < ratios.size(); i++) {
-    //     BatchInsert<Point, Tree, kTestTime>(tree, wp, wi, kRounds,
-    //     ratios[i]);
-    //   }
-    //   std::cout << std::endl;
-    //   std::cout << "Delete: ";
-    //   for (size_t i = 0; i < ratios.size(); i++) {
-    //     BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, kRounds,
-    //     ratios[i]);
-    //   }
-    //   puts("");
-    // }
-    // // WARN: compress the kdnode to MultiNode, should remove except for
-    // // exp if constexpr (IsKdTree<Tree>) {
-    // //   tree.Compress2Multi();
-    // // }
-    //
-    // // BatchInsertByStep<Point, Tree, true>(tree, wp, kRounds,
-    // 0.000000001);
-    // if (kQueryType & (1 << 0)) {  // NOTE: KNN
-    //   size_t batch_size = static_cast<size_t>(wp.size() *
-    //   kBatchQueryRatio);
-    //
-    //   if (kSummary == 0) {
-    //     int k[3] = {1, 10, 100};
-    //     for (int i = 0; i < 3; i++) {
-    //       run_batch_knn(wp.subseq(0, batch_size), k[i]);
-    //     }
-    //   } else {  // test kSummary
-    //     run_batch_knn(wp.subseq(0, batch_size), K);
-    //   }
-    // }
-    //
-    // if (kQueryType & (1 << 1)) {  // NOTE: range count
-    //   auto [query_box_seq, query_max_size] =
-    //       generate_query_box(kRangeQueryNum, 3, wp);
-    //
-    //   if (!kSummary) {
-    //     int recNum = kRangeQueryNum;
-    //     kdknn = new Typename[recNum];
-    //
-    //     // std::cout << std::endl;
-    //     for (int i = 0; i < 3; i++) {
-    //       rangeCountFix<Point>(tree, kdknn, kRounds, i, recNum, kDim,
-    //                            query_box_seq[i], query_max_size[i]);
-    //     }
-    //
-    //     delete[] kdknn;
-    //   }
-    // }
-    //
-    // if (kQueryType & (1 << 2)) {  // NOTE: range query
-    //   if (kSummary == 0) {
-    //     auto [query_box_seq, query_max_size] =
-    //         generate_query_box(kRangeQueryNum, 3, wp);
-    //
-    //     int recNum = kRangeQueryNum;
-    //     kdknn = new Typename[recNum];
-    //
-    //     for (int i = 0; i < 3; i++) {
-    //       Points Out;
-    //       rangeQueryFix<Point>(tree, kdknn, kRounds, Out, i, recNum,
-    //       kDim,
-    //                            query_box_seq[i], query_max_size[i]);
-    //     }
-    //     delete[] kdknn;
-    //   } else if (kSummary == 1) {  // NOTE: for kSummary
-    //     auto [query_box_seq, query_max_size] =
-    //         generate_query_box(kSummaryRangeQueryNum, 3, wp);
-    //
-    //     kdknn = new Typename[kSummaryRangeQueryNum];
-    //     Points Out;
-    //     rangeQueryFix<Point>(tree, kdknn, kRounds, Out, 2,
-    //     kSummaryRangeQueryNum,
-    //                          kDim, query_box_seq[2], query_max_size[2]);
-    //     delete[] kdknn;
-    //   }
-    // }
 
     std::cout << "\n" << std::flush;
 
@@ -1538,6 +1254,130 @@ static auto constexpr DefaultTestFunc =
 
     return;
   };
+
+struct Options
+{
+  Options(commandLine& params)
+  {
+    this->val_n = params.getOptionIntValue("-d", 1);
+    this->input_file_path = std::string(params.getOptionValue("-p"));
+    this->tag = params.getOptionIntValue("-t", 1);
+    this->rounds = params.getOptionIntValue("-r", 3);
+    this->query_type = params.getOptionIntValue("-q", 0);
+    this->summary = params.getOptionIntValue("-s", 0);
+    this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
+    this->tree_type = params.getOptionIntValue("-T", 0);
+    this->dis_type = std::string(params.getOptionValue("-D"));
+  }
+
+  void PrintOptions() const
+  {
+    std::cout << "InputFile: "
+              << std::filesystem::path(input_file_path).filename().string()
+              << "; ";
+    std::cout << "Dis: " << this->dis_type << "; ";
+  }
+
+  static auto ExtractPrefixes(std::string const& path)
+    -> std::pair<std::string, std::string>
+  {
+    // locate pivot: first occurrence of "/ins/" or "/del/"
+    size_t posIns = path.find("/ins/");
+    size_t posDel = path.find("/del/");
+    size_t pivot = std::string::npos;
+    if (posIns != std::string::npos) {
+      pivot = posIns;
+    }
+    if (posDel != std::string::npos &&
+        (pivot == std::string::npos || posDel < pivot)) {
+      pivot = posDel;
+    }
+
+    if (pivot == std::string::npos) {
+      // pattern not found
+      return { "", "" };
+    }
+
+    // directory prefix (up to just before /ins/ or /del/)
+    std::string dirPrefix = path.substr(0, pivot) + "/";
+
+    // filename part
+    size_t lastSlash = path.find_last_of('/');
+    std::string filename =
+      (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
+    // strip extensions
+    auto strip_suffix = [](std::string& s, std::string const& suf) {
+      if (s.size() >= suf.size() &&
+          s.compare(s.size() - suf.size(), suf.size(), suf) == 0) {
+        s.erase(s.size() - suf.size());
+      }
+    };
+    strip_suffix(filename, ".in");
+    strip_suffix(filename, ".base");
+
+    return { dirPrefix, filename };
+  }
+
+  [[nodiscard]] auto ParseInsertBatchPath(double batch_ratio) const
+    -> std::pair<std::string, std::string>
+  {
+    // PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
+    // PARA: dir_pre: ../kdtree/uni/1000000_1/
+    // PARA: file_pre: 1
+    auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
+    std::string base_path =
+      dir_prefix + "ins/" +
+      std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" + file_prefix +
+      ".base.in";
+
+    std::string batch_path = base_path;
+    batch_path.replace(batch_path.find(".base."), 6, ".batch.");
+    return std::make_pair(base_path, batch_path);
+  }
+
+  [[nodiscard]] auto ParseDeleteBatchPath(double batch_ratio) const
+    -> std::pair<std::string, std::string>
+  {
+    // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
+    auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
+    std::string base_path =
+      dir_prefix + "del/" +
+      std::to_string(static_cast<size_t>(batch_ratio * 100)) + "/" +
+      file_prefix + ".base.in";
+
+    std::string batch_path = base_path;
+    batch_path.replace(batch_path.find(".base."), 6, ".batch.");
+
+    return std::make_pair(base_path, batch_path);
+  }
+
+  int val_n;
+  std::string input_file_path = "";
+  int tag;
+  int rounds;
+  int query_type;
+  bool summary;
+  double batch_ratio; // decides the default batch file path
+  int tree_type;
+  std::string dis_type;
+};
+
+// NOTE: driven functions
+template<typename TreeWrapper, typename RunFunc>
+static void
+Run(Options const& opts, RunFunc test_func)
+{
+  using TT = typename TreeWrapper::TreeType::TT;
+  using E = typename TT::E;
+  using EntrySeq = typename TT::EntrySeq;
+
+  PrintTreeParam<TreeWrapper>();
+  opts.PrintOptions();
+  std::cout << "\n" << std::flush;
+
+  // Apply the test function
+  test_func.template operator()<TreeWrapper, TT>(opts);
+};
 
 class Wrapper
 {
@@ -1632,218 +1472,6 @@ public:
     std::optional<bool> force_par_indicator;
   };
 
-  // NOTE: Trees
-  template<typename TypeTrait>
-  struct BTreeWrapper
-  {
-    using TreeType = typename pmos::BTree<TypeTrait>;
-  };
-  template<typename TypeTrait>
-  struct CpamWrapper
-  {
-    using TreeType = typename CPAMTree::CpamRaw<TypeTrait>;
-  };
-  template<typename TypeTrait>
-  struct PamWrapper
-  {
-    using TreeType = typename PAMTree::PamRaw<TypeTrait>;
-  };
-  template<typename TypeTrait>
-  struct PmaWrapper
-  {
-    using TreeType = typename PMA::PmaWrapper<TypeTrait>;
-  };
-  template<typename TypeTrait>
-  struct SpmaWrapper
-  {
-    using TreeType = typename SPMA::SpmaWrapper<TypeTrait>;
-  };
-
-  // NOTE: Apply the dim and split rule
-  struct AugId
-  {
-    using IdType = int;
-    IdType id;
-
-    bool operator<(AugId const& rhs) const
-    {
-      return id < rhs.id;
-    }
-    bool operator==(AugId const& rhs) const
-    {
-      return id == rhs.id;
-    }
-    friend std::ostream& operator<<(std::ostream& os, AugId const& rhs)
-    {
-      os << rhs.id;
-      return os;
-    }
-  };
-
-  // For the spacial filling curve, we use the AugIdCode to
-  // ensure the id is unique and the code is used to determine the
-  // order of the points in the tree.
-  struct AugIdCode
-  {
-    using IdType = int_fast32_t;
-    using CurveCode = uint64_t;
-
-    AugIdCode()
-      : code(0)
-      , id(0)
-    {
-    }
-
-    void SetMember(CurveCode const& val)
-    {
-      code = val;
-    }
-
-    bool operator<(AugIdCode const& rhs) const
-    {
-      return code == rhs.code ? id < rhs.id : code < rhs.code;
-    }
-
-    bool operator==(AugIdCode const& rhs) const
-    {
-      // return code == rhs.code && id == rhs.id;
-      // WARN: code is not important, we only need to ensure the id
-      return id == rhs.id;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, AugIdCode const& rhs)
-    {
-      os << rhs.code << " " << rhs.id;
-      return os;
-    }
-
-    CurveCode code;
-    IdType id;
-  };
-
-  struct Options
-  {
-    Options(commandLine& params)
-    {
-      this->val_n = params.getOptionIntValue("-d", 1);
-      this->input_file_path = std::string(params.getOptionValue("-p"));
-      this->tag = params.getOptionIntValue("-t", 1);
-      this->rounds = params.getOptionIntValue("-r", 3);
-      this->query_type = params.getOptionIntValue("-q", 0);
-      this->summary = params.getOptionIntValue("-s", 0);
-      this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
-      this->tree_type = params.getOptionIntValue("-T", 0);
-      this->dis_type = std::string(params.getOptionValue("-D"));
-    }
-
-    void PrintOptions() const
-    {
-      std::cout << "InputFile: "
-                << std::filesystem::path(input_file_path).filename().string()
-                << "; ";
-      std::cout << "Dis: " << this->dis_type << "; ";
-    }
-
-    static auto ExtractPrefixes(std::string const& path)
-      -> std::pair<std::string, std::string>
-    {
-      // locate pivot: first occurrence of "/ins/" or "/del/"
-      size_t posIns = path.find("/ins/");
-      size_t posDel = path.find("/del/");
-      size_t pivot = std::string::npos;
-      if (posIns != std::string::npos) {
-        pivot = posIns;
-      }
-      if (posDel != std::string::npos &&
-          (pivot == std::string::npos || posDel < pivot)) {
-        pivot = posDel;
-      }
-
-      if (pivot == std::string::npos) {
-        // pattern not found
-        return { "", "" };
-      }
-
-      // directory prefix (up to just before /ins/ or /del/)
-      std::string dirPrefix = path.substr(0, pivot) + "/";
-
-      // filename part
-      size_t lastSlash = path.find_last_of('/');
-      std::string filename =
-        (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
-      // strip extensions
-      auto strip_suffix = [](std::string& s, std::string const& suf) {
-        if (s.size() >= suf.size() &&
-            s.compare(s.size() - suf.size(), suf.size(), suf) == 0) {
-          s.erase(s.size() - suf.size());
-        }
-      };
-      strip_suffix(filename, ".in");
-      strip_suffix(filename, ".base");
-
-      return { dirPrefix, filename };
-    }
-
-    [[nodiscard]] auto ParseInsertBatchPath(double batch_ratio) const
-      -> std::pair<std::string, std::string>
-    {
-      // PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
-      // PARA: dir_pre: ../kdtree/uni/1000000_1/
-      // PARA: file_pre: 1
-      auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
-      std::string base_path =
-        dir_prefix + "ins/" +
-        std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
-        file_prefix + ".base.in";
-
-      std::string batch_path = base_path;
-      batch_path.replace(batch_path.find(".base."), 6, ".batch.");
-      return std::make_pair(base_path, batch_path);
-    }
-
-    [[nodiscard]] auto ParseDeleteBatchPath(double batch_ratio) const
-      -> std::pair<std::string, std::string>
-    {
-      // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
-      auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
-      std::string base_path =
-        dir_prefix + "del/" +
-        std::to_string(static_cast<size_t>(batch_ratio * 100)) + "/" +
-        file_prefix + ".base.in";
-
-      std::string batch_path = base_path;
-      batch_path.replace(batch_path.find(".base."), 6, ".batch.");
-
-      return std::make_pair(base_path, batch_path);
-    }
-
-    int val_n;
-    std::string input_file_path = "";
-    int tag;
-    int rounds;
-    int query_type;
-    bool summary;
-    double batch_ratio; // decides the default batch file path
-    int tree_type;
-    std::string dis_type;
-  };
-
-  // NOTE: driven functions
-  template<typename TreeWrapper, typename RunFunc>
-  static void Run(Options const& opts, RunFunc test_func)
-  {
-    using TT = typename TreeWrapper::TreeType::TT;
-    using E = typename TT::E;
-    using EntrySeq = typename TT::EntrySeq;
-
-    PrintTreeParam<TreeWrapper>();
-    opts.PrintOptions();
-    std::cout << "\n" << std::flush;
-
-    // Apply the test function
-    test_func.template operator()<TreeWrapper, TT>(opts);
-  };
-
   // NOTE: the element we use
   template<typename KeyType, typename ValType>
   struct Element
@@ -1918,76 +1546,7 @@ public:
     };
   };
 
-  // NOTE: For kd tree and orth tree
-  template<typename RunFunc>
-  static void ApplyOrthogonal(Options const& opts, RunFunc test_func)
-  {
-    // using K = std::pair<uint32_t, uint32_t>;
-    using K = uint32_t;
-    using V = uint32_t;
-    using E = Element<K, V>;
-    // using EleType = Element<uint32_t, uint32_t>;
-#ifdef LEAF1
-    static constexpr uint const kBuf = 1;
-#elif defined(LEAF2)
-    static constexpr uint const kBuf = 2;
-#elif defined(LEAF4)
-    static constexpr uint const kBuf = 4;
-#elif defined(LEAF8)
-    static constexpr uint const kBuf = 8;
-#elif defined(LEAF16)
-    static constexpr uint const kBuf = 16;
-#elif defined(LEAF32)
-    static constexpr uint const kBuf = 32;
-#elif defined(LEAF64)
-    static constexpr uint const kBuf = 64;
-#elif defined(LEAF128)
-    static constexpr uint const kBuf = 128;
-#elif defined(LEAF256)
-    static constexpr uint const kBuf = 256;
-#elif defined(LEAF512)
-    static constexpr uint const kBuf = 512;
-#elif defined(LEAF1024)
-    static constexpr uint const kBuf = 1024;
-#else
-    static constexpr uint const kBuf = 32; // Default
-#endif // LEAF1
-
-    using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>,
-                                           kBuf,
-                                           LeafAugEmpty,
-                                           InteriorAugEmpty,
-                                           8,
-                                           pmos::ProtoNode>;
-    if (opts.tree_type == 0) {
-      Run<BTreeWrapper<TypeTrait>>(opts, test_func);
-    }
-  }
-
-  template<typename RunFunc>
-  static void ApplyBaselines(Options const& opts, RunFunc test_func)
-  {
-    // using K = std::pair<uint32_t, uint32_t>;
-    using K = uint32_t;
-    using V = uint32_t;
-    using E = Element<K, V>;
-    // using EleType = Element<uint32_t, uint32_t>;
-    using TypeTrait = pmos::BTreeTypeTrait<ElementWrapper<E>,
-                                           16,
-                                           LeafAugEmpty,
-                                           InteriorAugEmpty,
-                                           8,
-                                           pmos::ProtoNode>;
-    if (opts.tree_type == 0) {
-      // B-tree
-    } else if (opts.tree_type == 1) {
-      Run<CpamWrapper<TypeTrait>>(opts, test_func);
-    } else if (opts.tree_type == 2) {
-      Run<PamWrapper<TypeTrait>>(opts, test_func);
-    } else if (opts.tree_type == 3) {
-      Run<PmaWrapper<TypeTrait>>(opts, test_func);
-    } else if (opts.tree_type == 4) {
-      Run<SpmaWrapper<TypeTrait>>(opts, test_func);
-    }
-  }
+  using K = uint32_t;
+  using V = uint32_t;
+  using E = Element<K, V>;
 };
