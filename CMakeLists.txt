@@ -60,7 +60,7 @@ endif()
 
 if(APPLE)
 	message(">>>>> Compiling on MacOS")
-	add_compile_options(MAC_OS)
+	add_compile_definitions(MAC)
 endif()
 
 if(DEBUG)
@@ -117,16 +117,17 @@ target_link_libraries(CPAM INTERFACE parlay PMOS)
 target_include_directories(CPAM INTERFACE ${CPAM_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
 
 # NOTE: PMA
-add_library(PMA INTERFACE)
-set(PMA_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
-target_link_libraries(PMA INTERFACE parlay PMOS)
-target_include_directories(PMA INTERFACE ${PMA_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
+if(NOT APPLE)
+	add_library(PMA INTERFACE)
+	set(PMA_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
+	target_link_libraries(PMA INTERFACE parlay PMOS)
+	target_include_directories(PMA INTERFACE ${PMA_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
+endif()
 
 # NOTE: TEST_FRAME
 add_library(TEST_FRAME INTERFACE)
-set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PMOS_INCLUDE_DIR} ${CPAM_INCLUDE_DIR} ${PMA_INCLUDE_DIR})
-target_link_libraries(TEST_FRAME INTERFACE parlay PMOS CPAM PMA)
-target_include_directories(PMA INTERFACE ${TEST_FRAME_INCLUDE_DIR})
+set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PMOS_INCLUDE_DIR})
+target_link_libraries(TEST_FRAME INTERFACE parlay PMOS)
 
 # NOTE: executables for tests
 add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
@@ -135,8 +136,13 @@ target_include_directories(b_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
 add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
 target_link_libraries(baselines PUBLIC TEST_FRAME)
-target_include_directories(baselines PUBLIC ${TEST_FRAME_INCLUDE_DIR})
-target_compile_definitions(baselines PUBLIC PARALLEL=1 PARLAY=1)
+target_link_libraries(baselines PUBLIC CPAM)
+target_include_directories(baselines PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_DIR})
+if(NOT APPLE)
+	target_link_libraries(baselines PUBLIC PMA)
+	target_include_directories(baselines PUBLIC ${PMA_INCLUDE_DIR})
+	target_compile_definitions(baselines PUBLIC PARALLEL=1 PARLAY=1)
+endif()
 
 # NOTE: GoogleTest for b_ccp
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)

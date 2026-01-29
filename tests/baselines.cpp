@@ -14,7 +14,7 @@ struct PamWrapper
   using TreeType = typename PAMTree::PamRaw<TypeTrait>;
 };
 
-#ifndef MAC_OS
+#ifndef MAC
 #include "baselines/pma.h"
 #include "baselines/spma.h"
 
@@ -29,7 +29,7 @@ struct SpmaWrapper
   using TreeType = typename SPMA::SpmaWrapper<TypeTrait>;
 };
 
-#endif // !  #ifndef MAC_OS
+#endif // !  #ifndef MAC
 
 template<typename Options, typename RunFunc>
 void
@@ -54,13 +54,13 @@ ApplyBaselines(Options const& opts, RunFunc test_func)
     Run<PamWrapper<TypeTrait>>(opts, test_func);
   }
 
-#ifndef MAC_OS
+#ifndef MAC
   if (opts.tree_type == 3) {
     Run<PmaWrapper<TypeTrait>>(opts, test_func);
   } else if (opts.tree_type == 4) {
     Run<SpmaWrapper<TypeTrait>>(opts, test_func);
   }
-#endif // !  #ifndef MAC_OS
+#endif // !  #ifndef MAC
 }
 
 int
@@ -71,33 +71,33 @@ main(int argc, char* argv[])
 
   auto test_func =
     []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {
-      using Tree = TreeDesc::TreeType;
-      using TT = TypeTrait;
-      using EntrySeq = TT::EntrySeq;
-      EntrySeq wp;
-      EntrySeq wi;
-
-      using PmaLeaf = uncompressed_leaf<typename TT::K, typename TT::V>;
-      using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
-      using PmaPointer = PmaLeaf::element_ptr_type;
-      using PMA = CPMA<PmosPmaSettings>;
-
-      ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
-
-      parlay::internal::timer t("PMA Batch Insert Test");
-      for (int i = 0; i < 4; i++) {
-        auto P = Tree::ParseInput(wp);
-        PmaPointer it(P.first.begin(), P.second.begin());
-        PMA p;
-
-        t.start();
-        // parlay::sort_inplace(parlay::make_slice(P.first));
-        // t.next("Sorted keys");
-        p.insert_batch(it, P.first.size(), false);
-        t.stop();
-      }
-      std::cout << "average insertion time for " << t.total_time() / 4
-                << " over 4 rounds: ";
+      // using Tree = TreeDesc::TreeType;
+      // using TT = TypeTrait;
+      // using EntrySeq = TT::EntrySeq;
+      // EntrySeq wp;
+      // EntrySeq wi;
+      //
+      // using PmaLeaf = uncompressed_leaf<typename TT::K, typename TT::V>;
+      // using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
+      // using PmaPointer = PmaLeaf::element_ptr_type;
+      // using PMA = CPMA<PmosPmaSettings>;
+      //
+      // ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+      //
+      // parlay::internal::timer t("PMA Batch Insert Test");
+      // for (int i = 0; i < 4; i++) {
+      //   auto P = Tree::ParseInput(wp);
+      //   PmaPointer it(P.first.begin(), P.second.begin());
+      //   PMA p;
+      //
+      //   t.start();
+      //   // parlay::sort_inplace(parlay::make_slice(P.first));
+      //   // t.next("Sorted keys");
+      //   p.insert_batch(it, P.first.size(), false);
+      //   t.stop();
+      // }
+      // std::cout << "average insertion time for " << t.total_time() / 4
+      //           << " over 4 rounds: ";
 
       // auto [base_path, batch_path] =
       // opts.ParseInsertBatchPath(opts.batch_ratio);
