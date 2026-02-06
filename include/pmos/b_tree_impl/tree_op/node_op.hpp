@@ -68,11 +68,11 @@ BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 
 template<typename TT>
 TT::Node*
-BTree<TT>::UpdateInterior(Node* T,
-                          NodeSplitPairSlice node_split_slice,
-                          SizeBufUBArr const& split_pos_arr,
-                          SizeT new_node_n,
-                          SizeBufUBArr const& return_node_n_arr)
+BTree<TT>::BatchInsertUpdateInterior(Node* T,
+                                     NodeSplitPairSlice node_split_slice,
+                                     SizeBufUBArr const& split_pos_arr,
+                                     SizeT new_node_n,
+                                     SizeBufUBArr const& return_node_n_arr)
 {
   assert(!T->is_leaf);
   assert(new_node_n <= TT::kBufUB);
@@ -141,6 +141,25 @@ BTree<TT>::UpdateInterior(Node* T,
 
   TI->UpdateAug();
   return T;
+}
+
+template<typename TT>
+TT::SizeT
+BTree<TT>::BatchDeleteUpdateInteriorSize(Node* T,
+                                         SizeBufUBArr invalid_subtree_num)
+{
+  assert(!T->is_leaf);
+  auto TI = static_cast<Interior*>(T);
+  SizeT tot_entry_sz = 0;
+  BufSizeT valid_subtree_num = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    tot_entry_sz += TI->tree_nodes[i]->size;
+    valid_subtree_num += invalid_subtree_num[i];
+  }
+  TI->size = tot_entry_sz;
+  TI->valid = TI->GetNodeN() - valid_subtree_num >= TT::kBufLB;
+  TI->all_subtree_valid = valid_subtree_num == TI->GetNodeN();
+  return TI->valid ? TI->GetNodeN() - valid_subtree_num : 1;
 }
 
 template<typename TT>

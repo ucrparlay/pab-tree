@@ -60,6 +60,8 @@ public:
   static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
   using SizeBufUBArr = typename TT::SizeBufUBArr;
+  using BufSizeBufUBArr = typename TT::BufSizeBufUBArr;
+  using BooleanBufUBArr = typename TT::BooleanBufUBArr;
   using BufSizeT = TT::BufSizeT;
   using SizeT = TT::SizeT;
 
@@ -137,12 +139,16 @@ public:
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split)
       : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
+      , valid{ true }
+      , all_subtree_valid{ true }
     {
     } // TODO:finish AT
 
     BTreeInteriorNode(TT::NodeSlice _tree_nodes_slice,
                       TT::SplitSlice _split_slice)
       : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
+      , valid{ true }
+      , all_subtree_valid{ true }
     {
     } // TODO:finish AT
 
@@ -177,6 +183,9 @@ public:
     {
       return this->aug.Update();
     }
+
+    bool valid;
+    bool all_subtree_valid;
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
@@ -221,6 +230,22 @@ public:
                                   EntrySlice In,
                                   EntrySlice Out,
                                   NodeSplitPairSlice node_split_slice);
+
+  template<typename Range>
+  void BatchDelete(Range&& In);
+
+  void BatchDelete_(EntrySlice In);
+
+  // PARA: return whether T and all its subtree is valid
+  // Only needs to ensure the tree size is correct
+  SizeT BatchDeleteRecursive(Node* T, EntrySlice In);
+
+  // Remove the invalid subtree and put it in flatten_node_slice
+  // Needs to compact the tree_nodes if find a invalid subtree and update the
+  // interior node size and valid flag after the compaction
+  SizeT FetchInvalidSubtreeNodes(Node* T,
+                                 typename TT::NodeSlice flatten_node_slice);
+
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
   // static inline BucketType FindBucket(Point const& p,
@@ -233,11 +258,14 @@ public:
   // static inline void UpdateInterior(Node* T, NodeBox const& L,
   //                                   NodeBox const& R);
   //
-  static Node* UpdateInterior(Node* T,
-                              NodeSplitPairSlice node_split_slice,
-                              SizeBufUBArr const& split_pos_arr,
-                              SizeT new_node_n,
-                              SizeBufUBArr const& return_node_n_arr);
+  static Node* BatchInsertUpdateInterior(Node* T,
+                                         NodeSplitPairSlice node_split_slice,
+                                         SizeBufUBArr const& split_pos_arr,
+                                         SizeT new_node_n,
+                                         SizeBufUBArr const& return_node_n_arr);
+
+  static SizeT BatchDeleteUpdateInteriorSize(Node* T,
+                                             SizeBufUBArr invalid_subtree_num);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
@@ -296,10 +324,8 @@ public:
     SizeT new_node_n,
     SizeBufUBArr const& return_node_n_arr);
 
-  //
-  // template <typename Leaf, typename RT>
-  // static RT DeletePoints4Leaf(Node* T, Slice In);
-  //
+  static TT::SizeT DeletePoints4Leaf(Node* T, EntrySlice In);
+
   // template <typename Leaf, typename RT>
   // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
@@ -610,6 +636,7 @@ private:
 
 } // namespace pmos
 
+#include "b_tree_impl/batch_op/b_batch_delete.hpp"
 #include "b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"

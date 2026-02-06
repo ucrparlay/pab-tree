@@ -67,64 +67,33 @@ BTree<TT>::HandlingLeafSplitOverflow(Node* T,
   return rt_bkt_n;
 }
 
-// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-//           uint_fast8_t kImbaRatio>
-// template <typename Leaf, typename ReturnType>
-// ReturnType BTree<Point, DerivedTree, kSkHeight,
-//                     kImbaRatio>::DeletePoints4Leaf(Node* T, Slice In) {
-//   assert(T->size >= In.size());
-//   Leaf* TL = static_cast<Leaf*>(T);
-//
-//   if (TL->is_dummy) {
-//     assert(In.size() <= T->size);
-//     TL->size -= In.size();  // WARN: this assumes that In\in T
-//     if (TL->size == 0) {
-//       TL->is_dummy = false;
-//       TL->pts = Points::uninitialized(kLeaveWrap);
-//       TL->ResetAug();
-//     }
-//
-//     if constexpr (std::same_as<ReturnType, Node*>) {
-//       return T;
-//     } else if constexpr (std::same_as<ReturnType, NodeBox>) {
-//       if constexpr (HasBox<typename Leaf::AT>) {
-//         return NodeBox(T, TL->GetBox());
-//       } else {
-//         return NodeBox(T,
-//                        T->size ? Box(TL->pts[0], TL->pts[0]) :
-//                        GetEmptyBox());
-//       }
-//     } else {
-//       ;
-//     }
-//   }
-//
-//   auto it = TL->pts.begin(), end = TL->pts.begin() + TL->size;
-//   for (size_t i = 0; i < In.size(); i++) {
-//     it = std::ranges::find(TL->pts.begin(), end, In[i]);
-//     assert(it != end);
-//     std::ranges::iter_swap(it, --end);
-//   }
-//
-//   assert(std::cmp_equal(std::distance(TL->pts.begin(), end),
-//                         TL->size - In.size()));
-//   TL->size -= In.size();
-//   assert(TL->size >= 0);
-//   TL->UpdateAug(TL->pts.cut(0, TL->size));
-//   // assert(TL->GetBox() == GetBox(TL->pts.cut(0, TL->size)));
-//
-//   if constexpr (std::same_as<ReturnType, Node*>) {
-//     return T;
-//   } else if constexpr (std::same_as<ReturnType, NodeBox>) {
-//     if constexpr (HasBox<typename Leaf::AT>) {
-//       return NodeBox(T, TL->GetBox());
-//       // return NodeBox(T, GetBox(TL->pts.cut(0, TL->size)));
-//     } else {
-//       return NodeBox(T, GetBox(TL->pts.cut(0, TL->size)));
-//     }
-//   } else {
-//   }
-// }
+template<typename TT>
+TT::SizeT
+BTree<TT>::DeletePoints4Leaf(Node* T, EntrySlice In)
+{
+  assert(T->size >= In.size());
+  Leaf* TL = static_cast<Leaf*>(T);
+
+  auto it = TL->elements.begin();
+  auto end = TL->elements.begin() + TL->size;
+  BufSizeT delete_cnt = 0;
+  for (size_t i = 0; i < In.size(); i++) {
+    it = std::ranges::find(TL->elements.begin(), end, In[i]);
+    if (it != end) {
+      std::ranges::iter_swap(it, --end);
+      delete_cnt++;
+    }
+  }
+
+  assert(
+    std::cmp_equal(std::distance(TL->pts.begin(), end), TL->size - In.size()));
+  // TL->size -= In.size();
+  TL->size = std::distance(TL->pts.begin(), end);
+  assert(TL->size >= 0);
+  TL->UpdateAug(TL->elements.cut(0, TL->size));
+  // assert(TL->GetBox() == GetBox(TL->pts.cut(0, TL->size)));
+  return delete_cnt;
+}
 //
 // // NOTE: diff points from the leaf using std::set_difference
 // // {1, 2, 5, 5, 5, 9} ∖ {2, 5, 7} == {1, 5, 5, 9}

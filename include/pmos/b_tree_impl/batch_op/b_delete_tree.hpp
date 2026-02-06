@@ -17,7 +17,6 @@ BTree<TT>::DeleteTree()
   }
   this->DeleteTreeRecursive(this->root_);
   this->root_ = nullptr;
-  return;
 }
 
 template<typename TT>

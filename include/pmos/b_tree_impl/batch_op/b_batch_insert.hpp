@@ -104,7 +104,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
 #endif // DEBUG
 
   SizeBufUBArr new_split_node_n_arr;
-  SizeBufUBArr nodes_map;
+  BufSizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
@@ -134,7 +134,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
     new_node_n += new_split_node_n_arr[i] == 0 ? 1 : new_split_node_n_arr[i];
   }
   if (new_node_n <= TT::kBufUB) {
-    [[maybe_unused]] Node* new_inter_node = UpdateInterior(
+    [[maybe_unused]] Node* new_inter_node = BatchInsertUpdateInterior(
       T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
     return 0;
   }
@@ -291,7 +291,7 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
     new_node_n += new_split_node_n_arr[i] == 0 ? 1 : new_split_node_n_arr[i];
   }
   if (new_node_n <= TT::kBufUB) {
-    [[maybe_unused]] Node* new_inter_node = UpdateInterior(
+    [[maybe_unused]] Node* new_inter_node = BatchInsertUpdateInterior(
       T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
     return 0;
   }

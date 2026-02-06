@@ -108,6 +108,8 @@ public:
   static constexpr BufSizeT kBufUB = kBufUBFac * kBufferSize;
 
   using SizeBufUBArr = std::array<SizeT, kBufUB>;
+  using BufSizeBufUBArr = std::array<BufSizeT, kBufUB>;
+  using BooleanBufUBArr = std::array<bool, kBufUB>;
 
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
