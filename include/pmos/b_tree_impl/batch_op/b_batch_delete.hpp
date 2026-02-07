@@ -59,6 +59,8 @@ BTree<TT>::BatchDelete_(EntrySlice In)
   }
 }
 
+// PARA: return whether T and all its subtree is valid
+// Only needs to ensure the tree size is correct
 template<typename TT>
 TT::SizeT
 BTree<TT>::BatchDeleteRecursive(Node* T, EntrySlice In)
@@ -96,7 +98,6 @@ BTree<TT>::BatchDeleteRecursive(Node* T, EntrySlice In)
   }
 #endif // DEBUG
 
-  // TODO: we can use a boolean array
   SizeBufUBArr invalid_subtree_num;
   BufSizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
@@ -119,7 +120,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, EntrySlice In)
                   ? In.size()
                   : split_pos_seq[nodes_map[i]];
       invalid_subtree_num[nodes_map[i]] =
-        BatchInsertRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
+        BatchDeleteRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
     },
     // In.size() > 2048 ? 1 : cnt);
     1);

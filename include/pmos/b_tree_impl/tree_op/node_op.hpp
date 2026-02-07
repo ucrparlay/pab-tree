@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "parlay/monoid.h"
+#include "parlay/parallel.h"
 #include "pmos/b_tree.h"
 
 namespace pmos {
@@ -146,20 +147,20 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
 template<typename TT>
 TT::SizeT
 BTree<TT>::BatchDeleteUpdateInteriorSize(Node* T,
-                                         SizeBufUBArr invalid_subtree_num)
+                                         SizeBufUBArr invalid_subtree_num_arr)
 {
   assert(!T->is_leaf);
   auto TI = static_cast<Interior*>(T);
   SizeT tot_entry_sz = 0;
-  BufSizeT valid_subtree_num = 0;
+  BufSizeT tot_invalid_subtree_n = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     tot_entry_sz += TI->tree_nodes[i]->size;
-    valid_subtree_num += invalid_subtree_num[i];
+    tot_invalid_subtree_n += invalid_subtree_num_arr[i];
   }
   TI->size = tot_entry_sz;
-  TI->valid = TI->GetNodeN() - valid_subtree_num >= TT::kBufLB;
-  TI->all_subtree_valid = valid_subtree_num == TI->GetNodeN();
-  return TI->valid ? TI->GetNodeN() - valid_subtree_num : 1;
+  TI->valid = TI->GetNodeN() - tot_invalid_subtree_n >= TT::kBufLB;
+  TI->invalid_subtree_num = TI->valid ? tot_invalid_subtree_n : 1;
+  return TI->invalid_subtree_num;
 }
 
 template<typename TT>
@@ -226,6 +227,56 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
                       auto node) { node_split_slice[i].first = node; } });
 
   return rt_bkt_n;
+}
+
+template<typename TT>
+TT::SizeT
+BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
+{
+  if (T->is_leaf) {
+    if (T->size < TT::kBufLB) {
+      flatten_node_slice[0] = T;
+      return T->size;
+    }
+    return 0;
+  }
+
+  auto TI = static_cast<Interior*>(T);
+  if (TI->valid) {                      // find a valid subtree
+    if (TI->invalid_subtree_num == 0) { // no subtree is invalid
+      return 0;
+    } else { // contain a invalid subtree
+      typename Interior::NodeArr invalid_node_arr;
+      BufSizeT invalid_subtree_cnt = 0;
+      BufSizeT invalid_idx = 0;
+      BufSizeT tree_node_idx = 0;
+      for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+        if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
+          invalid_node_arr[invalid_idx] = TI->tree_nodes[tree_node_idx];
+          invalid_idx++;
+        } else {
+          TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
+          tree_node_idx++;
+        }
+      }
+      TI->node_n -= invalid_idx;
+      assert(invalid_idx == TI->invalid_subtree_num);
+      parlay::parallel_for(0, TI->GetNodeN(), [&](BufSizeT i) {
+        BufSizeT cnt = 0;
+        for (BufSizeT j = 0; j < i; j++) {
+          cnt += GetNodeInvalidSubtreeNum(invalid_node_arr[j]);
+        }
+        FetchInvalidSubtreeNodes(
+          invalid_node_arr[i],
+          flatten_node_slice.cut(
+            cnt, GetNodeInvalidSubtreeNum(invalid_node_arr[i])));
+      });
+    }
+  } else { // find a invalid tree
+    flatten_node_slice[0] = T;
+    assert(TI->invalid_subtree_num == 1);
+    return T->size;
+  }
 }
 
 template<typename TT>

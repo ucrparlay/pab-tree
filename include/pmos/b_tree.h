@@ -139,16 +139,16 @@ public:
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split)
       : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
-      , valid{ true }
-      , all_subtree_valid{ true }
+      , valid(true)
+      , invalid_subtree_num(0)
     {
     } // TODO:finish AT
 
     BTreeInteriorNode(TT::NodeSlice _tree_nodes_slice,
                       TT::SplitSlice _split_slice)
       : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
-      , valid{ true }
-      , all_subtree_valid{ true }
+      , valid(true)
+      , invalid_subtree_num(0)
     {
     } // TODO:finish AT
 
@@ -185,7 +185,7 @@ public:
     }
 
     bool valid;
-    bool all_subtree_valid;
+    SizeT invalid_subtree_num;
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
@@ -206,6 +206,12 @@ public:
   {
     return (n * (i + 1)) / bkt_n;
   };
+
+  static SizeT GetNodeInvalidSubtreeNum(Node* T)
+  {
+    return T->is_leaf ? T->size < TT::kBufLB ? 1 : 0
+                      : static_cast<Interior*>(T)->invalid_subtree_num;
+  }
 
   // NOTE: build tree
   template<typename Range>
@@ -243,6 +249,7 @@ public:
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
   // interior node size and valid flag after the compaction
+  // Return the total number entries in the tree that needs to rebuild
   SizeT FetchInvalidSubtreeNodes(Node* T,
                                  typename TT::NodeSlice flatten_node_slice);
 
@@ -264,8 +271,9 @@ public:
                                          SizeT new_node_n,
                                          SizeBufUBArr const& return_node_n_arr);
 
-  static SizeT BatchDeleteUpdateInteriorSize(Node* T,
-                                             SizeBufUBArr invalid_subtree_num);
+  static SizeT BatchDeleteUpdateInteriorSize(
+    Node* T,
+    SizeBufUBArr invalid_subtree_num_arr);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
