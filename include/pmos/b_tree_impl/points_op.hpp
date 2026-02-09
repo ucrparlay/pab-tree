@@ -46,11 +46,17 @@ BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
 }
 
 template<typename TT>
-typename TT::BucketType
-BTree<TT>::RetriveTag(E const e, TT::SplitSliceConst split_slice)
+template<typename T>
+typename TT::BufSizeT
+BTree<TT>::RetriveTag(T const e, TT::SplitSliceConst split_slice)
 {
-  return parlay::internal::binary_search(
-    split_slice, [&](K const key) { return key <= Entry::GetKey(e); });
+  return parlay::internal::binary_search(split_slice, [&](K const key) {
+    if constexpr (std::same_as<decltype(e), typename TT::K>) {
+      return key < e;
+    } else {
+      return key <= Entry::GetKey(e);
+    }
+  });
 }
 
 // NOTE: seieve Points from range A to range B, using the skeleton tags. The
@@ -107,27 +113,34 @@ BTree<TT>::SeievePoints(EntrySlice A,
 }
 
 template<typename TT>
+template<typename Range>
 void
 BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
-                                  EntrySlice In,
+                                  Range In,
                                   TT::SplitSliceConst split_slice)
 {
   // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
   // TODO: maybe we can decide it by skewed distribution
   SizeT offset = 0;
   for (BufSizeT i = 0; i < split_slice.size(); i++) {
-    SizeT pos = parlay::internal::binary_search(
-      In.cut(offset, In.size()),
-      [&](E const e) { return Entry::GetKey(e) < split_slice[i]; });
+    SizeT pos =
+      parlay::internal::binary_search(In.cut(offset, In.size()), [&](auto e) {
+        if constexpr (std::same_as<decltype(e), typename TT::K>) {
+          return e < split_slice[i];
+        } else {
+          return Entry::GetKey(e) < split_slice[i];
+        }
+      });
     offset += pos;
     split_pos_arr[i] = offset;
   }
 }
 
 template<typename TT>
+template<typename Range>
 void
 BTree<TT>::SplitBatchSieve(SizeBufUBArr& split_pos_arr,
-                           EntrySlice In,
+                           Range In,
                            TT::SplitSliceConst split_slice)
 {
   SizeT n = In.size();
@@ -163,14 +176,12 @@ BTree<TT>::SplitBatchSieve(SizeBufUBArr& split_pos_arr,
 }
 
 template<typename TT>
+template<typename Range>
 void
 BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
-                           EntrySlice In,
+                           Range In,
                            TT::SplitSliceConst split_slice)
 {
-  assert(parlay::is_sorted(In, [&](auto e1, auto e2) {
-    return Entry::GetKey(e1) < Entry::GetKey(e2);
-  }));
   assert(
     parlay::is_sorted(split_slice, [&](auto k1, auto k2) { return k1 < k2; }));
 
@@ -179,7 +190,13 @@ BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
   auto input_iter = In.begin();
 
   while (split_iter != split_slice.end() && input_iter != In.end()) {
-    if (Entry::GetKey(*input_iter) < *split_iter) {
+    bool less(false);
+    if constexpr (std::same_as<typename Range::value_type, typename TT::K>) {
+      less = *input_iter < *split_iter;
+    } else {
+      less = Entry::GetKey(*input_iter) < *split_iter;
+    }
+    if (less) {
       ++input_iter;
       ++cnt;
     } else {

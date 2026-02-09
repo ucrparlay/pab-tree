@@ -48,6 +48,7 @@ public:
   using InteriorAug = typename TT::InteriorAug;
 
   using InputRangeT = TT::EntrySeq;
+  using InputDeleteRangeT = TT::KeySeq;
 
   // NOTE: Const variables
   // NOTE: uint32t handle up to 4e9 at least
@@ -240,11 +241,11 @@ public:
   template<typename Range>
   void BatchDelete(Range&& In);
 
-  void BatchDelete_(EntrySlice In);
+  void BatchDelete_(TT::KeySlice In);
 
   // PARA: return whether T and all its subtree is valid
   // Only needs to ensure the tree size is correct
-  SizeT BatchDeleteRecursive(Node* T, EntrySlice In);
+  SizeT BatchDeleteRecursive(Node* T, TT::KeySlice In);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
@@ -332,25 +333,29 @@ public:
     SizeT new_node_n,
     SizeBufUBArr const& return_node_n_arr);
 
-  static TT::SizeT DeletePoints4Leaf(Node* T, EntrySlice In);
+  static TT::SizeT DeletePoints4Leaf(Node* T, TT::KeySlice In);
 
   // template <typename Leaf, typename RT>
   // static RT DiffPoints4Leaf(Node* T, Slice In);
   //
 
+  template<typename Range>
   static void SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
-                                     EntrySlice In,
+                                     Range In,
                                      TT::SplitSliceConst split_slice);
 
+  template<typename Range>
   static void SplitBatchSieve(SizeBufUBArr& split_pos_arr,
-                              EntrySlice In,
+                              Range In,
                               TT::SplitSliceConst split_slice);
 
+  template<typename Range>
   static void SplitBatchMerge(SizeBufUBArr& split_pos_arr,
-                              EntrySlice In,
+                              Range In,
                               TT::SplitSliceConst split_slice);
 
-  static inline BucketType RetriveTag(E e, TT::SplitSliceConst split_slice);
+  template<typename T>
+  static inline BufSizeT RetriveTag(T e, TT::SplitSliceConst split_slice);
 
   static TT::BallSeq SeievePoints(EntrySlice A,
                                   EntrySlice B,
@@ -609,6 +614,12 @@ public:
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return input_seq;
+  }
+
+  static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
+    -> InputDeleteRangeT
+  {
+    return parlay::map(input_seq, [&](auto e) { return Entry::GetKey(e); });
   }
 
   Node* GetRoot()

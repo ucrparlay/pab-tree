@@ -50,11 +50,19 @@ public:
 
   // NOTE: general type
   using Num = Num_Comparator<K>;
+
+  using EntrySeq = parlay::sequence<E>;
   using EntrySlice = parlay::slice<E*, E*>;
   using ConstEntrySlice = parlay::slice<E const*, E const*>;
-  using EntrySeq = parlay::sequence<E>;
   using ConstEntrySeq = parlay::sequence<E> const;
   using EntryIter = typename parlay::sequence<E>::iterator;
+
+  using KeySeq = parlay::sequence<K>;
+  using ConstKeySeq = parlay::sequence<K> const;
+  using KeySlice = parlay::slice<K*, K*>;
+  using ConstKeySlice = parlay::slice<K const*, K const*>;
+  using KeyIter = typename parlay::sequence<K>::iterator;
+
   using Box = std::pair<K, K>;
   using BoxSeq = parlay::sequence<Box>;
 

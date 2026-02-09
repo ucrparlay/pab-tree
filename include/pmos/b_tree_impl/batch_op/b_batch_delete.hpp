@@ -18,17 +18,17 @@ BTree<TT>::BatchDelete(Range&& In)
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
-  EntrySlice A = parlay::make_slice(std::forward<Range>(In));
+  auto A = parlay::make_slice(std::forward<Range>(In));
 
   BatchDelete_(A);
 }
 
 template<typename TT>
 void
-BTree<TT>::BatchDelete_(EntrySlice In)
+BTree<TT>::BatchDelete_(TT::KeySlice In)
 {
-  if (this->root_ == nullptr) { // TODO: may check using explicity tag
-    return Build_(In);
+  if (this->root_ == nullptr) {
+    return;
   }
   // parlay::internal::timer t("BatchInsert_Sort");
   auto sorted_seq = parlay::sort(In);
@@ -63,7 +63,7 @@ BTree<TT>::BatchDelete_(EntrySlice In)
 // Only needs to ensure the tree size is correct
 template<typename TT>
 TT::SizeT
-BTree<TT>::BatchDeleteRecursive(Node* T, EntrySlice In)
+BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
 {
 
   if (In.size() == 0) {
@@ -90,11 +90,9 @@ BTree<TT>::BatchDeleteRecursive(Node* T, EntrySlice In)
   // Ensure all elements between two splits are correct
   // i.e., less than the split value
   for (int i = 1; i < TI->GetSplitN(); i++) {
-    assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
-                          [&](E const e) {
-                            return Entry::GetKey(e) >= TI->split[i - 1] &&
-                                   Entry::GetKey(e) < TI->split[i];
-                          }));
+    assert(parlay::all_of(
+      In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
+      [&](K const k) { return k >= TI->split[i - 1] && k < TI->split[i]; }));
   }
 #endif // DEBUG
 

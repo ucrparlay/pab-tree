@@ -1477,7 +1477,7 @@ public:
 
     bool operator==(Element const& rhs) const
     {
-      return this->key == rhs.key && this->val == rhs.val;
+      return this->key == rhs.key;
     }
 
     friend std::ostream& operator<<(std::ostream& o, Element const& a)
