@@ -134,6 +134,12 @@ public:
     return to_aug(
       Map::multi_insert_sorted_map(std::move(m), SS, combine_op, map_op));
   }
+
+  static M multi_delete(M m, parlay::sequence<K> const& SS)
+  {
+    return to_aug(Map::multi_delete(std::move(m), SS));
+  }
+
   template<class Seq, class CombineOp>
   static M multi_delete_sorted_map(M m, Seq& SS, CombineOp combine_op)
   {

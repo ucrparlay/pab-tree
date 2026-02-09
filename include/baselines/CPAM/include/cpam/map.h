@@ -426,6 +426,39 @@ public:
     return x;
   }
 
+  template<class Seq>
+  static M multi_delete(M m, Seq const& SS)
+  {
+    timer t("MI", false);
+    using EE = typename Seq::value_type;
+    struct e_type
+    {
+      using entry_t = EE;
+      using key_t = EE;
+      using val_t = bool;
+      static bool comp(key_t const& a, key_t const& b)
+      {
+        return a < b;
+      }
+      static inline key_t get_key(entry_t const& e)
+      {
+        return e;
+      }
+      static inline val_t get_val(entry_t const& e)
+      {
+        return false;
+      }
+    };
+
+    using BD = build<e_type>;
+    parlay::sequence<K> A = BD::sort_remove_duplicates(SS);
+    // auto A = parlay::sort(SS);
+    t.next("build time");
+    auto x = M(Tree::multi_delete_sorted(m.get_root(), A.data(), A.size()));
+    t.next("MI time");
+    return x;
+  }
+
   // insert multiple keys from a sequence, destroying the sequence
   // ?? pass by rvalue reference instead ??
   // template<class Seq>

@@ -281,8 +281,6 @@ BatchInsert(Tree& pkd,
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
     BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
   } else { // NOTE: insert the points from previous tree
-    pkd.DeleteTree();
-    pkd.Build(wp);
     std::cout << "Insert " << wi.size() << " elements\n" << std::flush;
     pkd.BatchInsert(wi);
     std::cout << "finish ccp insert" << std::endl;
@@ -299,8 +297,8 @@ BatchDelete(Tree& pkd,
             typename TypeTrait::EntrySeq const& WI,
             int const rounds)
 {
-  typename Tree::InputRangeT parsed_base = Tree::ParseInput(WP);
-  typename Tree::InputRangeT parsed_batch = Tree::ParseInput(WI);
+  auto parsed_base = Tree::ParseInput(WP);
+  auto parsed_batch = Tree::ParseDeleteInput(WI);
   auto wp = parsed_base;
   auto wi = parsed_batch;
   double loop_late = rounds > 1 ? 0.01 : -100;
@@ -320,10 +318,7 @@ BatchDelete(Tree& pkd,
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
     BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
-  } else { // NOTE: insert the points from previous tree
-    pkd.DeleteTree();
-    pkd.Build(wp);
-    std::cout << "Delete " << wi.size() << " elements\n" << std::flush;
+  } else { // NOTE: delete the points from previous tree
     pkd.BatchDelete(wi);
     std::cout << "finish ccp delete" << std::endl;
   }

@@ -69,12 +69,20 @@ public:
   using Interior = zmap::Tree::node;
 
   using InputRangeT = parlay::sequence<par>;
+  using InputRangeDeleteT = parlay::sequence<K>;
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return parlay::map(input_seq, [&](auto e) -> par {
       return { Entry::GetKey(e), Entry::GetVal(e) };
     });
+  }
+
+  static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
+    -> InputRangeDeleteT
+  {
+    return parlay::map(input_seq,
+                       [&](auto e) -> K { return Entry::GetKey(e); });
   }
   // template <typename T>
   // auto knn(T& tree, Point const& query_point, auto k, auto& vis_leaf) {
@@ -112,23 +120,12 @@ public:
   {
     return std::move(zmap::multi_insert(std::forward<M>(mmp), P));
   }
-  //
-  // template <typename PT, typename M>
-  // auto map_delete(PT P, M&& mmp) {
-  //   size_t n = P.size();
-  //
-  //   parlay::parallel_for(
-  //       0, n, [&](int i) { P[i].aug.code = SplitRule::Encode(P[i]); });
-  //   parlay::sequence<par> delete_pts(n);
-  //   // parlay::sequence<pair<unsigned long long, long long> > delete_pts(n);
-  //   parlay::parallel_for(0, n, [&](int i) {
-  //     delete_pts[i] = {{P[i].aug.code, P[i].aug.id}, P[i]};
-  //     // delete_pts[i] = {P[i]->morton_id, P[i]->id};
-  //     // insert_pts[i] = {P[i]->id, P[i]};
-  //   });
-  //
-  //   return std::move(zmap::multi_delete(std::forward<M>(mmp), delete_pts));
-  // }
+
+  template<typename Range, typename M>
+  auto map_delete(Range P, M&& mmp)
+  {
+    return std::move(zmap::multi_delete(std::forward<M>(mmp), P));
+  }
   //
   // int mbr_mbr_relation(Box const& a, Box const& b) {
   //   if (!BT::BoxIntersectBox(a, b)) {
@@ -182,13 +179,15 @@ public:
     }
     cpam_aug_map_ = map_insert(In, std::move(cpam_aug_map_));
   }
-  //
-  // void BatchDelete(Slice In) {
-  //   if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
-  //     return;
-  //   }
-  //   cpam_aug_map_ = map_delete(In, std::move(cpam_aug_map_));
-  // }
+
+  template<typename Range>
+  void BatchDelete(Range&& In)
+  {
+    if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
+      return;
+    }
+    cpam_aug_map_ = map_delete(In, std::move(cpam_aug_map_));
+  }
 
   // template <typename Node, typename Range>
   // auto KNN(Node* T, Point const& q, psi::kBoundedQueue<Point, Range>& bq) {

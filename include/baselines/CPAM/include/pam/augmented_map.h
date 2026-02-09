@@ -149,9 +149,9 @@ public:
   // ?? should it be &
   //  return Map::multi_insert_xx(std::move(m), std::move(SS), sequential);}
 
-  static M multi_delete(M m, parlay::sequence<K> SS, bool seq_inplace = false)
+  static M multi_delete(M m, parlay::sequence<K> SS)
   { // ?? should it be &
-    return to_aug(Map::multi_delete(std::move(m), SS, seq_inplace));
+    return to_aug(Map::multi_delete(std::move(m), SS));
   }
   template<class Seq, class CombineOp>
   static M multi_delete_sorted_map(M m, Seq& SS, CombineOp combine_op)
