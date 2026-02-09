@@ -96,18 +96,22 @@ protected:
     constexpr bool kTestTime = false;
     EntrySeq wp;
     EntrySeq wi;
+    auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
+    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+    auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+    BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+    tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
 
     if (opts.tag & (1 << 0)) {
-      auto [base_path, batch_path] =
-        opts.ParseInsertBatchPath(opts.batch_ratio);
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
-
-      BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
-      tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
-
       BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
       ASSERT_EQ(tree.GetSize(), wp.size() + wi.size());
+      tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    }
+
+    if (opts.tag & (1 << 1)) {
+      // WARN: must happen after the insertion
+      BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, 2);
+      ASSERT_EQ(tree.GetSize(), wp.size());
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
     }
 
@@ -125,6 +129,12 @@ protected:
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
       ASSERT_TRUE(parlay::all_of(res, [&](auto r) { return r == true; }));
+      if (opts.tag & (1 << 1)) {
+        query_ele = wi.subseq(0, batch_size);
+        auto res = parlay::sequence<bool>(query_ele.size(), true);
+        Membership<TT>(tree, query_ele, opts.rounds, res);
+        ASSERT_TRUE(parlay::all_of(res, [&](auto r) { return r == false; }));
+      }
     }
 
     tree.DeleteTree();
