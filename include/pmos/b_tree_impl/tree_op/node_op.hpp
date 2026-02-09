@@ -235,6 +235,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
 {
   if (T->is_leaf) {
     if (T->size < TT::kBufLB) {
+      assert(flatten_node_slice.size() == 1);
       flatten_node_slice[0] = T;
       return T->size;
     }
@@ -250,9 +251,11 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
       BufSizeT invalid_subtree_cnt = 0;
       BufSizeT invalid_idx = 0;
       BufSizeT tree_node_idx = 0;
+      SizeT remove_entries_num = 0;
       for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
         if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
-          invalid_node_arr[invalid_idx] = TI->tree_nodes[tree_node_idx];
+          invalid_node_arr[invalid_idx] = TI->tree_nodes[i];
+          remove_entries_num += TI->tree_nodes[i];
           invalid_idx++;
         } else {
           TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
@@ -260,19 +263,25 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
         }
       }
       TI->node_n -= invalid_idx;
+      TI->size -= remove_entries_num;
+
       assert(invalid_idx == TI->invalid_subtree_num);
-      parlay::parallel_for(0, TI->GetNodeN(), [&](BufSizeT i) {
-        BufSizeT cnt = 0;
+      assert(flatten_node_slice.size() == invalid_idx);
+
+      parlay::parallel_for(0, invalid_idx, [&](BufSizeT i) {
+        BufSizeT sum = 0;
         for (BufSizeT j = 0; j < i; j++) {
-          cnt += GetNodeInvalidSubtreeNum(invalid_node_arr[j]);
+          sum += GetNodeInvalidSubtreeNum(invalid_node_arr[j]);
         }
-        FetchInvalidSubtreeNodes(
+        [[maybe_unused]] auto return_v = FetchInvalidSubtreeNodes(
           invalid_node_arr[i],
           flatten_node_slice.cut(
-            cnt, GetNodeInvalidSubtreeNum(invalid_node_arr[i])));
+            sum, GetNodeInvalidSubtreeNum(invalid_node_arr[i])));
       });
+      return remove_entries_num;
     }
   } else { // find a invalid tree
+    assert(flatten_node_slice.size() == 1);
     flatten_node_slice[0] = T;
     assert(TI->invalid_subtree_num == 1);
     return T->size;
