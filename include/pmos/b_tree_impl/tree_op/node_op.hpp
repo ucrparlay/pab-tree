@@ -255,7 +255,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
       for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
         if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
           invalid_node_arr[invalid_idx] = TI->tree_nodes[i];
-          remove_entries_num += TI->tree_nodes[i];
+          remove_entries_num += TI->tree_nodes[i]->size;
           invalid_idx++;
         } else {
           TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];

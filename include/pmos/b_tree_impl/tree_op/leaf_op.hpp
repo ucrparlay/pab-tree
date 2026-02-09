@@ -14,6 +14,17 @@
 #include "pmos/dependence/concepts.h"
 
 namespace pmos {
+template<typename TT>
+template<typename Range>
+void
+BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
+{
+  auto TL = static_cast<const Leaf*>(T);
+  assert(Out.size() >= TL->size);
+  for (BufSizeT i = 0; i < TL->size; i++) {
+    Out[i] = TL->elements[i];
+  }
+}
 
 template<typename TT>
 TT::Node*
@@ -72,12 +83,12 @@ TT::SizeT
 BTree<TT>::DeletePoints4Leaf(Node* T, EntrySlice In)
 {
   assert(T->size >= In.size());
-  Leaf* TL = static_cast<Leaf*>(T);
+  auto TL = static_cast<Leaf*>(T);
 
   auto it = TL->elements.begin();
   auto end = TL->elements.begin() + TL->size;
   BufSizeT delete_cnt = 0;
-  for (size_t i = 0; i < In.size(); i++) {
+  for (SizeT i = 0; i < In.size(); i++) {
     it = std::ranges::find(TL->elements.begin(), end, In[i]);
     if (it != end) {
       std::ranges::iter_swap(it, --end);
@@ -85,10 +96,10 @@ BTree<TT>::DeletePoints4Leaf(Node* T, EntrySlice In)
     }
   }
 
-  assert(
-    std::cmp_equal(std::distance(TL->pts.begin(), end), TL->size - In.size()));
+  assert(std::cmp_equal(std::distance(TL->elements.begin(), end),
+                        TL->size - In.size()));
   // TL->size -= In.size();
-  TL->size = std::distance(TL->pts.begin(), end);
+  TL->size = std::distance(TL->elements.begin(), end);
   assert(TL->size >= 0);
   TL->UpdateAug(TL->elements.cut(0, TL->size));
   // assert(TL->GetBox() == GetBox(TL->pts.cut(0, TL->size)));

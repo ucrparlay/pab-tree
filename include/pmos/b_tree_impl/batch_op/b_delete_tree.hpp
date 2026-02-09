@@ -15,14 +15,14 @@ BTree<TT>::DeleteTree()
   if (this->root_ == nullptr) {
     return;
   }
-  this->DeleteTreeRecursive(this->root_);
+  this->DeleteTreeRec(this->root_);
   this->root_ = nullptr;
 }
 
 template<typename TT>
 template<bool granularity>
 void
-BTree<TT>::DeleteTreeRecursive(Node* T)
+BTree<TT>::DeleteTreeRec(Node* T)
 {
   if (T == nullptr) {
     return;
@@ -30,14 +30,14 @@ BTree<TT>::DeleteTreeRecursive(Node* T)
   if (T->is_leaf) {
     FreeNode<Leaf>(T);
   } else {
-    Interior* TI = static_cast<Interior*>(T);
+    auto TI = static_cast<Interior*>(T);
 
     // NOTE: enable granularity control by default, if it is disabled,
     // always delete in parallel
     parlay::parallel_for(
       0,
       TI->GetNodeN(),
-      [&](size_t i) { DeleteTreeRecursive(TI->tree_nodes[i]); },
+      [&](size_t i) { DeleteTreeRec(TI->tree_nodes[i]); },
       // WARN: the granularity control may not work well here
       ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBuf);
 

@@ -30,15 +30,16 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
 {
   assert(T->size == Out.size());
 
-  if (T->size == 0)
-    return;
-
-  if (T->is_leaf) {
-    ExtractPointsInLeaf<Leaf>(T, Out);
+  if (T->size == 0) {
     return;
   }
 
-  Interior* TI = static_cast<Interior*>(T);
+  if (T->is_leaf) {
+    ExtractPointsInLeaf(T, Out);
+    return;
+  }
+
+  auto TI = static_cast<const Interior*>(T);
 
   assert(TI->size == std::accumulate(TI->tree_nodes.begin(),
                                      TI->tree_nodes.end(),
@@ -50,51 +51,19 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
   parlay::parallel_for(
     0,
     TI->tree_nodes.size(),
-    [&](BucketType i) {
-      size_t start = 0;
-      for (BucketType j = 0; j < i; ++j) {
+    [&](BufSizeT i) {
+      SizeT start = 0;
+      for (BufSizeT j = 0; j < i; ++j) {
         start += TI->tree_nodes[j]->size;
       }
-      FlattenRec<Range>(TI->tree_nodes[i],
-                        Out.cut(start, start + TI->tree_nodes[i]->size));
+      FlattenRec<Range, granularity>(
+        TI->tree_nodes[i], Out.cut(start, start + TI->tree_nodes[i]->size));
     },
-    // WARN: the granularity control may not work well here
+    // NOTE: In our btree when we flatten the tree, the size is always match the
+    // corresponding size, so we can use it as the granularity indicator
     ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBuf);
-
-  return;
 }
 
-// // NOTE: for multi node @T, it only flatten the subtree with id @idx to @Out
-// template <typename TT>
-// template <typename Leaf, IsMultiNode Interior, typename Range, bool
-// granularity> void BTree<TT>::PartialFlatten(Node* T, Range Out, BucketType
-// idx) {
-//   if (idx == 1) {
-//     assert(T->size == Out.size());
-//     FlattenRec<Leaf, Interior>(T, Out.cut(0, T->size));
-//     return;
-//   } else if (idx >= Interior::GetRegions()) {
-//     Node* ns =
-//         static_cast<Interior*>(T)->tree_nodes[idx - Interior::GetRegions()];
-//     assert(ns->size == Out.size());
-//     FlattenRec<Leaf, Interior>(ns, Out.cut(0, ns->size));
-//     return;
-//   }
-//
-//   Interior* TI = static_cast<Interior*>(T);
-//   size_t l_size = TI->MergeSize(idx << 1), r_size = TI->MergeSize(idx << 1 |
-//   1); assert(l_size + r_size == Out.size()); parlay::par_do_if(
-//       ForceParallelRecursion<Interior,
-//       granularity>(static_cast<Interior*>(T)),
-//       [&]() {
-//         PartialFlatten<Leaf, Interior>(T, Out.cut(0, l_size), idx << 1);
-//       },
-//       [&]() {
-//         PartialFlatten<Leaf, Interior>(T, Out.cut(l_size, l_size + r_size),
-//                                        idx << 1 | 1);
-//       });
-//   return;
-// }
 } // namespace pmos
 
 #endif // PMOS_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_

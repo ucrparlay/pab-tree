@@ -289,39 +289,43 @@ BatchInsert(Tree& pkd,
   }
 }
 
-template<typename Point,
+template<typename TypeTrait,
          typename Tree,
          bool kTestTime = true,
          bool kSerial = false>
 void
 BatchDelete(Tree& pkd,
-            parlay::sequence<Point> const& WP,
-            parlay::sequence<Point> const& WI,
-            int const rounds,
-            double ratio = 1.0)
+            typename TypeTrait::EntrySeq const& WP,
+            typename TypeTrait::EntrySeq const& WI,
+            int const rounds)
 {
-  using Points = typename Tree::Points;
-  Points wp = Points::uninitialized(WP.size());
-  Points wi = Points::uninitialized(WP.size());
-  size_t batchSize = static_cast<size_t>(WP.size() * ratio);
+  typename Tree::InputRangeT parsed_base = Tree::ParseInput(WP);
+  typename Tree::InputRangeT parsed_batch = Tree::ParseInput(WI);
+  auto wp = parsed_base;
+  auto wi = parsed_batch;
   double loop_late = rounds > 1 ? 0.01 : -100;
 
-  if constexpr (kTestTime) {
+  if constexpr (kTestTime) { // NOTE: clean and measure time
     pkd.DeleteTree();
-    double aveDelete = time_loop(
+    double aveInsert = time_loop(
       rounds,
       loop_late,
       [&]() {
-        BuildTree<Point, Tree, false>(WP, rounds, pkd);
-        parlay::copy(WI, wi);
+        wp = parsed_base;
+        wi = parsed_batch;
+        pkd.Build(wp);
       },
-      [&]() { pkd.BatchDelete(wi.cut(0, batchSize)); },
+      [&]() { pkd.BatchDelete(wi); },
       [&]() { pkd.DeleteTree(); });
-    std::cout << aveDelete << " " << std::flush;
-    BuildTree<Point, Tree, false>(WP, rounds, pkd);
-  } else {
-    parlay::copy(WI, wi);
-    pkd.BatchDelete(wi.cut(0, batchSize));
+    std::cout << aveInsert << " " << std::flush;
+    // std::cout << ratio << " " << aveInsert << " " << std::endl;
+    BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
+  } else { // NOTE: insert the points from previous tree
+    pkd.DeleteTree();
+    pkd.Build(wp);
+    std::cout << "Delete " << wi.size() << " elements\n" << std::flush;
+    pkd.BatchDelete(wi);
+    std::cout << "finish ccp delete" << std::endl;
   }
 }
 
@@ -1211,20 +1215,28 @@ static auto constexpr DefaultTestFunc =
         BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
       }
     }
-    //
-    // // NOTE: batch delete
-    // if (kTag & (1 << 1)) {
-    //   if (kSummary) {
-    //     parlay::sequence<double> const ratios = {0.0001, 0.001, 0.01,
-    //     0.1}; for (size_t i = 0; i < ratios.size(); i++) {
-    //       BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, opts.rounds,
-    //       ratios[i]);
-    //     }
-    //   } else {
-    //     BatchDelete<Point, Tree, kTestTime>(tree, wp, wp, opts.rounds,
-    //                                         kBatchInsertRatio);
-    //   }
-    // }
+
+    // NOTE: batch delete
+    if (opts.tag & (1 << 1)) {
+      if (opts.summary) {
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        for (auto ratio : ratio_seq) {
+          auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+          // std::cout << base_path << " " << batch_path << std::endl;
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+          auto [n2, d2] =
+            ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+          BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+        }
+      } else {
+        auto [base_path, batch_path] =
+          opts.ParseDeleteBatchPath(opts.batch_ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
+    }
 
     if (opts.query_type & (1 << 0)) { // NOTE: membership
       auto [base_path, batch_path] =
@@ -1342,8 +1354,8 @@ struct Options
     auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
     std::string base_path =
       dir_prefix + "del/" +
-      std::to_string(static_cast<size_t>(batch_ratio * 100)) + "/" +
-      file_prefix + ".base.in";
+      std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" + file_prefix +
+      ".base.in";
 
     std::string batch_path = base_path;
     batch_path.replace(batch_path.find(".base."), 6, ".batch.");
@@ -1401,20 +1413,7 @@ public:
 
   struct InteriorAugEmpty
   {
-    InteriorAugEmpty()
-    {
-      force_par_indicator.reset();
-    }
-    InteriorAugEmpty(bool /*flag*/)
-    {
-      force_par_indicator.reset();
-    }
-
-    // use a bool to reload default constructor
-    // template <typename Leaf, typename Interior>
-    // static bool Create(Node* l, Node* r) {
-    //   return true;
-    // }
+    InteriorAugEmpty() = default;
 
     template<typename TreeNodes>
     static bool Create(TreeNodes const& /*nodes*/)
@@ -1422,54 +1421,24 @@ public:
       return true;
     }
 
-    void SetParallelFlag(bool const flag)
+    [[nodiscard]] static bool ForceParallel(size_t /*sz*/,
+                                            size_t /*granularity*/)
     {
-      this->force_par_indicator.emplace(flag);
+      return true;
     }
-
-    void ResetParallelFlag()
-    {
-      this->force_par_indicator.reset();
-    }
-
-    [[nodiscard]] bool GetParallelFlagIniStatus() const
-    {
-      return this->force_par_indicator.has_value();
-    }
-
-    [[nodiscard]] bool ForceParallel(size_t sz, size_t granularity) const
-    {
-      return this->force_par_indicator.has_value()
-               ? this->force_par_indicator.value()
-               : sz > granularity;
-    }
-
-    // template <typename Leaf, typename Interior>
-    // void Update(Node*, Node*) {
-    //   return;
-    // }
 
     template<typename TreeNodes, typename SplitSeq>
     void Update(TreeNodes const& /*nodes*/, SplitSeq const& /*splits*/)
     {
-      return;
     }
 
     void Update()
     {
-      return;
     }
 
     void Reset()
     {
-      this->force_par_indicator.reset();
     }
-
-    // NOTE: use a tri-state bool to indicate whether a subtree needs to be
-    // rebuilt. If aug is not INITIALIZED, then it means there is no need to
-    // rebuild; otherwise, the value depends on the initial tree size before
-    // rebuilding.
-    std::optional<bool> force_par_indicator;
   };
 
   // NOTE: the element we use
@@ -1509,6 +1478,11 @@ public:
     bool operator<(Element const& rhs) const
     {
       return this->key < rhs.key;
+    }
+
+    bool operator==(Element const& rhs) const
+    {
+      return this->key == rhs.key && this->val == rhs.val;
     }
 
     friend std::ostream& operator<<(std::ostream& o, Element const& a)

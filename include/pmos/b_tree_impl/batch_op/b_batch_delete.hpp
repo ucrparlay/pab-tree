@@ -35,7 +35,7 @@ BTree<TT>::BatchDelete_(EntrySlice In)
   // t.next("Sorted");
 
   auto invalid_subtree_num =
-    BatcDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
+    BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
 
   if (invalid_subtree_num) {
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
@@ -52,7 +52,7 @@ BTree<TT>::BatchDelete_(EntrySlice In)
         }
         FlattenRec(flatten_node_seq[i],
                    reinsert_entries.cut(sum, sum + flatten_node_seq[i]->size));
-        DeleteTree(flatten_node_seq[i]);
+        DeleteTreeRec(flatten_node_seq[i]);
       },
       1);
     BatchInsert_(parlay::make_slice(reinsert_entries));

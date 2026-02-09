@@ -395,7 +395,7 @@ public:
   void DeleteTree();
 
   template<bool granularity = true>
-  static void DeleteTreeRecursive(Node* T);
+  static void DeleteTreeRec(Node* T);
 
   // // NOTE: KNN query stuffs
   // static inline DisType P2PDistanceSquare(Point const& p, Point const& q);
