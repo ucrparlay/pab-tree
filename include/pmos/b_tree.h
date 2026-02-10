@@ -200,12 +200,12 @@ public:
 
   static SizeT GetBktStIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
   {
-    return (n * i) / bkt_n;
+    return (static_cast<size_t>(n) * i) / bkt_n;
   };
 
   static SizeT GetBktEndIdx(SizeT const i, SizeT const bkt_n, SizeT const n)
   {
-    return (n * (i + 1)) / bkt_n;
+    return (static_cast<size_t>(n) * (i + 1)) / bkt_n;
   };
 
   static SizeT GetNodeInvalidSubtreeNum(Node* T)
