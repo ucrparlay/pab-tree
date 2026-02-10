@@ -250,37 +250,38 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
   }
 
   auto TI = static_cast<Interior*>(T);
+  assert(TI->valid || TI->invalid_subtree_num > 0);
   if (TI->valid) {                      // find a valid subtree
     if (TI->invalid_subtree_num == 0) { // no subtree is invalid
       return 0;
     } else { // contain a invalid subtree
-      typename Interior::NodeArr invalid_node_arr;
-      assert(invalid_node_arr.size() == TT::kBufUB);
+      typename Interior::NodeArr nodes_contain_invalid_subtree;
+      assert(nodes_contain_invalid_subtree.size() == TT::kBufUB);
       BufSizeT invalid_idx = 0;
       BufSizeT tree_node_idx = 0;
+      BufSizeT split_idx = 0;
 
       for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
         if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
-          // this subtree needs to further check
-          invalid_node_arr[invalid_idx] = TI->tree_nodes[i];
-          invalid_idx++;
+          // this subtree contains invalid subtree(s)
+          nodes_contain_invalid_subtree[invalid_idx++] = TI->tree_nodes[i];
           if (!GetNodeInvalidStatus(TI->tree_nodes[i])) {
-            // this subtree is a valid node, needs to keep in the
-            // current interior node
-            TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
-            tree_node_idx++;
+            // this subtree is valid, needs to keep in the current interior
+            TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
+            if (i < TI->GetSplitN()) {
+              TI->split[split_idx++] = TI->split[i];
+            }
           }
-        } else {
-          TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
-          tree_node_idx++;
+        } else { // valid subtree, keep in the current interior
+          TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
+          if (i < TI->GetSplitN()) {
+            TI->split[split_idx++] = TI->split[i];
+          }
         }
       }
 
       assert(TI->node_n >= invalid_idx);
       TI->node_n = tree_node_idx;
-
-      assert(invalid_idx == TI->invalid_subtree_num);
-      assert(flatten_node_slice.size() == invalid_idx);
 
       SizeBufUBArr remove_entries_num;
       parlay::parallel_for(
@@ -289,12 +290,13 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
         [&](BufSizeT i) {
           SizeT sum = 0;
           for (BufSizeT j = 0; j < i; j++) {
-            sum += GetNodeInvalidSubtreeNum(invalid_node_arr[j]);
+            sum += GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
           }
           remove_entries_num[i] = FetchInvalidSubtreeNodes(
-            invalid_node_arr[i],
-            flatten_node_slice.cut(
-              sum, GetNodeInvalidSubtreeNum(invalid_node_arr[i])));
+            nodes_contain_invalid_subtree[i],
+            flatten_node_slice.cut(sum,
+                                   sum + GetNodeInvalidSubtreeNum(
+                                           nodes_contain_invalid_subtree[i])));
         },
         1);
 
@@ -303,6 +305,26 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
                         remove_entries_num.begin() + invalid_idx,
                         static_cast<SizeT>(0));
       TI->size -= total_remove_entries_n;
+
+#ifdef DEBUG // ensure the tree structure is correct after the compaction, i.e.,
+             // all the nodes in the interior node are valid and the split is
+             // correct
+      for (int i = 0; i < TI->GetNodeN(); i++) {
+        assert(TI->tree_nodes[i] != nullptr);
+        if (TI->GetNodeN() == 1) {
+          continue;
+        }
+        auto box = GetBox(TI->tree_nodes[i]);
+        if (i == 0) {
+          assert(box.second < TI->split[0]);
+        } else if (i == TI->GetNodeN() - 1) {
+          assert(box.first >= TI->split[TI->GetSplitN() - 1]);
+        } else {
+          assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
+        }
+      }
+#endif // DEBUG
+
       return total_remove_entries_n;
     }
   } else { // find a invalid tree
