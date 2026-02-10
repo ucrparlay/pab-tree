@@ -80,9 +80,9 @@ public:
   template<typename PT>
   void map_delete(PT P)
   {
-    assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
-    size_t n = P.first.size();
-    pma_tree_->insert_batch(P.begin(), n, false);
+    assert(parlay::all_of(P, [](auto x) { return x != 0; }));
+    size_t n = P.size();
+    pma_tree_->remove_batch(P.data(), n, false);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
 
