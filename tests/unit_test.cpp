@@ -72,7 +72,12 @@ public:
   static bool redirect_output;
 
 protected:
+#ifndef MAC
   static constexpr char const* kDataPrefix = "/ssd1/zmen002/kv_pair";
+#else
+  static constexpr char const* kDataPrefix =
+    "/Users/ziyang/code/ParallelMultiwayOrderedSet/benchmarks";
+#endif                                // !  #ifndef MAC
   static constexpr int kTag = 0b0001; // 2#0001
   static constexpr double kBatchRatio = 0.01;
   static constexpr int kQueryType = 0b001; // 2#001
@@ -309,6 +314,16 @@ TEST_F(ParTreeCorrectTest, Norm10M)
 TEST_F(ParTreeCorrectTest, Norm50M)
 {
   BTreeTest("norm", 50000000);
+}
+
+TEST_F(ParTreeCorrectTest, DualNorm1M)
+{
+  BTreeTest("dual_norm", 1000000);
+}
+
+TEST_F(ParTreeCorrectTest, DualNorm5M)
+{
+  BTreeTest("dual_norm", 5000000);
 }
 
 TEST_F(ParTreeCorrectTest, DualNorm10M)
