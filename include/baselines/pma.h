@@ -40,12 +40,20 @@ public:
   std::shared_ptr<PMA> pma_tree_;
 
   using InputRangeT = std::pair<parlay::sequence<K>, parlay::sequence<V>>;
+  using InputRangeDeleteT = parlay::sequence<K>;
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return { parlay::map(input_seq,
                          [&](auto e) { return Entry::GetKey(e) + 1; }),
              parlay::map(input_seq, [&](auto e) { return Entry::GetVal(e); }) };
+  }
+
+  static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
+    -> InputRangeDeleteT
+  {
+    return parlay::map(input_seq,
+                       [&](auto e) -> K { return Entry::GetKey(e); });
   }
 
   template<class PT>
@@ -69,6 +77,15 @@ public:
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
 
+  template<typename PT>
+  void map_delete(PT P)
+  {
+    assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
+    size_t n = P.first.size();
+    pma_tree_->insert_batch(P.begin(), n, false);
+    // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
+  }
+
   // APIs
   template<typename Range>
   void Build(Range&& In)
@@ -81,13 +98,12 @@ public:
   {
     map_insert(std::forward<Range>(In));
   }
-  //
-  // void BatchDelete(Slice In) {
-  //   if (!this->cpam_aug_map_.root || !zmap::size(this->cpam_aug_map_.root)) {
-  //     return;
-  //   }
-  //   cpam_aug_map_ = map_delete(In, std::move(cpam_aug_map_));
-  // }
+
+  template<typename Range>
+  void BatchDelete(Range In)
+  {
+    map_delete(std::forward<Range>(In));
+  }
 
   auto Contain(K const k) const
   {

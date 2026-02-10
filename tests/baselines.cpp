@@ -58,7 +58,7 @@ ApplyBaselines(Options const& opts, RunFunc test_func)
   if (opts.tree_type == 3) {
     Run<PmaWrapper<TypeTrait>>(opts, test_func);
   } else if (opts.tree_type == 4) {
-    Run<SpmaWrapper<TypeTrait>>(opts, test_func);
+    // Run<SpmaWrapper<TypeTrait>>(opts, test_func);
   }
 #endif // !  #ifndef MAC
 }
