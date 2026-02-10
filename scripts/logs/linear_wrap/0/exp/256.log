@@ -1,2 +1,2 @@
-Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: exp; 
-1.27176 0.0018285 0.00454625 0.0163135 0.125432 0.0476478 
+Tree: BTree; Buf: 256; InputFile: 1.base.in; Dis: exp; 
+1.29502 0.00120275 0.00297275 0.0136575 0.125069 0.177129 

@@ -7,8 +7,8 @@ Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: dual_norm;
 Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
 1.285 0.0018755 0.00733575 0.0254687 0.14102 0.0474235 
 
-Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: dual_norm; 
-1.26226 0.001998 0.00684775 0.0215012 0.130802 0.0490028 
+Tree: BTree; Buf: 256; InputFile: 1.base.in; Dis: dual_norm; 
+1.29512 0.001568 0.0037325 0.0152348 0.122884 0.15252 
 
 Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: dual_norm; 
 1.64979 0.00271075 0.0108208 0.047495 0.268122 0.072219 
@@ -37,8 +37,8 @@ Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: exp;
 Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: exp; 
 1.28287 0.00202925 0.005748 0.019097 0.137153 0.0427602 
 
-Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: exp; 
-1.27176 0.0018285 0.00454625 0.0163135 0.125432 0.0476478 
+Tree: BTree; Buf: 256; InputFile: 1.base.in; Dis: exp; 
+1.29502 0.00120275 0.00297275 0.0136575 0.125069 0.177129 
 
 Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: exp; 
 1.6457 0.00267925 0.00991175 0.04361 0.232667 0.0658502 
@@ -67,8 +67,8 @@ Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: norm;
 Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: norm; 
 1.29799 0.0027465 0.0121028 0.0318688 0.137187 0.0610822 
 
-Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: norm; 
-1.26952 0.00342325 0.0094975 0.0242378 0.122105 0.0636447 
+Tree: BTree; Buf: 256; InputFile: 1.base.in; Dis: norm; 
+1.29377 0.00181075 0.004014 0.0152165 0.114755 0.1933 
 
 Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: norm; 
 1.64516 0.00263775 0.0125845 0.068732 0.326932 0.088811 
@@ -97,8 +97,8 @@ Tree: BTree; Buf: 128; InputFile: 1.base.in; Dis: uni;
 Tree: BTree; Buf: 16; InputFile: 1.base.in; Dis: uni; 
 1.28658 0.0032345 0.0149765 0.0345172 0.141816 0.065054 
 
-Tree: BTree; Buf: 32; InputFile: 1.base.in; Dis: uni; 
-1.26877 0.00398825 0.0108895 0.0268727 0.123629 0.0672348 
+Tree: BTree; Buf: 256; InputFile: 1.base.in; Dis: uni; 
+1.28473 0.001924 0.00409375 0.0147027 0.108311 0.203045 
 
 Tree: BTree; Buf: 2; InputFile: 1.base.in; Dis: uni; 
 1.63635 0.00360775 0.0155957 0.0861605 0.357619 0.0923077 
@@ -153,4 +153,16 @@ Tree: PMA; Buf: 16; InputFile: 1.base.in; Dis: norm;
 
 Tree: PMA; Buf: 16; InputFile: 1.base.in; Dis: uni; 
 11.2023 0.0044945 0.0246642 0.115913 1.30503 0.489764 
+
+Tree: SPMA; Buf: 16; InputFile: 1.base.in; Dis: dual_norm; 
+11.325 0.003863 0.728526 0.841098 1.27367 0.0257965 
+
+Tree: SPMA; Buf: 16; InputFile: 1.base.in; Dis: exp; 
+11.2997 0.00557425 0.018453 0.0694585 1.22445 0.024103 
+
+Tree: SPMA; Buf: 16; InputFile: 1.base.in; Dis: norm; 
+11.2834 0.004609 0.021565 0.819926 1.29244 0.0322218 
+
+Tree: SPMA; Buf: 16; InputFile: 1.base.in; Dis: uni; 
+11.4243 0.003655 0.0249503 0.122498 1.28427 0.032436 
 

@@ -71,7 +71,7 @@ def combine(P) -> List:
 def post_processing(data):
     # desired order for x[0]
     bench_order = ["uni", "exp", "norm", "dual_norm"]
-    tree_order = ["BTree", "PAM", "CPAM", "PMA"]  # desired order for x[1]
+    tree_order = ["BTree", "PAM", "CPAM", "PMA", "SPMA"]  # desired order for x[1]
 
     sorted_lst = sorted(
         data,
