@@ -240,7 +240,9 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
 
     wp = parsed_input;
     pkd.Build(wp);
-    std::cout << aveBuild << " " << std::flush;
+    if constexpr (kPrint) {
+      std::cout << aveBuild << " " << std::flush;
+    }
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
@@ -1241,7 +1243,7 @@ static auto constexpr DefaultTestFunc =
         ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
       auto [n2, d2] =
         ReadEntries<typename TT::E>(batch_path.c_str(), wi, wp.size());
-      BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+      BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
 
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele =
