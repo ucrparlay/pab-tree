@@ -36,6 +36,12 @@ BTree<TT>::BatchInsert_(EntrySlice In)
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
   }
+
+  if (this->root_->size == 0) { // empty ghost node should be eliminated
+    this->DeleteTree();
+    return Build_(In);
+  }
+
   // parlay::internal::timer t("BatchInsert_Sort");
   auto sorted_seq = parlay::sort(In);
   // t.next("Sorted");
@@ -81,6 +87,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   auto TI = static_cast<Interior*>(T);
 
   SizeBufUBArr split_pos_seq;
+  assert(TI->GetNodeN() > 0);
   if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
     SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
   } else {

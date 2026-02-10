@@ -272,7 +272,7 @@ struct MultiWayNode : TypeTrait::Node
 
   TT::BufSizeT GetSplitN() const
   {
-    return node_n - 1;
+    return node_n == 0 ? 0 : node_n - 1;
   }
 
   SplitArr const& GetSplit() const

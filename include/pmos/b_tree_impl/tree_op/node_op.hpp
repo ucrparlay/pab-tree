@@ -145,22 +145,29 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
 }
 
 template<typename TT>
-TT::SizeT
-BTree<TT>::BatchDeleteUpdateInteriorSize(Node* T,
-                                         SizeBufUBArr invalid_subtree_num_arr)
+std::pair<bool, typename TT::SizeT>
+BTree<TT>::BatchDeleteUpdateInteriorSize(
+  Node* T,
+  BooleanBufUBArr const& invalid_subtree_flag_arr,
+  SizeBufUBArr const& invalid_subtree_num_arr)
+// update the size and valid status of the interior node, return the number of
+// invalid subtree
 {
   assert(!T->is_leaf);
   auto TI = static_cast<Interior*>(T);
   SizeT tot_entry_sz = 0;
-  BufSizeT tot_invalid_subtree_n = 0;
+  SizeT tot_invalid_subtree_n = 0;
+  BufSizeT invalid_tree_n = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     tot_entry_sz += TI->tree_nodes[i]->size;
+    invalid_tree_n += invalid_subtree_flag_arr[i] ? 1 : 0;
     tot_invalid_subtree_n += invalid_subtree_num_arr[i];
   }
   TI->size = tot_entry_sz;
-  TI->valid = TI->GetNodeN() - tot_invalid_subtree_n >= TT::kBufLB;
+  TI->valid = T != this->root_ ? (TI->GetNodeN() - invalid_tree_n) >= TT::kBufLB
+                               : (TI->GetNodeN() - invalid_tree_n) > 0;
   TI->invalid_subtree_num = TI->valid ? tot_invalid_subtree_n : 1;
-  return TI->invalid_subtree_num;
+  return std::make_pair(!TI->valid, TI->invalid_subtree_num);
 }
 
 template<typename TT>
@@ -248,42 +255,60 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
       return 0;
     } else { // contain a invalid subtree
       typename Interior::NodeArr invalid_node_arr;
-      BufSizeT invalid_subtree_cnt = 0;
+      assert(invalid_node_arr.size() == TT::kBufUB);
       BufSizeT invalid_idx = 0;
       BufSizeT tree_node_idx = 0;
-      SizeT remove_entries_num = 0;
+
       for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
         if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
+          // this subtree needs to further check
           invalid_node_arr[invalid_idx] = TI->tree_nodes[i];
-          remove_entries_num += TI->tree_nodes[i]->size;
           invalid_idx++;
+          if (!GetNodeInvalidStatus(TI->tree_nodes[i])) {
+            // this subtree is a valid node, needs to keep in the
+            // current interior node
+            TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
+            tree_node_idx++;
+          }
         } else {
           TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
           tree_node_idx++;
         }
       }
-      TI->node_n -= invalid_idx;
-      TI->size -= remove_entries_num;
+
+      assert(TI->node_n >= invalid_idx);
+      TI->node_n = tree_node_idx;
 
       assert(invalid_idx == TI->invalid_subtree_num);
       assert(flatten_node_slice.size() == invalid_idx);
 
-      parlay::parallel_for(0, invalid_idx, [&](BufSizeT i) {
-        BufSizeT sum = 0;
-        for (BufSizeT j = 0; j < i; j++) {
-          sum += GetNodeInvalidSubtreeNum(invalid_node_arr[j]);
-        }
-        [[maybe_unused]] auto return_v = FetchInvalidSubtreeNodes(
-          invalid_node_arr[i],
-          flatten_node_slice.cut(
-            sum, GetNodeInvalidSubtreeNum(invalid_node_arr[i])));
-      });
-      return remove_entries_num;
+      SizeBufUBArr remove_entries_num;
+      parlay::parallel_for(
+        0,
+        invalid_idx,
+        [&](BufSizeT i) {
+          SizeT sum = 0;
+          for (BufSizeT j = 0; j < i; j++) {
+            sum += GetNodeInvalidSubtreeNum(invalid_node_arr[j]);
+          }
+          remove_entries_num[i] = FetchInvalidSubtreeNodes(
+            invalid_node_arr[i],
+            flatten_node_slice.cut(
+              sum, GetNodeInvalidSubtreeNum(invalid_node_arr[i])));
+        },
+        1);
+
+      SizeT total_remove_entries_n =
+        std::accumulate(remove_entries_num.begin(),
+                        remove_entries_num.begin() + invalid_idx,
+                        static_cast<SizeT>(0));
+      TI->size -= total_remove_entries_n;
+      return total_remove_entries_n;
     }
   } else { // find a invalid tree
     assert(flatten_node_slice.size() == 1);
-    flatten_node_slice[0] = T;
     assert(TI->invalid_subtree_num == 1);
+    flatten_node_slice[0] = T;
     return T->size;
   }
 }

@@ -208,9 +208,16 @@ public:
     return (static_cast<size_t>(n) * (i + 1)) / bkt_n;
   };
 
+  // PARA: return whether a node is invalid
+  static SizeT GetNodeInvalidStatus(Node* T)
+  {
+    return T->is_leaf ? (T->size >= TT::kBufLB ? 0 : 1)
+                      : (static_cast<Interior*>(T)->valid ? 0 : 1);
+  }
+
   static SizeT GetNodeInvalidSubtreeNum(Node* T)
   {
-    return T->is_leaf ? T->size < TT::kBufLB ? 1 : 0
+    return T->is_leaf ? (T->size < TT::kBufLB ? 1 : 0)
                       : static_cast<Interior*>(T)->invalid_subtree_num;
   }
 
@@ -245,7 +252,7 @@ public:
 
   // PARA: return whether T and all its subtree is valid
   // Only needs to ensure the tree size is correct
-  SizeT BatchDeleteRecursive(Node* T, TT::KeySlice In);
+  std::pair<bool, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
@@ -272,9 +279,10 @@ public:
                                          SizeT new_node_n,
                                          SizeBufUBArr const& return_node_n_arr);
 
-  static SizeT BatchDeleteUpdateInteriorSize(
+  std::pair<bool, SizeT> BatchDeleteUpdateInteriorSize(
     Node* T,
-    SizeBufUBArr invalid_subtree_num_arr);
+    BooleanBufUBArr const& invalid_subtree_flag_arr,
+    SizeBufUBArr const& invalid_subtree_num_arr);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,

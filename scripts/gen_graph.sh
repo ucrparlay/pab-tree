@@ -4,10 +4,10 @@ set -o xtrace
 # path_prefix=/ssd1/zmen002/kv_pair
 path_prefix=$1
 # base_n_seq=(1000000 5000000 10000000 50000000)
-base_n_seq=(50000000)
-file_num=1
-# batch_ratio_seq=(100)
-batch_ratio_seq=(10000 1000 100 10)
+base_n_seq=(5000000)
+# file_num=10
+file_num=3
+batch_ratio_seq=(100)
 
 # path_prefix=/data/zmen002/kv_pair
 # base_n_seq=(1000000000)
@@ -15,9 +15,9 @@ batch_ratio_seq=(10000 1000 100 10)
 # # batch_ratio_seq=(10000 1000 100 10)
 # batch_ratio_seq=(1)
 
-dis_seq=(0 1 2 3)
-# dis_seq=(3)
-batch_op=(0)
+# dis_seq=(0 1 2 3)
+dis_seq=(0 3)
+batch_op=(0 1)
 val_n=1
 
 logger_path="log.in"

@@ -96,15 +96,17 @@ BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
       std::ranges::iter_swap(it, --end);
       delete_cnt++;
     }
+    if (end == TL->elements.begin()) { // all elements are deleted
+      break;
+    }
   }
 
-  assert(std::cmp_equal(std::distance(TL->elements.begin(), end),
+  assert(end == TL->elements.begin() ||
+         std::cmp_equal(std::distance(TL->elements.begin(), end),
                         TL->size - In.size()));
-  // TL->size -= In.size();
   TL->size = std::distance(TL->elements.begin(), end);
   assert(TL->size >= 0);
   TL->UpdateAug(TL->elements.cut(0, TL->size));
-  // assert(TL->GetBox() == GetBox(TL->pts.cut(0, TL->size)));
   return delete_cnt;
 }
 } // namespace pmos

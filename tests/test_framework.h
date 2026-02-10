@@ -319,6 +319,7 @@ BatchDelete(Tree& pkd,
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
     BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
   } else { // NOTE: delete the points from previous tree
+    std::cout << "begin ccp delete" << std::endl;
     pkd.BatchDelete(wi);
     std::cout << "finish ccp delete" << std::endl;
   }

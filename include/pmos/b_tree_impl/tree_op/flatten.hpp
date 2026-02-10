@@ -42,7 +42,7 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
   auto TI = static_cast<const Interior*>(T);
 
   assert(TI->size == std::accumulate(TI->tree_nodes.begin(),
-                                     TI->tree_nodes.end(),
+                                     TI->tree_nodes.begin() + TI->GetNodeN(),
                                      static_cast<size_t>(0),
                                      [](size_t acc, Node* n) -> size_t {
                                        return acc + n->size;
@@ -50,7 +50,7 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
 
   parlay::parallel_for(
     0,
-    TI->tree_nodes.size(),
+    TI->GetNodeN(),
     [&](BufSizeT i) {
       SizeT start = 0;
       for (BufSizeT j = 0; j < i; ++j) {

@@ -78,7 +78,7 @@ protected:
   static constexpr char const* kDataPrefix =
     "/Users/ziyang/code/ParallelMultiwayOrderedSet/benchmarks";
 #endif                                // !  #ifndef MAC
-  static constexpr int kTag = 0b0001; // 2#0001
+  static constexpr int kTag = 0b0011; // 2#0001
   static constexpr double kBatchRatio = 0.01;
   static constexpr int kQueryType = 0b001; // 2#001
   static constexpr int kTreeType = 0;
@@ -129,16 +129,17 @@ protected:
     }
 
     if (opts.query_type & (1 << 0)) {
+      // this part needs to correct for all parts
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
-      ASSERT_TRUE(parlay::all_of(res, [&](auto r) { return r == true; }));
-      if (opts.tag & (1 << 1)) {
-        query_ele = wi.subseq(0, batch_size);
+      assert(parlay::all_of(res, [&](auto r) { return r == true; }));
+      if (opts.tag & (1 << 1)) { // specifically for delete
+        query_ele = wi;
         auto res = parlay::sequence<bool>(query_ele.size(), true);
         Membership<TT>(tree, query_ele, opts.rounds, res);
-        ASSERT_TRUE(parlay::all_of(res, [&](auto r) { return r == false; }));
+        assert(parlay::all_of(res, [&](auto r) { return r == false; }));
       }
     }
 

@@ -34,10 +34,18 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   auto sorted_seq = parlay::sort(In);
   // t.next("Sorted");
 
-  auto invalid_subtree_num =
+  std::cout << " Before delete, root size: " << this->root_->size << std::endl;
+
+  auto [invalid_flag, invalid_subtree_num] =
     BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
 
+  std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
+            << ", Invalid subtree num: " << invalid_subtree_num
+            << ", tree size after delete: " << this->root_->size << std::endl;
+
   if (invalid_subtree_num) {
+    std::cout << "Invalid subtree num: " << invalid_subtree_num << std::endl;
+
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     auto reinsert_entry_num = FetchInvalidSubtreeNodes(
       this->root_, parlay::make_slice(flatten_node_seq));
@@ -47,7 +55,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
       invalid_subtree_num,
       [&](SizeT i) {
         SizeT sum = 0;
-        for (int j = 0; j < i; j++) {
+        for (SizeT j = 0; j < i; j++) {
           sum += flatten_node_seq[j]->size;
         }
         FlattenRec(flatten_node_seq[i],
@@ -55,6 +63,8 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
         DeleteTreeRec(flatten_node_seq[i]);
       },
       1);
+
+    std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
     BatchInsert_(parlay::make_slice(reinsert_entries));
   }
 }
@@ -62,19 +72,19 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
 // PARA: return whether T and all its subtree is valid
 // Only needs to ensure the tree size is correct
 template<typename TT>
-TT::SizeT
+std::pair<bool, typename TT::SizeT>
 BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
 {
 
   if (In.size() == 0) {
     // stop here, than all subtree is valid
-    return 0;
+    return std::make_pair(true, 0);
   }
 
   if (T->is_leaf) {
     [[maybe_unused]] auto delete_cnt = DeletePoints4Leaf(T, In);
     assert(delete_cnt == In.size());
-    return In.size() >= TT::kBufLB ? 0 : 1;
+    return std::make_pair(T->size < TT::kBufLB, T->size < TT::kBufLB ? 1 : 0);
   }
 
   auto TI = static_cast<Interior*>(T);
@@ -97,6 +107,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
 #endif // DEBUG
 
   SizeBufUBArr invalid_subtree_num;
+  BooleanBufUBArr invalid_subtree_flag;
   BufSizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
@@ -104,8 +115,9 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     SizeT r = (i == TI->GetNodeN() - 1 ? In.size() : split_pos_seq[i]);
     if (l != r) {
       nodes_map[cnt++] = i;
-    } else {
-      invalid_subtree_num[i] = 0; // no element in this subtree, so it's valid
+    } else { // no element in this subtree, so it's valid
+      invalid_subtree_flag[i] = false;
+      invalid_subtree_num[i] = 0;
     }
   }
 
@@ -117,13 +129,15 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
       SizeT r = nodes_map[i] == TI->GetNodeN() - 1
                   ? In.size()
                   : split_pos_seq[nodes_map[i]];
-      invalid_subtree_num[nodes_map[i]] =
+      std::tie(invalid_subtree_flag[nodes_map[i]],
+               invalid_subtree_num[nodes_map[i]]) =
         BatchDeleteRecursive(TI->tree_nodes[nodes_map[i]], In.cut(l, r));
     },
     // In.size() > 2048 ? 1 : cnt);
     1);
 
-  return BatchDeleteUpdateInteriorSize(T, invalid_subtree_num);
+  return BatchDeleteUpdateInteriorSize(
+    T, invalid_subtree_flag, invalid_subtree_num);
 }
 
 } // namespace pmos
