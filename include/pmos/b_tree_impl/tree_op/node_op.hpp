@@ -145,32 +145,6 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
 }
 
 template<typename TT>
-std::pair<bool, typename TT::SizeT>
-BTree<TT>::BatchDeleteUpdateInteriorSize(
-  Node* T,
-  BooleanBufUBArr const& invalid_subtree_flag_arr,
-  SizeBufUBArr const& invalid_subtree_num_arr)
-// update the size and valid status of the interior node, return the number of
-// invalid subtree
-{
-  assert(!T->is_leaf);
-  auto TI = static_cast<Interior*>(T);
-  SizeT tot_entry_sz = 0;
-  SizeT tot_invalid_subtree_n = 0;
-  BufSizeT invalid_tree_n = 0;
-  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    tot_entry_sz += TI->tree_nodes[i]->size;
-    invalid_tree_n += invalid_subtree_flag_arr[i] ? 1 : 0;
-    tot_invalid_subtree_n += invalid_subtree_num_arr[i];
-  }
-  TI->size = tot_entry_sz;
-  TI->valid = T != this->root_ ? (TI->GetNodeN() - invalid_tree_n) >= TT::kBufLB
-                               : (TI->GetNodeN() - invalid_tree_n) > 0;
-  TI->invalid_subtree_num = TI->valid ? tot_invalid_subtree_n : 1;
-  return std::make_pair(!TI->valid, TI->invalid_subtree_num);
-}
-
-template<typename TT>
 TT::SizeT
 BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
                                          NodeSplitPairSlice node_split_slice,
@@ -237,14 +211,52 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
 }
 
 template<typename TT>
+std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
+BTree<TT>::BatchDeleteUpdateInteriorSize(
+  Node* T,
+  SizeBufUBArr const& invalid_subtree_num_arr,
+  BooleanBufUBArr const& invalid_subtree_flag_arr,
+  SizeBufUBArr const& reinsert_entries_num_arr)
+// update the size and valid status of the interior node, return the number of
+// invalid subtree
+{
+  assert(!T->is_leaf);
+  auto TI = static_cast<Interior*>(T);
+  SizeT tot_entry_sz = 0;
+  SizeT tot_invalid_subtree_n = 0;
+  SizeT reinsert_entries_n = 0;
+  BufSizeT invalid_tree_n = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    tot_entry_sz += TI->tree_nodes[i]->size;
+    invalid_tree_n += invalid_subtree_flag_arr[i] ? 1 : 0;
+    tot_invalid_subtree_n += invalid_subtree_num_arr[i];
+    reinsert_entries_n += reinsert_entries_num_arr[i];
+  }
+  // TODO: these values should be reset in following operations
+  TI->size = tot_entry_sz;
+  TI->valid = T != this->root_ ? (TI->GetNodeN() - invalid_tree_n) >= TT::kBufLB
+                               : (TI->GetNodeN() - invalid_tree_n) > 0;
+  TI->invalid_subtree_num = TI->valid ? tot_invalid_subtree_n : 1;
+  TI->reinsert_size = TI->valid ? reinsert_entries_n : TI->size;
+  return std::make_tuple(
+    !TI->valid, TI->invalid_subtree_num, TI->reinsert_size);
+}
+
+template<typename TT>
 TT::SizeT
-BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
+BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
+                                    TT::NodeSlice flatten_node_slice,
+                                    EntrySlice reinsert_entries)
 {
   if (T->is_leaf) {
     if (T->size < TT::kBufLB) {
       assert(flatten_node_slice.size() == 1);
+      assert(reinsert_entries.size() == T->size);
       flatten_node_slice[0] = T;
-      return T->size;
+      SizeT size = T->size;
+      FlattenRec(T, reinsert_entries);
+      // DeleteTreeRec(T);
+      return size;
     }
     return 0;
   }
@@ -267,24 +279,24 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
           nodes_contain_invalid_subtree[invalid_idx++] = TI->tree_nodes[i];
           if (!GetNodeInvalidStatus(TI->tree_nodes[i])) {
             // this subtree is valid, needs to keep in the current interior
-            if (i != tree_node_idx) {
-              TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
-              if (i < TI->GetSplitN()) {
-                TI->split[split_idx] = TI->split[i];
-              }
+            // if (i != tree_node_idx) { // no need copy if positions unchange
+            TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
+            if (i < TI->GetSplitN()) {
+              TI->split[split_idx++] = TI->split[i];
             }
-            tree_node_idx++;
-            split_idx++;
+            // }
+            // tree_node_idx++;
+            // split_idx++;
           }
         } else { // valid subtree, keep in the current interior
-          if (i != tree_node_idx) {
-            TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
-            if (i < TI->GetSplitN()) {
-              TI->split[split_idx] = TI->split[i];
-            }
-            tree_node_idx++;
-            split_idx++;
+          // if (i != tree_node_idx) { // no need copy if positions unchange
+          TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
+          if (i < TI->GetSplitN()) {
+            TI->split[split_idx++] = TI->split[i];
           }
+          // tree_node_idx++;
+          // split_idx++;
+          // }
         }
       }
 
@@ -296,15 +308,25 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
         0,
         invalid_idx,
         [&](BufSizeT i) {
-          SizeT sum = 0;
+          SizeT subtree_sum = 0;
+          SizeT reinsert_sum = 0;
           for (BufSizeT j = 0; j < i; j++) {
-            sum += GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
+            subtree_sum +=
+              GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
+            reinsert_sum +=
+              GetNodeReinsertSize(nodes_contain_invalid_subtree[j]);
           }
+
           remove_entries_num[i] = FetchInvalidSubtreeNodes(
             nodes_contain_invalid_subtree[i],
-            flatten_node_slice.cut(sum,
-                                   sum + GetNodeInvalidSubtreeNum(
-                                           nodes_contain_invalid_subtree[i])));
+            flatten_node_slice.cut(
+              subtree_sum,
+              subtree_sum +
+                GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[i])),
+            reinsert_entries.cut(
+              reinsert_sum,
+              reinsert_sum +
+                GetNodeReinsertSize(nodes_contain_invalid_subtree[i])));
         },
         1);
 
@@ -312,6 +334,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
         std::accumulate(remove_entries_num.begin(),
                         remove_entries_num.begin() + invalid_idx,
                         static_cast<SizeT>(0));
+      assert(total_remove_entries_n == reinsert_entries.size());
       TI->size -= total_remove_entries_n;
 
 #ifdef DEBUG // ensure the tree structure is correct after the compaction, i.e.,
@@ -338,8 +361,12 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
   } else { // find a invalid tree
     assert(flatten_node_slice.size() == 1);
     assert(TI->invalid_subtree_num == 1);
+    assert(reinsert_entries.size() == TI->size);
     flatten_node_slice[0] = T;
-    return T->size;
+    SizeT size = T->size;
+    FlattenRec(T, reinsert_entries);
+    // DeleteTreeRec(T);
+    return size;
   }
 }
 

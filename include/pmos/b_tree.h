@@ -187,6 +187,7 @@ public:
 
     bool valid;
     SizeT invalid_subtree_num;
+    SizeT reinsert_size;
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
@@ -221,6 +222,12 @@ public:
                       : static_cast<Interior*>(T)->invalid_subtree_num;
   }
 
+  static SizeT GetNodeReinsertSize(Node* T)
+  {
+    return T->is_leaf ? (T->size < TT::kBufLB ? T->size : 0)
+                      : static_cast<Interior*>(T)->reinsert_size;
+  }
+
   // NOTE: build tree
   template<typename Range>
   void Build(Range&& In);
@@ -250,16 +257,20 @@ public:
 
   void BatchDelete_(TT::KeySlice In);
 
-  // PARA: return whether T and all its subtree is valid
+  // PARA: return whether T is valid, invalid subtree num, and total # of
+  // entries needs to be reinserted
   // Only needs to ensure the tree size is correct
-  std::pair<bool, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
+  std::tuple<bool, SizeT, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
   // interior node size and valid flag after the compaction
   // Return the total number entries in the tree that needs to rebuild
   SizeT FetchInvalidSubtreeNodes(Node* T,
-                                 typename TT::NodeSlice flatten_node_slice);
+                                 typename TT::NodeSlice flatten_node_slice,
+                                 EntrySlice reinsert_entries
+
+  );
 
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
@@ -279,10 +290,11 @@ public:
                                          SizeT new_node_n,
                                          SizeBufUBArr const& return_node_n_arr);
 
-  std::pair<bool, SizeT> BatchDeleteUpdateInteriorSize(
+  std::tuple<bool, SizeT, SizeT> BatchDeleteUpdateInteriorSize(
     Node* T,
+    SizeBufUBArr const& invalid_subtree_num_arr,
     BooleanBufUBArr const& invalid_subtree_flag_arr,
-    SizeBufUBArr const& invalid_subtree_num_arr);
+    SizeBufUBArr const& reinsert_entries_num_arr);
 
   // PARA: return bucket_num
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,

@@ -116,7 +116,7 @@ protected:
     if (opts.tag & (1 << 1)) {
       // WARN: must happen after the insertion
       BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, 2);
-      ASSERT_EQ(tree.GetSize(), wp.size());
+      assert(tree.GetSize() == wp.size());
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
     }
 
