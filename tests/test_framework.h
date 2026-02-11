@@ -315,7 +315,10 @@ BatchDelete(Tree& pkd,
         wi = parsed_batch;
         pkd.Build(wp);
       },
-      [&]() { pkd.BatchDelete(wi); },
+      [&]() {
+        puts("-----------------------");
+        pkd.BatchDelete(wi);
+      },
       [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
@@ -1217,7 +1220,9 @@ static auto constexpr DefaultTestFunc =
     // NOTE: batch delete
     if (opts.tag & (1 << 1)) {
       if (opts.summary) {
-        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        // parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1
+        // };
+        parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;

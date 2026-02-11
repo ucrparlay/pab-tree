@@ -42,9 +42,9 @@ BTree<TT>::BatchInsert_(EntrySlice In)
     return Build_(In);
   }
 
-  // parlay::internal::timer t("BatchInsert_Sort");
+  parlay::internal::timer t("BatchInsert_Sort");
   auto sorted_seq = parlay::sort(In);
-  // t.next("Sorted");
+  t.next("Sorted");
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
   SizeT new_node_n = BatchInsertRecursive(this->root_,

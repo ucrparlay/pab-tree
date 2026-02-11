@@ -83,7 +83,9 @@ endif()
 
 if(STDALLOC)
 	add_compile_options(-DPARLAY_USE_STD_ALLOC)
-elseif(JEMA)
+endif()
+
+if(JEMA)
 	include_directories("/usr/local/lib")
 	set(CMAKE_BUILD_RPATH "/usr/local/lib")
 endif()

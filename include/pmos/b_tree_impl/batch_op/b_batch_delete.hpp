@@ -2,6 +2,7 @@
 #define PMOS_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
 
 #include "../../b_tree.h"
+#include "parlay/monoid.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "parlay/slice.h"
@@ -30,20 +31,21 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   if (this->root_ == nullptr) {
     return;
   }
-  // parlay::internal::timer t("BatchInsert_Sort");
+  parlay::internal::timer t(">>> BatchDelete");
+  std::cout << "Tree nodes before delete: "
+            << GetTreeNodesNum<Leaf, Interior>(this->root_) << std::endl;
   auto sorted_seq = parlay::sort(In);
-  // t.next("Sorted");
+  t.next("Sorted");
 
-  // std::cout << " Before delete, root size: " << this->root_->size <<
-  // std::endl;
+  std::cout << " Before delete, root size: " << this->root_->size << std::endl;
 
   auto [invalid_flag, invalid_subtree_num] =
     BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
+  t.next("BatchDeleteRecursive");
 
-  // std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
-  //           << ", Invalid subtree num: " << invalid_subtree_num
-  //           << ", tree size after delete: " << this->root_->size <<
-  //           std::endl;
+  std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
+            << ", Invalid subtree num: " << invalid_subtree_num
+            << ", tree size after delete: " << this->root_->size << std::endl;
 
   if (invalid_flag) {
     assert(this->root_->size == 0);
@@ -52,28 +54,45 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   }
 
   if (invalid_subtree_num) {
-    // std::cout << "Invalid subtree num: " << invalid_subtree_num << std::endl;
+    std::cout << "Invalid subtree num: " << invalid_subtree_num << std::endl;
 
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     auto reinsert_entry_num = FetchInvalidSubtreeNodes(
       this->root_, parlay::make_slice(flatten_node_seq));
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
-    parlay::parallel_for(
-      0,
-      invalid_subtree_num,
-      [&](SizeT i) {
-        SizeT sum = 0;
-        for (SizeT j = 0; j < i; j++) {
-          sum += flatten_node_seq[j]->size;
-        }
-        FlattenRec(flatten_node_seq[i],
-                   reinsert_entries.cut(sum, sum + flatten_node_seq[i]->size));
-        DeleteTreeRec(flatten_node_seq[i]);
-      },
-      1);
+    t.next("FetchInvalidSubtreeNodes");
+    parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
+      SizeT sum = 0;
+      for (SizeT j = 0; j < i; j++) {
+        sum += flatten_node_seq[j]->size;
+      }
+      FlattenRec(flatten_node_seq[i],
+                 reinsert_entries.cut(sum, sum + flatten_node_seq[i]->size));
+      DeleteTreeRec(flatten_node_seq[i]);
+    });
 
-    // std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
+    std::cout << "Max tree size: "
+              << (*parlay::max_element(
+                    flatten_node_seq,
+                    [](Node* a, Node* b) { return a->size < b->size; }))
+                   ->size
+              << std::endl;
+    std::cout << "Number of leaves: "
+              << parlay::count_if(flatten_node_seq,
+                                  [](Node* T) { return T->is_leaf; })
+              << std::endl;
+    std::cout << "Number of leaf entries: "
+              << std::accumulate(flatten_node_seq.begin(),
+                                 flatten_node_seq.end(),
+                                 static_cast<SizeT>(0),
+                                 [](SizeT sum, Node* T) {
+                                   return sum + (T->is_leaf ? T->size : 0);
+                                 })
+              << std::endl;
+    std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
+    t.next("FlattenRec and DeleteTreeRec");
     BatchInsert_(parlay::make_slice(reinsert_entries));
+    t.next("BatchInsert_");
   }
 }
 

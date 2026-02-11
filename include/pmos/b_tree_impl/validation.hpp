@@ -22,7 +22,7 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
     return GetBox(TL->GetEle());
   }
 
-  Interior const* TI = static_cast<Interior const*>(T);
+  auto const* TI = static_cast<Interior const*>(T);
 
   // ensure the split number is 1 less than the child number
   assert(T == this->root_ ||
@@ -115,7 +115,7 @@ BTree<TT>::GetTreeNodesNum(Node const* T)
     return 1;
   }
 
-  Interior const* TI = static_cast<Interior const*>(T);
+  auto const* TI = static_cast<Interior const*>(T);
 
   int sum = 0;
   for (int i = 0; i < TI->GetNodeN(); i++) {

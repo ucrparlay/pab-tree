@@ -267,15 +267,23 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T, TT::NodeSlice flatten_node_slice)
           nodes_contain_invalid_subtree[invalid_idx++] = TI->tree_nodes[i];
           if (!GetNodeInvalidStatus(TI->tree_nodes[i])) {
             // this subtree is valid, needs to keep in the current interior
-            TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
-            if (i < TI->GetSplitN()) {
-              TI->split[split_idx++] = TI->split[i];
+            if (i != tree_node_idx) {
+              TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
+              if (i < TI->GetSplitN()) {
+                TI->split[split_idx] = TI->split[i];
+              }
             }
+            tree_node_idx++;
+            split_idx++;
           }
         } else { // valid subtree, keep in the current interior
-          TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
-          if (i < TI->GetSplitN()) {
-            TI->split[split_idx++] = TI->split[i];
+          if (i != tree_node_idx) {
+            TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
+            if (i < TI->GetSplitN()) {
+              TI->split[split_idx] = TI->split[i];
+            }
+            tree_node_idx++;
+            split_idx++;
           }
         }
       }
