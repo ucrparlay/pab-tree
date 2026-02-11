@@ -273,32 +273,53 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       BufSizeT tree_node_idx = 0;
       BufSizeT split_idx = 0;
 
-      for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-        if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
-          // this subtree contains invalid subtree(s)
-          nodes_contain_invalid_subtree[invalid_idx++] = TI->tree_nodes[i];
-          if (!GetNodeInvalidStatus(TI->tree_nodes[i])) {
-            // this subtree is valid, needs to keep in the current interior
-            // if (i != tree_node_idx) { // no need copy if positions unchange
-            TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
+      for (BufSizeT i = 0; i < TI->GetNodeN(); ++i) {
+        auto node = TI->tree_nodes[i];
+
+        if (GetNodeInvalidSubtreeNum(node) != 0) {
+          nodes_contain_invalid_subtree[invalid_idx++] = node;
+        }
+
+        // Keep node iff it's not an invalid node.
+        if (!GetNodeInvalidStatus(node)) {
+          if (i != tree_node_idx) {
+            TI->tree_nodes[tree_node_idx] = node;
             if (i < TI->GetSplitN()) {
-              TI->split[split_idx++] = TI->split[i];
+              TI->split[split_idx] = TI->split[i];
             }
-            // }
-            // tree_node_idx++;
-            // split_idx++;
           }
-        } else { // valid subtree, keep in the current interior
-          // if (i != tree_node_idx) { // no need copy if positions unchange
-          TI->tree_nodes[tree_node_idx++] = TI->tree_nodes[i];
+          ++tree_node_idx;
           if (i < TI->GetSplitN()) {
-            TI->split[split_idx++] = TI->split[i];
+            ++split_idx;
           }
-          // tree_node_idx++;
-          // split_idx++;
-          // }
         }
       }
+      // for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+      //   if (GetNodeInvalidSubtreeNum(TI->tree_nodes[i])) {
+      //     // this subtree contains invalid subtree(s)
+      //     nodes_contain_invalid_subtree[invalid_idx++] = TI->tree_nodes[i];
+      //     if (!GetNodeInvalidStatus(TI->tree_nodes[i])) {
+      //       // this subtree is valid, needs to keep in the current interior
+      //       if (i != tree_node_idx) { // no need copy if positions unchange
+      //         TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
+      //         if (i < TI->GetSplitN()) {
+      //           TI->split[split_idx] = TI->split[i];
+      //         }
+      //       }
+      //       tree_node_idx++;
+      //       split_idx += i < TI->GetSplitN() ? 1 : 0;
+      //     }
+      //   } else { // valid subtree, keep in the current interior
+      //     if (i != tree_node_idx) { // no need copy if positions unchange
+      //       TI->tree_nodes[tree_node_idx] = TI->tree_nodes[i];
+      //       if (i < TI->GetSplitN()) {
+      //         TI->split[split_idx] = TI->split[i];
+      //       }
+      //     }
+      //     tree_node_idx++;
+      //     split_idx += i < TI->GetSplitN() ? 1 : 0;
+      //   }
+      // }
 
       assert(TI->node_n >= invalid_idx);
       TI->node_n = tree_node_idx;
@@ -337,9 +358,10 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       assert(total_remove_entries_n == reinsert_entries.size());
       TI->size -= total_remove_entries_n;
 
-#ifdef DEBUG // ensure the tree structure is correct after the compaction, i.e.,
-             // all the nodes in the interior node are valid and the split is
-             // correct
+#ifdef DEBUG
+      // ensure the tree structure is correct after the compaction,
+      // i.e., all the nodes in the interior node are valid and the split is
+      // correct
       for (int i = 0; i < TI->GetNodeN(); i++) {
         assert(TI->tree_nodes[i] != nullptr);
         if (TI->GetNodeN() == 1) {

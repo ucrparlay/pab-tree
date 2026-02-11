@@ -210,10 +210,10 @@ public:
   };
 
   // PARA: return whether a node is invalid
-  static SizeT GetNodeInvalidStatus(Node* T)
+  static bool GetNodeInvalidStatus(Node* T)
   {
-    return T->is_leaf ? (T->size >= TT::kBufLB ? 0 : 1)
-                      : (static_cast<Interior*>(T)->valid ? 0 : 1);
+    return T->is_leaf ? (T->size < TT::kBufLB)
+                      : (!static_cast<Interior*>(T)->valid);
   }
 
   static SizeT GetNodeInvalidSubtreeNum(Node* T)

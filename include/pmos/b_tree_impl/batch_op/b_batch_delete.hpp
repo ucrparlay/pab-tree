@@ -35,6 +35,8 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   parlay::internal::timer t(">>> BatchDelete");
   std::cout << "Tree nodes before delete: "
             << GetTreeNodesNum<Leaf, Interior>(this->root_) << std::endl;
+  static_assert(
+    std::same_as<typename decltype(In)::value_type, typename TT::K>);
   auto sorted_seq = parlay::sort(In);
   t.next("Sorted");
 
