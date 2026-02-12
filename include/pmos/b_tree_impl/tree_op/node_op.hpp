@@ -256,10 +256,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       flatten_node_slice[0] = T;
       SizeT size = T->size;
       FlattenRec<EntrySlice, true, true>(T, reinsert_entries);
-      assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
-        return Entry::GetKey(a) < Entry::GetKey(b);
-      }));
-      // DeleteTreeRec(T);
       return size;
     }
     return 0;
@@ -280,22 +276,25 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       for (BufSizeT i = 0; i < TI->GetNodeN(); ++i) {
         auto node = TI->tree_nodes[i];
 
-        if (GetNodeInvalidSubtreeNum(node) != 0) {
-          nodes_contain_invalid_subtree[invalid_idx++] = node;
+        // this node contain invalid subtree
+        if (GetNodeInvalidSubtreeNum(node)) {
+          nodes_contain_invalid_subtree[invalid_idx] = node;
+          invalid_idx++;
         }
 
-        // Keep node iff it's not an invalid node.
-        if (!GetNodeInvalidStatus(node)) {
+        assert(GetNodeInvalidSubtreeNum(node) == 0 ? !GetNodeInvalidStatus(node)
+                                                   : true);
+
+        if (!GetNodeInvalidSubtreeNum(node) || !GetNodeInvalidStatus(node)) {
+          const bool has_split = i < TI->GetSplitN();
           if (i != tree_node_idx) {
             TI->tree_nodes[tree_node_idx] = node;
-            if (i < TI->GetSplitN()) {
+            if (has_split) {
               TI->split[split_idx] = TI->split[i];
             }
           }
           ++tree_node_idx;
-          if (i < TI->GetSplitN()) {
-            ++split_idx;
-          }
+          split_idx += has_split;
         }
       }
 
@@ -303,6 +302,40 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       TI->node_n = tree_node_idx;
 
       SizeBufUBArr remove_entries_num;
+      // for (int i = 0; i < invalid_idx; i++) {
+      //   SizeT subtree_sum = 0;
+      //   SizeT reinsert_sum = 0;
+      //   for (BufSizeT j = 0; j < i; j++) {
+      //     subtree_sum +=
+      //       GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
+      //     reinsert_sum +=
+      //     GetNodeReinsertSize(nodes_contain_invalid_subtree[j]);
+      //   }
+      //
+      //   remove_entries_num[i] = FetchInvalidSubtreeNodes(
+      //     nodes_contain_invalid_subtree[i],
+      //     flatten_node_slice.cut(
+      //       subtree_sum,
+      //       subtree_sum +
+      //         GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[i])),
+      //     reinsert_entries.cut(
+      //       reinsert_sum,
+      //       reinsert_sum +
+      //         GetNodeReinsertSize(nodes_contain_invalid_subtree[i])));
+      //
+      //   assert(parlay::is_sorted(
+      //     reinsert_entries.cut(
+      //       reinsert_sum,
+      //       reinsert_sum +
+      //         GetNodeReinsertSize(nodes_contain_invalid_subtree[i])),
+      //     [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b);
+      //     }));
+      //
+      //   // if (GetNodeInvalidStatus(nodes_contain_invalid_subtree[i])) {
+      //   //   DeleteTreeRec(nodes_contain_invalid_subtree[i]);
+      //   // }
+      // }
+
       parlay::parallel_for(
         0,
         invalid_idx,
@@ -329,11 +362,23 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
         },
         1);
 
+      for (int i = 0; i < invalid_idx; i++) {
+        auto node = nodes_contain_invalid_subtree[i];
+        if (node->is_leaf && GetNodeInvalidStatus(node)) {
+          FreeNode<Leaf>(node);
+        }
+      }
       SizeT total_remove_entries_n =
         std::accumulate(remove_entries_num.begin(),
                         remove_entries_num.begin() + invalid_idx,
                         static_cast<SizeT>(0));
       assert(total_remove_entries_n == reinsert_entries.size());
+      // for (int i = 1; i < reinsert_entries.size(); i++) {
+      //   if (reinsert_entries[i - 1].GetKey() >= reinsert_entries[i].GetKey())
+      //   {
+      //     std::cout << i << " " << reinsert_entries[i] << std::endl;
+      //   }
+      // }
       assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
         return Entry::GetKey(a) < Entry::GetKey(b);
       }));
@@ -368,10 +413,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     flatten_node_slice[0] = T;
     SizeT size = T->size;
     FlattenRec<decltype(reinsert_entries), true, true>(T, reinsert_entries);
-    assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
-      return Entry::GetKey(a) < Entry::GetKey(b);
-    }));
-    // DeleteTreeRec(T);
+    DeleteTreeRec(T);
     return size;
   }
 }

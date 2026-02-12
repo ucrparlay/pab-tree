@@ -9,6 +9,7 @@
 #include <tuple>
 #include <vector>
 
+#include "parlay/primitives.h"
 #include "test_framework.h"
 
 namespace fs = std::filesystem;
@@ -106,21 +107,25 @@ protected:
     auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
     tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
-    EntrySeq tmp(wp.size());
-    Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
-    assert(parlay::sort(tmp) == parlay::sort(wp));
+
+    {
+      EntrySeq tmp(wp.size());
+      Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+      assert(parlay::sort(tmp) == parlay::sort(wp));
+    }
 
     if (opts.tag & (1 << 0)) {
       BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
       ASSERT_EQ(tree.GetSize(), wp.size() + wi.size());
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
 
-      tmp.resize(wp.size() + wi.size());
-      Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
-      wp.append(wi);
-      wp = parlay::sort(wp);
-      tmp = parlay::sort(tmp);
-      assert(wp == tmp);
+      {
+        EntrySeq tmp(wp.size() + wi.size());
+        Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+        auto nwp = parlay::sort(parlay::append(wp, wi));
+        tmp = parlay::sort(tmp);
+        assert(tmp == nwp);
+      }
     }
 
     if (opts.tag & (1 << 1)) {
@@ -129,7 +134,7 @@ protected:
       assert(tree.GetSize() == wp.size());
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
 
-      tmp.resize(wp.size());
+      EntrySeq tmp(wp.size());
       Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
       assert(parlay::sort(tmp) == parlay::sort(wp));
     }

@@ -61,6 +61,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
 
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
+    // TODO: we can check the tag in leaf to avoid additional sort
     auto total = FetchInvalidSubtreeNodes(this->root_,
                                           parlay::make_slice(flatten_node_seq),
                                           parlay::make_slice(reinsert_entries));
@@ -76,30 +77,29 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     //   DeleteTreeRec(flatten_node_seq[i]);
     // });
 
-    std::cout << "Max tree size: "
-              << (*parlay::max_element(
-                    flatten_node_seq,
-                    [](Node* a, Node* b) { return a->size < b->size; }))
-                   ->size
-              << std::endl;
-    std::cout << "Number of leaves: "
-              << parlay::count_if(flatten_node_seq,
-                                  [](Node* T) { return T->is_leaf; })
-              << std::endl;
-    std::cout << "Number of leaf entries: "
-              << std::accumulate(flatten_node_seq.begin(),
-                                 flatten_node_seq.end(),
-                                 static_cast<SizeT>(0),
-                                 [](SizeT sum, Node* T) {
-                                   return sum + (T->is_leaf ? T->size : 0);
-                                 })
-              << std::endl;
-    parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
-      DeleteTreeRec(flatten_node_seq[i]);
-    });
-    std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
-    t.next("FlattenRec and DeleteTreeRec");
-    // TODO: we can ensure the entries to be sorted before launch insert
+    // std::cout << "Max tree size: "
+    //           << (*parlay::max_element(
+    //                 flatten_node_seq,
+    //                 [](Node* a, Node* b) { return a->size < b->size; }))
+    //                ->size
+    //           << std::endl;
+    // std::cout << "Number of leaves: "
+    //           << parlay::count_if(flatten_node_seq,
+    //                               [](Node* T) { return T->is_leaf; })
+    //           << std::endl;
+    // std::cout << "Number of leaf entries: "
+    //           << std::accumulate(flatten_node_seq.begin(),
+    //                              flatten_node_seq.end(),
+    //                              static_cast<SizeT>(0),
+    //                              [](SizeT sum, Node* T) {
+    //                                return sum + (T->is_leaf ? T->size : 0);
+    //                              })
+    //           << std::endl;
+    // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
+    //   DeleteTreeRec(flatten_node_seq[i]);
+    // });
+    // std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
+    // t.next("FlattenRec and DeleteTreeRec");
     assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
       return Entry::GetKey(a) < Entry::GetKey(b);
     }));
