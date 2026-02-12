@@ -95,9 +95,9 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     //                                return sum + (T->is_leaf ? T->size : 0);
     //                              })
     //           << std::endl;
-    // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
-    //   DeleteTreeRec(flatten_node_seq[i]);
-    // });
+    parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
+      DeleteTreeRec(flatten_node_seq[i]);
+    });
     // std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
     // t.next("FlattenRec and DeleteTreeRec");
     assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {

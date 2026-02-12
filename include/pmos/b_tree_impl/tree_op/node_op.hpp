@@ -362,12 +362,12 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
         },
         1);
 
-      for (int i = 0; i < invalid_idx; i++) {
-        auto node = nodes_contain_invalid_subtree[i];
-        if (node->is_leaf && GetNodeInvalidStatus(node)) {
-          FreeNode<Leaf>(node);
-        }
-      }
+      // for (int i = 0; i < invalid_idx; i++) {
+      //   auto node = nodes_contain_invalid_subtree[i];
+      //   if (node->is_leaf && GetNodeInvalidStatus(node)) {
+      //     FreeNode<Leaf>(node);
+      //   }
+      // }
       SizeT total_remove_entries_n =
         std::accumulate(remove_entries_num.begin(),
                         remove_entries_num.begin() + invalid_idx,
@@ -413,7 +413,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     flatten_node_slice[0] = T;
     SizeT size = T->size;
     FlattenRec<decltype(reinsert_entries), true, true>(T, reinsert_entries);
-    DeleteTreeRec(T);
+    // DeleteTreeRec(T);
     return size;
   }
 }
