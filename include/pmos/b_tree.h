@@ -537,10 +537,10 @@ public:
   //
   // NOTE: utility
   // TODO: better evaluate the parallel recursion function
-  template<typename Range, bool Granularity = true, bool Sorted = false>
+  template<typename Range, bool granularity = true, bool sorted = false>
   static void FlattenRec(Node* T, Range Out);
 
-  template<typename Range, bool Sorted = false>
+  template<typename Range, bool sorted = false>
   static void ExtractPointsInLeaf(Node* T, Range Out);
 
   // template <typename Leaf, IsMultiNode Interior, typename Range,

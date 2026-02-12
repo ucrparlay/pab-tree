@@ -39,7 +39,7 @@ BTree<TT>::DeleteTreeRec(Node* T)
       TI->GetNodeN(),
       [&](size_t i) { DeleteTreeRec(TI->tree_nodes[i]); },
       // WARN: the granularity control may not work well here
-      ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBuf);
+      ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBufUB);
 
     FreeNode<Interior>(T);
   }
