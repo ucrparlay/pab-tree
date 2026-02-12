@@ -32,23 +32,24 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   if (this->root_ == nullptr) {
     return;
   }
-  parlay::internal::timer t(">>> BatchDelete");
+  // parlay::internal::timer t(">>> BatchDelete");
   // std::cout << "Tree nodes before delete: "
   //           << GetTreeNodesNum<Leaf, Interior>(this->root_) << std::endl;
   static_assert(
     std::same_as<typename decltype(In)::value_type, typename TT::K>);
   auto sorted_seq = parlay::sort(In);
-  t.next("Sorted");
+  // t.next("Sorted");
 
-  std::cout << " Before delete, root size: " << this->root_->size << std::endl;
+  // std::cout << " Before delete, root size: " << this->root_->size <<
+  // std::endl;
 
   auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
     BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
-  t.next("BatchDeleteRecursive");
+  // t.next("BatchDeleteRecursive");
 
-  std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
-            << ", Invalid subtree num: " << invalid_subtree_num
-            << ", tree size after delete: " << this->root_->size << std::endl;
+  // std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
+  //           << ", Invalid subtree num: " << invalid_subtree_num
+  // << ", tree size after delete: " << this->root_->size << std::endl;
 
   if (invalid_flag) {
     assert(this->root_->size == 0);
@@ -57,7 +58,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   }
 
   if (invalid_subtree_num) {
-    std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
+    // std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
 
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
@@ -104,7 +105,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
       return Entry::GetKey(a) < Entry::GetKey(b);
     }));
     BatchInsert_(parlay::make_slice(reinsert_entries), true);
-    t.next("BatchInsert_");
+    // t.next("BatchInsert_");
   }
 }
 
