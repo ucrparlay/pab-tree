@@ -9,13 +9,14 @@ declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
 
 Nodes=(1000000000)
 Dim=(1)
-tag=$((2#0011))
+tag=$((2#0010))
 summary=1
 query_type=$((2#001))
 instance_n=1
 round=4
 
-log_path="logs/linear_wrap"
+# log_path="logs/linear_wrap"
+log_path="logs/batch_delete"
 mkdir -p "${log_path}"
 
 data_prefix="/data/zmen002/kv_pair"
