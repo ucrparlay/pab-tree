@@ -24,7 +24,7 @@ BTree<TT>::ForceParallelRecursion(Interior const* TI)
 }
 
 template<typename TT>
-template<typename Range, bool granularity>
+template<typename Range, bool Granularity, bool Sorted>
 void
 BTree<TT>::FlattenRec(Node* T, Range Out)
 {
@@ -35,11 +35,11 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
   }
 
   if (T->is_leaf) {
-    ExtractPointsInLeaf(T, Out);
+    ExtractPointsInLeaf<Range, Sorted>(T, Out);
     return;
   }
 
-  auto TI = static_cast<const Interior*>(T);
+  auto TI = static_cast<Interior*>(T);
 
   assert(TI->size == std::accumulate(TI->tree_nodes.begin(),
                                      TI->tree_nodes.begin() + TI->GetNodeN(),
@@ -56,12 +56,12 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
       for (BufSizeT j = 0; j < i; ++j) {
         start += TI->tree_nodes[j]->size;
       }
-      FlattenRec<Range, granularity>(
+      FlattenRec<Range, Granularity, Sorted>(
         TI->tree_nodes[i], Out.cut(start, start + TI->tree_nodes[i]->size));
     },
     // NOTE: In our btree when we flatten the tree, the size is always match the
     // corresponding size, so we can use it as the granularity indicator
-    ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBuf);
+    ForceParallelRecursion<Granularity>(TI) ? 1 : Interior::TT::kBuf);
 }
 
 } // namespace pmos

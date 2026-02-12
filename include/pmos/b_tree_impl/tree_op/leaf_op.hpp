@@ -15,11 +15,14 @@
 
 namespace pmos {
 template<typename TT>
-template<typename Range>
+template<typename Range, bool Sorted>
 void
 BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
 {
-  auto TL = static_cast<const Leaf*>(T);
+  auto TL = static_cast<Leaf*>(T);
+  if constexpr (Sorted) {
+    std::sort(TL->elements.begin(), TL->elements.begin() + TL->size);
+  }
   assert(Out.size() >= TL->size);
   for (BufSizeT i = 0; i < TL->size; i++) {
     Out[i] = TL->elements[i];

@@ -239,7 +239,7 @@ public:
   template<typename Range>
   void BatchInsert(Range&& In);
 
-  void BatchInsert_(EntrySlice In);
+  void BatchInsert_(EntrySlice In, bool sorted = false);
 
   void BatchInsertSieve(EntrySlice In);
 
@@ -537,10 +537,10 @@ public:
   //
   // NOTE: utility
   // TODO: better evaluate the parallel recursion function
-  template<typename Range, bool granularity = true>
+  template<typename Range, bool Granularity = true, bool Sorted = false>
   static void FlattenRec(Node* T, Range Out);
 
-  template<typename Range>
+  template<typename Range, bool Sorted = false>
   static void ExtractPointsInLeaf(Node* T, Range Out);
 
   // template <typename Leaf, IsMultiNode Interior, typename Range,

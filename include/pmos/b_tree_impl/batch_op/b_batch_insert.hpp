@@ -31,7 +31,7 @@ BTree<TT>::BatchInsert(Range&& In)
 
 template<typename TT>
 void
-BTree<TT>::BatchInsert_(EntrySlice In)
+BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
 {
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
@@ -42,14 +42,17 @@ BTree<TT>::BatchInsert_(EntrySlice In)
     return Build_(In);
   }
 
-  parlay::internal::timer t("BatchInsert_Sort");
-  auto sorted_seq = parlay::sort(In);
-  t.next("Sorted");
+  EntrySlice sorted_slice = In;
+  if (!sorted) {
+    parlay::internal::timer t("BatchInsert_Sort");
+    auto sorted_seq = parlay::sort(In);
+    sorted_slice = parlay::make_slice(sorted_seq);
+    t.next("Sorted");
+  }
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
-  SizeT new_node_n = BatchInsertRecursive(this->root_,
-                                          parlay::make_slice(sorted_seq),
-                                          parlay::make_slice(node_split_seq));
+  SizeT new_node_n = BatchInsertRecursive(
+    this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
   if (new_node_n > 0) {
     auto updated_node_seq = parlay::tabulate(

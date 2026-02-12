@@ -99,7 +99,11 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     });
     std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
     t.next("FlattenRec and DeleteTreeRec");
-    BatchInsert_(parlay::make_slice(reinsert_entries));
+    // TODO: we can ensure the entries to be sorted before launch insert
+    assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
+      return Entry::GetKey(a) < Entry::GetKey(b);
+    }));
+    BatchInsert_(parlay::make_slice(reinsert_entries), true);
     t.next("BatchInsert_");
   }
 }
