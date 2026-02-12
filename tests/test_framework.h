@@ -248,10 +248,6 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
     pkd.DeleteTree();
     wp = parsed_input;
     pkd.Build(wp);
-
-    EntrySeq tmp(wp.size());
-    Tree::FlattenRec(pkd.GetRoot(), parlay::make_slice(tmp));
-    assert(parlay::sort(tmp) == parlay::sort(wp));
   }
 }
 
@@ -290,13 +286,6 @@ BatchInsert(Tree& pkd,
     std::cout << "Insert " << wi.size() << " elements\n" << std::flush;
     pkd.BatchInsert(wi);
     std::cout << "finish ccp insert" << std::endl;
-
-    typename TypeTrait::EntrySeq tmp(wp.size() + wi.size());
-    Tree::FlattenRec(pkd.GetRoot(), parlay::make_slice(tmp));
-    wp.append(wi);
-    wp = parlay::sort(wp);
-    tmp = parlay::sort(tmp);
-    assert(wp == tmp);
   }
 }
 
@@ -338,10 +327,6 @@ BatchDelete(Tree& pkd,
     std::cout << "begin ccp delete" << std::endl;
     pkd.BatchDelete(wi);
     std::cout << "finish ccp delete" << std::endl;
-
-    typename TypeTrait::EntrySeq tmp(wp.size());
-    Tree::FlattenRec(pkd.GetRoot(), parlay::make_slice(tmp));
-    assert(parlay::sort(tmp) == parlay::sort(wp));
   }
 }
 

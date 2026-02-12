@@ -106,11 +106,21 @@ protected:
     auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
     tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    EntrySeq tmp(wp.size());
+    Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+    assert(parlay::sort(tmp) == parlay::sort(wp));
 
     if (opts.tag & (1 << 0)) {
       BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
       ASSERT_EQ(tree.GetSize(), wp.size() + wi.size());
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+
+      tmp.resize(wp.size() + wi.size());
+      Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+      wp.append(wi);
+      wp = parlay::sort(wp);
+      tmp = parlay::sort(tmp);
+      assert(wp == tmp);
     }
 
     if (opts.tag & (1 << 1)) {
@@ -118,6 +128,10 @@ protected:
       BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, 2);
       assert(tree.GetSize() == wp.size());
       tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+
+      tmp.resize(wp.size());
+      Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+      assert(parlay::sort(tmp) == parlay::sort(wp));
     }
 
     EntrySeq new_wp;
