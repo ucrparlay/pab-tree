@@ -136,14 +136,18 @@ add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
 target_link_libraries(b_test PUBLIC TEST_FRAME)
 target_include_directories(b_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
-add_executable(baselines ${PROJECT_SOURCE_DIR}/tests/baselines.cpp)
-target_link_libraries(baselines PUBLIC TEST_FRAME)
-target_link_libraries(baselines PUBLIC CPAM)
-target_include_directories(baselines PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_DIR})
+# NOTE: CPAM
+add_executable(cpam ${PROJECT_SOURCE_DIR}/tests/cpam.cpp)
+target_link_libraries(cpam PUBLIC TEST_FRAME)
+target_link_libraries(cpam PUBLIC CPAM)
+target_include_directories(cpam PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_DIR})
+
 if(NOT APPLE)
-	target_link_libraries(baselines PUBLIC PMA)
-	target_include_directories(baselines PUBLIC ${PMA_INCLUDE_DIR})
-	target_compile_definitions(baselines PUBLIC PARALLEL=1 PARLAY=1)
+	# NOTE: PMA
+	add_executable(pma ${PROJECT_SOURCE_DIR}/tests/pma.cpp)
+	target_link_libraries(pma PUBLIC PMA)
+	target_include_directories(pma PUBLIC ${PMA_INCLUDE_DIR})
+	target_compile_definitions(pma PUBLIC PARALLEL=1 PARLAY=1)
 endif()
 
 # NOTE: GoogleTest for b_ccp
@@ -155,6 +159,7 @@ add_test(NAME UnitTest COMMAND unit_test)
 
 if(JEMA)
 	target_link_libraries(b_test PUBLIC libjemalloc.so)
+	target_link_libraries(cpam PUBLIC libjemalloc.so)
 endif()
 
 add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)

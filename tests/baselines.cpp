@@ -33,7 +33,7 @@ struct SpmaWrapper
 
 template<typename Options, typename RunFunc>
 void
-ApplyBaselines(Options const& opts, RunFunc test_func)
+ApplyCPAM(Options const& opts, RunFunc test_func)
 {
   // using K = std::pair<uint32_t, uint32_t>;
   using K = Wrapper::K;
@@ -121,7 +121,7 @@ main(int argc, char* argv[])
     };
 
   // Wrapper::ApplyBaselines(opts, test_func);
-  ApplyBaselines(opts, DefaultTestFunc);
+  ApplyCPAM(opts, DefaultTestFunc);
 
   return 0;
 }
