@@ -44,10 +44,10 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
 
   EntrySlice sorted_slice = In;
   if (!sorted) {
-    parlay::internal::timer t("BatchInsert_Sort");
+    // parlay::internal::timer t("BatchInsert_Sort");
     auto sorted_seq = parlay::sort(In);
     sorted_slice = parlay::make_slice(sorted_seq);
-    t.next("Sorted");
+    // t.next("Sorted");
   }
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
