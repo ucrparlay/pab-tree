@@ -47,9 +47,10 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
   // t.next("BatchDeleteRecursive");
 
-  std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
-            << ", Invalid subtree num: " << invalid_subtree_num
-            << ", tree size after delete: " << this->root_->size << std::endl;
+  // std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
+  //           << ", Invalid subtree num: " << invalid_subtree_num
+  //           << ", tree size after delete: " << this->root_->size <<
+  //           std::endl;
 
   if (invalid_flag) {
     assert(this->root_->size == 0);
@@ -58,7 +59,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   }
 
   if (invalid_subtree_num) {
-    std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
+    // std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
 
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
