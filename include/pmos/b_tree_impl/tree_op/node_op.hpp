@@ -247,17 +247,17 @@ template<typename TT>
 TT::SizeT
 BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                     TT::NodeSlice flatten_node_slice,
-                                    EntrySlice reinsert_entries)
+                                    EntrySlice reinsert_entries,
+                                    const bool has_tomb)
 {
   if (T->is_leaf) {
-    if (T->size < TT::kBufLB) {
-      assert(flatten_node_slice.size() == 1);
-      assert(reinsert_entries.size() == T->size);
-      flatten_node_slice[0] = T;
-      SizeT size = T->size;
-      FlattenRec<EntrySlice, true, true>(T, reinsert_entries);
-      return size;
-    }
+    assert(GetNodeInvalidStatus(T));
+    assert(flatten_node_slice.size() == 1);
+    assert(reinsert_entries.size() == T->size);
+    flatten_node_slice[0] = T;
+    SizeT size = T->size;
+    FlattenRec<EntrySlice, true, true>(T, reinsert_entries);
+    return size;
     return 0;
   }
 
@@ -273,6 +273,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       BufSizeT tree_node_idx = 0;
       BufSizeT split_idx = 0;
 
+      bool reinsert_flag = false;
       for (BufSizeT i = 0; i < TI->GetNodeN(); ++i) {
         auto node = TI->tree_nodes[i];
 
@@ -280,6 +281,10 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
         if (GetNodeInvalidSubtreeNum(node)) {
           nodes_contain_invalid_subtree[invalid_idx] = node;
           invalid_idx++;
+        }
+
+        if (GetNodeInvalidStatus(node)) {
+          reinsert_flag = true;
         }
 
         assert(GetNodeInvalidSubtreeNum(node) == 0 ? !GetNodeInvalidStatus(node)
@@ -302,39 +307,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       TI->node_n = tree_node_idx;
 
       SizeBufUBArr remove_entries_num;
-      // for (int i = 0; i < invalid_idx; i++) {
-      //   SizeT subtree_sum = 0;
-      //   SizeT reinsert_sum = 0;
-      //   for (BufSizeT j = 0; j < i; j++) {
-      //     subtree_sum +=
-      //       GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
-      //     reinsert_sum +=
-      //     GetNodeReinsertSize(nodes_contain_invalid_subtree[j]);
-      //   }
-      //
-      //   remove_entries_num[i] = FetchInvalidSubtreeNodes(
-      //     nodes_contain_invalid_subtree[i],
-      //     flatten_node_slice.cut(
-      //       subtree_sum,
-      //       subtree_sum +
-      //         GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[i])),
-      //     reinsert_entries.cut(
-      //       reinsert_sum,
-      //       reinsert_sum +
-      //         GetNodeReinsertSize(nodes_contain_invalid_subtree[i])));
-      //
-      //   assert(parlay::is_sorted(
-      //     reinsert_entries.cut(
-      //       reinsert_sum,
-      //       reinsert_sum +
-      //         GetNodeReinsertSize(nodes_contain_invalid_subtree[i])),
-      //     [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b);
-      //     }));
-      //
-      //   // if (GetNodeInvalidStatus(nodes_contain_invalid_subtree[i])) {
-      //   //   DeleteTreeRec(nodes_contain_invalid_subtree[i]);
-      //   // }
-      // }
 
       parlay::parallel_for(
         0,
@@ -358,7 +330,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
             reinsert_entries.cut(
               reinsert_sum,
               reinsert_sum +
-                GetNodeReinsertSize(nodes_contain_invalid_subtree[i])));
+                GetNodeReinsertSize(nodes_contain_invalid_subtree[i])),
+            has_tomb ? !reinsert_flag : false);
         },
         1);
 
@@ -382,7 +355,16 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
         return Entry::GetKey(a) < Entry::GetKey(b);
       }));
-      TI->size -= total_remove_entries_n;
+      if (reinsert_flag && has_tomb) {
+        TI->size -= total_remove_entries_n;
+        BatchInsert_(parlay::make_slice(reinsert_entries), true);
+      } else {
+        TI->size = std::accumulate(
+          TI->tree_nodes.begin(),
+          TI->tree_nodes.begin() + TI->GetNodeN(),
+          static_cast<SizeT>(0),
+          [](SizeT sum, Node* node) { return sum + node->size; });
+      }
 
 #ifdef DEBUG
       // ensure the tree structure is correct after the compaction,

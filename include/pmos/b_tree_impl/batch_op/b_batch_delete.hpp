@@ -47,9 +47,9 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
   // t.next("BatchDeleteRecursive");
 
-  // std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
-  //           << ", Invalid subtree num: " << invalid_subtree_num
-  // << ", tree size after delete: " << this->root_->size << std::endl;
+  std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
+            << ", Invalid subtree num: " << invalid_subtree_num
+            << ", tree size after delete: " << this->root_->size << std::endl;
 
   if (invalid_flag) {
     assert(this->root_->size == 0);
@@ -58,14 +58,15 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   }
 
   if (invalid_subtree_num) {
-    // std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
+    std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
 
     auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
     // TODO: we can check the tag in leaf to avoid additional sort
     auto total = FetchInvalidSubtreeNodes(this->root_,
                                           parlay::make_slice(flatten_node_seq),
-                                          parlay::make_slice(reinsert_entries));
+                                          parlay::make_slice(reinsert_entries),
+                                          true);
     assert(total == reinsert_entry_num);
     // t.next("FetchInvalidSubtreeNodes");
     // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
@@ -101,10 +102,10 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     });
     // std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
     // t.next("FlattenRec and DeleteTreeRec");
-    assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
-      return Entry::GetKey(a) < Entry::GetKey(b);
-    }));
-    BatchInsert_(parlay::make_slice(reinsert_entries), true);
+    // assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
+    //   return Entry::GetKey(a) < Entry::GetKey(b);
+    // }));
+    // BatchInsert_(parlay::make_slice(reinsert_entries), true);
     // t.next("BatchInsert_");
   }
 }

@@ -268,7 +268,8 @@ public:
   // Return the total number entries in the tree that needs to rebuild
   SizeT FetchInvalidSubtreeNodes(Node* T,
                                  typename TT::NodeSlice flatten_node_slice,
-                                 EntrySlice reinsert_entries
+                                 EntrySlice reinsert_entries,
+                                 bool has_tomb
 
   );
 
