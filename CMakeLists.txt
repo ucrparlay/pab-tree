@@ -145,8 +145,8 @@ target_include_directories(cpam PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_
 if(NOT APPLE)
 	# NOTE: PMA
 	add_executable(pma ${PROJECT_SOURCE_DIR}/tests/pma.cpp)
-	target_link_libraries(pma PUBLIC PMA)
-	target_include_directories(pma PUBLIC ${PMA_INCLUDE_DIR})
+	target_link_libraries(pma PUBLIC TEST_FRAME PMA)
+	target_include_directories(pma PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${PMA_INCLUDE_DIR})
 	target_compile_definitions(pma PUBLIC PARALLEL=1 PARLAY=1)
 endif()
 
