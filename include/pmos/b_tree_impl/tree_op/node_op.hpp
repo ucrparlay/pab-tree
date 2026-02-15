@@ -282,7 +282,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
           invalid_idx++;
         }
 
-        if (GetNodeInvalidStatus(node)) {
+        if (!reinsert_flag && GetNodeInvalidStatus(node)) {
           reinsert_flag = true;
         }
 
@@ -355,7 +355,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       if (reinsert_flag && has_tomb) {
         TI->size -= total_remove_entries_n;
         BatchInsert_(parlay::make_slice(reinsert_entries), true);
-      } else {
+      } else { // the subtrees may perform reinsertion
         TI->size = std::accumulate(
           TI->tree_nodes.begin(),
           TI->tree_nodes.begin() + TI->GetNodeN(),
