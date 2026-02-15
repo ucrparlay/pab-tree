@@ -585,8 +585,12 @@ public:
   template<typename Leaf, typename Interior>
   TT::Box VerifyTreeProperty(Node const* T);
 
+  bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice);
+
   template<typename Leaf, typename Interior>
   int CheckHeight(Node const* T);
+
+  bool CheckContainNode(Node const* T, Node const* P);
 
   template<typename Leaf, typename Interior>
   int GetHeight(Node const* T);

@@ -37,7 +37,6 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
     box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
     if (i == 0) {
-      // assert(box_seq[i].second < TI->split[0]);
       if (box_seq[i].second >= TI->split[0]) {
         std::cout << "Validation failed at first node split check."
                   << std::endl;
@@ -45,11 +44,10 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
                   << "], Split: " << TI->split[0] << std::endl;
         assert(false);
       }
+      assert(box_seq[i].second < TI->split[0]);
     } else if (i == TI->GetNodeN() - 1) {
       assert(box_seq[i].first >= TI->split[i - 1]);
     } else {
-      // assert(box_seq[i].first >= TI->split[i - 1] &&
-      //        box_seq[i].second < TI->split[i]);
       if (box_seq[i].first < TI->split[i - 1] ||
           box_seq[i].second >= TI->split[i]) {
         std::cout << "Validation failed at interior node split check."
@@ -59,11 +57,50 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
                   << "]" << std::endl;
         assert(false);
       }
+      assert(box_seq[i].first >= TI->split[i - 1] &&
+             box_seq[i].second < TI->split[i]);
     }
   });
-  // }
 
   return GetBox(box_seq);
+}
+
+template<typename TT>
+bool
+BTree<TT>::VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice)
+{
+  int cnt = 0;
+  for (int i = 0; i < node_slice.size(); i++) {
+    auto node = node_slice[i];
+    cnt += CheckContainNode(T, node) ? 1 : 0;
+  }
+  assert(cnt == 1);
+  return cnt == 1;
+}
+
+template<typename TT>
+bool
+BTree<TT>::CheckContainNode(Node const* T, Node const* P)
+{
+  if (T == P) {
+    return true;
+  }
+
+  if (T->is_leaf) {
+    return false;
+  }
+
+  auto TI = static_cast<Interior const*>(T);
+  BooleanBufUBArr contain_arr;
+
+  parlay::parallel_for(0, TI->GetNodeN(), [&](BufSizeT i) {
+    contain_arr[i] = CheckContainNode(TI->tree_nodes[i], P);
+  });
+
+  return parlay::reduce(
+    parlay::make_slice(contain_arr.begin(),
+                       contain_arr.begin() + TI->GetNodeN()),
+    parlay::binary_op([&](bool a, bool b) { return a | b; }, bool()));
 }
 
 template<typename TT>
@@ -75,7 +112,7 @@ BTree<TT>::CheckHeight(Node const* T)
     return 0;
   }
 
-  Interior const* TI = static_cast<Interior const*>(T);
+  auto TI = static_cast<Interior const*>(T);
   parlay::sequence<int> heights(TI->GetNodeN());
 
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {

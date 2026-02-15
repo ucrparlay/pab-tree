@@ -258,7 +258,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     SizeT size = T->size;
     FlattenRec<EntrySlice, true, true>(T, reinsert_entries);
     return size;
-    return 0;
   }
 
   auto TI = static_cast<Interior*>(T);
@@ -346,15 +345,13 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                         remove_entries_num.begin() + invalid_idx,
                         static_cast<SizeT>(0));
       assert(total_remove_entries_n == reinsert_entries.size());
-      // for (int i = 1; i < reinsert_entries.size(); i++) {
-      //   if (reinsert_entries[i - 1].GetKey() >= reinsert_entries[i].GetKey())
-      //   {
-      //     std::cout << i << " " << reinsert_entries[i] << std::endl;
-      //   }
-      // }
       assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
         return Entry::GetKey(a) < Entry::GetKey(b);
       }));
+      assert(parlay::all_of(flatten_node_slice, [&](auto node) {
+        return VerifyUnoverlappedTree(node, flatten_node_slice);
+      }));
+
       if (reinsert_flag && has_tomb) {
         TI->size -= total_remove_entries_n;
         BatchInsert_(parlay::make_slice(reinsert_entries), true);
