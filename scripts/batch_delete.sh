@@ -5,7 +5,6 @@ set -o xtrace
 /usr/bin/drop_caches
 
 declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
-# declare -a leaf_wrap_seq=(256)
 
 Nodes=(1000000000)
 Dim=(1)
@@ -15,7 +14,6 @@ query_type=$((2#001))
 instance_n=1
 round=4
 
-# log_path="logs/linear_wrap"
 log_path="logs/batch_delete"
 mkdir -p "${log_path}"
 
