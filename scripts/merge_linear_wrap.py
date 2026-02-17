@@ -12,7 +12,7 @@ from pathlib import Path
 solver = ""
 ratio_map = {}
 input_type = sys.argv[1]
-log_folder_name = "batch_insert"
+log_folder_name = "batch_delete"
 
 subprocess.run(
     f"""
