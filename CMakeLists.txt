@@ -158,8 +158,15 @@ add_test(NAME UnitTest COMMAND unit_test)
 # ctest -R BCCPTest -V
 
 if(JEMA)
-	target_link_libraries(b_test PUBLIC libjemalloc.so)
-	target_link_libraries(cpam PUBLIC libjemalloc.so)
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(JEMALLOC REQUIRED IMPORTED_TARGET jemalloc)
+	message(">>>>> Linking with jemalloc")
+
+	# target_link_libraries(myapp PRIVATE PkgConfig::JEMALLOC)
+	target_link_libraries(b_test PUBLIC PkgConfig::JEMALLOC)
+	target_link_libraries(cpam PUBLIC PkgConfig::JEMALLOC)
+	# target_link_libraries(b_test PUBLIC libjemalloc.so)
+	# target_link_libraries(cpam PUBLIC libjemalloc.so)
 endif()
 
 add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
