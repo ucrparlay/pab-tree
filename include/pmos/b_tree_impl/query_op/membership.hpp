@@ -22,15 +22,11 @@ BTree<TT>::ContainRec(Node const* T, K const k) const
   }
 
   auto const* TI = static_cast<Interior const*>(T);
-  auto pos = parlay::internal::binary_search(
-    parlay::make_slice(TI->split.begin(), TI->split.begin() + TI->GetSplitN()),
-    [&](K const key) { return k >= key; });
+  auto pos = TI->GetNodeIdContainingKey(k);
 
   assert(pos < TI->GetNodeN());
-  assert(pos == 0 ? k < TI->split.front()
-                  : (pos == TI->GetSplitN()
-                       ? k >= TI->split[TI->GetNodeN() - 2]
-                       : (k >= TI->split[pos - 1] && k < TI->split[pos])));
+  assert(TI->ValidateKeyInNode(pos, k));
+
   return ContainRec(TI->tree_nodes[pos], k);
 }
 

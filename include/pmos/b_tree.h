@@ -615,7 +615,16 @@ public:
   auto Contain(K k) const -> std::pair<bool, MembershipLogger>;
 
   bool ContainRec(Node const* T, K k) const;
-  //
+
+  template<typename Range>
+  auto RangeReport(TT::Box query_box, Range&& out) const
+    -> std::pair<bool, RangeReportLogger>;
+
+  template<typename Range>
+  BufSizeT RangeReportLeaf(Node const* T, TT::Box query_box, Range out) const;
+
+  template<typename Range>
+  SizeT RangeReportRec(Node const* T, TT::Box query_box, Range out) const;
   // template <typename Leaf, typename Interior>
   // size_t GetTreeHeight();
   //

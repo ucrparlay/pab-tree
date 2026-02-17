@@ -98,34 +98,36 @@ struct LeafNode : TypeTrait::Node
     });
   }
 
-  bool CapacityFull() const
+  [[nodiscard]] bool CapacityFull() const
   {
     return this->size >= TT::kBufUB;
   }
 
+  // return the first idx s.t. Entry::GetKey(elements[idx]) >= k
+  auto BinarySearchKey(K const k) const
+  {
+    assert(this->is_sorted);
+    return pmos::BinarySearch<8>(
+      parlay::make_slice(this->elements.begin(),
+                         this->elements.begin() + this->size),
+      [k](E const e) { return Entry::GetKey(e) < k; });
+  }
+
+  // return the first idx s.t. Entry::GetKey(elements[idx]) > k
+  auto BinarySearchKeyExclusive(K const k) const
+  {
+    assert(this->is_sorted);
+    return pmos::BinarySearch<8>(
+      parlay::make_slice(this->elements.begin(),
+                         this->elements.begin() + this->size),
+      [k](E const e) { return Entry::GetKey(e) <= k; });
+  }
+
   bool Contain(K const k) const
   {
-
-    // if (this->is_sorted) {
-    //   auto idx = parlay::internal::binary_search(
-    //     parlay::make_slice(this->elements.begin(),
-    //                        this->elements.begin() + this->size),
-    //     [k](E const e) { return Entry::GetKey(e) < k; });
-    //   return idx < this->size && (Entry::GetKey(this->elements[idx]) == k);
-    // } else {
-    //   return std::ranges::find_if(this->elements.begin(),
-    //                               this->elements.begin() + this->size,
-    //                               [&](E const e) {
-    //                                 return Entry::GetKey(e) == k;
-    //                               }) != this->elements.begin() + this->size;
-    // }
-
     return this->is_sorted
              ? ([&] {
-                 auto idx = pmos::BinarySearch<8>(
-                   parlay::make_slice(this->elements.begin(),
-                                      this->elements.begin() + this->size),
-                   [k](E const e) { return Entry::GetKey(e) < k; });
+                 auto idx = this->BinarySearchKey(k);
                  return idx < this->size &&
                         (Entry::GetKey(this->elements[idx]) == k);
                })()
@@ -134,17 +136,6 @@ struct LeafNode : TypeTrait::Node
                                      [&](E const e) {
                                        return Entry::GetKey(e) == k;
                                      }) != this->elements.begin() + this->size);
-    // return this->is_sorted
-    //          ? parlay::internal::binary_search(
-    //              parlay::make_slice(this->elements.begin(),
-    //                                 this->elements.begin() + this->size),
-    //              [k](E const e) { return Entry::GetKey(e) < k; }) <
-    //              this->size
-    //          : std::ranges::find_if(
-    //              this->elements.begin(),
-    //              this->elements.begin() + this->size,
-    //              [&](E const e) { return Entry::GetKey(e) == k; }) !=
-    //              this->elements.begin() + this->size;
   }
 
   EntrySeq GetEle() const
@@ -334,6 +325,24 @@ struct MultiWayNode : TypeTrait::Node
   auto GetSplitSlice() const
   {
     return parlay::make_slice(split.begin(), split.begin() + GetSplitN());
+  }
+
+  TT::BufSizeT GetNodeIdContainingKey(TT::Key const k) const
+  {
+    // return the first id s.t. split[id] > k
+    // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
+    // if split[1] > k && split[0] <= k, then k belongs to tree_nodes[1]
+    return pmos::BinarySearch<8>(this->GetSplitSlice(),
+                                 [&](TT::Key const key) { return key <= k; });
+  }
+
+  bool ValidateKeyInNode(TT::BufSizeT node_idx, TT::Key const k) const
+  {
+    return node_idx == 0 ? k < this->split.front()
+                         : (node_idx == this->GetSplitN()
+                              ? k >= this->split[this->GetNodeN() - 2]
+                              : (k >= this->split[node_idx - 1] &&
+                                 k < this->split[node_idx]));
   }
 
   TT::BufSizeT node_n;
