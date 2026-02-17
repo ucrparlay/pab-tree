@@ -21,7 +21,10 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
 {
   auto TL = static_cast<Leaf*>(T);
   if constexpr (sorted) {
-    std::sort(TL->elements.begin(), TL->elements.begin() + TL->size);
+    if (!TL->is_sorted) {
+      std::sort(TL->elements.begin(), TL->elements.begin() + TL->size);
+      TL->is_sorted = true;
+    }
   }
   assert(Out.size() >= TL->size);
   for (BufSizeT i = 0; i < TL->size; i++) {
@@ -47,6 +50,7 @@ BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In)
     TL->elements[TL->size + i] = In[i];
   }
   TL->size += In.size();
+  TL->is_sorted = false;
 
   TL->UpdateAug(TL->elements.cut(0, TL->size));
   return T;
@@ -108,6 +112,7 @@ BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
          std::cmp_equal(std::distance(TL->elements.begin(), end),
                         TL->size - In.size()));
   TL->size = std::distance(TL->elements.begin(), end);
+  TL->is_sorted = false;
   assert(TL->size >= 0);
   TL->UpdateAug(TL->elements.cut(0, TL->size));
   return delete_cnt;

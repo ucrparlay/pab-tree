@@ -16,6 +16,7 @@
 #include "basic_point.h"
 #include "comparator.h"
 #include "concepts.h"
+#include "dependence/binary_search.h"
 #include "parlay/utilities.h"
 
 namespace pmos {
@@ -53,12 +54,14 @@ struct LeafNode : TypeTrait::Node
   // NOTE: default allocator
   LeafNode()
     : Node{ true, static_cast<size_t>(0) }
+    , is_sorted{ true }
     , aug(AT())
   {
   }
 
   LeafNode(AT const& _aug)
     : Node{ true, static_cast<size_t>(0) }
+    , is_sorted{ true }
     , aug(_aug)
   {
   }
@@ -68,9 +71,12 @@ struct LeafNode : TypeTrait::Node
   LeafNode(Range In, AllocNormalLeafTag)
     : Node{ true, static_cast<size_t>(In.size()) }
     , elements(EntrySeq::uninitialized(TT::kBufUB))
+    , is_sorted{ true }
     , aug(AT(In))
   {
     assert(In.size() <= TT::kBufUB);
+    assert(parlay::is_sorted(
+      In, [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b); }));
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
       parlay::assign_dispatch(elements[i++], x, EleAssignTag());
     });
@@ -81,9 +87,12 @@ struct LeafNode : TypeTrait::Node
   LeafNode(Range In, size_t const alloc_size, AllocNormalLeafTag)
     : Node{ true, static_cast<size_t>(In.size()) }
     , elements(EntrySeq::uninitialized(alloc_size))
+    , is_sorted{ true }
     , aug(AT(In))
   {
     assert(In.size() <= alloc_size);
+    assert(parlay::is_sorted(
+      In, [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b); }));
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
       parlay::assign_dispatch(elements[i++], x, EleAssignTag());
     });
@@ -96,11 +105,46 @@ struct LeafNode : TypeTrait::Node
 
   bool Contain(K const k) const
   {
-    return std::ranges::find_if(this->elements.begin(),
-                                this->elements.begin() + this->size,
-                                [&](E const e) {
-                                  return Entry::GetKey(e) == k;
-                                }) != this->elements.begin() + this->size;
+
+    // if (this->is_sorted) {
+    //   auto idx = parlay::internal::binary_search(
+    //     parlay::make_slice(this->elements.begin(),
+    //                        this->elements.begin() + this->size),
+    //     [k](E const e) { return Entry::GetKey(e) < k; });
+    //   return idx < this->size && (Entry::GetKey(this->elements[idx]) == k);
+    // } else {
+    //   return std::ranges::find_if(this->elements.begin(),
+    //                               this->elements.begin() + this->size,
+    //                               [&](E const e) {
+    //                                 return Entry::GetKey(e) == k;
+    //                               }) != this->elements.begin() + this->size;
+    // }
+
+    return this->is_sorted
+             ? ([&] {
+                 auto idx = pmos::BinarySearch<8>(
+                   parlay::make_slice(this->elements.begin(),
+                                      this->elements.begin() + this->size),
+                   [k](E const e) { return Entry::GetKey(e) < k; });
+                 return idx < this->size &&
+                        (Entry::GetKey(this->elements[idx]) == k);
+               })()
+             : (std::ranges::find_if(this->elements.begin(),
+                                     this->elements.begin() + this->size,
+                                     [&](E const e) {
+                                       return Entry::GetKey(e) == k;
+                                     }) != this->elements.begin() + this->size);
+    // return this->is_sorted
+    //          ? parlay::internal::binary_search(
+    //              parlay::make_slice(this->elements.begin(),
+    //                                 this->elements.begin() + this->size),
+    //              [k](E const e) { return Entry::GetKey(e) < k; }) <
+    //              this->size
+    //          : std::ranges::find_if(
+    //              this->elements.begin(),
+    //              this->elements.begin() + this->size,
+    //              [&](E const e) { return Entry::GetKey(e) == k; }) !=
+    //              this->elements.begin() + this->size;
   }
 
   EntrySeq GetEle() const
@@ -142,6 +186,7 @@ struct LeafNode : TypeTrait::Node
 
   EntrySeq elements;
   AT aug;
+  bool is_sorted;
 };
 
 // template <typename NodeType, typename Range>
