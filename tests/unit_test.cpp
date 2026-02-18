@@ -81,12 +81,14 @@ protected:
 #endif                                // !  #ifndef MAC
   static constexpr int kTag = 0b0011; // 2#0001
   static constexpr double kBatchRatio = 0.01;
-  static constexpr int kQueryType = 0b001; // 2#001
+  static constexpr int kQueryType = 0b011; // 2#001
+  static constexpr int kRangeQueryType = 3;
+  static constexpr int kRangeQueryNum = 1000;
   static constexpr int kTreeType = 0;
   static constexpr int kDim = 1;
   static constexpr int kRounds = 2;
   static constexpr int kSummary = 0;
-  static constexpr double kBatchQueryRatio = 0.1;
+  static constexpr double kMembershipQueryRatio = 0.1;
 
   std::vector<size_t> nodes{ 1000000, 5000000, 10000000, 50000000 };
   std::vector<std::string> distributions{ "uni", "exp", "norm", "dual_norm" };
@@ -149,7 +151,7 @@ protected:
 
     if (opts.query_type & (1 << 0)) {
       // this part needs to correct for all parts
-      auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+      auto batch_size = static_cast<size_t>(wp.size() * kMembershipQueryRatio);
       auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), false);
       Membership<TT>(tree, query_ele, opts.rounds, res);
@@ -159,6 +161,12 @@ protected:
         auto res = parlay::sequence<bool>(query_ele.size(), true);
         Membership<TT>(tree, query_ele, opts.rounds, res);
         assert(parlay::all_of(res, [&](auto r) { return r == false; }));
+      }
+    }
+
+    if (opts.query_type & (1 << 1)) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        RangeQuery<TT>(new_wp, tree, kRounds, kRangeQueryNum, rec_type);
       }
     }
 

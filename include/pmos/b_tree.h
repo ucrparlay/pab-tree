@@ -618,7 +618,7 @@ public:
 
   template<typename Range>
   auto RangeReport(TT::Box query_box, Range&& out) const
-    -> std::pair<bool, RangeReportLogger>;
+    -> std::pair<SizeT, RangeReportLogger>;
 
   template<typename Range>
   BufSizeT RangeReportLeaf(Node const* T, TT::Box query_box, Range out) const;
@@ -696,6 +696,7 @@ private:
 #include "b_tree_impl/box_op.hpp"
 #include "b_tree_impl/points_op.hpp"
 #include "b_tree_impl/query_op/membership.hpp"
+#include "b_tree_impl/query_op/range_report.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
 #include "b_tree_impl/tree_op/leaf_op.hpp"
 #include "b_tree_impl/tree_op/node_op.hpp"

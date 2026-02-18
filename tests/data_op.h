@@ -158,7 +158,7 @@ SupplySample(Seq const& current_seq, size_t extra_n, size_t l, size_t r)
   auto sorted_seq = parlay::sort(current_seq);
   while (selected_set.size() < extra_n) {
     // std::cout << selected_set.size() << "/" << extra_n << "\n" << std::flush;
-    size_t idx = get_random_index(l, r, 0);
+    size_t idx = GetRandomIndex(l, r, 0);
     if (*std::lower_bound(sorted_seq.begin(), sorted_seq.end(), idx) != idx &&
         selected_set.find(idx) == selected_set.end()) {
       selected_set.insert(idx);

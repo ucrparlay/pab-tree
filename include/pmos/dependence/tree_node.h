@@ -327,16 +327,25 @@ struct MultiWayNode : TypeTrait::Node
     return parlay::make_slice(split.begin(), split.begin() + GetSplitN());
   }
 
-  TT::BufSizeT GetNodeIdContainingKey(TT::Key const k) const
+  TT::BufSizeT GetNodeIdContainingKey(TT::K const k) const
   {
     // return the first id s.t. split[id] > k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
     // if split[1] > k && split[0] <= k, then k belongs to tree_nodes[1]
     return pmos::BinarySearch<8>(this->GetSplitSlice(),
-                                 [&](TT::Key const key) { return key <= k; });
+                                 [&](TT::K const key) { return key <= k; });
   }
 
-  bool ValidateKeyInNode(TT::BufSizeT node_idx, TT::Key const k) const
+  TT::BufSizeT GetNodeIdContainingKeyExclusive(TT::K const k) const
+  {
+    // return the first id s.t. split[id] > k
+    // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
+    // if split[1] > k && split[0] <= k, then k belongs to tree_nodes[1]
+    return pmos::BinarySearch<8>(this->GetSplitSlice(),
+                                 [&](TT::K const key) { return key < k; });
+  }
+
+  bool ValidateKeyInNode(TT::BufSizeT node_idx, TT::K const k) const
   {
     return node_idx == 0 ? k < this->split.front()
                          : (node_idx == this->GetSplitN()

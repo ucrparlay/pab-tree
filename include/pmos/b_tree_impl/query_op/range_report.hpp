@@ -10,7 +10,7 @@ template<typename TT>
 template<typename Range>
 auto
 BTree<TT>::RangeReport(TT::Box const query_box, Range&& out) const
-  -> std::pair<bool, RangeReportLogger>
+  -> std::pair<SizeT, RangeReportLogger>
 {
   RangeReportLogger logger;
   return { RangeReportRec(this->root_, query_box, std::forward<Range>(out)),
@@ -25,7 +25,7 @@ BTree<TT>::RangeReportLeaf(Node const* T, TT::Box query_box, Range out) const
   auto TL = static_cast<Leaf const*>(T);
   if (TL->is_sorted) {
     auto l = TL->BinarySearchKey(query_box.first);
-    auto r = TL->BinarySearchKeyExclusive(query_box.second);
+    auto r = TL->BinarySearchKey(query_box.second);
     assert(l <= r);
     assert(r <= TL->size);
     for (BufSizeT i = l; i < r; i++) {
@@ -57,7 +57,8 @@ BTree<TT>::RangeReportRec(Node const* T,
 
   auto const* TI = static_cast<Interior const*>(T);
   auto l = TI->GetNodeIdContainingKey(query_box.first);
-  auto r = TI->GetNodeIdContainingKey(query_box.second);
+  // BUG: double check the left close and right open
+  auto r = TI->GetNodeIdContainingKeyExclusive(query_box.second);
 
   assert(l < TI->GetNodeN());
   assert(r < TI->GetNodeN());
