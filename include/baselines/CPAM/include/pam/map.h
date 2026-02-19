@@ -413,9 +413,12 @@ public:
     };
 
     using BD = build<e_type>;
+    timer t("MD", false);
     parlay::sequence<K> A = BD::sort_remove_duplicates(SS);
+    t.next("sort time");
 
     auto x = M(Tree::multi_delete_sorted(m.get_root(), A.data(), A.size()));
+    t.next("MD time");
     return x;
   }
 

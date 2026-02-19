@@ -1062,6 +1062,7 @@ static auto constexpr DefaultTestFunc =
         parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
         // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
         for (auto ratio : ratio_seq) {
+          // puts("------------------------------");
           auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
           auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);

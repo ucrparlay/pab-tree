@@ -429,7 +429,8 @@ public:
   template<class Seq>
   static M multi_delete(M m, Seq const& SS)
   {
-    timer t("MI", false);
+    // timer t("MD", false);
+    timer t("MD", false);
     using EE = typename Seq::value_type;
     struct e_type
     {
@@ -453,9 +454,9 @@ public:
     using BD = build<e_type>;
     parlay::sequence<K> A = BD::sort_remove_duplicates(SS);
     // auto A = parlay::sort(SS);
-    t.next("build time");
+    t.next("sort time");
     auto x = M(Tree::multi_delete_sorted(m.get_root(), A.data(), A.size()));
-    t.next("MI time");
+    t.next("MD time");
     return x;
   }
 

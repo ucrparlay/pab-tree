@@ -354,6 +354,9 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
       if (reinsert_flag && has_tomb) {
         TI->size -= total_remove_entries_n;
+        // parlay::write_max(&this->max_reinsert_batch_size,
+        //                   reinsert_entries.size(),
+        //                   std::less<size_t>());
         BatchInsert_(parlay::make_slice(reinsert_entries), true);
       } else { // the subtrees may perform reinsertion
         TI->size = std::accumulate(
