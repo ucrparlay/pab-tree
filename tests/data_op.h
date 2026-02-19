@@ -158,7 +158,7 @@ SupplySample(Seq const& current_seq, size_t extra_n, size_t l, size_t r)
   auto sorted_seq = parlay::sort(current_seq);
   while (selected_set.size() < extra_n) {
     // std::cout << selected_set.size() << "/" << extra_n << "\n" << std::flush;
-    size_t idx = GetRandomIndex(l, r);
+    size_t idx = GetRandomIndex(l, r, 0);
     if (*std::lower_bound(sorted_seq.begin(), sorted_seq.end(), idx) != idx &&
         selected_set.find(idx) == selected_set.end()) {
       selected_set.insert(idx);
@@ -321,6 +321,9 @@ public:
   static std::pair<parlay::sequence<size_t>, parlay::sequence<size_t>>
   Discreatize(auto const& base_ran_seq, auto const& batch_ran_seq, int batch_op)
   {
+    // the first element is the random number
+    // the second element is the flag for base or batch
+    // the third is the numbered id
     auto base_flag_seq = parlay::map(base_ran_seq, [&](double x) {
       return std::make_tuple(x, bool(0), size_t(0));
     });
@@ -328,12 +331,14 @@ public:
       return std::make_tuple(x, bool(1), size_t(0));
     });
 
+    // append both seq and sort
     auto ground_seq =
       parlay::sort(parlay::append(base_flag_seq, batch_flag_seq),
                    [&](auto const& a, auto const& b) {
                      return std::get<0>(a) < std::get<0>(b);
                    });
 
+    // assign id to the sorted sequence
     parlay::parallel_for(
       0, ground_seq.size(), [&](size_t i) { std::get<2>(ground_seq[i]) = i; });
 
