@@ -19,7 +19,8 @@ mkdir -p "${log_path}"
 
 data_prefix="/data/zmen002/kv_pair"
 batch_op_seq=("ins")
-dis_seq=("uni" "exp" "norm" "dual_norm")
+# dis_seq=("uni" "exp" "norm" "dual_norm")
+dis_seq=("dual_norm")
 batch_ratio=0.01
 
 function run_test() {
@@ -52,7 +53,7 @@ function run_test() {
 }
 
 function run_cmake() {
-	/usr/bin/drop_caches
+	# /usr/bin/drop_caches
 	local leaf_idx="$1"
 	local solver="$2"
 
