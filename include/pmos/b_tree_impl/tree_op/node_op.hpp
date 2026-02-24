@@ -43,6 +43,7 @@ template<typename OutputHandler>
 TT::SizeT
 BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
                                  TT::SplitSlice key_in,
+                                 TT::HeightT cur_height,
                                  OutputHandler&& output_handler)
 {
   SizeT item_n = node_in.size();
@@ -62,8 +63,8 @@ BTree<TT>::GenerateInteriorNodes(TT::NodeSlice node_in,
 
     output_handler.set_node(
       i,
-      AllocInteriorNode<Interior, TT>(node_in.cut(node_l, node_r),
-                                      key_in.cut(key_l, key_r)));
+      AllocInteriorNode<Interior, TT>(
+        node_in.cut(node_l, node_r), key_in.cut(key_l, key_r), cur_height));
   });
   return bkt_n;
 }
@@ -131,7 +132,9 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
     if (TI->GetNodeN() == 1) {
       continue;
     }
+    auto node = TI->tree_nodes[i];
     auto box = GetNodeBoxRec(TI->tree_nodes[i]);
+    assert(node->is_leaf || box == GetNodeBox(node));
     if (i == 0) {
       assert(box.second < TI->split[0]);
     } else if (i == TI->GetNodeN() - 1) {
@@ -200,10 +203,12 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
                            [&](TT::K a, TT::K b) { return a < b; }));
 
   // launch rebuild
+  auto cur_height = TI->height;
   FreeNode<Interior>(T);
   [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
     parlay::make_slice(flatten_node_seq),
     parlay::make_slice(flatten_split_seq),
+    cur_height,
     GenNodesOutputHandler{
       .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
       .set_node = [&](SizeT i,

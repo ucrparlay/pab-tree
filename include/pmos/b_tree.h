@@ -139,30 +139,36 @@ public:
     using BaseNode = MultiWayNode<TT>;
 
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
-                      TT::SplitSeq const& _split)
+                      TT::SplitSeq const& _split,
+                      TT::HeightT _height)
       : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
       , valid(true)
       , invalid_subtree_num(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
+      , height(_height)
     {
     } // TODO:finish AT
 
     BTreeInteriorNode(TT::NodeSlice _tree_nodes_slice,
-                      TT::SplitSlice _split_slice)
+                      TT::SplitSlice _split_slice,
+                      TT::HeightT _height)
       : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
       , valid(true)
       , invalid_subtree_num(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
+      , height(_height)
     {
     } // TODO:finish AT
 
     BTreeInteriorNode(TT::NodeSeq const& _tree_nodes,
                       TT::SplitSeq const& _split,
+                      TT::HeightT _height,
                       TT::InteriorAug const& _aug)
       : BaseNode(_tree_nodes, _split, _aug)
       , valid(true)
       , invalid_subtree_num(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
+      , height(_height)
     {
     }
 
@@ -195,6 +201,7 @@ public:
     SizeT invalid_subtree_num;
     SizeT reinsert_size;
     TT::Box box;
+    TT::HeightT height;
   };
 
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
@@ -327,6 +334,7 @@ public:
   template<typename OutputHandler>
   static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
                                      TT::SplitSlice key_in,
+                                     TT::HeightT cur_height,
                                      OutputHandler&& output_handler);
   // NOTE: batch insert
   static Node* InsertPoints2Leaf(Node* T, EntrySlice In);
@@ -410,8 +418,7 @@ public:
 
   bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice);
 
-  template<typename Leaf, typename Interior>
-  int CheckHeight(Node const* T);
+  TT::HeightT CheckHeight(Node const* T, TT::HeightT cur_height);
 
   bool CheckContainNode(Node const* T, Node const* P);
 

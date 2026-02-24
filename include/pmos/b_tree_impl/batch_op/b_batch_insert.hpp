@@ -49,6 +49,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
   }
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
+  auto cur_height =
+    this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
   SizeT new_node_n = BatchInsertRecursive(
     this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
@@ -57,8 +59,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
       new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
     auto updated_split_seq = parlay::tabulate(
       new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
-    this->root_ =
-      AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
+    this->root_ = AllocInteriorNode<Interior, TT>(
+      updated_node_seq, updated_split_seq, cur_height + 1);
   }
 }
 

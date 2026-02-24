@@ -104,6 +104,7 @@ public:
   static uint const kBufMDFac = 2;
   static uint const kBufUBFac = 4;
 
+  using HeightT = uint_fast8_t;
   using SizeT = uint_fast32_t;
   using BufSizeT =
     std::conditional_t<(kBufferSize * kBufUBFac > 65535U),
