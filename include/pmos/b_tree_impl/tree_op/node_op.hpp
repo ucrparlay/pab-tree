@@ -123,6 +123,7 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
   TI->split = std::move(new_splits);
   TI->size = tot_entry_sz;
   TI->node_n = new_node_n;
+  TI->box = GetNodeSliceBox(TI->GetNodeSlice());
 
 #ifdef DEBUG
   for (int i = 0; i < TI->GetNodeN(); i++) {
@@ -130,7 +131,7 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
     if (TI->GetNodeN() == 1) {
       continue;
     }
-    auto box = GetBox(TI->tree_nodes[i]);
+    auto box = GetNodeBoxRec(TI->tree_nodes[i]);
     if (i == 0) {
       assert(box.second < TI->split[0]);
     } else if (i == TI->GetNodeN() - 1) {
@@ -237,6 +238,7 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
   TI->size = tot_entry_sz;
   TI->valid = T != this->root_ ? (TI->GetNodeN() - invalid_tree_n) >= TT::kBufLB
                                : (TI->GetNodeN() - invalid_tree_n) > 0;
+  TI->box = GetNodeSliceBox(TI->GetNodeSlice());
   TI->invalid_subtree_num = TI->valid ? tot_invalid_subtree_n : 1;
   TI->reinsert_size = TI->valid ? reinsert_entries_n : TI->size;
   return std::make_tuple(
@@ -352,6 +354,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
         return VerifyUnoverlappedTree(node, flatten_node_slice);
       }));
 
+      TI->box = GetNodeSliceBox(TI->GetNodeSlice());
       if (reinsert_flag && has_tomb) {
         TI->size -= total_remove_entries_n;
         // parlay::write_max(&this->max_reinsert_batch_size,
@@ -375,7 +378,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
         if (TI->GetNodeN() == 1) {
           continue;
         }
-        auto box = GetBox(TI->tree_nodes[i]);
+        auto box = GetNodeBoxRec(TI->tree_nodes[i]);
         if (i == 0) {
           assert(box.second < TI->split[0]);
         } else if (i == TI->GetNodeN() - 1) {

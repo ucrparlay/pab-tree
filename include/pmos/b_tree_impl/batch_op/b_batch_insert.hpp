@@ -44,10 +44,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
 
   EntrySlice sorted_slice = In;
   if (!sorted) {
-    // parlay::internal::timer t("BatchInsert_Sort");
     auto sorted_seq = parlay::sort(In);
     sorted_slice = parlay::make_slice(sorted_seq);
-    // t.next("Sorted");
   }
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
@@ -139,15 +137,20 @@ BTree<TT>::BatchInsertRecursive(Node* T,
     // In.size() > 2048 ? 1 : cnt);
     1);
 
+  // compute the number of new nodes
   SizeT new_node_n = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     new_node_n += new_split_node_n_arr[i] == 0 ? 1 : new_split_node_n_arr[i];
   }
+
+  // the interior node can be updated without split
   if (new_node_n <= TT::kBufUB) {
     [[maybe_unused]] Node* new_inter_node = BatchInsertUpdateInterior(
       T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
     return 0;
   }
+
+  // handle interior node split overflow
   return HandlingInteriorSplitOverflow(
     T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
 }

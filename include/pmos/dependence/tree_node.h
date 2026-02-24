@@ -17,6 +17,7 @@
 #include "comparator.h"
 #include "concepts.h"
 #include "dependence/binary_search.h"
+#include "dependence/box_op.h"
 #include "parlay/utilities.h"
 
 namespace pmos {
@@ -141,6 +142,27 @@ struct LeafNode : TypeTrait::Node
   EntrySeq GetEle() const
   {
     return elements.substr(0, this->size);
+  }
+
+  auto GetEleBeginIter() const
+  {
+    return this->elements.begin();
+  }
+
+  auto GetEleRbeginIter() const
+  {
+    return this->elements.begin() + this->size - 1;
+  }
+
+  auto GetEleEndIter() const
+  {
+    return this->elements.begin() + this->size;
+  }
+
+  TT::EntrySlice GetEleSlice() const
+  {
+    return parlay::make_slice(this->elements.begin(),
+                              this->elements.begin() + this->size);
   }
 
   EntrySeq const& GetEleContainer() const
@@ -279,6 +301,7 @@ struct MultiWayNode : TypeTrait::Node
     for (BufSizeT i = 0; i < _split.size(); i++) {
       split[i] = _split[i];
     }
+    assert(this->GetNodeN() == _tree_nodes.size());
   }
 
   MultiWayNode(TT::NodeSlice _tree_nodes_slice,

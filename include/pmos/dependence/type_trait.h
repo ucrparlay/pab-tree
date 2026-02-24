@@ -72,6 +72,7 @@ public:
   using Node = NodeType;
   using NodeSeq = parlay::sequence<Node*>;
   using NodeSlice = parlay::slice<Node**, Node**>;
+  using ConstNodeSlice = parlay::slice<Node* const*, Node* const*>;
 };
 
 template<typename EleType,

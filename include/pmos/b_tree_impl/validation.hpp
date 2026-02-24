@@ -23,7 +23,7 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
            }));
     assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
                                 TL->GetEle().size() <= TT::kBufUB));
-    return GetBox(TL->GetEle());
+    return pmos::GetBox<TT>(TL->GetEle());
   }
 
   auto const* TI = static_cast<Interior const*>(T);
@@ -40,33 +40,28 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
   parlay::sequence<typename TT::Box> box_seq(TI->GetNodeN());
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
     box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
+    auto node = TI->tree_nodes[i];
+    auto box = box_seq[i];
+    assert(node->is_leaf || static_cast<Interior*>(node)->box == box);
+
     if (i == 0) {
-      if (box_seq[i].second >= TI->split[0]) {
-        std::cout << "Validation failed at first node split check."
-                  << std::endl;
-        std::cout << "Box: [" << box_seq[i].first << ", " << box_seq[i].second
-                  << "], Split: " << TI->split[0] << std::endl;
-        assert(false);
-      }
-      assert(box_seq[i].second < TI->split[0]);
+      assert(box.second < TI->split[0]);
     } else if (i == TI->GetNodeN() - 1) {
-      assert(box_seq[i].first >= TI->split[i - 1]);
+      assert(box.first >= TI->split[i - 1]);
     } else {
-      if (box_seq[i].first < TI->split[i - 1] ||
-          box_seq[i].second >= TI->split[i]) {
+      if (box.first < TI->split[i - 1] || box.second >= TI->split[i]) {
         std::cout << "Validation failed at interior node split check."
                   << std::endl;
-        std::cout << "Box: [" << box_seq[i].first << ", " << box_seq[i].second
+        std::cout << "Box: [" << box.first << ", " << box.second
                   << "], Splits: [" << TI->split[i - 1] << ", " << TI->split[i]
                   << "]" << std::endl;
         assert(false);
       }
-      assert(box_seq[i].first >= TI->split[i - 1] &&
-             box_seq[i].second < TI->split[i]);
+      assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
     }
   });
 
-  return GetBox(box_seq);
+  return pmos::GetBox<TT>(box_seq);
 }
 
 template<typename TT>
