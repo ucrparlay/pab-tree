@@ -134,6 +134,10 @@ public:
 
   using BucketSeq = parlay::sequence<BucketType>;
   using BallSeq = parlay::sequence<SizeT>;
+
+  using NodeHeightPair = std::pair<typename BT::Node*, HeightT>;
+  using NodeHeightPairSeq = parlay::sequence<NodeHeightPair>;
+  using NodeHeightPairSlice = parlay::slice<NodeHeightPair*, NodeHeightPair*>;
 };
 
 } // namespace pmos

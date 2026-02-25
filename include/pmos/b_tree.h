@@ -143,7 +143,9 @@ public:
                       TT::HeightT _height)
       : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
       , valid(true)
-      , invalid_subtree_num(0)
+      , has_invalid_subtree(false)
+      , valid_subtree_num(1) // itself is always valid
+      , reinsert_size(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
       , height(_height)
     {
@@ -154,7 +156,9 @@ public:
                       TT::HeightT _height)
       : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
       , valid(true)
-      , invalid_subtree_num(0)
+      , has_invalid_subtree(false)
+      , valid_subtree_num(1)
+      , reinsert_size(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
       , height(_height)
     {
@@ -166,7 +170,9 @@ public:
                       TT::InteriorAug const& _aug)
       : BaseNode(_tree_nodes, _split, _aug)
       , valid(true)
-      , invalid_subtree_num(0)
+      , has_invalid_subtree(false)
+      , valid_subtree_num(1)
+      , reinsert_size(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
       , height(_height)
     {
@@ -198,8 +204,11 @@ public:
     }
 
     bool valid;
-    SizeT invalid_subtree_num;
+    bool has_invalid_subtree; // subtree or itself is invalid
+    SizeT valid_subtree_num;  // if iteself is valid then 1, otherwise should be
+                              // the number of valid subtrees
     SizeT reinsert_size;
+
     TT::Box box;
     TT::HeightT height;
   };
@@ -224,16 +233,23 @@ public:
   };
 
   // PARA: return whether a node is invalid
-  static bool GetNodeInvalidStatus(Node* T)
+
+  static bool NodeIsValid(Node* T)
   {
-    return T->is_leaf ? (T->size < TT::kBufLB)
-                      : (!static_cast<Interior*>(T)->valid);
+    return T->is_leaf ? (T->size >= TT::kBufLB)
+                      : static_cast<Interior*>(T)->valid;
   }
 
-  static SizeT GetNodeInvalidSubtreeNum(Node* T)
+  static SizeT GetNodeValidSubtreeNum(Node* T)
+  {
+    return T->is_leaf ? (T->size < TT::kBufLB ? 0 : 1)
+                      : static_cast<Interior*>(T)->valid_subtree_num;
+  }
+
+  static bool NodeHasInvalidSubtree(Node* T)
   {
     return T->is_leaf ? (T->size < TT::kBufLB ? 1 : 0)
-                      : static_cast<Interior*>(T)->invalid_subtree_num;
+                      : static_cast<Interior*>(T)->has_invalid_subtree;
   }
 
   static SizeT GetNodeReinsertSize(Node* T)
@@ -271,10 +287,13 @@ public:
 
   void BatchDelete_(TT::KeySlice In);
 
-  // PARA: return whether T is valid, invalid subtree num, and total # of
-  // entries needs to be reinserted
+  // PARA: return whether T is invalid,
+  // whether contain invalid subtree,
+  // valid subtree num,
+  // total # of leaf entries needs to be reinserted
   // Only needs to ensure the tree size is correct
-  std::tuple<bool, SizeT, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
+  std::tuple<bool, bool, SizeT, SizeT> BatchDeleteRecursive(Node* T,
+                                                            TT::KeySlice In);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
@@ -283,9 +302,13 @@ public:
   SizeT FetchInvalidSubtreeNodes(Node* T,
                                  typename TT::NodeSlice flatten_node_slice,
                                  EntrySlice reinsert_entries,
-                                 bool has_tomb
+                                 bool has_tomb);
 
-  );
+  void FetchValidSubtreeAndInvalidLeaves(
+    Node* T,
+    TT::NodeHeightPairSlice reinsert_subtrees,
+    EntrySlice reinsert_entries,
+    bool has_tomb);
 
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
@@ -305,10 +328,11 @@ public:
                                          SizeT new_node_n,
                                          SizeBufUBArr const& return_node_n_arr);
 
-  std::tuple<bool, SizeT, SizeT> BatchDeleteUpdateInteriorSize(
+  std::tuple<bool, bool, SizeT, SizeT> BatchDeleteUpdateInteriorSize(
     Node* T,
-    SizeBufUBArr const& invalid_subtree_num_arr,
-    BooleanBufUBArr const& invalid_subtree_flag_arr,
+    BooleanBufUBArr const& subtree_is_invalid_arr,
+    SizeBufUBArr const& valid_subtree_num_arr,
+    BooleanBufUBArr const& subtree_has_invalid_arr,
     SizeBufUBArr const& reinsert_entries_num_arr);
 
   // PARA: return bucket_num
