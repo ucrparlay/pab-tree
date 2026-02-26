@@ -2,6 +2,7 @@
 #define PMOS_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
 
 #include "../../b_tree.h"
+#include "dependence/binary_search.h"
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
@@ -65,23 +66,38 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     // std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
 
     auto flatten_node_seq =
-      TT::NodeHeightPairSeq::uninitialized(valid_subtree_num);
+      parlay::sequence<InteriorNodesWrapper>::uninitialized(valid_subtree_num);
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
     FetchValidSubtreeAndInvalidLeaves(this->root_,
                                       parlay::make_slice(flatten_node_seq),
                                       parlay::make_slice(reinsert_entries),
                                       true);
-    auto node_by_height = parlay::sort(
-      parlay::make_slice(flatten_node_seq),
-      [](TT::NodeHeightPair a, TT::NodeHeightPair b) {
-        auto box_a = GetNodeBox(a.first);
-        auto box_b = GetNodeBox(b.first);
-        auto box_mid_a = GetBoxMid<TT>(box_a);
-        auto box_mid_b = GetBoxMid<TT>(box_b);
-        return a.second < b.second ||
-               (a.second == b.second && box_a.second < box_b.first &&
-                box_mid_a < box_mid_b);
-      });
+    auto sorted_node = parlay::sort(parlay::make_slice(flatten_node_seq));
+    auto node_split_seq = NodeSplitPairSeq::uninitialized(sorted_node.size());
+
+    SizeT st = 0;
+    SizeT ed = 0;
+    auto height = sorted_node.front().height;
+    while (height) {
+      ed = pmos::BinarySearch<16>(
+        parlay::make_slice(sorted_node),
+        [&](auto const wrapper) { return wrapper.height >= height; });
+      auto len = ed - st;
+      auto new_node_n = BatchInsertNodesRecursive(this->root_,
+                                                  sorted_node.cut(st, ed),
+                                                  node_split_seq.cut(st, ed),
+                                                  height);
+
+      assert(new_node_n == 0);
+      height--;
+      st = ed;
+    }
+
+    assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
+      return Entry::GetKey(a) < Entry::GetKey(b);
+    }));
+    BatchInsert_(parlay::make_slice(reinsert_entries), true);
+
     // t.next("FetchInvalidSubtreeNodes");
     // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
     //   SizeT sum = 0;

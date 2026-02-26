@@ -216,6 +216,24 @@ public:
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
   using Interior = BTreeInteriorNode;
 
+  // for batch delete
+  struct InteriorNodesWrapper
+  {
+    Node* node;
+    TT::HeightT height;
+    TT::K box_mid;
+
+    bool operator<(InteriorNodesWrapper const& other) const
+    {
+      return this->height == other.height ? this->box_mid > other.box_mid
+                                          : this->height < other.height;
+    }
+  };
+
+  using InteriorWrapperSeq = parlay::sequence<InteriorNodesWrapper>;
+  using InteriorWrapperSlice =
+    parlay::slice<InteriorNodesWrapper*, InteriorNodesWrapper*>;
+
   // NOTE: helper function to decide the bucket number and range
   static SizeT GetBktNum(SizeT const item_n)
   {
@@ -278,7 +296,7 @@ public:
                              NodeSplitPairSlice node_split_slice);
 
   SizeT BatchInsertNodesRecursive(Node* T,
-                                  TT::NodeHeightPairSlice In,
+                                  InteriorWrapperSlice In,
                                   NodeSplitPairSlice node_split_slice,
                                   TT::HeightT dest_height);
 
@@ -309,11 +327,10 @@ public:
                                  EntrySlice reinsert_entries,
                                  bool has_tomb);
 
-  void FetchValidSubtreeAndInvalidLeaves(
-    Node* T,
-    TT::NodeHeightPairSlice reinsert_subtrees,
-    EntrySlice reinsert_entries,
-    bool has_tomb);
+  void FetchValidSubtreeAndInvalidLeaves(Node* T,
+                                         InteriorWrapperSlice reinsert_subtrees,
+                                         EntrySlice reinsert_entries,
+                                         bool has_tomb);
 
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 

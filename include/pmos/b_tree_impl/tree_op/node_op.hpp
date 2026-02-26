@@ -261,14 +261,15 @@ template<typename TT>
 void
 BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
   Node* T,
-  TT::NodeHeightPairSlice reinsert_subtrees,
+  InteriorWrapperSlice reinsert_subtrees,
   EntrySlice reinsert_entries,
   const bool has_tomb)
 {
   if (T->is_leaf) {
     if (NodeIsValid(T)) {
       assert(reinsert_subtrees.size() == 1);
-      reinsert_subtrees[0] = typename TT::NodeHeightPair(T, 1);
+      auto box = GetNodeBox(T);
+      reinsert_subtrees[0] = InteriorNodesWrapper{ T, 1, GetBoxMid<TT>(box) };
     } else {
       assert(reinsert_entries.size() == T->size);
       ExtractPointsInLeaf<EntrySlice, true>(T, reinsert_entries);
@@ -328,7 +329,9 @@ BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
   if (TI->valid && !NodeHasInvalidSubtree(T)) { // T is a fully valid subtree
     // TODO: maybe we can pass the height rather than store it
     assert(reinsert_subtrees.size() == 1);
-    reinsert_subtrees[0] = typename TT::NodeHeightPair(T, TI->height);
+    auto box = GetNodeBox(T);
+    reinsert_subtrees[0] =
+      InteriorNodesWrapper{ T, TI->height, GetBoxMid<TT>(box) };
     return;
   }
 
