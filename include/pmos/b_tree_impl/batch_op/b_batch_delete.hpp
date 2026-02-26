@@ -71,11 +71,17 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
                                       parlay::make_slice(flatten_node_seq),
                                       parlay::make_slice(reinsert_entries),
                                       true);
-    auto node_by_height =
-      parlay::sort(parlay::make_slice(flatten_node_seq),
-                   [](TT::NodeHeightPair a, TT::NodeHeightPair b) {
-                     return a.second < b.second;
-                   });
+    auto node_by_height = parlay::sort(
+      parlay::make_slice(flatten_node_seq),
+      [](TT::NodeHeightPair a, TT::NodeHeightPair b) {
+        auto box_a = GetNodeBox(a.first);
+        auto box_b = GetNodeBox(b.first);
+        auto box_mid_a = GetBoxMid<TT>(box_a);
+        auto box_mid_b = GetBoxMid<TT>(box_b);
+        return a.second < b.second ||
+               (a.second == b.second && box_a.second < box_b.first &&
+                box_mid_a < box_mid_b);
+      });
     // t.next("FetchInvalidSubtreeNodes");
     // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
     //   SizeT sum = 0;

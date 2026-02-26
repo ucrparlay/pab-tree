@@ -4,6 +4,7 @@
 #include <numeric>
 
 #include "../../b_tree.h"
+#include "dependence/box_op.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "parlay/slice.h"
@@ -64,6 +65,9 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
   }
 }
 
+// return the total number of nodes generated after the insertion
+// If the cur node is not overflow, return 0;
+// otherwise, return the number of nodes after the split
 template<typename TT>
 TT::SizeT
 BTree<TT>::BatchInsertRecursive(Node* T,
@@ -111,6 +115,174 @@ BTree<TT>::BatchInsertRecursive(Node* T,
                                    Entry::GetKey(e) < TI->split[i];
                           }));
   }
+#endif // DEBUG
+
+  SizeBufUBArr new_split_node_n_arr;
+  BufSizeBufUBArr nodes_map;
+  BufSizeT cnt = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
+    SizeT r = (i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]);
+    if (l != r) {
+      nodes_map[cnt++] = i;
+    } else {
+      new_split_node_n_arr[i] = 0; // i-th child remains the same
+    }
+  }
+
+  parlay::parallel_for(
+    0,
+    cnt,
+    [&](BufSizeT i) {
+      SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+      SizeT r =
+        nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
+      new_split_node_n_arr[nodes_map[i]] = BatchInsertRecursive(
+        TI->tree_nodes[nodes_map[i]], In.cut(l, r), node_split_slice.cut(l, r));
+    },
+    // In.size() > 2048 ? 1 : cnt);
+    1);
+
+  // compute the number of new nodes
+  SizeT new_node_n = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    new_node_n += new_split_node_n_arr[i] == 0 ? 1 : new_split_node_n_arr[i];
+  }
+
+  // the interior node can be updated without split
+  if (new_node_n <= TT::kBufUB) {
+    [[maybe_unused]] Node* new_inter_node = BatchInsertUpdateInterior(
+      T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
+    return 0;
+  }
+
+  // handle interior node split overflow
+  return HandlingInteriorSplitOverflow(
+    T, node_split_slice, split_pos_seq, new_node_n, new_split_node_n_arr);
+}
+
+template<typename TT>
+TT::SizeT
+BTree<TT>::BatchInsertNodesRecursive(Node* T,
+                                     TT::NodeHeightPairSlice In,
+                                     NodeSplitPairSlice node_split_slice,
+                                     TT::HeightT dest_height)
+{
+  assert(In.size() == node_split_slice.size());
+  assert(!T->is_leaf);
+
+  SizeT n = In.size();
+  if (n == 0) {
+    return 0;
+  }
+
+  if (T->is_leaf) {
+    assert(dest_height == 1);
+    auto leaf_box = GetNodeBox(T);
+    auto leaf_mid = GetBoxMid<TT>(leaf_box);
+
+    auto new_node_n = In.size() + 1;
+    auto node_seq = TT::NodeSeq::uninitialized(new_node_n);
+    auto split_seq = TT::SplitSeq::uninitialized(new_node_n - 1);
+    SizeT node_idx = 0;
+    SizeT output_idx = 0;
+    auto cur_split = 0;
+
+    while (node_idx < In.size()) {
+      auto node_box = GetNodeBox(In[node_idx].first);
+      auto node_mid = GetBoxMid<TT>(node_box);
+
+      if (node_mid < leaf_mid) {
+        node_seq[output_idx] = In[node_idx].first;
+        node_idx++;
+        cur_split = node_box.first;
+      } else {
+        node_seq[output_idx] = T;
+        cur_split = leaf_box.first;
+      }
+
+      if (output_idx > 0) {
+        split_seq[output_idx - 1] = cur_split;
+      }
+      output_idx++;
+    }
+
+    [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
+      parlay::make_slice(node_seq),
+      parlay::make_slice(split_seq),
+      dest_height + 1, // should be 2
+      GenNodesOutputHandler{
+        .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
+        .set_node = [&](SizeT i,
+                        auto node) { node_split_slice[i].first = node; } });
+    return rt_bkt_n;
+  }
+
+  auto TI = static_cast<Interior*>(T);
+  SizeBufUBArr split_pos_seq;
+  assert(TI->GetNodeN() > 0);
+  // if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
+  //   SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
+  // } else {
+  //   SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
+  // }
+
+  auto split_slice = TI->GetSplitSlice();
+  SizeT offset = 0;
+  for (BufSizeT i = 0; i < split_slice.size(); i++) {
+    SizeT pos =
+      parlay::internal::binary_search(In.cut(offset, In.size()), [&](auto e) {
+        auto box = GetNodeBox(e.first);
+        auto mid = GetBoxMid<TT>(box);
+        return mid < split_slice[i];
+      });
+    offset += pos;
+    split_pos_seq[i] = offset;
+  }
+
+  if (TI->height == dest_height) {
+    auto new_node_n = In.size() + TI->GetNodeN();
+    auto node_seq = TT::NodeSeq::uninitialized(new_node_n);
+    auto split_seq = TT::SplitSeq::uninitialized(new_node_n - 1);
+    SizeT node_idx = 0;
+    SizeT output_idx = 0;
+
+    SizeT cnt = 0;
+    for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+      SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
+      SizeT r = (i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]);
+      // r- l is the number of reinsertion nodes in this subtree
+      if (l == r) {
+        node_seq[output_idx++] = TI->tree_nodes[i];
+      } else {
+        parlay::parallel_for(
+          l, r, [&](SizeT j) { node_seq[output_idx + j - l] = In[j].first; });
+        output_idx += r - l;
+      }
+    }
+
+    parlay::parallel_for(0, split_seq.size(), [&](SizeT i) {
+      split_seq[i] = GetNodeBox(node_seq[i]).first;
+    });
+
+    return GenerateInteriorNodes(
+      parlay::make_slice(node_seq),
+      parlay::make_slice(split_seq),
+      dest_height + 1, // should be same as TI->height
+      GenNodesOutputHandler{
+        .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
+        .set_node = [&](SizeT i,
+                        auto node) { node_split_slice[i].first = node; } });
+  }
+
+#ifdef DEBUG
+  // for (int i = 1; i < TI->GetSplitN(); i++) {
+  //   assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
+  //                         [&](E const e) {
+  //                           return Entry::GetKey(e) >= TI->split[i - 1] &&
+  //                                  Entry::GetKey(e) < TI->split[i];
+  //                         }));
+  // }
 #endif // DEBUG
 
   SizeBufUBArr new_split_node_n_arr;

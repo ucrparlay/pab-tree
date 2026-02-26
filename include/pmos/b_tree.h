@@ -277,6 +277,11 @@ public:
                              EntrySlice In,
                              NodeSplitPairSlice node_split_slice);
 
+  SizeT BatchInsertNodesRecursive(Node* T,
+                                  TT::NodeHeightPairSlice In,
+                                  NodeSplitPairSlice node_split_slice,
+                                  TT::HeightT dest_height);
+
   SizeT BatchInsertSieveRecursive(Node* T,
                                   EntrySlice In,
                                   EntrySlice Out,
@@ -339,9 +344,6 @@ public:
   static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
                                  TT::SplitSlice key_out,
                                  TT::NodeSlice node_out);
-
-  static SizeT GenerateLeafNodes(TT::EntrySlice key_in,
-                                 NodeSplitPairSlice node_split_out);
 
   // PARA: return bucket_num
   template<typename KeyFunc, typename NodeFunc>

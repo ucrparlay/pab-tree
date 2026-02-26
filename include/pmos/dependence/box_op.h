@@ -13,8 +13,15 @@ GetEmptyBox()
 }
 
 template<typename TT>
+auto
+GetBoxMid(typename TT::Box const a)
+{
+  return (a.first + a.second) / 2;
+}
+
+template<typename TT>
 TT::Box
-GetBox(typename TT::Box const& a, typename TT::Box const& b)
+GetBox(typename TT::Box const a, typename TT::Box const b)
 {
   return typename TT::Box(TT::Num::Min(a.first, b.first),
                           TT::Num::Max(a.second, b.second));
