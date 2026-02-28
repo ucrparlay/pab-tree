@@ -176,6 +176,9 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     return 0;
   }
 
+  assert(parlay::all_of(In, [&](auto e) { return e.height == In[0].height; }));
+  // we are insert leaf nodes, needs to reorder the leaves then allocate a new
+  // interior nodes
   if (T->is_leaf) {
     assert(dest_height == 1);
     auto leaf_box = GetNodeBox(T);
@@ -188,6 +191,7 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     SizeT output_idx = 0;
     auto cur_split = 0;
 
+    bool put_cur_leaf_flag = false;
     while (node_idx < In.size()) {
       auto node_box = GetNodeBox(In[node_idx].node);
       auto node_mid = In[node_idx].box_mid;
@@ -200,6 +204,7 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
       } else {
         node_seq[output_idx] = T;
         cur_split = leaf_box.first;
+        put_cur_leaf_flag = true;
       }
 
       if (output_idx > 0) {
@@ -207,6 +212,16 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
       }
       output_idx++;
     }
+
+    if (!put_cur_leaf_flag) {
+      node_seq[output_idx] = T;
+      if (output_idx > 0) {
+        split_seq[output_idx - 1] = leaf_box.first;
+      }
+      output_idx++;
+    }
+
+    assert(output_idx == new_node_n);
 
     [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
       parlay::make_slice(node_seq),
@@ -220,21 +235,24 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
   }
 
   auto TI = static_cast<Interior*>(T);
-  SizeBufUBArr split_pos_seq;
   assert(TI->GetNodeN() > 0);
 
-  auto split_slice = TI->GetSplitSlice();
-  SizeT offset = 0;
-  for (BufSizeT i = 0; i < split_slice.size(); i++) {
-    SizeT pos =
-      parlay::internal::binary_search(In.cut(offset, In.size()), [&](auto e) {
-        return e.box_mid < split_slice[i];
-      });
-    offset += pos;
-    split_pos_seq[i] = offset;
-  }
-
   if (TI->height == dest_height) {
+    // when the insertion node is within the same level, the bounding box should
+    // not overlapped with each other, so we can split them using tree nodes
+    SizeBufUBArr split_pos_seq;
+    SizeT offset = 0;
+    for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+      auto tree_box = GetNodeBox(TI->tree_nodes[i]);
+      auto tree_box_mid = GetBoxMid<TT>(tree_box);
+      SizeT pos =
+        parlay::internal::binary_search(In.cut(offset, In.size()), [&](auto e) {
+          return e.box_mid < tree_box_mid;
+        });
+      offset += pos;
+      split_pos_seq[i] = offset;
+    }
+
     auto new_node_n = In.size() + TI->GetNodeN();
     auto node_seq = TT::NodeSeq::uninitialized(new_node_n);
     auto split_seq = TT::SplitSeq::uninitialized(new_node_n - 1);
@@ -242,21 +260,29 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     SizeT output_idx = 0;
 
     SizeT cnt = 0;
-    for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    for (BufSizeT i = 0; i < TI->GetNodeN() + 1; i++) {
       SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
-      SizeT r = (i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]);
-      // r- l is the number of reinsertion nodes in this subtree
-      if (l == r) {
-        node_seq[output_idx++] = TI->tree_nodes[i];
-      } else {
+      SizeT r = (i == TI->GetNodeN() ? n : split_pos_seq[i]);
+      // r - l is the number of reinsertion nodes in this subtree
+      if (l != r) {
         parlay::parallel_for(
           l, r, [&](SizeT j) { node_seq[output_idx + j - l] = In[j].node; });
         output_idx += r - l;
       }
+      if (i < TI->GetNodeN()) {
+        node_seq[output_idx++] = TI->tree_nodes[i];
+      }
     }
 
+    assert(output_idx == new_node_n);
+    parlay::is_sorted(node_seq, [&](auto a, auto b) {
+      auto box_a = GetNodeBox(a);
+      auto box_b = GetNodeBox(b);
+      return GetBoxMid<TT>(box_a) < GetBoxMid<TT>(box_b);
+    });
+
     parlay::parallel_for(0, split_seq.size(), [&](SizeT i) {
-      split_seq[i] = GetNodeBox(node_seq[i]).first;
+      split_seq[i] = GetNodeBox(node_seq[i + 1]).first;
     });
 
     return GenerateInteriorNodes(
@@ -278,6 +304,18 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
   //                         }));
   // }
 #endif // DEBUG
+
+  SizeBufUBArr split_pos_seq;
+  auto split_slice = TI->GetSplitSlice();
+  SizeT offset = 0;
+  for (BufSizeT i = 0; i < split_slice.size(); i++) {
+    SizeT pos =
+      parlay::internal::binary_search(In.cut(offset, In.size()), [&](auto e) {
+        return e.box_mid < split_slice[i];
+      });
+    offset += pos;
+    split_pos_seq[i] = offset;
+  }
 
   SizeBufUBArr new_split_node_n_arr;
   BufSizeBufUBArr nodes_map;

@@ -310,13 +310,20 @@ public:
 
   void BatchDelete_(TT::KeySlice In);
 
+  struct DeleteInfoWrapper
+  {
+    bool is_invalid;
+    bool has_invalid_subtree;
+    SizeT valid_subtree_num;
+    SizeT reinsert_size;
+  };
+
   // PARA: return whether T is invalid,
   // whether contain invalid subtree,
   // valid subtree num,
   // total # of leaf entries needs to be reinserted
   // Only needs to ensure the tree size is correct
-  std::tuple<bool, bool, SizeT, SizeT> BatchDeleteRecursive(Node* T,
-                                                            TT::KeySlice In);
+  DeleteInfoWrapper BatchDeleteRecursive(Node* T, TT::KeySlice In);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
@@ -350,7 +357,7 @@ public:
                                          SizeT new_node_n,
                                          SizeBufUBArr const& return_node_n_arr);
 
-  std::tuple<bool, bool, SizeT, SizeT> BatchDeleteUpdateInteriorSize(
+  DeleteInfoWrapper BatchDeleteUpdateInteriorSize(
     Node* T,
     BooleanBufUBArr const& subtree_is_invalid_arr,
     SizeBufUBArr const& valid_subtree_num_arr,
