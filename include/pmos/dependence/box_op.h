@@ -2,9 +2,25 @@
 #define PMOS_DEPENDENCE_BOX_OP_HPP_
 
 #include "dependence/type_trait.h"
+#include "parlay/parallel.h"
+#include "parlay/primitives.h"
 #include "utility"
 
 namespace pmos {
+template<typename TT>
+bool
+IsValidBox(typename TT::Box const box)
+{
+  return box.first <= box.second;
+}
+
+template<typename TT>
+bool
+SameBox(typename TT::Box const a, typename TT::Box const b)
+{
+  return a == b;
+}
+
 template<typename TT>
 TT::Box
 GetEmptyBox()
@@ -16,7 +32,25 @@ template<typename TT>
 auto
 GetBoxMid(typename TT::Box const a)
 {
+  assert(IsValidBox<TT>(a));
   return (a.first + a.second) / 2;
+}
+
+template<typename TT>
+bool
+BoxIntersectBox(typename TT::Box const a, typename TT::Box const b)
+{
+  assert(IsValidBox<TT>(a) && IsValidBox<TT>(b));
+  return !(a.second < b.first || b.second < a.first);
+}
+
+template<typename TT, typename BoxSeq>
+bool
+BoxIntersectBoxSeq(typename TT::Box const a, BoxSeq const& box_seq)
+{
+  assert(IsValidBox<TT>(a));
+  return parlay::any_of(
+    box_seq, [&](auto const& box) { return BoxIntersectBox<TT>(a, box); });
 }
 
 template<typename TT>

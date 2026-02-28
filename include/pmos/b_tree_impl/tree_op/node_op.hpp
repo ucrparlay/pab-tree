@@ -250,13 +250,49 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
                                : (TI->GetNodeN() - invalid_tree_n) > 0;
   TI->box = GetNodeSliceBox(TI->GetNodeSlice());
   TI->has_invalid_subtree = !TI->valid || has_invalid_subtree;
-  TI->valid_subtree_num = TI->valid ? 1 : tot_valid_subtree_n;
+  TI->valid_subtree_num =
+    (TI->valid && !TI->has_invalid_subtree) ? 1 : tot_valid_subtree_n;
   TI->reinsert_size = reinsert_entries_n;
 
   return { .is_invalid = !TI->valid,
            .has_invalid_subtree = !TI->valid || TI->has_invalid_subtree,
            .valid_subtree_num = TI->valid_subtree_num,
            .reinsert_size = TI->reinsert_size };
+}
+
+template<typename TT>
+void
+BTree<TT>::PruneOutInvalidSubtrees(Node* T)
+{
+  auto TI = static_cast<Interior*>(T);
+  if (std::ranges::all_of(TI->tree_nodes.begin(),
+                          TI->tree_nodes.begin() + TI->GetNodeN(),
+                          [&](Node* node) { return NodeIsValid(node); })) {
+    // all subtree is valid, then no need to reorder
+    TI->ResetByNodes(TI->GetNodeN());
+    return;
+  }
+
+  BufSizeT tree_node_idx = 0;
+  BufSizeT split_idx = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); ++i) {
+    auto node = TI->tree_nodes[i];
+
+    assert(NodeIsValid(node) || NodeHasInvalidSubtree(T));
+
+    if (NodeIsValid(node)) {
+      const bool has_split = i < TI->GetSplitN();
+      if (i != tree_node_idx) { // avoid write the tree node on same pos
+        TI->tree_nodes[tree_node_idx] = node;
+        if (has_split) {
+          TI->split[split_idx] = TI->split[i];
+        }
+      }
+      ++tree_node_idx;
+      split_idx += has_split;
+    }
+  }
+  TI->ResetByNodes(tree_node_idx);
 }
 
 template<typename TT>
@@ -268,6 +304,10 @@ BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
   const bool has_tomb)
 {
   if (T->is_leaf) {
+    if (has_tomb) {
+      return;
+    }
+
     if (NodeIsValid(T)) {
       assert(reinsert_subtrees.size() == 1);
       assert(reinsert_entries.size() == 0);
@@ -294,6 +334,8 @@ BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
 
     // TODO: maybe we can pass the height rather than store it
     assert(reinsert_subtrees.size() == 1);
+    assert(TI->height > 0 &&
+           TI->height <= static_cast<Interior*>(this->root_)->height);
     auto box = GetNodeBox(T);
     reinsert_subtrees[0] = InteriorNodesWrapper{
       .node = T, .height = TI->height, .box_mid = GetBoxMid<TT>(box)
@@ -301,110 +343,39 @@ BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
     return;
   }
 
-  // now we need consider three cases:
-  // 1: TI->valid && TI->has_invalid_subtree: this means TI is valid but contain
-  // invalid subtree, we need to continue recurse on those contain invalid
-  // subtree
-  //
-  // 2: !TI->valid && !TI->has_invalid_subtree: this should never happen since
-  // it is not a valid case and all subtree is valid, we can directly return
-  //
-  // 3: !TI->valid && TI->has_invalid_subtree: reorder nodes, recurse on all
-  // subtrees and pass tomb
-
-  // Prune out Case 2
-  // if not valid, must have invalid subtree
   assert(TI->valid ? true : TI->has_invalid_subtree);
+  assert(TI->has_invalid_subtree);
 
-  // Case 1
-  if (TI->valid && TI->has_invalid_subtree) {
-    // needs to continue recurse on those contain invalid subtrees
-    // for example, at a valid root, we need to find those invalid subtrees
-    // since this node is valid, no need to reorder nodes
-    // This is true either with or without tomb
-    BufSizeBufUBArr nodes_map;
-    BufSizeT cnt = 0;
-    for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-      if (NodeHasInvalidSubtree(TI->tree_nodes[i])) {
-        nodes_map[cnt++] = i;
-      }
-    }
-
-    parlay::parallel_for(0, cnt, [&](BufSizeT i) {
-      SizeT reinsert_entry_sum = 0;
-      SizeT reinsert_subtree_sum = 0;
-      for (BufSizeT j = 0; j < i; j++) {
-        reinsert_entry_sum += GetNodeReinsertSize(TI->tree_nodes[nodes_map[j]]);
-        reinsert_subtree_sum +=
-          GetNodeValidSubtreeNum(TI->tree_nodes[nodes_map[j]]);
-      }
-
-      FetchValidSubtreeAndInvalidLeaves(
-        TI->tree_nodes[nodes_map[i]],
-        reinsert_subtrees.cut(
-          reinsert_subtree_sum,
-          reinsert_subtree_sum +
-            GetNodeValidSubtreeNum(TI->tree_nodes[nodes_map[i]])),
-        reinsert_entries.cut(
-          reinsert_entry_sum,
-          reinsert_entry_sum +
-            GetNodeReinsertSize(TI->tree_nodes[nodes_map[i]])),
-        TI->valid ? has_tomb : false);
-    });
-    return;
-  }
-
-  // 3: !TI->valid && TI->has_invalid_subtree: reorder nodes, recurse on all
-  // subtrees and pass tomb
-  auto old_nodes = TI->tree_nodes;
-  BufSizeT old_node_n = TI->GetNodeN();
-
-  // reorder nodes
-  BufSizeT tree_node_idx = 0;
-  BufSizeT split_idx = 0;
-  for (BufSizeT i = 0; i < TI->GetNodeN(); ++i) {
-    auto node = TI->tree_nodes[i];
-
-    assert(NodeIsValid(node) || NodeHasInvalidSubtree(T));
-
-    if (NodeIsValid(node)) {
-      const bool has_split = i < TI->GetSplitN();
-      if (i != tree_node_idx) { // avoid write the tree node on same pos
-        TI->tree_nodes[tree_node_idx] = node;
-        if (has_split) {
-          TI->split[split_idx] = TI->split[i];
-        }
-      }
-      ++tree_node_idx;
-      split_idx += has_split;
+  BufSizeBufUBArr nodes_map;
+  BufSizeT cnt = 0;
+  for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+    if (!TI->valid || !has_tomb || NodeHasInvalidSubtree(TI->tree_nodes[i])) {
+      nodes_map[cnt++] = i;
     }
   }
-  TI->node_n = tree_node_idx;
 
-  // for invalid subtres, we need to traverse on all subtrees and extract valid
-  // subtree and invalid leaves
-  parlay::parallel_for(
-    0,
-    old_node_n,
-    [&](BufSizeT i) {
-      SizeT reinsert_entry_sum = 0;
-      SizeT reinsert_subtree_sum = 0;
-      for (BufSizeT j = 0; j < i; j++) {
-        reinsert_entry_sum += GetNodeReinsertSize(old_nodes[j]);
-        reinsert_subtree_sum += GetNodeValidSubtreeNum(old_nodes[j]);
-      }
+  parlay::parallel_for(0, cnt, [&](BufSizeT i) {
+    SizeT reinsert_entry_sum = 0;
+    SizeT reinsert_subtree_sum = 0;
+    for (BufSizeT j = 0; j < i; j++) {
+      reinsert_entry_sum += GetNodeReinsertSize(TI->tree_nodes[nodes_map[j]]);
+      reinsert_subtree_sum +=
+        GetNodeValidSubtreeNum(TI->tree_nodes[nodes_map[j]]);
+    }
 
-      FetchValidSubtreeAndInvalidLeaves(
-        old_nodes[i],
-        reinsert_subtrees.cut(reinsert_subtree_sum,
-                              reinsert_subtree_sum +
-                                GetNodeValidSubtreeNum(old_nodes[i])),
-        reinsert_entries.cut(reinsert_entry_sum,
-                             reinsert_entry_sum +
-                               GetNodeReinsertSize(old_nodes[i])),
-        false);
-    },
-    1);
+    FetchValidSubtreeAndInvalidLeaves(
+      TI->tree_nodes[nodes_map[i]],
+      reinsert_subtrees.cut(
+        reinsert_subtree_sum,
+        reinsert_subtree_sum +
+          GetNodeValidSubtreeNum(TI->tree_nodes[nodes_map[i]])),
+      reinsert_entries.cut(reinsert_entry_sum,
+                           reinsert_entry_sum +
+                             GetNodeReinsertSize(TI->tree_nodes[nodes_map[i]])),
+      TI->valid ? has_tomb : false);
+  });
+
+  PruneOutInvalidSubtrees(T);
 }
 
 template<typename TT>

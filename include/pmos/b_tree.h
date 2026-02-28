@@ -203,6 +203,21 @@ public:
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
+    void ResetByNodes(BufSizeT valid_tree_node_n)
+    {
+      this->node_n = valid_tree_node_n;
+      this->size =
+        std::accumulate(this->tree_nodes.begin(),
+                        this->tree_nodes.begin() + this->GetNodeN(),
+                        0,
+                        [](SizeT sum, Node* node) { return sum + node->size; });
+      this->box = GetNodeSliceBox(this->GetNodeSlice());
+      this->valid = true;
+      this->has_invalid_subtree = false;
+      this->valid_subtree_num = 1;
+      this->reinsert_size = 0;
+    }
+
     bool valid;
     bool has_invalid_subtree; // subtree or itself is invalid
     SizeT valid_subtree_num;  // if iteself is valid then 1, otherwise should be
@@ -219,8 +234,9 @@ public:
   // for batch delete
   struct InteriorNodesWrapper
   {
-    Node* node;
-    TT::HeightT height;
+    Node* node = nullptr;
+    // TT::HeightT height;
+    int height = -1;
     TT::K box_mid;
 
     bool operator<(InteriorNodesWrapper const& other) const
@@ -338,6 +354,8 @@ public:
                                          InteriorWrapperSlice reinsert_subtrees,
                                          EntrySlice reinsert_entries,
                                          bool has_tomb);
+
+  void PruneOutInvalidSubtrees(Node* T);
 
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 

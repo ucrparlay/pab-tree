@@ -45,7 +45,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   // std::endl;
 
   auto rt = BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
-  // t.next("BatchDeleteRecursive");
+  t.next("BatchDeleteRecursive");
 
   // std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
   //           << ", Invalid subtree num: " << invalid_subtree_num
@@ -61,8 +61,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   if (rt.has_invalid_subtree) {
     // fetch the valid subtrees and leaf entries needs to be reinserted
     auto reinsert_node_seq =
-      parlay::sequence<InteriorNodesWrapper>::uninitialized(
-        rt.valid_subtree_num);
+      parlay::sequence<InteriorNodesWrapper>(rt.valid_subtree_num);
     auto reinsert_entries = TT::EntrySeq::uninitialized(rt.reinsert_size);
     FetchValidSubtreeAndInvalidLeaves(this->root_,
                                       parlay::make_slice(reinsert_node_seq),
@@ -70,6 +69,21 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
                                       true);
     auto sorted_node = parlay::sort(parlay::make_slice(reinsert_node_seq));
     auto node_split_seq = NodeSplitPairSeq::uninitialized(sorted_node.size());
+    t.next("FetchValidSubtreeAndInvalidLeaves");
+    assert(parlay::all_of(sorted_node, [&](auto e) {
+      return e.height > 0 &&
+             e.height <= static_cast<Interior*>(this->root_)->height;
+    }));
+
+#ifdef DEBUG
+    auto box_seq = parlay::tabulate(sorted_node.size(), [&](size_t i) {
+      return GetNodeBox(sorted_node[i].node);
+    });
+    assert(parlay::none_of(box_seq, [&](auto const box) {
+      return BoxIntersectBoxSeq<TT>(box, box_seq);
+    }));
+    std::cout << "No intersection between valid subtree boxes: " << std::endl;
+#endif // DEBUG
 
     // reinsert valid subtrees
     SizeT st = 0;

@@ -115,6 +115,10 @@ BTree<TT>::BatchInsertRecursive(Node* T,
                                    Entry::GetKey(e) < TI->split[i];
                           }));
   }
+  assert(parlay::all_of(
+    In.cut(split_pos_seq[TI->GetSplitN() - 1], In.size()), [&](E const e) {
+      return Entry::GetKey(e) >= TI->split[TI->GetSplitN() - 1];
+    }));
 #endif // DEBUG
 
   SizeBufUBArr new_split_node_n_arr;
@@ -169,7 +173,6 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
                                      const TT::HeightT dest_height)
 {
   assert(In.size() == node_split_slice.size());
-  assert(!T->is_leaf);
 
   SizeT n = In.size();
   if (n == 0) {
@@ -222,6 +225,12 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     }
 
     assert(output_idx == new_node_n);
+    assert(parlay::is_sorted(node_seq, [&](auto a, auto b) {
+      auto box_a = GetNodeBox(a);
+      auto box_b = GetNodeBox(b);
+      return GetBoxMid<TT>(box_a) < GetBoxMid<TT>(box_b);
+    }));
+    assert(parlay::is_sorted(split_seq, [&](auto a, auto b) { return a < b; }));
 
     [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
       parlay::make_slice(node_seq),
@@ -253,6 +262,23 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
       split_pos_seq[i] = offset;
     }
 
+#ifdef DEBUG
+    for (int i = 1; i < TI->GetNodeN(); i++) {
+      assert(parlay::all_of(
+        In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](auto const e) {
+          auto l_mid = GetBoxMid<TT>(GetNodeBox(TI->tree_nodes[i - 1]));
+          auto r_mid = GetBoxMid<TT>(GetNodeBox(TI->tree_nodes[i]));
+          return e.box_mid > l_mid && e.box_mid < r_mid;
+        }));
+    }
+    assert(parlay::all_of(
+      In.cut(split_pos_seq[TI->GetNodeN() - 1], In.size()), [&](auto const e) {
+        auto l_mid =
+          GetBoxMid<TT>(GetNodeBox(TI->tree_nodes[TI->GetNodeN() - 1]));
+        return e.box_mid > l_mid;
+      }));
+#endif // DEBUG
+
     auto new_node_n = In.size() + TI->GetNodeN();
     auto node_seq = TT::NodeSeq::uninitialized(new_node_n);
     auto split_seq = TT::SplitSeq::uninitialized(new_node_n - 1);
@@ -275,15 +301,16 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     }
 
     assert(output_idx == new_node_n);
-    parlay::is_sorted(node_seq, [&](auto a, auto b) {
+    assert(parlay::is_sorted(node_seq, [&](auto a, auto b) {
       auto box_a = GetNodeBox(a);
       auto box_b = GetNodeBox(b);
       return GetBoxMid<TT>(box_a) < GetBoxMid<TT>(box_b);
-    });
+    }));
 
     parlay::parallel_for(0, split_seq.size(), [&](SizeT i) {
       split_seq[i] = GetNodeBox(node_seq[i + 1]).first;
     });
+    assert(parlay::is_sorted(split_seq, [&](auto a, auto b) { return a < b; }));
 
     return GenerateInteriorNodes(
       parlay::make_slice(node_seq),
@@ -295,16 +322,7 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
                         auto node) { node_split_slice[i].first = node; } });
   }
 
-#ifdef DEBUG
-  // for (int i = 1; i < TI->GetSplitN(); i++) {
-  //   assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
-  //                         [&](E const e) {
-  //                           return Entry::GetKey(e) >= TI->split[i - 1] &&
-  //                                  Entry::GetKey(e) < TI->split[i];
-  //                         }));
-  // }
-#endif // DEBUG
-
+  // now we will split the node
   SizeBufUBArr split_pos_seq;
   auto split_slice = TI->GetSplitSlice();
   SizeT offset = 0;
@@ -316,6 +334,21 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     offset += pos;
     split_pos_seq[i] = offset;
   }
+
+#ifdef DEBUG
+  for (int i = 1; i < TI->GetSplitN(); i++) {
+    assert(parlay::all_of(
+      In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](auto const e) {
+        auto box = GetNodeBox(e.node);
+        return box.first >= TI->split[i - 1] && box.second < TI->split[i];
+      }));
+  }
+  assert(parlay::all_of(In.cut(split_pos_seq[TI->GetSplitN() - 1], In.size()),
+                        [&](auto const e) {
+                          auto box = GetNodeBox(e.node);
+                          return box.first >= TI->split[TI->GetSplitN() - 1];
+                        }));
+#endif // DEBUG
 
   SizeBufUBArr new_split_node_n_arr;
   BufSizeBufUBArr nodes_map;
