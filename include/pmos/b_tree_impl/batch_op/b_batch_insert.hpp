@@ -180,73 +180,61 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
   }
 
   assert(parlay::all_of(In, [&](auto e) { return e.height == In[0].height; }));
+  assert(parlay::find_if(In, [&](auto wrapper) { return wrapper.node == T; }) ==
+         In.end());
   // we are insert leaf nodes, needs to reorder the leaves then allocate a new
   // interior nodes
-  if (T->is_leaf) {
-    assert(dest_height == 1);
-    auto leaf_box = GetNodeBox(T);
-    auto leaf_mid = GetBoxMid<TT>(leaf_box);
+  // if (T->is_leaf) {
+  //   assert(dest_height == 1);
+  //   auto leaf_box = GetNodeBox(T);
+  //   auto leaf_mid = GetBoxMid<TT>(leaf_box);
+  //
+  //   auto new_node_n = In.size() + 1;
+  //   auto node_seq = TT::NodeSeq::uninitialized(new_node_n);
+  //   auto split_seq = TT::SplitSeq::uninitialized(new_node_n - 1);
+  //
+  //   auto pos =
+  //     pmos::BinarySearch<8>(In, [&](auto e) { return e.box_mid < leaf_mid;
+  //     });
+  //
+  //   parlay::parallel_for(0, pos, [&](SizeT i) { node_seq[i] = In[i].node; });
+  //
+  //   node_seq[pos] = T;
+  //
+  //   if (pos < In.size()) {
+  //     parlay::parallel_for(
+  //       0, n - pos, [&](SizeT i) { node_seq[pos + 1 + i] = In[pos + i].node;
+  //       });
+  //   }
+  //   assert(parlay::is_sorted(node_seq, [&](auto a, auto b) {
+  //     auto box_a = GetNodeBox(a);
+  //     auto box_b = GetNodeBox(b);
+  //     return GetBoxMid<TT>(box_a) < GetBoxMid<TT>(box_b);
+  //   }));
+  //
+  //   parlay::parallel_for(0, split_seq.size(), [&](SizeT i) {
+  //     split_seq[i] = GetNodeBox(node_seq[i + 1]).first;
+  //   });
+  //
+  //   assert(parlay::is_sorted(split_seq, [&](auto a, auto b) { return a < b;
+  //   }));
+  //
+  //   [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
+  //     parlay::make_slice(node_seq),
+  //     parlay::make_slice(split_seq),
+  //     dest_height + 1, // generate the nodes above the leaves
+  //     GenNodesOutputHandler{
+  //       .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key;
+  //       }, .set_node = [&](SizeT i,
+  //                       auto node) { node_split_slice[i].first = node; } });
+  //   return rt_bkt_n;
+  // }
 
-    auto new_node_n = In.size() + 1;
-    auto node_seq = TT::NodeSeq::uninitialized(new_node_n);
-    auto split_seq = TT::SplitSeq::uninitialized(new_node_n - 1);
-    SizeT node_idx = 0;
-    SizeT output_idx = 0;
-    auto cur_split = 0;
-
-    bool put_cur_leaf_flag = false;
-    while (node_idx < In.size()) {
-      auto node_box = GetNodeBox(In[node_idx].node);
-      auto node_mid = In[node_idx].box_mid;
-      assert(node_mid == GetBoxMid<TT>(node_box));
-
-      if (node_mid < leaf_mid) {
-        node_seq[output_idx] = In[node_idx].node;
-        node_idx++;
-        cur_split = node_box.first;
-      } else {
-        node_seq[output_idx] = T;
-        cur_split = leaf_box.first;
-        put_cur_leaf_flag = true;
-      }
-
-      if (output_idx > 0) {
-        split_seq[output_idx - 1] = cur_split;
-      }
-      output_idx++;
-    }
-
-    if (!put_cur_leaf_flag) {
-      node_seq[output_idx] = T;
-      if (output_idx > 0) {
-        split_seq[output_idx - 1] = leaf_box.first;
-      }
-      output_idx++;
-    }
-
-    assert(output_idx == new_node_n);
-    assert(parlay::is_sorted(node_seq, [&](auto a, auto b) {
-      auto box_a = GetNodeBox(a);
-      auto box_b = GetNodeBox(b);
-      return GetBoxMid<TT>(box_a) < GetBoxMid<TT>(box_b);
-    }));
-    assert(parlay::is_sorted(split_seq, [&](auto a, auto b) { return a < b; }));
-
-    [[maybe_unused]] SizeT rt_bkt_n = GenerateInteriorNodes(
-      parlay::make_slice(node_seq),
-      parlay::make_slice(split_seq),
-      dest_height + 1, // generate the nodes above the leaves
-      GenNodesOutputHandler{
-        .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
-        .set_node = [&](SizeT i,
-                        auto node) { node_split_slice[i].first = node; } });
-    return rt_bkt_n;
-  }
-
+  assert(!T->is_leaf);
   auto TI = static_cast<Interior*>(T);
   assert(TI->GetNodeN() > 0);
 
-  if (TI->height == dest_height) {
+  if (TI->height == dest_height + 1) {
     // when the insertion node is within the same level, the bounding box should
     // not overlapped with each other, so we can split them using tree nodes
     SizeBufUBArr split_pos_seq;
@@ -289,7 +277,7 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     for (BufSizeT i = 0; i < TI->GetNodeN() + 1; i++) {
       SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
       SizeT r = (i == TI->GetNodeN() ? n : split_pos_seq[i]);
-      // r - l is the number of reinsertion nodes in this subtree
+      // r - l is the number of reinsertion nodes in the i-th subtree
       if (l != r) {
         parlay::parallel_for(
           l, r, [&](SizeT j) { node_seq[output_idx + j - l] = In[j].node; });
@@ -312,18 +300,32 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     });
     assert(parlay::is_sorted(split_seq, [&](auto a, auto b) { return a < b; }));
 
-    return GenerateInteriorNodes(
-      parlay::make_slice(node_seq),
-      parlay::make_slice(split_seq),
-      dest_height + 1, // should be same as TI->height
-      GenNodesOutputHandler{
-        .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
-        .set_node = [&](SizeT i,
-                        auto node) { node_split_slice[i].first = node; } });
+    if (new_node_n <= TT::kBufUB) {
+      // TODO: optimize above by separate small total node num
+      for (BufSizeT i = 0; i < new_node_n; i++) {
+        TI->tree_nodes[i] = node_seq[i];
+      }
+      for (BufSizeT i = 0; i < new_node_n - 1; i++) {
+        TI->split[i] = split_seq[i];
+      }
+      TI->ResetByNodes(new_node_n);
+      return 0;
+    } else {
+      FreeNode<Interior>(T);
+      return GenerateInteriorNodes(
+        parlay::make_slice(node_seq),
+        parlay::make_slice(split_seq),
+        dest_height + 1, // should be same as TI->height
+        GenNodesOutputHandler{
+          .set_key = [&](SizeT i,
+                         auto key) { node_split_slice[i].second = key; },
+          .set_node = [&](SizeT i,
+                          auto node) { node_split_slice[i].first = node; } });
+    }
   }
 
-  // now we will split the node
-  SizeBufUBArr split_pos_seq;
+  // now we will split the node using the split
+  SizeBufUBArr split_pos_seq{ 0 };
   auto split_slice = TI->GetSplitSlice();
   SizeT offset = 0;
   for (BufSizeT i = 0; i < split_slice.size(); i++) {
@@ -336,18 +338,20 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
   }
 
 #ifdef DEBUG
-  for (int i = 1; i < TI->GetSplitN(); i++) {
-    assert(parlay::all_of(
-      In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](auto const e) {
-        auto box = GetNodeBox(e.node);
-        return box.first >= TI->split[i - 1] && box.second < TI->split[i];
-      }));
+  for (int i = 0; i < TI->GetNodeN(); i++) {
+    SizeT l = (i == 0 ? 0 : split_pos_seq[i - 1]);
+    SizeT r = (i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]);
+    typename TT::K lb = i == 0 ? TT::Num::MinVal() : TI->split[i - 1];
+    typename TT::K rb =
+      i == TI->GetNodeN() - 1 ? TT::Num::MaxVal() : TI->split[i];
+    bool res = parlay::all_of(In.cut(l, r), [&](auto const e) {
+      auto box = GetNodeBox(e.node);
+      bool within_flag = box.first >= lb && box.second < rb;
+      assert(within_flag);
+      return within_flag;
+    });
+    assert(res);
   }
-  assert(parlay::all_of(In.cut(split_pos_seq[TI->GetSplitN() - 1], In.size()),
-                        [&](auto const e) {
-                          auto box = GetNodeBox(e.node);
-                          return box.first >= TI->split[TI->GetSplitN() - 1];
-                        }));
 #endif // DEBUG
 
   SizeBufUBArr new_split_node_n_arr;
@@ -363,21 +367,31 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     }
   }
 
-  parlay::parallel_for(
-    0,
-    cnt,
-    [&](BufSizeT i) {
-      SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
-      SizeT r =
-        nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
-      new_split_node_n_arr[nodes_map[i]] =
-        BatchInsertNodesRecursive(TI->tree_nodes[nodes_map[i]],
-                                  In.cut(l, r),
-                                  node_split_slice.cut(l, r),
-                                  dest_height);
-    },
-    // In.size() > 2048 ? 1 : cnt);
-    1);
+  for (int i = 0; i < cnt; i++) {
+    SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+    SizeT r =
+      nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
+    new_split_node_n_arr[nodes_map[i]] =
+      BatchInsertNodesRecursive(TI->tree_nodes[nodes_map[i]],
+                                In.cut(l, r),
+                                node_split_slice.cut(l, r),
+                                dest_height);
+  }
+  // parlay::parallel_for(
+  //   0,
+  //   cnt,
+  //   [&](BufSizeT i) {
+  //     SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+  //     SizeT r =
+  //       nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
+  //     new_split_node_n_arr[nodes_map[i]] =
+  //       BatchInsertNodesRecursive(TI->tree_nodes[nodes_map[i]],
+  //                                 In.cut(l, r),
+  //                                 node_split_slice.cut(l, r),
+  //                                 dest_height);
+  //   },
+  //   // In.size() > 2048 ? 1 : cnt);
+  //   1);
 
   // compute the number of new nodes
   SizeT new_node_n = 0;

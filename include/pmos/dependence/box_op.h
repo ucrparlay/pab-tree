@@ -46,11 +46,12 @@ BoxIntersectBox(typename TT::Box const a, typename TT::Box const b)
 
 template<typename TT, typename BoxSeq>
 bool
-BoxIntersectBoxSeq(typename TT::Box const a, BoxSeq const& box_seq)
+BoxIntersectBoxSeqExcludeIfself(typename TT::Box const a, BoxSeq const& box_seq)
 {
   assert(IsValidBox<TT>(a));
-  return parlay::any_of(
-    box_seq, [&](auto const& box) { return BoxIntersectBox<TT>(a, box); });
+  return parlay::any_of(box_seq, [&](auto const& box) {
+    return a == box ? false : BoxIntersectBox<TT>(a, box);
+  });
 }
 
 template<typename TT>

@@ -45,6 +45,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   // std::endl;
 
   auto rt = BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
+  rt.valid_subtree_num = MarkValidSubtrees(this->root_, true);
   t.next("BatchDeleteRecursive");
 
   // std::cout << In.size() << " keys to delete, Invalid flag: " << invalid_flag
@@ -62,11 +63,15 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     // fetch the valid subtrees and leaf entries needs to be reinserted
     auto reinsert_node_seq =
       parlay::sequence<InteriorNodesWrapper>(rt.valid_subtree_num);
-    auto reinsert_entries = TT::EntrySeq::uninitialized(rt.reinsert_size);
-    FetchValidSubtreeAndInvalidLeaves(this->root_,
-                                      parlay::make_slice(reinsert_node_seq),
-                                      parlay::make_slice(reinsert_entries),
-                                      true);
+    // auto reinsert_entries = TT::EntrySeq::uninitialized(rt.reinsert_size);
+    typename TT::EntrySeq reinsert_entries(rt.reinsert_size,
+                                           { .key = 0, .val = 0 });
+    auto discard_flag =
+      FetchValidSubtreeAndInvalidLeaves(this->root_,
+                                        parlay::make_slice(reinsert_node_seq),
+                                        parlay::make_slice(reinsert_entries),
+                                        true);
+    assert(discard_flag == false);
     auto sorted_node = parlay::sort(parlay::make_slice(reinsert_node_seq));
     auto node_split_seq = NodeSplitPairSeq::uninitialized(sorted_node.size());
     t.next("FetchValidSubtreeAndInvalidLeaves");
@@ -77,12 +82,15 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
 
 #ifdef DEBUG
     auto box_seq = parlay::tabulate(sorted_node.size(), [&](size_t i) {
-      return GetNodeBox(sorted_node[i].node);
+      auto box = GetNodeBox(sorted_node[i].node);
+      assert(GetBoxMid<TT>(box) ==
+             sorted_node[i].box_mid); // ensure the box mid is correct
+      return box;
     });
     assert(parlay::none_of(box_seq, [&](auto const box) {
-      return BoxIntersectBoxSeq<TT>(box, box_seq);
+      return BoxIntersectBoxSeqExcludeIfself<TT>(box, box_seq);
     }));
-    std::cout << "No intersection between valid subtree boxes: " << std::endl;
+    std::cout << "No intersection between valid subtree boxes " << std::endl;
 #endif // DEBUG
 
     // reinsert valid subtrees
@@ -163,21 +171,23 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
 {
 
   if (In.size() == 0) {
-    // stop here, than all subtree below is valid
+    // stop here, all subtree below is valid
     return DeleteInfoWrapper{ .is_invalid = false,
                               .has_invalid_subtree = false,
-                              .valid_subtree_num = 1,
+                              .valid_subtree_num = 0,
                               .reinsert_size = 0 };
   }
 
   if (T->is_leaf) {
     [[maybe_unused]] auto delete_cnt = DeletePoints4Leaf(T, In);
     assert(delete_cnt == In.size());
-    return DeleteInfoWrapper{ .is_invalid = T->size < TT::kBufLB,
-                              .has_invalid_subtree = T->size < TT::kBufLB,
-                              .valid_subtree_num = T->size < TT::kBufLB ? 0 : 1,
-                              .reinsert_size =
-                                T->size < TT::kBufLB ? T->size : 0 };
+    return DeleteInfoWrapper{
+      .is_invalid = T->size < TT::kBufLB,
+      .has_invalid_subtree = T->size < TT::kBufLB,
+      // .valid_subtree_num = T->size < TT::kBufLB ? 0 : 1,
+      .valid_subtree_num = 0,
+      .reinsert_size = T->size < TT::kBufLB ? T->size : 0
+    };
   }
 
   auto TI = static_cast<Interior*>(T);
@@ -214,7 +224,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     } else { // no element in this subtree, so it's valid
       subtree_is_invalid[i] = false;
       subtree_has_invalid[i] = false;
-      valid_subtree_num[i] = 1; // this subtree itself is a valid subtree
+      valid_subtree_num[i] = 0; // this subtree itself is a valid subtree
       reinsert_entries_num[i] = 0;
     }
   }

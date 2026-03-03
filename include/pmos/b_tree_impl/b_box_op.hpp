@@ -15,7 +15,7 @@ BTree<TT>::GetNodeBox(Node const* T)
       return typename TT::Box(Entry::GetKey(*TL->GetEleBeginIter()),
                               Entry::GetKey(*TL->GetEleRbeginIter()));
     }
-    return pmos::GetBox<TT>(TL->GetEle());
+    return pmos::GetBox<TT>(TL->GetEle()); // warning pass element
   }
 
   return static_cast<Interior const*>(T)->box;

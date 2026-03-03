@@ -141,7 +141,7 @@ struct LeafNode : TypeTrait::Node
 
   EntrySeq GetEle() const
   {
-    return elements.substr(0, this->size);
+    return this->elements.substr(0, this->size);
   }
 
   auto GetEleBeginIter() const

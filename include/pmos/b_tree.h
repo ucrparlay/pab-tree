@@ -144,7 +144,7 @@ public:
       : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
       , valid(true)
       , has_invalid_subtree(false)
-      , valid_subtree_num(1) // itself is always valid
+      , valid_subtree_num(0) // itself is always valid
       , reinsert_size(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
       , height(_height)
@@ -157,7 +157,7 @@ public:
       : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
       , valid(true)
       , has_invalid_subtree(false)
-      , valid_subtree_num(1)
+      , valid_subtree_num(0)
       , reinsert_size(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
       , height(_height)
@@ -171,7 +171,7 @@ public:
       : BaseNode(_tree_nodes, _split, _aug)
       , valid(true)
       , has_invalid_subtree(false)
-      , valid_subtree_num(1)
+      , valid_subtree_num(0)
       , reinsert_size(0)
       , box(GetNodeSliceBox(this->GetNodeSlice()))
       , height(_height)
@@ -212,10 +212,10 @@ public:
                         0,
                         [](SizeT sum, Node* node) { return sum + node->size; });
       this->box = GetNodeSliceBox(this->GetNodeSlice());
-      this->valid = true;
-      this->has_invalid_subtree = false;
-      this->valid_subtree_num = 1;
-      this->reinsert_size = 0;
+      // this->valid = this->node_n >= TT::kBufLB;
+      // this->has_invalid_subtree = false;
+      // this->valid_subtree_num = 0;
+      // this->reinsert_size = 0;
     }
 
     bool valid;
@@ -241,8 +241,8 @@ public:
 
     bool operator<(InteriorNodesWrapper const& other) const
     {
-      return this->height == other.height ? this->box_mid > other.box_mid
-                                          : this->height < other.height;
+      return this->height == other.height ? this->box_mid < other.box_mid
+                                          : this->height > other.height;
     }
   };
 
@@ -350,12 +350,15 @@ public:
                                  EntrySlice reinsert_entries,
                                  bool has_tomb);
 
-  void FetchValidSubtreeAndInvalidLeaves(Node* T,
+  bool FetchValidSubtreeAndInvalidLeaves(Node* T,
                                          InteriorWrapperSlice reinsert_subtrees,
                                          EntrySlice reinsert_entries,
                                          bool has_tomb);
 
-  void PruneOutInvalidSubtrees(Node* T);
+  void PruneOutInvalidSubtrees(Node* T,
+                               BooleanBufUBArr const& discard_node_arr);
+
+  SizeT MarkValidSubtrees(Node* T, bool has_tomb);
 
   // void BatchInsertRecursive(Node* T, EntrySlice In);
 
