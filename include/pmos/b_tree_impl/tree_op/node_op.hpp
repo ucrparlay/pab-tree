@@ -423,10 +423,12 @@ BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     if (!TI->valid || !has_tomb || NodeHasInvalidSubtree(TI->tree_nodes[i])) {
-      // subtree_ps[cnt] =
-      //   subtree_ps[cnt - 1] + GetNodeValidSubtreeNum(TI->tree_nodes[i]);
-      // entries_ps[cnt] =
-      //   entries_ps[cnt - 1] + GetNodeReinsertSize(TI->tree_nodes[i]);
+      subtree_ps[cnt] = cnt == 0 ? GetNodeValidSubtreeNum(TI->tree_nodes[i])
+                                 : subtree_ps[cnt - 1] +
+                                     GetNodeValidSubtreeNum(TI->tree_nodes[i]);
+      entries_ps[cnt] =
+        cnt == 0 ? GetNodeReinsertSize(TI->tree_nodes[i])
+                 : entries_ps[cnt - 1] + GetNodeReinsertSize(TI->tree_nodes[i]);
 
       nodes_map[cnt++] = i;
     } else {
@@ -435,50 +437,36 @@ BTree<TT>::FetchValidSubtreeAndInvalidLeaves(
     }
   }
 
-  // parlay::parallel_for(0, cnt, [&](BufSizeT i) {
-  for (int i = 0; i < cnt; i++) {
-    SizeT reinsert_entry_sum = 0;
-    SizeT reinsert_subtree_sum = 0;
-    for (BufSizeT j = 0; j < i; j++) {
-      reinsert_entry_sum += GetNodeReinsertSize(TI->tree_nodes[nodes_map[j]]);
-      reinsert_subtree_sum +=
-        GetNodeValidSubtreeNum(TI->tree_nodes[nodes_map[j]]);
-    }
+  assert(subtree_ps[cnt - 1] == TI->valid_subtree_num);
+  assert(entries_ps[cnt - 1] == TI->reinsert_size);
+
+  parlay::parallel_for(0, cnt, [&](BufSizeT i) {
+    // for (int i = 0; i < cnt; i++) {
+    SizeT entry_l = i == 0 ? 0 : entries_ps[i - 1];
+    SizeT entry_r = entries_ps[i];
+
+    SizeT subtree_l = i == 0 ? 0 : subtree_ps[i - 1];
+    SizeT subtree_r = subtree_ps[i];
 
     auto node = TI->tree_nodes[nodes_map[i]];
     // assert(GetNodeValidSubtreeNum(node));
 
-#ifdef DEBUG
-    // if (i == cnt - 1) {
-    //   std::cout << i << " "
-    //             << std::accumulate(TI->tree_nodes.begin(),
-    //                                TI->tree_nodes.begin() + TI->GetNodeN(),
-    //                                static_cast<SizeT>(0),
-    //                                [&](SizeT sum, Node* node) {
-    //                                  return sum + GetNodeReinsertSize(node);
-    //                                })
-    //             << " " << TI->reinsert_size << std::endl;
-    //   assert(reinsert_entry_sum + GetNodeReinsertSize(node) ==
-    //          reinsert_entries.size());
-    // }
-#endif // DEBUG
     discard_node_arr[nodes_map[i]] = FetchValidSubtreeAndInvalidLeaves(
       node,
-      reinsert_subtrees.cut(reinsert_subtree_sum,
-                            reinsert_subtree_sum +
-                              GetNodeValidSubtreeNum(node)),
-      reinsert_entries.cut(reinsert_entry_sum,
-                           reinsert_entry_sum + GetNodeReinsertSize(node)),
+      reinsert_subtrees.cut(subtree_l, subtree_r),
+      reinsert_entries.cut(entry_l, entry_r),
       TI->valid ? has_tomb : false);
-
-    // });
-  }
+  });
+  // }
 
   assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
     return Entry::GetKey(a) < Entry::GetKey(b);
   }));
 
   PruneOutInvalidSubtrees(T, discard_node_arr);
+  if (T == this->root_) {
+    TI->valid = TI->GetNodeN() > 0;
+  }
 
   return !TI->valid;
 }

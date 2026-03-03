@@ -212,10 +212,10 @@ public:
                         0,
                         [](SizeT sum, Node* node) { return sum + node->size; });
       this->box = GetNodeSliceBox(this->GetNodeSlice());
-      // this->valid = this->node_n >= TT::kBufLB;
-      // this->has_invalid_subtree = false;
-      // this->valid_subtree_num = 0;
-      // this->reinsert_size = 0;
+      this->valid = this->node_n >= TT::kBufLB;
+      this->has_invalid_subtree = false;
+      this->valid_subtree_num = 0;
+      this->reinsert_size = 0;
     }
 
     bool valid;

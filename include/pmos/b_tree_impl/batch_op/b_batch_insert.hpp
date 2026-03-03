@@ -367,16 +367,22 @@ BTree<TT>::BatchInsertNodesRecursive(Node* T,
     }
   }
 
-  for (int i = 0; i < cnt; i++) {
-    SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
-    SizeT r =
-      nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
-    new_split_node_n_arr[nodes_map[i]] =
-      BatchInsertNodesRecursive(TI->tree_nodes[nodes_map[i]],
-                                In.cut(l, r),
-                                node_split_slice.cut(l, r),
-                                dest_height);
-  }
+  parlay::parallel_for(
+    0,
+    cnt,
+    [&](BufSizeT i) {
+      // for (int i = 0; i < cnt; i++) {
+      SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
+      SizeT r =
+        nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
+      new_split_node_n_arr[nodes_map[i]] =
+        BatchInsertNodesRecursive(TI->tree_nodes[nodes_map[i]],
+                                  In.cut(l, r),
+                                  node_split_slice.cut(l, r),
+                                  dest_height);
+    },
+    1);
+  // }
   // parlay::parallel_for(
   //   0,
   //   cnt,
