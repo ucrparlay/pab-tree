@@ -59,8 +59,44 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
       new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
     auto updated_split_seq = parlay::tabulate(
       new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
-    this->root_ = AllocInteriorNode<Interior, TT>(
-      updated_node_seq, updated_split_seq, cur_height + 1);
+
+    if (updated_node_seq.size() < TT::kBufUB) {
+      this->root_ = AllocInteriorNode<Interior, TT>(
+        updated_node_seq, updated_split_seq, cur_height + 1);
+    } else {
+      // the returned new nodes exceeds the node capacity, needs further split
+      auto node_in = parlay::make_slice(updated_node_seq);
+      auto key_in = parlay::make_slice(updated_split_seq);
+
+      auto aux_node_seq = TT::NodeSeq::uninitialized(updated_node_seq.size());
+      auto aux_key_seq = TT::KeySeq::uninitialized(updated_split_seq.size());
+      auto node_out = parlay::make_slice(updated_node_seq);
+      auto key_out = parlay::make_slice(updated_split_seq);
+
+      auto swap_key_node = [&](size_t bkt_n) {
+        key_in = key_in.cut(0, bkt_n - 1);
+        key_out = key_out.cut(0, bkt_n - 1);
+        node_in = node_in.cut(0, bkt_n);
+        node_out = node_out.cut(0, bkt_n);
+        std::ranges::swap(key_in, key_out);
+        std::ranges::swap(node_in, node_out);
+      };
+
+      while (node_in.size() >= TT::kBufUB) {
+        SizeT interior_bkt_n = GenerateInteriorNodes(
+          node_in,
+          key_in,
+          ++cur_height,
+          GenNodesOutputHandler{
+            .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
+            .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
+        swap_key_node(interior_bkt_n);
+        assert(
+          parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
+      }
+      this->root_ =
+        AllocInteriorNode<Interior, TT>(node_in, key_in, ++cur_height);
+    }
   }
 }
 
