@@ -352,18 +352,16 @@ struct MultiWayNode : TypeTrait::Node
 
   TT::BufSizeT GetNodeIdContainingKey(TT::K const k) const
   {
-    // return the first id s.t. split[id] > k
+    // return the first idx s.t. split[idx] > k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
-    // if split[1] > k && split[0] <= k, then k belongs to tree_nodes[1]
     return pmos::BinarySearch<8>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key <= k; });
   }
 
   TT::BufSizeT GetNodeIdContainingKeyExclusive(TT::K const k) const
   {
-    // return the first id s.t. split[id] > k
-    // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
-    // if split[1] > k && split[0] <= k, then k belongs to tree_nodes[1]
+    // return the first idx s.t. split[idx] >= k
+    // i.e.: if split[1] == k, then k belongs to tree_nodes[1]
     return pmos::BinarySearch<8>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key < k; });
   }
@@ -372,7 +370,7 @@ struct MultiWayNode : TypeTrait::Node
   {
     return node_idx == 0 ? k < this->split.front()
                          : (node_idx == this->GetSplitN()
-                              ? k >= this->split[this->GetNodeN() - 2]
+                              ? k >= this->split[this->GetSplitN() - 1]
                               : (k >= this->split[node_idx - 1] &&
                                  k < this->split[node_idx]));
   }

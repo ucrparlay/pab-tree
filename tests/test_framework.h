@@ -656,9 +656,12 @@ RangeQuery(auto const& wp,
     [&]() {},
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
+        // parlay::parallel_for(0, 1, [&](size_t i) {
         auto [size, logger] = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
         kdknn[i] = size;
+        int output_size = query_box_seq[i].second.size();
+        assert(std::cmp_equal(kdknn[i], size) && Out.size() >= output_size);
       });
     },
     [&]() {});
@@ -666,13 +669,14 @@ RangeQuery(auto const& wp,
   std::cout << "check range query: " << rec_num << " " << rec_type << " "
             << max_size << std::endl;
   for (int i = 0; i < rec_num; i++) {
-    if (kdknn[i] != query_box_seq[i].second.size()) {
-      std::cout << kdknn[i] << " " << query_box_seq[i].second.size() << " "
+    int output_size = query_box_seq[i].second.size();
+    if (kdknn[i] != output_size) {
+      std::cout << kdknn[i] << " " << output_size << " "
                 << query_box_seq[i].first.first << query_box_seq[i].first.second
                 << std::endl;
     }
-    assert(std::cmp_equal(kdknn[i], query_box_seq[i].second.size()));
-    // std::cout << kdknn[i] << " " << query_box_seq[i].second.size() << " "
+    assert(std::cmp_equal(kdknn[i], output_size));
+    // std::cout << kdknn[i] << " " << output_size << " "
     //     << query_box_seq[i].first.first << query_box_seq[i].first.second
     //     << std::endl;
     parlay::sort_inplace(Out.cut(offset[i], offset[i + 1]),
@@ -683,29 +687,27 @@ RangeQuery(auto const& wp,
                          [&](auto const& a, auto const& b) {
                            return TT::Entry::GetKey(a) < TT::Entry::GetKey(b);
                          });
-    for (size_t j = 0; j < query_box_seq[i].second.size(); j++) {
+    parlay::parallel_for(0, output_size, [&](size_t j) {
       if (Out[offset[i] + j] != query_box_seq[i].second.at(j)) {
-        std::cout << "wrong" << query_box_seq[i].first.first
-                  << query_box_seq[i].first.second << std::endl;
-        std::cout << Out[offset[i] + j] << " " << query_box_seq[i].second.at(j)
-                  << std::endl;
+        std::cout << "wrong: bounding box: " << query_box_seq[i].first.first
+                  << " " << query_box_seq[i].first.second << std::endl;
+        std::cout << "------ " << Out[offset[i] + j] << " "
+                  << query_box_seq[i].second.at(j) << std::endl;
+        assert(false);
       }
-
-      if constexpr (IsKdTree<Tree> ||
-                    IsOrthTree<Tree>) { // TODO: fix this by enable kdtree
-                                        // handling duplicates by id
-        // assert(Out[offset[i] +
-        // j].SameDimension(query_box_seq[i].second.at(j)));
-        assert(Out[offset[i] + j] == query_box_seq[i].second.at(j));
-      } else if constexpr (IsPTree<Tree>) {
-        assert(Out[offset[i] + j] == query_box_seq[i].second.at(j));
-      }
-
-      // if (Out[i * step + j] != query_box_seq[i].second.at(j)) std::cout <<
-      // "wrong
-      // "; std::cout << Out[j] << " " << query_box_seq[i].second.at(j) <<
-      // std::endl;
-    }
+    });
+    // bool flag = true;
+    //   for (size_t j = 0; j < output_size; j++) {
+    //     if (Out[offset[i] + j] != query_box_seq[i].second.at(j)) {
+    //       std::cout << "wrong: bounding box: " <<
+    //       query_box_seq[i].first.first
+    //                 << " " << query_box_seq[i].first.second << std::endl;
+    //       std::cout << "------ " << Out[offset[i] + j] << " "
+    //                 << query_box_seq[i].second.at(j) << std::endl;
+    //       flag = false;
+    //     }
+    //   }
+    //   assert(flag);
   }
 
   std::cout << ave_query << "\n" << std::flush;

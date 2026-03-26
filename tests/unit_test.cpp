@@ -80,9 +80,11 @@ protected:
     "/Users/ziyang/code/ParallelMultiwayOrderedSet/benchmarks";
 #endif                                // !  #ifndef MAC
   static constexpr int kTag = 0b0011; // 2#0001
+  // static constexpr int kTag = 0b0000; // 2#0001
   static constexpr double kBatchRatio = 0.01;
-  static constexpr int kQueryType = 0b001; // 2#001
+  static constexpr int kQueryType = 0b011; // 2#001
   static constexpr int kRangeQueryType = 3;
+  // static constexpr int kRangeQueryType = 2;
   static constexpr int kRangeQueryNum = 1000;
   static constexpr int kTreeType = 0;
   static constexpr int kDim = 1;

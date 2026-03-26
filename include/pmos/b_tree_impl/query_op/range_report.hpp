@@ -12,6 +12,7 @@ auto
 BTree<TT>::RangeReport(TT::Box const query_box, Range&& out) const
   -> std::pair<SizeT, RangeReportLogger>
 {
+  // the bounding box should be [a, b)
   RangeReportLogger logger;
   return { RangeReportRec(this->root_, query_box, std::forward<Range>(out)),
            logger };
@@ -29,7 +30,9 @@ BTree<TT>::RangeReportLeaf(Node const* T, TT::Box query_box, Range out) const
     assert(l <= r);
     assert(r <= TL->size);
     for (BufSizeT i = l; i < r; i++) {
-      out[i] = TL->elements[i];
+      auto k = Entry::GetKey(TL->elements[i]);
+      assert(k >= query_box.first && k < query_box.second);
+      out[i - l] = TL->elements[i];
     }
     return r - l;
   }
@@ -37,7 +40,7 @@ BTree<TT>::RangeReportLeaf(Node const* T, TT::Box query_box, Range out) const
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TL->size; i++) {
     auto k = Entry::GetKey(TL->elements[i]);
-    if (k >= query_box.first && k <= query_box.second) {
+    if (k >= query_box.first && k < query_box.second) {
       out[cnt++] = TL->elements[i];
     }
   }
@@ -57,13 +60,15 @@ BTree<TT>::RangeReportRec(Node const* T,
 
   auto const* TI = static_cast<Interior const*>(T);
   auto l = TI->GetNodeIdContainingKey(query_box.first);
-  // BUG: double check the left close and right open
   auto r = TI->GetNodeIdContainingKeyExclusive(query_box.second);
 
   assert(l < TI->GetNodeN());
   assert(r < TI->GetNodeN());
   assert(TI->ValidateKeyInNode(l, query_box.first));
-  assert(TI->ValidateKeyInNode(r, query_box.second));
+  assert(TI->ValidateKeyInNode(r, query_box.second) ||
+         TI->split[r] == query_box.second);
+
+  // NOTE: visit nodes [l, r]
 
   if (l == r) { // falls into one node
     return RangeReportRec(TI->tree_nodes[l], query_box, out);
@@ -71,7 +76,8 @@ BTree<TT>::RangeReportRec(Node const* T,
 
   if (l + 1 == r) { // two single node
     auto count_l = RangeReportRec(TI->tree_nodes[l], query_box, out);
-    auto count_r = RangeReportRec(TI->tree_nodes[r], query_box, out);
+    auto count_r = RangeReportRec(
+      TI->tree_nodes[r], query_box, out.cut(count_l, out.size()));
     return count_l + count_r;
   }
 
@@ -82,6 +88,7 @@ BTree<TT>::RangeReportRec(Node const* T,
     for (BufSizeT j = l + 1; j < i; j++) {
       sum += TI->tree_nodes[j]->size;
     }
+    assert(out.size() >= sum + TI->tree_nodes[i]->size);
     FlattenRec(TI->tree_nodes[i], out.cut(sum, sum + TI->tree_nodes[i]->size));
   });
   count_l +=
@@ -90,9 +97,7 @@ BTree<TT>::RangeReportRec(Node const* T,
                     SizeT(0),
                     [](SizeT acc, Node* node) { return acc + node->size; });
   auto count_r =
-    RangeReportRec(TI->tree_nodes[r],
-                   query_box,
-                   out.cut(count_l, count_l + TI->tree_nodes[r]->size));
+    RangeReportRec(TI->tree_nodes[r], query_box, out.cut(count_l, out.size()));
   return count_l + count_r;
 }
 
