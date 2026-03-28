@@ -406,7 +406,7 @@ public:
 
   bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice);
 
-  TT::HeightT CheckHeight(Node const* T, TT::HeightT cur_height);
+  TT::HeightT CheckHeight(Node const* T);
 
   bool CheckContainNode(Node const* T, Node const* P);
 

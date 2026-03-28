@@ -104,24 +104,22 @@ BTree<TT>::CheckContainNode(Node const* T, Node const* P)
 
 template<typename TT>
 TT::HeightT
-BTree<TT>::CheckHeight(Node const* T, TT::HeightT cur_height)
+BTree<TT>::CheckHeight(Node const* T)
 {
   if (T->is_leaf) {
-    assert(cur_height == 1);
     return 1;
   }
 
   auto TI = static_cast<Interior const*>(T);
-  assert(cur_height == TI->height);
   parlay::sequence<typename TT::HeightT> heights(TI->GetNodeN());
 
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
-    heights[i] = CheckHeight(TI->tree_nodes[i], cur_height - 1);
+    heights[i] = CheckHeight(TI->tree_nodes[i]);
   });
 
   assert(parlay::all_of(heights, [&](auto h) { return h == heights[0]; }));
 
-  return TI->height;
+  return heights[0] + 1;
 }
 
 template<typename TT>
@@ -174,7 +172,7 @@ BTree<TT>::Validate()
 
   // typename TT::HeightT height =
   //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
-  // CheckHeight(this->root_, height);
+  CheckHeight(this->root_);
   // std::cout << "Tree height validated.\n" << std::flush;
 
   std::cout << "<<< end validate tree\n" << std::flush;
