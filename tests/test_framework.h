@@ -37,6 +37,7 @@ static constexpr double kBatchQueryRatio = 0.01;
 static constexpr size_t kBatchQueryOsmSize = 10000000;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50000;
+static constexpr int kRangeQueryType = 3;
 static constexpr int kSingleQueryLogRepeatNum = 100;
 
 // NOTE: rectangle numbers for inba ratio
@@ -843,30 +844,24 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
   std::cout << ave_query << " " << std::flush;
 }
 
-template<typename Point, typename Tree>
+template<typename TT, typename Tree>
 void
-rangeQueryFix(Tree& pkd,
-              Typename* kdknn,
+RangeQueryFix(Tree& pkd,
               int const& rounds,
-              parlay::sequence<Point>& Out,
-              int rec_type,
+              auto& Out,
               int rec_num,
-              int DIM,
-              auto const& query_box_seq,
-              auto max_size)
+              auto const& query_box_seq)
 {
   // auto [query_box_seq, max_size] =
   //     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
   parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num),
     gen_box(rec_num), full_box(rec_num), skip_box(rec_num);
+
   auto [offset, tot_size] = parlay::scan(
     parlay::delayed_tabulate(
       rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
     parlay::addm<size_t>());
   offset.push_back(tot_size);
-  // std::cout << "range query: " << rec_num << " " << rec_type << " " <<
-  // tot_size
-  //           << std::endl;
   Out.resize(tot_size);
 
   // int n = WP.size();
@@ -880,35 +875,38 @@ rangeQueryFix(Tree& pkd,
     [&]() {},
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
-        auto [size, logger] = pkd.RangeQuery(query_box_seq[i].first,
-                                             Out.cut(offset[i], offset[i + 1]));
+        auto [size, logger] = pkd.RangeReport(
+          query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
 
-        kdknn[i] = size;
-        vis_leaf[i] = logger.vis_leaf_num;
-        vis_inter[i] = logger.vis_interior_num;
-        gen_box[i] = logger.generate_box_num;
-        full_box[i] = logger.full_box_num;
-        skip_box[i] = logger.skip_box_num;
+        // vis_leaf[i] = logger.vis_leaf_num;
+        // vis_inter[i] = logger.vis_interior_num;
+        // gen_box[i] = logger.generate_box_num;
+        // full_box[i] = logger.full_box_num;
+        // skip_box[i] = logger.skip_box_num;
       });
     },
     [&]() {});
 
   std::cout << ave_query << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(vis_inter.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(gen_box.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(full_box.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(skip_box.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
+  // std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, rec_num)))
+  // /
+  //                static_cast<double>(rec_num)
+  //           << " " << std::flush;
+  // std::cout << static_cast<double>(parlay::reduce(vis_inter.cut(0, rec_num)))
+  // /
+  //                static_cast<double>(rec_num)
+  //           << " " << std::flush;
+  // std::cout << static_cast<double>(parlay::reduce(gen_box.cut(0, rec_num))) /
+  //                static_cast<double>(rec_num)
+  //           << " " << std::flush;
+  // std::cout << static_cast<double>(parlay::reduce(full_box.cut(0, rec_num)))
+  // /
+  //                static_cast<double>(rec_num)
+  //           << " " << std::flush;
+  // std::cout << static_cast<double>(parlay::reduce(skip_box.cut(0, rec_num)))
+  // /
+  //                static_cast<double>(rec_num)
+  //           << " " << std::flush;
   return;
 }
 
@@ -1096,7 +1094,14 @@ static auto constexpr DefaultTestFunc =
       Membership<TT>(tree, query_ele, opts.rounds, res);
     }
 
-    if (opts.query_type & (1 << 1)) {
+    if (opts.query_type & (1 << 1)) { // NOTE: range query
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] =
+          GenRectangles<TT, Tree, false, false>(kRangeQueryNum, rec_type, wp);
+        typename TT::EntrySeq Out;
+        RangeQueryFix<TT>(
+          tree, opts.rounds, Out, kRangeQueryNum, query_box_seq);
+      }
     }
 
     std::cout << "\n" << std::flush;

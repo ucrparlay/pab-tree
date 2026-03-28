@@ -160,6 +160,28 @@ struct augmented_ops : Map
 
     return Map::insert_j(b, e, f, lazy_join, false);
   }
+
+  template<class F, typename Out>
+  static void range_report_filter2(node* b, F const& f, int64_t& cnt, Out& out)
+  {
+
+    if (!b) {
+      return;
+    }
+
+    auto cur_key = Map::get_key(b);
+    auto pos = f(cur_key);
+    if (pos == -1) {
+      range_report_filter2(b->rc, f, cnt, out);
+    } else if (pos == 1) {
+      range_report_filter2(b->lc, f, cnt, out);
+    } else {
+      auto entry = Map::get_entry(b);
+      out[cnt++] = { Map::get_key(b), Map::get_val(b) };
+      range_report_filter2(b->lc, f, cnt, out);
+      range_report_filter2(b->rc, f, cnt, out);
+    }
+  }
 };
 
 } // namespace pam

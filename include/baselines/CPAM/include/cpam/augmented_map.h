@@ -304,6 +304,12 @@ public:
     Map::foreach_seq(m, f);
   }
 
+  template<typename F, typename Out>
+  static void range_report_filter2(M& m, F const& f, int64_t& cnt, Out& out)
+  {
+    Tree::range_report_filter2(m.root, f, cnt, out);
+  }
+
 public:
   using Map::check_balance;
   using Map::check_structure;

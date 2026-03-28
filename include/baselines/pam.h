@@ -233,6 +233,35 @@ public:
     return std::make_pair(res, logger);
   }
 
+  template<class T, class MBR, typename Out>
+  auto RangeReportImpl(T& tree, MBR query_mbr, Out&& out)
+  {
+    // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
+    auto f = [&](TT::K cur_key) {
+      if (cur_key < query_mbr.first) { // query box is to the right
+        return -1;
+      } else if (cur_key >= query_mbr.second) { // query box is to the left
+        return 1;
+      } else { // within the box
+        return 0;
+      }
+    };
+
+    int64_t ret = 0;
+    zmap::range_report_filter2(tree, f, ret, out);
+    return ret;
+  }
+
+  template<typename Range>
+  auto RangeReport(TT::Box const query_box, Range&& out)
+    -> std::pair<size_t, pmos::RangeReportLogger>
+  {
+    // the bounding box should be [a, b)
+    pmos::RangeReportLogger logger;
+    auto rt_size = this->RangeReportImpl(this->pam_aug_map_, query_box, out);
+    return { rt_size, logger };
+  }
+
   void DeleteTree()
   {
     pam_aug_map_.clear();

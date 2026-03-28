@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
 
 #include "CPAM/include/cpam/cpam.h"
 #include "pmos/b_tree.h"
@@ -153,16 +154,6 @@ public:
   //   return res;
   // }
   //
-  // template <class T, class MBR, typename Out>
-  // auto range_report(T& tree, MBR query_mbr, Out&& out) {
-  //   // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
-  //   auto f = [&](auto cur) { return mbr_mbr_relation(cur, query_mbr); };
-  //
-  //   int64_t ret = 0;
-  //   // zmap::range_report_filter(tree, f, ret, out);
-  //   zmap::range_report_filter2(tree, f, ret, out);
-  //   return ret;
-  // }
 
   // APIs
   template<typename Range>
@@ -189,33 +180,44 @@ public:
     cpam_aug_map_ = map_delete(In, std::move(cpam_aug_map_));
   }
 
-  // template <typename Node, typename Range>
-  // auto KNN(Node* T, Point const& q, psi::kBoundedQueue<Point, Range>& bq) {
-  //   psi::KNNLogger logger;
-  //   // this->knn(this->cpam_aug_map_, q, bq.max_size(), logger.vis_leaf_num);
-  //   zmap::template knn<BT>(this->cpam_aug_map_, q, bq, logger);
-  //   return logger;
-  // }
-  //
-
   auto Contain(K const k) const
   {
     pmos::RangeQueryLogger logger;
     auto res = this->cpam_aug_map_.contains(k);
     return std::make_pair(res, logger);
   }
-  // auto RangeCount(Box const& q) {
-  //   psi::RangeQueryLogger logger;
-  //   auto size = this->range_count(this->cpam_aug_map_, q);
-  //   return std::make_pair(size, logger);
-  // }
-  //
-  // template <typename Range>
-  // auto RangeQuery(Box const& q, Range&& Out) {
-  //   psi::RangeQueryLogger logger;
-  //   auto size = this->range_report(this->cpam_aug_map_, q, Out);
-  //   return std::make_pair(size, logger);
-  // }
+
+  int mbr_mbr_relation(TT::K cur_key, TT::Box const& box)
+  {
+    if (cur_key < box.first) { // query box is to the right
+      return -1;
+    } else if (cur_key >= box.second) { // query box is to the left
+      return 1;
+    } else { // within the box
+      return 0;
+    }
+  }
+
+  template<class T, class MBR, typename Out>
+  auto RangeReportImpl(T& tree, MBR query_mbr, Out&& out)
+  {
+    // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
+    auto f = [&](TT::K cur) { return mbr_mbr_relation(cur, query_mbr); };
+
+    int64_t ret = 0;
+    zmap::range_report_filter2(tree, f, ret, out);
+    return ret;
+  }
+
+  template<typename Range>
+  auto RangeReport(TT::Box const query_box, Range&& out)
+    -> std::pair<size_t, pmos::RangeReportLogger>
+  {
+    // the bounding box should be [a, b)
+    pmos::RangeReportLogger logger;
+    auto rt_size = this->RangeReportImpl(this->cpam_aug_map_, query_box, out);
+    return { rt_size, logger };
+  }
 
   void DeleteTree()
   {
