@@ -112,6 +112,20 @@ public:
     return std::make_pair(res, logger);
   }
 
+  template<typename Range>
+  auto RangeReport(TT::Box const query_box, Range&& out)
+    -> std::pair<size_t, pmos::RangeReportLogger>
+  {
+    // the bounding box should be [a, b)
+    pmos::RangeReportLogger logger;
+
+    auto cnt = 0;
+    auto f = [&](auto ele) { out[cnt++] = ele; };
+    auto rt_size =
+      this->pma_tree_->map_range(f, query_box.first, query_box.second);
+    return { rt_size, logger };
+  }
+
   void DeleteTree()
   {
     // auto tmp = std::move(this->pma_tree_);
