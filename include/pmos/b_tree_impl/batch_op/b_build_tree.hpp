@@ -87,7 +87,7 @@ BTree<TT>::BuildRecursive(EntrySlice In)
     SizeT interior_bkt_n = GenerateInteriorNodes(
       node_in,
       key_in,
-      ++cur_height,
+      // ++cur_height,
       GenNodesOutputHandler{
         .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
         .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
@@ -95,7 +95,9 @@ BTree<TT>::BuildRecursive(EntrySlice In)
     assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
   }
 
-  this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in, ++cur_height);
+  // this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in,
+  // ++cur_height);
+  this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
   return this->root_;
 }
 

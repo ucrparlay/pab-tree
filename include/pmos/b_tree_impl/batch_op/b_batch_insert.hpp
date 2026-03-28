@@ -49,8 +49,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
   }
 
   NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
-  auto cur_height =
-    this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
+  // auto cur_height =
+  //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
   SizeT new_node_n = BatchInsertRecursive(
     this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
@@ -61,8 +61,9 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
       new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
 
     if (updated_node_seq.size() < TT::kBufUB) {
-      this->root_ = AllocInteriorNode<Interior, TT>(
-        updated_node_seq, updated_split_seq, cur_height + 1);
+      this->root_ =
+        AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
+      // updated_node_seq, updated_split_seq, cur_height + 1);
     } else {
       // the returned new nodes exceeds the node capacity, needs further split
       auto node_in = parlay::make_slice(updated_node_seq);
@@ -86,7 +87,7 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
         SizeT interior_bkt_n = GenerateInteriorNodes(
           node_in,
           key_in,
-          ++cur_height,
+          // ++cur_height,
           GenNodesOutputHandler{
             .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
             .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
@@ -94,8 +95,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
         assert(
           parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
       }
-      this->root_ =
-        AllocInteriorNode<Interior, TT>(node_in, key_in, ++cur_height);
+      this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
+      // AllocInteriorNode<Interior, TT>(node_in, key_in, ++cur_height);
     }
   }
 }

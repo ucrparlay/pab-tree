@@ -5,21 +5,21 @@
 
 namespace pmos {
 
-template<typename TT>
-TT::Box
-BTree<TT>::GetNodeBox(Node const* T)
-{
-  if (T->is_leaf) {
-    auto TL = static_cast<Leaf const*>(T);
-    if (TL->is_sorted) {
-      return typename TT::Box(Entry::GetKey(*TL->GetEleBeginIter()),
-                              Entry::GetKey(*TL->GetEleRbeginIter()));
-    }
-    return pmos::GetBox<TT>(TL->GetEle());
-  }
-
-  return static_cast<Interior const*>(T)->box;
-}
+// template<typename TT>
+// TT::Box
+// BTree<TT>::GetNodeBox(Node const* T)
+// {
+//   if (T->is_leaf) {
+//     auto TL = static_cast<Leaf const*>(T);
+//     if (TL->is_sorted) {
+//       return typename TT::Box(Entry::GetKey(*TL->GetEleBeginIter()),
+//                               Entry::GetKey(*TL->GetEleRbeginIter()));
+//     }
+//     return pmos::GetBox<TT>(TL->GetEle());
+//   }
+//
+//   return static_cast<Interior const*>(T)->box;
+// }
 
 template<typename TT>
 TT::Box

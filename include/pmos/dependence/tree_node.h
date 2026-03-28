@@ -384,22 +384,20 @@ struct MultiWayNode : TypeTrait::Node
 template<typename Interior, typename TT>
 static Interior*
 AllocInteriorNode(typename TT::NodeSeq const& tree_nodes,
-                  typename TT::SplitSeq const& split,
-                  typename TT::HeightT height)
+                  typename TT::SplitSeq const& split)
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
-  new (o) Interior(tree_nodes, split, height);
+  new (o) Interior(tree_nodes, split);
   return o;
 }
 
 template<typename Interior, typename TT>
 static Interior*
 AllocInteriorNode(typename TT::NodeSlice tree_nodes_slice,
-                  typename TT::SplitSlice split_slice,
-                  typename TT::HeightT height)
+                  typename TT::SplitSlice split_slice)
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
-  new (o) Interior(tree_nodes_slice, split_slice, height);
+  new (o) Interior(tree_nodes_slice, split_slice);
   return o;
 }
 
@@ -408,11 +406,10 @@ template<typename Interior, typename TT>
 static Interior*
 AllocInteriorNode(typename TT::NodeSlice const& tree_nodes,
                   typename TT::SplitSeq const& split,
-                  typename TT::HeightT height,
                   typename TT::InteriorAug const& aug)
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
-  new (o) Interior(tree_nodes, split, height, aug);
+  new (o) Interior(tree_nodes, split, aug);
   return o;
 }
 
