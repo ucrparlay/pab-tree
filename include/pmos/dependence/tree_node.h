@@ -356,6 +356,12 @@ struct MultiWayNode : TypeTrait::Node
     // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
     return pmos::BinarySearch<8>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key <= k; });
+    // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
+    //   if (split[i] > k) {
+    //     return i;
+    //   }
+    // }
+    // return this->GetSplitN();
   }
 
   TT::BufSizeT GetNodeIdContainingKeyExclusive(TT::K const k) const
@@ -364,6 +370,12 @@ struct MultiWayNode : TypeTrait::Node
     // i.e.: if split[1] == k, then k belongs to tree_nodes[1]
     return pmos::BinarySearch<8>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key < k; });
+    // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
+    //   if (split[i] >= k) {
+    //     return i;
+    //   }
+    // }
+    // return this->GetSplitN();
   }
 
   bool ValidateKeyInNode(TT::BufSizeT node_idx, TT::K const k) const

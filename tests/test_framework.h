@@ -854,8 +854,7 @@ RangeQueryFix(Tree& pkd,
 {
   // auto [query_box_seq, max_size] =
   //     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
-  parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num),
-    gen_box(rec_num), full_box(rec_num), skip_box(rec_num);
+  parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num);
 
   auto [offset, tot_size] = parlay::scan(
     parlay::delayed_tabulate(
@@ -875,14 +874,20 @@ RangeQueryFix(Tree& pkd,
     [&]() {},
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
+        // for (int i = 0; i < rec_num; i++) {
         auto [size, logger] = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
-
-        // vis_leaf[i] = logger.vis_leaf_num;
-        // vis_inter[i] = logger.vis_interior_num;
-        // gen_box[i] = logger.generate_box_num;
-        // full_box[i] = logger.full_box_num;
-        // skip_box[i] = logger.skip_box_num;
+        vis_leaf[i] = logger.vis_leaf_num;
+        vis_inter[i] = logger.vis_interior_num;
+        // std::cout << size << " " << query_box_seq[i].second << std::endl;
+        // if (size != query_box_seq[i].second) {
+        //   std::cout << "wrong: bounding box: " <<
+        //   query_box_seq[i].first.first
+        //             << " " << query_box_seq[i].first.second << std::endl;
+        //   std::cout << "------ " << size << " " << query_box_seq[i].second
+        //             << std::endl;
+        // }
+        // }
       });
     },
     [&]() {});

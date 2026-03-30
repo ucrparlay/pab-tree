@@ -428,10 +428,17 @@ public:
     -> std::pair<SizeT, RangeReportLogger>;
 
   template<typename Range>
-  BufSizeT RangeReportLeaf(Node const* T, TT::Box query_box, Range out) const;
+  void RangeReportLeaf(Node const* T,
+                       TT::Box query_box,
+                       SizeT& offset,
+                       Range out) const;
 
   template<typename Range>
-  SizeT RangeReportRec(Node const* T, TT::Box query_box, Range out) const;
+  void RangeReportRec(Node const* T,
+                      TT::Box query_box,
+                      SizeT& offset,
+                      Range out,
+                      RangeReportLogger& logger) const;
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
