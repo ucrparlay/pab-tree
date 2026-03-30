@@ -231,41 +231,57 @@ struct augmented_ops : Map
   }
 
   template<class F, typename Out>
-  static void range_report_filter2(node* b,
+  static void range_report_filter2(ptr b,
                                    F const& f,
                                    int64_t& cnt,
                                    Out& out,
                                    size_t granularity = kNodeLimit)
   {
 
-    if (!b) {
+    if (b.empty()) {
       return;
     }
 
-    if (Map::is_compressed(b)) { // leaf node
+    if (b.is_compressed()) { // leaf node
       auto f_filter = [&](auto const& et) {
         auto key = std::get<0>(et);
         if (f(key) == 0) {
           out[cnt++] = { std::get<0>(et), std::get<1>(et) };
         }
       };
-      Map::iterate_seq(b, f_filter);
+      Map::iterate_seq(b.node_ptr(), f_filter);
       return;
     }
 
-    auto rb = Map::cast_to_regular(b);
-    auto cur_key = Map::get_key(rb);
+    // auto rb = Map::cast_to_regular(b);
+    auto [lc, e, rc, root] = Seq::expose(std::move(b));
+    auto cur_key = Entry::get_key(e);
     auto pos = f(cur_key);
     if (pos == -1) {
-      range_report_filter2(rb->rc, f, cnt, out, granularity);
+      range_report_filter2(std::move(rc), f, cnt, out, granularity);
     } else if (pos == 1) {
-      range_report_filter2(rb->lc, f, cnt, out, granularity);
+      range_report_filter2(std::move(lc), f, cnt, out, granularity);
     } else {
-      auto entry = Map::get_entry(rb);
-      out[cnt++] = { Map::get_key(rb), Map::get_val(rb) };
-      range_report_filter2(rb->lc, f, cnt, out, granularity);
-      range_report_filter2(rb->rc, f, cnt, out, granularity);
+      auto entry = e;
+      out[cnt++] = { Entry::get_key(e), Entry::get_val(e) };
+      range_report_filter2(std::move(lc), f, cnt, out, granularity);
+      range_report_filter2(std::move(rc), f, cnt, out, granularity);
     }
+    GC::decrement(root);
+    // auto rb = Map::cast_to_regular(b);
+    // auto [lc, e, rc, root] = Seq::expose(std::move(b));
+    // auto cur_key = Map::get_key(rb);
+    // auto pos = f(cur_key);
+    // if (pos == -1) {
+    //   range_report_filter2(rb->rc, f, cnt, out, granularity);
+    // } else if (pos == 1) {
+    //   range_report_filter2(rb->lc, f, cnt, out, granularity);
+    // } else {
+    //   auto entry = Map::get_entry(rb);
+    //   out[cnt++] = { Map::get_key(rb), Map::get_val(rb) };
+    //   range_report_filter2(rb->lc, f, cnt, out, granularity);
+    //   range_report_filter2(rb->rc, f, cnt, out, granularity);
+    // }
   }
 };
 

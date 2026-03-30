@@ -215,7 +215,18 @@ public:
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
-    auto rt_size = this->RangeReportImpl(this->cpam_aug_map_, query_box, out);
+    // auto rt_size = this->RangeReportImpl(this->cpam_aug_map_, query_box,
+    // out);
+    auto rt_tree =
+      zmap::range(this->cpam_aug_map_, query_box.first, query_box.second);
+    auto rt_size = zmap::size(rt_tree.root);
+    // zmap::foreach_index(std::move(rt_tree), [&](auto& e, size_t i) {
+    //   out[i] = { std::get<0>(e), std::get<1>(e) };
+    // });
+    auto seq = zmap::entries(std::move(rt_tree));
+    parlay::parallel_for(0, seq.size(), [&](size_t i) {
+      out[i] = { std::get<0>(seq[i]), std::get<1>(seq[i]) };
+    });
     return { rt_size, logger };
   }
 
