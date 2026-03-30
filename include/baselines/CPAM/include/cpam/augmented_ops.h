@@ -230,12 +230,12 @@ struct augmented_ops : Map
       b, e, f, lazy_join);
   }
 
-  template<class F, typename Out>
+  template<class F, typename Out, typename Logger>
   static void range_report_filter2(ptr b,
                                    F const& f,
                                    int64_t& cnt,
                                    Out& out,
-                                   size_t granularity = kNodeLimit)
+                                   Logger& logger)
   {
 
     if (b.empty()) {
@@ -243,6 +243,7 @@ struct augmented_ops : Map
     }
 
     if (b.is_compressed()) { // leaf node
+      logger.vis_leaf_num++;
       auto f_filter = [&](auto const& et) {
         auto key = std::get<0>(et);
         if (f(key) == 0) {
@@ -253,19 +254,20 @@ struct augmented_ops : Map
       return;
     }
 
+    logger.vis_interior_num++;
     // auto rb = Map::cast_to_regular(b);
     auto [lc, e, rc, root] = Seq::expose(std::move(b));
     auto cur_key = Entry::get_key(e);
     auto pos = f(cur_key);
     if (pos == -1) {
-      range_report_filter2(std::move(rc), f, cnt, out, granularity);
+      range_report_filter2(std::move(rc), f, cnt, out, logger);
     } else if (pos == 1) {
-      range_report_filter2(std::move(lc), f, cnt, out, granularity);
+      range_report_filter2(std::move(lc), f, cnt, out, logger);
     } else {
       auto entry = e;
       out[cnt++] = { Entry::get_key(e), Entry::get_val(e) };
-      range_report_filter2(std::move(lc), f, cnt, out, granularity);
-      range_report_filter2(std::move(rc), f, cnt, out, granularity);
+      range_report_filter2(std::move(lc), f, cnt, out, logger);
+      range_report_filter2(std::move(rc), f, cnt, out, logger);
     }
     GC::decrement(root);
     // auto rb = Map::cast_to_regular(b);

@@ -304,11 +304,15 @@ public:
     Map::foreach_seq(m, f);
   }
 
-  template<typename F, typename Out>
-  static void range_report_filter2(M& m, F const& f, int64_t& cnt, Out& out)
+  template<typename F, typename Out, typename Logger>
+  static void range_report_filter2(M& m,
+                                   F const& f,
+                                   int64_t& cnt,
+                                   Out& out,
+                                   Logger& logger)
   {
     // Tree::range_report_filter2(m.root, f, cnt, out);
-    Tree::range_report_filter2(ptr(m.root, true), f, cnt, out);
+    Tree::range_report_filter2(ptr(m.root, true), f, cnt, out, logger);
   }
 
 public:
