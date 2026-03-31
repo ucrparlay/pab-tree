@@ -1301,6 +1301,7 @@ public:
     {
       return key;
     }
+
     V GetVal() const
     {
       return val;
@@ -1355,11 +1356,11 @@ public:
     using V = typename E::V;
 
     // differs from different entry, interface for pmos structure
-    static auto GetKey(E const e)
+    static auto GetKey(E const& e)
     {
       return e.GetKey();
     }
-    static auto GetVal(E const e)
+    static auto GetVal(E const& e)
     {
       return e.GetVal();
     }
