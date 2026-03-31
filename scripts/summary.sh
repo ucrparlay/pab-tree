@@ -59,22 +59,23 @@ function run_cmake() {
 	local cur_path
 	cur_path=$(pwd)
 	cd ../build || exit
-	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=clang++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	# cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=clang++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
 	make "${solver}"
 	cd "${cur_path}" || exit
 }
 
 # PMA
-tree=3
-solver="pma"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=3
+# solver="pma"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=2
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # CPAM
 tree=1
