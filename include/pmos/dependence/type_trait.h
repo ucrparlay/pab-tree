@@ -121,6 +121,8 @@ public:
   using BufSizeBufUBArr = std::array<BufSizeT, kBufUB>;
   using BooleanBufUBArr = std::array<bool, kBufUB>;
 
+  using EntryArr = std::array<typename BT::E, kBufUB>;
+
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
   // using BucketType =

@@ -52,7 +52,9 @@ BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In)
   TL->size += In.size();
   TL->is_sorted = false;
 
-  TL->UpdateAug(TL->elements.cut(0, TL->size));
+  // TL->UpdateAug(TL->elements.cut(0, TL->size));
+  TL->UpdateAug(
+    parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
   return T;
 }
 
@@ -114,7 +116,9 @@ BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
   TL->size = std::distance(TL->elements.begin(), end);
   TL->is_sorted = false;
   assert(TL->size >= 0);
-  TL->UpdateAug(TL->elements.cut(0, TL->size));
+  // TL->UpdateAug(TL->elements.cut(0, TL->size));
+  TL->UpdateAug(
+    parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
   return delete_cnt;
 }
 } // namespace pmos

@@ -49,6 +49,7 @@ struct LeafNode : TypeTrait::Node
   using K = typename TT::K;
   using Entry = TT::Entry;
   using EntrySeq = typename TT::EntrySeq;
+  using EntryArr = typename TT::EntryArr;
   using AT = typename TT::LeafAug;
   using EleAssignTagType = EleAssignTag;
 
@@ -71,27 +72,11 @@ struct LeafNode : TypeTrait::Node
   template<typename Range>
   LeafNode(Range In, AllocNormalLeafTag)
     : Node{ true, static_cast<size_t>(In.size()) }
-    , elements(EntrySeq::uninitialized(TT::kBufUB))
+    , elements(EntryArr())
     , is_sorted{ true }
     , aug(AT(In))
   {
     assert(In.size() <= TT::kBufUB);
-    assert(parlay::is_sorted(
-      In, [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b); }));
-    std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
-      parlay::assign_dispatch(elements[i++], x, EleAssignTag());
-    });
-  }
-
-  // NOTE: alloc a leaf with specific size
-  template<typename Range>
-  LeafNode(Range In, size_t const alloc_size, AllocNormalLeafTag)
-    : Node{ true, static_cast<size_t>(In.size()) }
-    , elements(EntrySeq::uninitialized(alloc_size))
-    , is_sorted{ true }
-    , aug(AT(In))
-  {
-    assert(In.size() <= alloc_size);
     assert(parlay::is_sorted(
       In, [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b); }));
     std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
@@ -141,7 +126,9 @@ struct LeafNode : TypeTrait::Node
 
   EntrySeq GetEle() const
   {
-    return elements.substr(0, this->size);
+    // return elements.substr(0, this->size);
+    return EntrySeq(this->elements.begin(),
+                    this->elements.begin() + this->size);
   }
 
   auto GetEleBeginIter() const
@@ -159,25 +146,26 @@ struct LeafNode : TypeTrait::Node
     return this->elements.begin() + this->size;
   }
 
-  TT::EntrySlice GetEleSlice() const
+  auto GetEleSlice() const
   {
     return parlay::make_slice(this->elements.begin(),
                               this->elements.begin() + this->size);
   }
 
-  EntrySeq const& GetEleContainer() const
+  auto const& GetEleContainer() const
   {
     return this->elements;
   }
 
-  EntrySeq& GetEleContainer()
+  EntryArr& GetEleContainer()
   {
     return this->elements;
   }
 
   void InitializeEleSeq()
   {
-    this->elements = EntrySeq::uninitialized(TT::kBufUB);
+    // this->elements = EntrySeq::uninitialized(TT::kBufUB);
+    this->elements = EntryArr();
   }
 
   AT& GetAug() const
@@ -197,7 +185,7 @@ struct LeafNode : TypeTrait::Node
     return aug.Reset();
   }
 
-  EntrySeq elements;
+  EntryArr elements;
   AT aug;
   bool is_sorted;
 };
@@ -219,17 +207,6 @@ struct LeafNode : TypeTrait::Node
 //     return typename NodeType::AT();
 //   }
 // }
-
-// NOTE:: Alloc a leaf with input IN and given size
-// TODO: the input aug is no longer valid
-template<typename Range, typename Leaf>
-static Leaf*
-AllocFixSizeLeafNode(Range In, size_t const alloc_size)
-{
-  Leaf* o = parlay::type_allocator<Leaf>::alloc();
-  new (o) Leaf(In, alloc_size, AllocNormalLeafTag());
-  return o;
-}
 
 // NOTE: Alloc a leaf
 template<typename Range, typename Leaf>
