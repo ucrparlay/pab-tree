@@ -429,13 +429,13 @@ public:
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,
-                       TT::Box query_box,
+                       TT::Box const& query_box,
                        SizeT& offset,
                        Range out) const;
 
   template<typename Range>
   void RangeReportRec(Node const* T,
-                      TT::Box query_box,
+                      TT::Box const& query_box,
                       SizeT& offset,
                       Range out,
                       RangeReportLogger& logger) const;
