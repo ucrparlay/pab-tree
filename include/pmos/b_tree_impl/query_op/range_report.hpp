@@ -37,8 +37,7 @@ BTree<TT>::RangeReportLeaf(Node const* T,
     for (BufSizeT i = l; i < r; i++) {
       auto k = Entry::GetKey(TL->elements[i]);
       assert(k >= query_box.first && k < query_box.second);
-      out[offset + i - l] = TL->elements[i];
-      offset++;
+      out[offset++] = TL->elements[i];
     }
     return;
   }
