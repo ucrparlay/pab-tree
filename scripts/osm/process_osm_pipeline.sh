@@ -55,6 +55,9 @@ if [ ! -f "$INPUT_FILE" ]; then
 	exit 1
 fi
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Define intermediate file names
 CSV_FILE="${INPUT_FILE%.osm.pbf}.osm.pbf.csv"
 SHIFTED_FILE="${INPUT_FILE%.osm.pbf}.osm.pbf_shifted_morton.csv"
@@ -65,6 +68,29 @@ log_info "=========================================="
 log_info "Input file: $INPUT_FILE"
 log_info "Output prefix: $OUTPUT_PREFIX"
 log_info ""
+
+# ==========================================
+# Check prerequisites
+# ==========================================
+# Check if osmium is available in system Python or venv
+if python3 -c "import osmium" 2>/dev/null; then
+	log_info "osmium found in system Python"
+	USE_VENV=false
+elif [ -d "$SCRIPT_DIR/venv" ]; then
+	log_info "Using virtual environment for osmium"
+	USE_VENV=true
+else
+	log_error "osmium not found!"
+	log_error "Please install it:"
+	log_error "  Option 1 - System-wide: pip3 install osmium"
+	log_error "  Option 2 - Virtual env:"
+	log_error "    cd $SCRIPT_DIR"
+	log_error "    python3 -m venv venv"
+	log_error "    source venv/bin/activate"
+	log_error "    pip install osmium"
+	log_error "    deactivate"
+	exit 1
+fi
 
 # ==========================================
 # Step 1: Convert OSM PBF to CSV
@@ -80,16 +106,24 @@ if [ -f "$CSV_FILE" ]; then
 		log_info "Skipping Step 1"
 	else
 		log_info "Running osm_to_csv.py..."
-		source venv/bin/activate
-		python osm_to_csv.py "$INPUT_FILE"
-		deactivate
+		if [ "$USE_VENV" = true ]; then
+			source "$SCRIPT_DIR/venv/bin/activate"
+			python "$SCRIPT_DIR/osm_to_csv.py" "$INPUT_FILE"
+			deactivate
+		else
+			python3 "$SCRIPT_DIR/osm_to_csv.py" "$INPUT_FILE"
+		fi
 		log_info "Step 1 complete!"
 	fi
 else
 	log_info "Running osm_to_csv.py..."
-	source venv/bin/activate
-	python osm_to_csv.py "$INPUT_FILE"
-	deactivate
+	if [ "$USE_VENV" = true ]; then
+		source "$SCRIPT_DIR/venv/bin/activate"
+		python "$SCRIPT_DIR/osm_to_csv.py" "$INPUT_FILE"
+		deactivate
+	else
+		python3 "$SCRIPT_DIR/osm_to_csv.py" "$INPUT_FILE"
+	fi
 	log_info "Step 1 complete!"
 fi
 
@@ -109,12 +143,12 @@ if [ -f "$SHIFTED_FILE" ]; then
 		log_info "Skipping Step 2"
 	else
 		log_info "Running shift_coordinates.py..."
-		python3 shift_coordinates.py "$CSV_FILE" "$SHIFTED_FILE"
+		python3 "$SCRIPT_DIR/shift_coordinates.py" "$CSV_FILE" "$SHIFTED_FILE"
 		log_info "Step 2 complete!"
 	fi
 else
 	log_info "Running shift_coordinates.py..."
-	python3 shift_coordinates.py "$CSV_FILE" "$SHIFTED_FILE"
+	python3 "$SCRIPT_DIR/shift_coordinates.py" "$CSV_FILE" "$SHIFTED_FILE"
 	log_info "Step 2 complete!"
 fi
 
@@ -127,7 +161,7 @@ log_info "Step 3/3: Filtering by year (2014-2024) and splitting into yearly file
 log_info "Output: ${OUTPUT_PREFIX}_YYYY.csv"
 
 log_info "Running filter_by_year.py..."
-python3 filter_by_year.py "$SHIFTED_FILE" "$OUTPUT_PREFIX"
+python3 "$SCRIPT_DIR/filter_by_year.py" "$SHIFTED_FILE" "$OUTPUT_PREFIX"
 log_info "Step 3 complete!"
 
 echo ""
