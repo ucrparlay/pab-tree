@@ -226,6 +226,67 @@ BatchInsert(Tree& pkd,
   }
 }
 
+struct StepUpdateLogger
+{
+  int id;
+  double t;
+
+  friend std::ostream& operator<<(std::ostream& os, StepUpdateLogger const& log)
+  {
+    os << "(" << log.id << ", " << log.t << ")";
+    return os;
+  }
+};
+
+template<typename TT, typename Tree, bool kInsert>
+void
+BatchInsertByStep(Tree& pkd,
+                  auto const& WP,
+                  int const rounds,
+                  double const insert_ratio)
+{
+  auto wp = WP;
+  size_t n = wp.size();
+  auto step = static_cast<size_t>(insert_ratio * n);
+  size_t slice_num = n / step;
+  size_t round_cnt = 0;
+
+  pkd.DeleteTree();
+
+  auto incre_build = [&]() {
+    parlay::internal::timer t;
+    size_t l = 0;
+    size_t r = 0;
+    size_t cnt = 0;
+    while (l < n) {
+      r = std::min(l + step, n);
+      // std::cout << l << " " << r << " " << n << std::endl;
+      pkd.BatchInsert(parlay::make_slice(wp.begin() + l, wp.begin() + r));
+      l = r;
+    }
+    round_cnt++;
+  };
+
+  double ave_time = time_loop(
+    rounds,
+    0.01,
+    [&]() { parlay::copy(WP, wp); },
+    [&]() { incre_build(); },
+    [&]() { pkd.DeleteTree(); });
+
+  // WARN: restore status
+  parlay::copy(WP, wp);
+  incre_build();
+  // auto original_box = Tree::GetBox(wp.cut(0, n / remain_divide_ratio));
+  // auto tree_box = pkd.GetRootBox();
+  // std::cout << original_box.first << ' ' << original_box.second << std::endl;
+  // std::cout << tree_box.first << ' ' << tree_box.second << std::endl;
+  // auto root = pkd.cpam_aug_map_;
+  // std::cout << "root size: " << root.size() << std::endl;
+
+  return;
+}
+
 template<typename TypeTrait,
          typename Tree,
          bool kTestTime = true,
@@ -314,238 +375,6 @@ BatchDiff(Tree& pkd,
     parlay::copy(WI, wi);
     pkd.BatchDiff(wi.cut(0, total_batch_size));
   }
-}
-
-struct StepUpdateLogger
-{
-  int id;
-  double t;
-
-  friend std::ostream& operator<<(std::ostream& os, StepUpdateLogger const& log)
-  {
-    os << "(" << log.id << ", " << log.t << ")";
-    return os;
-  }
-};
-
-template<typename Point, typename Tree, bool kInsert>
-void
-BatchInsertByStep(Tree& pkd,
-                  parlay::sequence<Point> const& WP,
-                  int const rounds,
-                  double const insert_ratio,
-                  int const remain_divide_ratio = 2)
-{
-  using Points = typename Tree::Points;
-  using Box = typename Tree::Box;
-  Points wp = Points::uninitialized(WP.size());
-  size_t n = wp.size();
-  size_t step = static_cast<size_t>(insert_ratio * n);
-  size_t slice_num = n / step;
-  parlay::sequence<parlay::sequence<double>> time_table(
-    rounds + 2, parlay::sequence<double>(slice_num, 0.0));
-  parlay::sequence<StepUpdateLogger> log_time(slice_num);
-  int id_cnt = 0;
-  for (auto& i : log_time) {
-    i = { id_cnt++, 0.0 };
-  }
-  size_t round_cnt = 0;
-
-  pkd.DeleteTree();
-
-  // NOTE: build the tree by type
-  auto prepare_build = [&]() {
-    pkd.DeleteTree();
-    if constexpr (pmos::IsKdTree<Tree> || pmos::IsPTree<Tree>) {
-      parlay::copy(WP, wp);
-    } else if constexpr (pmos::IsOrthTree<Tree>) {
-      parlay::copy(WP, wp);
-      auto box = Tree::GetBox(wp.cut(0, n));
-      pkd.SetBoundingBox(box);
-    } else {
-      parlay::copy(WP, wp);
-    }
-  };
-
-  auto incre_build = [&](int rounds_num_cutoff) {
-    parlay::internal::timer t;
-    size_t l = 0, r = 0;
-    size_t cnt = 0;
-    while (l < n) {
-      if (cnt >= rounds_num_cutoff) {
-        break;
-      }
-
-      r = std::min(l + step, n);
-      // std::cout << l << " " << r << " " << n << std::endl;
-      pkd.BatchInsert(parlay::make_slice(wp.begin() + l, wp.begin() + r));
-      l = r;
-      time_table[round_cnt][cnt++] += t.next_time();
-    }
-    round_cnt++;
-  };
-
-  double loop_late = rounds > 1 ? 0.01 : -100;
-  double ave_time = time_loop(
-    rounds,
-    loop_late,
-    [&]() { prepare_build(); },
-    [&]() { incre_build(slice_num + 1); },
-    [&]() { pkd.DeleteTree(); });
-
-  // begin count the time
-  if (rounds != 1 && round_cnt - 1 != rounds) {
-    throw std::runtime_error("rounds not match!");
-  }
-  for (int i = 1; i <= rounds; i++) {
-    for (int j = 0; j < slice_num; j++) {
-      log_time[j].t += time_table[i][j];
-    }
-  }
-  for (int j = 0; j < slice_num; j++) {
-    log_time[j].t /= rounds;
-  }
-
-  puts("# Insert");
-  std::cout << "## " << insert_ratio << std::endl;
-  std::sort(log_time.begin(), log_time.end(), [](auto const& a, auto const& b) {
-    return a.t < b.t;
-  });
-
-  // Calculate average time from log_time
-  double total_time = 0.0;
-  for (auto const& log : log_time) {
-    total_time += log.t;
-  }
-  double average_time = total_time / log_time.size();
-
-  std::cout << "median: " << log_time[slice_num / 2]
-            << "-> min: " << *log_time.begin()
-            << "-> max: " << *log_time.rbegin() << "-> tot: " << ave_time
-            << "-> avg: " << average_time << std::endl;
-
-  // WARN: restore status
-  prepare_build();
-  incre_build(slice_num / remain_divide_ratio);
-  // auto original_box = Tree::GetBox(wp.cut(0, n / remain_divide_ratio));
-  // auto tree_box = pkd.GetRootBox();
-  // std::cout << original_box.first << ' ' << original_box.second <<
-  // std::endl; std::cout << tree_box.first << ' ' << tree_box.second <<
-  // std::endl; auto root = pkd.cpam_aug_map_; std::cout << "root size: " <<
-  // root.size() << std::endl;
-
-  return;
-}
-
-template<typename Point, typename Tree, bool kInsert>
-void
-BatchDeleteByStep(Tree& pkd,
-                  parlay::sequence<Point> const& WP,
-                  int const rounds,
-                  double const insert_ratio,
-                  size_t const remain_divide_ratio = 2)
-{
-  using Points = typename Tree::Points;
-  using Box = typename Tree::Box;
-  Points wp = Points::uninitialized(WP.size());
-  size_t n = wp.size();
-  size_t step = static_cast<size_t>(insert_ratio * n);
-  size_t slice_num = n / step;
-  // std::cout << "n: " << n << " step: " << step << " slice_num: " <<
-  // slice_num
-  // << std::endl;
-  parlay::sequence<parlay::sequence<double>> time_table(
-    rounds + 2, parlay::sequence<double>(slice_num, 0.0));
-  parlay::sequence<StepUpdateLogger> log_time(slice_num);
-  int id_cnt = 0;
-  for (auto& i : log_time) {
-    i = { id_cnt++, 0.0 };
-  }
-  size_t round_cnt = 0;
-
-  pkd.DeleteTree();
-
-  // NOTE: build the tree by type
-  auto build_tree_by_type = [&]() {
-    parlay::copy(WP, wp);
-
-    if constexpr (pmos::IsKdTree<Tree> || pmos::IsPTree<Tree>) {
-      pkd.Build(parlay::make_slice(wp));
-    } else if constexpr (pmos::IsOrthTree<Tree>) {
-      auto box = Tree::GetBox(wp.cut(0, n));
-      pkd.Build(parlay::make_slice(wp), box);
-    } else {
-      pkd.Build(parlay::make_slice(wp));
-    }
-
-    parlay::copy(WP, wp);
-  };
-
-  auto incre_delete = [&](int rounds_num_cutoff, auto wp_slice) {
-    parlay::internal::timer t;
-    size_t l = 0, r = 0;
-    size_t cnt = 0;
-    while (l < n) {
-      if (cnt >= rounds_num_cutoff) {
-        break;
-      }
-
-      r = std::min(l + step, n);
-      // WARN: r may exceeds the right bounds with offset
-      pkd.BatchDelete(
-        parlay::make_slice(wp_slice.begin() + l, wp_slice.begin() + r));
-      l = r;
-      time_table[round_cnt][cnt++] += t.next_time();
-    }
-    round_cnt++;
-  };
-
-  double loop_late = rounds > 1 ? 0.01 : -100;
-  double ave_time = time_loop(
-    rounds,
-    loop_late,
-    [&]() { build_tree_by_type(); },
-    [&]() { incre_delete(slice_num, wp.cut(0, slice_num * step)); },
-    [&]() { pkd.DeleteTree(); });
-
-  if (rounds != 1 && round_cnt - 1 != rounds) {
-    throw std::runtime_error("rounds not match!");
-  }
-  for (int i = 1; i <= rounds; i++) {
-    for (int j = 0; j < slice_num; j++) {
-      log_time[j].t += time_table[i][j];
-    }
-  }
-  for (int j = 0; j < slice_num; j++) {
-    log_time[j].t /= rounds;
-  }
-
-  puts("# Delete");
-  std::cout << "## " << insert_ratio << std::endl;
-  // puts("");
-  // std::cout << ave_time << " " << std::flush;
-  std::sort(log_time.begin(), log_time.end(), [](auto const& a, auto const& b) {
-    return a.t < b.t;
-  });
-  // Calculate average time from log_time
-  double total_time = 0.0;
-  for (auto const& log : log_time) {
-    total_time += log.t;
-  }
-  double average_time = total_time / log_time.size();
-
-  std::cout << "median: " << log_time[slice_num / 2]
-            << "-> min: " << *log_time.begin()
-            << "-> max: " << *log_time.rbegin() << "-> tot: " << ave_time
-            << "-> avg: " << average_time << std::endl;
-
-  // WARN: restore status
-  pkd.DeleteTree();
-  build_tree_by_type();
-  incre_delete(slice_num / remain_divide_ratio,
-               wp.cut(slice_num / remain_divide_ratio * step, n));
-
-  return;
 }
 
 // NOTE: run range count and check the correct
@@ -1082,6 +911,18 @@ static auto constexpr DefaultTestFunc =
         auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
         auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
         BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
+    }
+
+    // NOTE: incremental build
+    if (opts.tag & (1 << 2)) {
+      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
       }
     }
 
