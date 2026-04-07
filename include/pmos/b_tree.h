@@ -423,9 +423,21 @@ public:
 
   bool ContainRec(Node const* T, K k) const;
 
+  auto RangeCount(TT::Box query_box) const
+    -> std::pair<SizeT, RangeReportLogger>;
+
+  void RangeCountLeaf(Node const* T,
+                      TT::Box const& query_box,
+                      SizeT& offset) const;
+
+  void RangeCountRec(Node const* T,
+                     TT::Box const& query_box,
+                     SizeT& offset,
+                     RangeReportLogger& logger) const;
+
   template<typename Range>
-  auto RangeReport(TT::Box query_box,
-                   Range&& out) const -> std::pair<SizeT, RangeReportLogger>;
+  auto RangeReport(TT::Box query_box, Range&& out) const
+    -> std::pair<SizeT, RangeReportLogger>;
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,
@@ -439,7 +451,6 @@ public:
                       SizeT& offset,
                       Range out,
                       RangeReportLogger& logger) const;
-
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return input_seq;
@@ -493,6 +504,7 @@ private:
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "b_tree_impl/points_op.hpp"
 #include "b_tree_impl/query_op/membership.hpp"
+#include "b_tree_impl/query_op/range_count.hpp"
 #include "b_tree_impl/query_op/range_report.hpp"
 #include "b_tree_impl/tree_op/flatten.hpp"
 #include "b_tree_impl/tree_op/leaf_op.hpp"

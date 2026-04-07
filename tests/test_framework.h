@@ -370,51 +370,6 @@ BatchDiff(Tree& pkd,
   }
 }
 
-// NOTE: run range count and check the correct
-template<typename Point, typename Tree>
-void
-RangeCount(parlay::sequence<Point> const& wp,
-           Tree& pkd,
-           int const& rounds,
-           int rec_num,
-           int rec_type,
-           int const DIM)
-{
-  // using Points = typename Tree::Points;
-  // using Box = typename Tree::Box;
-
-  auto [query_box_seq, max_size] =
-    GenRectangles<Point, Tree, false>(rec_num, rec_type, wp, DIM);
-  parlay::sequence<size_t> kdknn(rec_num, 0);
-
-  double aveCount = time_loop(
-    rounds,
-    0.01,
-    [&]() {},
-    [&]() {
-      parlay::parallel_for(0, rec_num, [&](size_t i) {
-        auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
-        kdknn[i] = size;
-      });
-    },
-    [&]() {});
-
-  // NOTE: verify the solutions
-  std::cout << "check range count: " << rec_num << " " << rec_type << std::endl;
-  for (int i = 0; i < rec_num; i++) {
-    if (kdknn[i] != query_box_seq[i].second) {
-      std::cout << kdknn[i] << " " << query_box_seq[i].second << " "
-                << query_box_seq[i].first.first << " "
-                << query_box_seq[i].first.second << std::endl;
-    }
-    assert(std::cmp_equal(kdknn[i], query_box_seq[i].second));
-  }
-
-  std::cout << aveCount << "\n" << std::flush;
-
-  return;
-}
-
 template<typename Point, typename Tree>
 void
 rangeCountRadius(parlay::sequence<Point> const& wp,
@@ -451,6 +406,50 @@ rangeCountRadius(parlay::sequence<Point> const& wp,
   return;
 }
 
+template<typename TT, typename Tree>
+void
+RangeCount(auto const& wp,
+           Tree const& pkd,
+           int const kRounds,
+           int const rec_num,
+           int const rec_type)
+{
+  using EntrySeq = typename TT::EntrySeq;
+
+  auto [query_box_seq, max_size] =
+    GenRectangles<TT, Tree, false, false>(rec_num, rec_type, wp);
+  parlay::sequence<size_t> kdknn(rec_num, 0);
+
+  double ave_query = time_loop(
+    kRounds,
+    0.01,
+    [&]() {},
+    [&]() {
+      parlay::parallel_for(0, rec_num, [&](size_t i) {
+        // parlay::parallel_for(0, 1, [&](size_t i) {
+        auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
+        kdknn[i] = size;
+        int output_size = query_box_seq[i].second;
+        assert(std::cmp_equal(kdknn[i], size) && Out.size() >= output_size);
+      });
+    },
+    [&]() {});
+
+  std::cout << "check range count: " << rec_num << " " << rec_type << " "
+            << max_size << std::endl;
+  for (int i = 0; i < rec_num; i++) {
+    int output_size = query_box_seq[i].second;
+    if (kdknn[i] != output_size) {
+      std::cout << kdknn[i] << " " << output_size << " "
+                << query_box_seq[i].first.first << query_box_seq[i].first.second
+                << std::endl;
+    }
+    assert(std::cmp_equal(kdknn[i], output_size));
+  }
+
+  std::cout << ave_query << "\n" << std::flush;
+  return;
+}
 // NOTE: run range query and check the correct
 template<typename TT, typename Tree>
 void
@@ -538,68 +537,7 @@ RangeQuery(auto const& wp,
 }
 
 //* test range count for fix rectangle
-template<typename Point, typename Tree>
-void
-rangeCountFix(Tree& pkd,
-              Typename* kdknn,
-              int const& rounds,
-              int rec_type,
-              int rec_num,
-              int DIM,
-              auto const& query_box_seq,
-              auto max_size)
-{
-  // using Tree = Tree;
-  // using Points = typename Tree::Points;
-  // using Box = typename Tree::Box;
 
-  // int n = WP.size();
-
-  // auto [query_box_seq, max_size] =
-  //     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
-  parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num),
-    gen_box(rec_num), full_box(rec_num), skip_box(rec_num);
-
-  double aveCount = time_loop(
-    rounds,
-    0.01,
-    [&]() {},
-    [&]() {
-      parlay::parallel_for(0, rec_num, [&](size_t i) {
-        auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
-
-        kdknn[i] = size;
-        vis_leaf[i] = logger.vis_leaf_num;
-        vis_inter[i] = logger.vis_interior_num;
-        gen_box[i] = logger.generate_box_num;
-        full_box[i] = logger.full_box_num;
-        skip_box[i] = logger.skip_box_num;
-      });
-      // for (int i = 0; i < rec_num; i++) {
-      //     kdknn[i] = pkd.RangeCount(query_box_seq[i].first);
-      // }
-    },
-    [&]() {});
-
-  std::cout << aveCount << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(vis_leaf.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(vis_inter.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(gen_box.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(full_box.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-  std::cout << static_cast<double>(parlay::reduce(skip_box.cut(0, rec_num))) /
-                 static_cast<double>(rec_num)
-            << " " << std::flush;
-
-  return;
-}
 //
 // template<typename Point>
 // void rangeCountFixWithLog(const parlay::sequence<Point>& WP,
@@ -664,6 +602,40 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
 
   // std::cout << query_num << " ";
   std::cout << ave_query << " " << std::flush;
+}
+
+template<typename TT, typename Tree>
+void
+RangeCountFix(Tree& pkd,
+              int const& rounds,
+              int rec_num,
+              auto const& query_box_seq)
+{
+  // auto [query_box_seq, max_size] =
+  //     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
+  parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num);
+
+  // int n = WP.size();
+  // size_t step = Out.size() / rec_num;
+  // using ref_t = std::reference_wrapper<Point>;
+  // parlay::sequence<ref_t> out_ref( Out.size(), std::ref( Out[0] ) );
+
+  double ave_query = time_loop(
+    rounds,
+    0.01,
+    [&]() {},
+    [&]() {
+      parlay::parallel_for(0, rec_num, [&](size_t i) {
+        // for (int i = 0; i < rec_num; i++) {
+        auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
+        vis_leaf[i] = logger.vis_leaf_num;
+        vis_inter[i] = logger.vis_interior_num;
+      });
+    },
+    [&]() {});
+
+  std::cout << ave_query << " " << std::flush;
+  return;
 }
 
 template<typename TT, typename Tree>
@@ -976,6 +948,14 @@ static auto constexpr DefaultTestFunc =
       }
     };
 
+    auto range_count = [&](auto const& base_points) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] = GenRectangles<TT, Tree, false, false>(
+          kRangeQueryNum, rec_type, base_points);
+        RangeCountFix<TT>(tree, opts.rounds, kRangeQueryNum, query_box_seq);
+      }
+    };
+
     if (opts.query_type & (1 << 0)) { // NOTE: membership
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele =
@@ -988,6 +968,9 @@ static auto constexpr DefaultTestFunc =
       range_query(wp);
     }
 
+    if (opts.query_type & (1 << 2)) { // NOTE: range count
+      range_count(wp);
+    }
     // NOTE: incremental build
     if (opts.tag & (1 << 2)) {
       parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
@@ -1155,7 +1138,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In){};
+    LeafAugEmpty(Slice In) {};
 
     template<typename Slice>
     void UpdateAug(Slice In)

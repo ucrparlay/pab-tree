@@ -315,6 +315,12 @@ public:
     Tree::range_report_filter2(ptr(m.root, true), f, cnt, out, logger);
   }
 
+  template<typename F, typename Logger>
+  static void range_count(M& m, F const& f, int64_t& cnt, Logger& logger)
+  {
+    Tree::range_count(ptr(m.root, true), f, cnt, logger);
+  }
+
 public:
   using Map::check_balance;
   using Map::check_structure;

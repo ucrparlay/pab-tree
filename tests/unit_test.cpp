@@ -172,6 +172,12 @@ protected:
       }
     }
 
+    if (opts.query_type & (1 << 2)) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        RangeCount<TT>(new_wp, tree, kRounds, kRangeQueryNum, rec_type);
+      }
+    }
+
     tree.DeleteTree();
   }
 

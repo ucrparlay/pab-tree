@@ -161,6 +161,28 @@ struct augmented_ops : Map
     return Map::insert_j(b, e, f, lazy_join, false);
   }
 
+  template<class F>
+  static void range_count(node* b, F const& f, int64_t& cnt)
+  {
+
+    if (!b) {
+      return;
+    }
+
+    auto cur_key = Map::get_key(b);
+    auto pos = f(cur_key);
+    if (pos == -1) {
+      range_count(b->rc, f, cnt);
+    } else if (pos == 1) {
+      range_count(b->lc, f, cnt);
+    } else {
+      auto entry = Map::get_entry(b);
+      cnt++;
+      range_count(b->lc, f, cnt);
+      range_count(b->rc, f, cnt);
+    }
+  }
+
   template<class F, typename Out>
   static void range_report_filter2(node* b, F const& f, int64_t& cnt, Out& out)
   {

@@ -280,6 +280,12 @@ public:
     Map::foreach_index(m, f, start, granularity);
   }
 
+  template<typename F>
+  static void range_count(M& m, F const& f, int64_t& cnt)
+  {
+    Tree::range_count(m.root, f, cnt);
+  }
+
   template<typename F, typename Out>
   static void range_report_filter2(M& m, F const& f, int64_t& cnt, Out& out)
   {

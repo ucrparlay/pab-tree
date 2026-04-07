@@ -230,6 +230,44 @@ struct augmented_ops : Map
       b, e, f, lazy_join);
   }
 
+  template<class F, typename Logger>
+  static void range_count(ptr b, F const& f, int64_t& cnt, Logger& logger)
+  {
+
+    if (b.empty()) {
+      return;
+    }
+
+    if (b.is_compressed()) { // leaf node
+      logger.vis_leaf_num++;
+      auto f_filter = [&](auto const& et) {
+        auto key = std::get<0>(et);
+        if (f(key) == 0) {
+          cnt++;
+        }
+      };
+      Map::iterate_seq(b.node_ptr(), f_filter);
+      return;
+    }
+
+    logger.vis_interior_num++;
+    // auto rb = Map::cast_to_regular(b);
+    auto [lc, e, rc, root] = Seq::expose(std::move(b));
+    auto cur_key = Entry::get_key(e);
+    auto pos = f(cur_key);
+    if (pos == -1) {
+      range_count(std::move(rc), f, cnt, logger);
+    } else if (pos == 1) {
+      range_count(std::move(lc), f, cnt, logger);
+    } else {
+      auto entry = e;
+      cnt++;
+      range_count(std::move(lc), f, cnt, logger);
+      range_count(std::move(rc), f, cnt, logger);
+    }
+    GC::decrement(root);
+  }
+
   template<class F, typename Out, typename Logger>
   static void range_report_filter2(ptr b,
                                    F const& f,
