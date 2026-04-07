@@ -120,7 +120,17 @@ public:
     pmos::RangeReportLogger logger;
 
     auto cnt = 0;
-    auto f = [&](auto ele) { out[cnt++] = ele; };
+    auto f = [&](auto ele) {
+      if constexpr (std::is_same_v<decltype(ele), typename TT::K>) {
+        // Binary case: ele is just the key
+        out[cnt++] = ele;
+      } else {
+        // Key-value case: ele is a tuple
+        out[cnt].key = std::get<0>(ele);
+        out[cnt].val = std::get<1>(ele);
+        cnt++;
+      }
+    };
     auto rt_size =
       this->pma_tree_->map_range(f, query_box.first, query_box.second);
     return { rt_size, logger };

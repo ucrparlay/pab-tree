@@ -1,0 +1,24 @@
+[submodule "parlaylib"]
+	path = parlaylib
+	url = https://github.com/ParAlg/parlaylib.git
+[submodule "ParallelTools"]
+	path = ParallelTools
+	url = https://github.com/wheatman/ParallelTools.git
+[submodule "EdgeMapVertexMap"]
+	path = EdgeMapVertexMap
+	url = https://github.com/wheatman/EdgeMapVertexMap.git
+[submodule "tlx"]
+	path = tlx
+	url = https://github.com/tlx/tlx.git
+[submodule "StructOfArrays"]
+	path = StructOfArrays
+	url = https://github.com/wheatman/StructOfArrays.git
+[submodule "other_systems/rma"]
+	path = other_systems/rma
+	url = https://github.com/wheatman/rma.git
+[submodule "other_systems/CPAM"]
+	path = other_systems/CPAM
+	url = https://github.com/wheatman/CPAM.git
+[submodule "other_systems/aspen"]
+	path = other_systems/aspen
+	url = https://github.com/wheatman/aspen.git

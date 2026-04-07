@@ -85,11 +85,6 @@ if(STDALLOC)
 	add_compile_options(-DPARLAY_USE_STD_ALLOC)
 endif()
 
-if(JEMA)
-	include_directories("/usr/local/lib")
-	set(CMAKE_BUILD_RPATH "/usr/local/lib")
-endif()
-
 add_subdirectory(external/parlaylib)
 
 # NOTE: clear CMAKE_MODULE_PATH to avoid finding parlay's cmake files
