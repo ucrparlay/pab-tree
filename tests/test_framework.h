@@ -801,7 +801,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   // NOTE: begin revert
   int within_num = 0;
   for (int i = 0; i < time_period_num; i++) {
-    std::cout << insert_entry[i].size() << " ";
+    // std::cout << insert_entry[i].size() << " ";
     parlay::internal::timer t;
     t.reset(), t.start();
     pkd.BatchInsert(insert_entry[i]);
@@ -1151,7 +1151,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In) {};
+    LeafAugEmpty(Slice In){};
 
     template<typename Slice>
     void UpdateAug(Slice In)

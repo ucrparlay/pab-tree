@@ -40,7 +40,7 @@ public:
   std::shared_ptr<PMA> pma_tree_;
 
   using InputRangeT = std::pair<parlay::sequence<K>, parlay::sequence<V>>;
-  using InputRangeDeleteT = parlay::sequence<K>;
+  using InputDeleteRangeT = parlay::sequence<K>;
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
@@ -50,7 +50,7 @@ public:
   }
 
   static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
-    -> InputRangeDeleteT
+    -> InputDeleteRangeT
   {
     return parlay::map(input_seq,
                        [&](auto e) -> K { return Entry::GetKey(e); });
@@ -113,8 +113,8 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+  auto RangeReport(TT::Box const query_box,
+                   Range&& out) -> std::pair<size_t, pmos::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
