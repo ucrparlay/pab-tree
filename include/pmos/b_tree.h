@@ -424,8 +424,8 @@ public:
   bool ContainRec(Node const* T, K k) const;
 
   template<typename Range>
-  auto RangeReport(TT::Box query_box, Range&& out) const
-    -> std::pair<SizeT, RangeReportLogger>;
+  auto RangeReport(TT::Box query_box,
+                   Range&& out) const -> std::pair<SizeT, RangeReportLogger>;
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,

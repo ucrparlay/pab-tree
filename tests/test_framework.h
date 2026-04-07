@@ -785,6 +785,54 @@ RangeQuerySerialWithLog(Tree& pkd,
   return;
 }
 
+template<typename TT, typename Tree>
+void
+InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
+                Tree& pkd,
+                const int sliding_window_len)
+{
+  pkd.DeleteTree();
+  const int time_period_num = node_by_time.size();
+  parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
+    time_period_num);
+  // typename TT::Points query_points(batchQueryOsmSize);
+  for (int i = 0; i < time_period_num; i++) {
+    // parlay::copy(node_by_time[i].cut(0, input_offset),
+    //              query_points.cut(i * input_offset, (i + 1) * input_offset));
+    insert_entry[i] = Tree::ParseInput(node_by_time[i]);
+    delete_entry[i] = Tree::ParseDeleteInput(node_by_time[i]);
+  }
+
+  // NOTE: begin revert
+  int within_num = 0;
+  for (int i = 0; i < time_period_num; i++) {
+    std::cout << insert_entry[i].size() << " ";
+    parlay::internal::timer t;
+    t.reset(), t.start();
+    pkd.BatchInsert(insert_entry[i]);
+    t.stop();
+    std::cout << t.total_time() << " ";
+    if (within_num == sliding_window_len) {
+      // std::cout << "begin delete " << wi[i - within_num].size() << " ";
+      t.reset(), t.start();
+      pkd.BatchDelete(delete_entry[i - within_num]);
+      t.stop();
+      std::cout << t.total_time() << " ";
+    } else {
+      within_num++;
+      std::cout << "-1 ";
+    }
+    std::cout << std::endl;
+
+    // if (time_period_num < 12) {
+    //   queryKNN(Dim, query_points, rounds, pkd, kdknn, K, true);
+    // }
+  }
+
+  return;
+}
+
 template<typename E>
 auto
 ReadEntries(char const* iFile,
@@ -914,23 +962,21 @@ static auto constexpr DefaultTestFunc =
       }
     }
 
-    // NOTE: incremental build
-    if (opts.tag & (1 << 2)) {
-      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-      for (auto ratio : ratio_seq) {
-        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
-        // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
-        BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
-      }
-    }
-
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(kBatchQueryRatio);
     auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
-    // auto [n2, d2] =
-    //   ReadEntries<typename TT::E>(batch_path.c_str(), wi, wp.size());
     BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
+
+    auto membership_query = [&](auto const& query_ele) {};
+
+    auto range_query = [&](auto const& base_points) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] = GenRectangles<TT, Tree, false, false>(
+          kRangeQueryNum, rec_type, base_points);
+        typename TT::EntrySeq Out;
+        RangeQueryFix<TT>(
+          tree, opts.rounds, Out, kRangeQueryNum, query_box_seq);
+      }
+    };
 
     if (opts.query_type & (1 << 0)) { // NOTE: membership
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
@@ -941,13 +987,35 @@ static auto constexpr DefaultTestFunc =
     }
 
     if (opts.query_type & (1 << 1)) { // NOTE: range query
-      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        auto [query_box_seq, max_size] =
-          GenRectangles<TT, Tree, false, false>(kRangeQueryNum, rec_type, wp);
-        typename TT::EntrySeq Out;
-        RangeQueryFix<TT>(
-          tree, opts.rounds, Out, kRangeQueryNum, query_box_seq);
+      range_query(wp);
+    }
+
+    // NOTE: incremental build
+    if (opts.tag & (1 << 2)) {
+      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
+        range_query(wp);
       }
+    }
+
+    // NOTE: real world sliding window
+    if (opts.tag & (1 << 2)) {
+      string osm_prefix = "/data/zmen002/geometry/africa/africa_";
+      const std::vector<std::string> files = { "2014", "2015", "2016", "2017",
+                                               "2018", "2019", "2020", "2021",
+                                               "2022", "2023" };
+      parlay::sequence<EntrySeq> node_by_year(files.size());
+      for (int i = 0; i < files.size(); i++) {
+        std::string path = osm_prefix + files[i] + ".csv";
+        ReadEntries(path.c_str(), node_by_year[i]);
+      }
+
+      InsertOsmByTime<TT>(node_by_year, tree, 5);
     }
 
     std::cout << "\n" << std::flush;
