@@ -10,7 +10,7 @@ Nodes=(1000000000)
 Dim=(1)
 tag=$((2#0011))
 summary=1
-query_type=$((2#011))
+query_type=$((2#111))
 instance_n=1
 round=4
 
@@ -66,16 +66,16 @@ function run_cmake() {
 }
 
 # PMA
-# tree=3
-# solver="pma"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+tree=3
+solver="pma"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # PAM
-# tree=2
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+tree=2
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # CPAM
 tree=1

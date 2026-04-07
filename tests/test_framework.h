@@ -928,7 +928,7 @@ static auto constexpr DefaultTestFunc =
       }
     }
 
-    if (opts.query_type != 0) {
+    if (opts.query_type != 0 && opts.tag != 0) {
       auto [base_path, batch_path] =
         opts.ParseInsertBatchPath(kBatchQueryRatio);
       auto [n, d] =

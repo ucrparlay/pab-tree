@@ -107,7 +107,12 @@ def csvSetup():
             "1%",
             "10%",
             "membership",
-            "range_report",
+            "RRS",
+            "RRM",
+            "RRL",
+            "RCS",
+            "RCM",
+            "RCL",
         ]
     )
     return csv_writer, csv_file_pointer
