@@ -69,7 +69,7 @@ public:
   using Interior = zmap::Tree::node;
 
   using InputRangeT = parlay::sequence<par>;
-  using InputRangeDeleteT = parlay::sequence<K>;
+  using InputDeleteRangeT = parlay::sequence<K>;
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
@@ -79,7 +79,7 @@ public:
   }
 
   static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
-    -> InputRangeDeleteT
+    -> InputDeleteRangeT
   {
     return parlay::map(input_seq,
                        [&](auto e) -> K { return Entry::GetKey(e); });

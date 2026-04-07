@@ -248,23 +248,17 @@ BatchInsertByStep(Tree& pkd,
   auto wp = WP;
   size_t n = wp.size();
   auto step = static_cast<size_t>(insert_ratio * n);
-  size_t slice_num = n / step;
-  size_t round_cnt = 0;
+  size_t slice_num = (n / step) + (n % step != 0);
+  auto insert_batch_seq = parlay::tabulate(slice_num, [&](size_t i) {
+    return Tree::ParseInput(wp.subseq(i * step, std::min((i + 1) * step, n)));
+  });
 
   pkd.DeleteTree();
 
   auto incre_build = [&]() {
-    parlay::internal::timer t;
-    size_t l = 0;
-    size_t r = 0;
-    size_t cnt = 0;
-    while (l < n) {
-      r = std::min(l + step, n);
-      // std::cout << l << " " << r << " " << n << std::endl;
-      pkd.BatchInsert(parlay::make_slice(wp.begin() + l, wp.begin() + r));
-      l = r;
+    for (int i = 0; i < slice_num; i++) {
+      pkd.BatchInsert(insert_batch_seq[i]);
     }
-    round_cnt++;
   };
 
   double ave_time = time_loop(
@@ -1157,7 +1151,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In){};
+    LeafAugEmpty(Slice In) {};
 
     template<typename Slice>
     void UpdateAug(Slice In)
