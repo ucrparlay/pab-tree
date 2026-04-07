@@ -255,6 +255,11 @@ BatchInsertByStep(Tree& pkd,
 
   pkd.DeleteTree();
 
+  auto prepare_func = [&]() {
+    insert_batch_seq = parlay::tabulate(slice_num, [&](size_t i) {
+      return Tree::ParseInput(wp.subseq(i * step, std::min((i + 1) * step, n)));
+    });
+  };
   auto incre_build = [&]() {
     for (int i = 0; i < slice_num; i++) {
       pkd.BatchInsert(insert_batch_seq[i]);
@@ -264,21 +269,15 @@ BatchInsertByStep(Tree& pkd,
   double ave_time = time_loop(
     rounds,
     0.01,
-    [&]() { parlay::copy(WP, wp); },
+    [&]() { prepare_func(); },
     [&]() { incre_build(); },
     [&]() { pkd.DeleteTree(); });
 
-  // WARN: restore status
-  parlay::copy(WP, wp);
-  incre_build();
-  // auto original_box = Tree::GetBox(wp.cut(0, n / remain_divide_ratio));
-  // auto tree_box = pkd.GetRootBox();
-  // std::cout << original_box.first << ' ' << original_box.second << std::endl;
-  // std::cout << tree_box.first << ' ' << tree_box.second << std::endl;
-  // auto root = pkd.cpam_aug_map_;
-  // std::cout << "root size: " << root.size() << std::endl;
+  std::cout << ave_time << " " << std::flush;
 
-  return;
+  // NOTE: restore status
+  prepare_func();
+  incre_build();
 }
 
 template<typename TypeTrait,
@@ -800,6 +799,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 
   // NOTE: begin revert
   int within_num = 0;
+  std::cout << std::endl;
   for (int i = 0; i < time_period_num; i++) {
     // std::cout << insert_entry[i].size() << " ";
     parlay::internal::timer t;
@@ -956,9 +956,13 @@ static auto constexpr DefaultTestFunc =
       }
     }
 
-    auto [base_path, batch_path] = opts.ParseInsertBatchPath(kBatchQueryRatio);
-    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
-    BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
+    if (opts.query_type != 0) {
+      auto [base_path, batch_path] =
+        opts.ParseInsertBatchPath(kBatchQueryRatio);
+      auto [n, d] =
+        ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
+      BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
+    }
 
     auto membership_query = [&](auto const& query_ele) {};
 
@@ -998,7 +1002,7 @@ static auto constexpr DefaultTestFunc =
     }
 
     // NOTE: real world sliding window
-    if (opts.tag & (1 << 2)) {
+    if (opts.tag & (1 << 3)) {
       string osm_prefix = "/data/zmen002/geometry/africa/africa_";
       const std::vector<std::string> files = { "2014", "2015", "2016", "2017",
                                                "2018", "2019", "2020", "2021",
