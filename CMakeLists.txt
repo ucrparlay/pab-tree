@@ -137,15 +137,80 @@ target_link_libraries(cpam PUBLIC TEST_FRAME)
 target_link_libraries(cpam PUBLIC CPAM)
 target_include_directories(cpam PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_DIR})
 
+# NOTE: PMA
 if(NOT APPLE)
-	# NOTE: PMA
 	add_executable(pma ${PROJECT_SOURCE_DIR}/tests/pma.cpp)
 	target_link_libraries(pma PUBLIC TEST_FRAME PMA)
 	target_include_directories(pma PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${PMA_INCLUDE_DIR})
 	target_compile_definitions(pma PUBLIC PARALLEL=1 PARLAY=1)
 endif()
 
-# NOTE: GoogleTest for b_ccp
+# NOTE: MASSTREE
+set(MASSTREE_DIR "${PMOS_SOURCE_DIR}/external/masstree-beta")
+set(MASSTREE_SOURCES
+	${MASSTREE_DIR}/compiler.cc
+	${MASSTREE_DIR}/str.cc
+	${MASSTREE_DIR}/straccum.cc
+	${MASSTREE_DIR}/string.cc
+	${MASSTREE_DIR}/string_slice.cc
+	${MASSTREE_DIR}/kvthread.cc
+	${MASSTREE_DIR}/json.cc
+	${MASSTREE_DIR}/msgpack.cc
+	${MASSTREE_DIR}/kvrandom.cc
+	${MASSTREE_DIR}/memdebug.cc
+	${MASSTREE_DIR}/misc.cc
+	${MASSTREE_DIR}/query_masstree.cc
+	${MASSTREE_DIR}/value_string.cc
+	${MASSTREE_DIR}/value_array.cc
+	${MASSTREE_DIR}/value_versioned_array.cc
+	${MASSTREE_DIR}/checkpoint.cc
+	${MASSTREE_DIR}/file.cc
+	${MASSTREE_DIR}/log.cc
+	${MASSTREE_DIR}/kvio.cc
+)
+
+add_library(MASSTREE ${MASSTREE_SOURCES})
+target_include_directories(MASSTREE PUBLIC ${MASSTREE_DIR})
+target_compile_definitions(MASSTREE PUBLIC 
+	NOSUPERPAGE=1
+	HAVE___BUILTIN_CLZ=1
+	HAVE___BUILTIN_CLZL=1
+	HAVE___BUILTIN_CLZLL=1
+	HAVE___BUILTIN_CTZ=1
+	HAVE___BUILTIN_CTZL=1
+	HAVE___BUILTIN_CTZLL=1
+	HAVE_TYPE_TRAITS=1
+	ENABLE_PRECONDITIONS=0
+	ENABLE_INVARIANTS=0
+	CACHE_LINE_SIZE=64
+	MASSTREE_MAXKEYLEN=255
+)
+# Define assertion macros as no-ops since we disabled them
+target_compile_options(MASSTREE PRIVATE 
+	-Wno-error -Wno-all -Wno-extra
+	-Dprecondition\(x,...\)=
+	-Dinvariant\(x,...\)=
+	-Dmasstree_precondition\(x,...\)=
+	-Dmasstree_invariant\(x,...\)=
+	-Dalways_assert\(x,...\)=
+	-Dmandatory_assert\(x,...\)=
+)
+target_link_libraries(MASSTREE PUBLIC pthread)
+
+# NOTE: MASSTREE test executable
+add_executable(masstree ${PROJECT_SOURCE_DIR}/tests/masstree.cpp ${PROJECT_SOURCE_DIR}/include/baselines/masstree_globals.cc)
+target_link_libraries(masstree PUBLIC TEST_FRAME MASSTREE)
+target_include_directories(masstree PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${MASSTREE_DIR})
+target_compile_options(masstree PRIVATE
+	-Dprecondition\(x,...\)=
+	-Dinvariant\(x,...\)=
+	-Dmasstree_precondition\(x,...\)=
+	-Dmasstree_invariant\(x,...\)=
+	-Dalways_assert\(x,...\)=
+	-Dmandatory_assert\(x,...\)=
+)
+
+# NOTE: GoogleTest for correctness check
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
 target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
 target_include_directories(unit_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
@@ -160,6 +225,7 @@ if(JEMA)
 	# target_link_libraries(myapp PRIVATE PkgConfig::JEMALLOC)
 	target_link_libraries(b_test PUBLIC PkgConfig::JEMALLOC)
 	target_link_libraries(cpam PUBLIC PkgConfig::JEMALLOC)
+	# target_link_libraries(masstree PUBLIC PkgConfig::JEMALLOC)
 	# target_link_libraries(b_test PUBLIC libjemalloc.so)
 	# target_link_libraries(cpam PUBLIC libjemalloc.so)
 endif()

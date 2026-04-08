@@ -430,7 +430,7 @@ RangeCount(auto const& wp,
         auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
         kdknn[i] = size;
         int output_size = query_box_seq[i].second;
-        assert(std::cmp_equal(kdknn[i], size) && Out.size() >= output_size);
+        assert(std::cmp_equal(kdknn[i], output_size));
       });
     },
     [&]() {});
@@ -1138,7 +1138,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In) {};
+    LeafAugEmpty(Slice In){};
 
     template<typename Slice>
     void UpdateAug(Slice In)
