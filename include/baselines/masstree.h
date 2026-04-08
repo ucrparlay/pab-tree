@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <atomic>
 
 #include "dependence/loggers.h"
 #include "parlay/primitives.h"
@@ -19,20 +20,28 @@
 
 namespace MasstreeWrapper {
 
-// Thread info required by Masstree
-class SimpleThreadInfo {
+// Thread-local threadinfo management for Masstree
+class ThreadInfoManager {
 public:
-  threadinfo* ti_;
-  
-  SimpleThreadInfo() {
-    ti_ = threadinfo::make(threadinfo::TI_MAIN, -1);
+  static threadinfo* get_threadinfo() {
+    thread_local threadinfo* ti = nullptr;
+    thread_local bool initialized = false;
+    
+    if (!initialized) {
+      static std::atomic<int> thread_counter{0};
+      int tid = thread_counter.fetch_add(1);
+      ti = threadinfo::make(threadinfo::TI_PROCESS, tid);
+      initialized = true;
+    }
+    return ti;
   }
   
-  ~SimpleThreadInfo() {
-    ti_->rcu_stop();
+  static void cleanup_threadinfo() {
+    threadinfo* ti = get_threadinfo();
+    if (ti) {
+      ti->rcu_stop();
+    }
   }
-  
-  threadinfo* get() { return ti_; }
 };
 
 template<class TypeTrait>
@@ -66,19 +75,18 @@ public:
   using Str = Masstree::Str;
   
   std::unique_ptr<Table> table_;
-  mutable SimpleThreadInfo thread_info_;
 
   using InputRangeT = std::pair<parlay::sequence<K>, parlay::sequence<V>>;
   using InputDeleteRangeT = parlay::sequence<K>;
 
   MasstreeWrapper() {
     table_ = std::make_unique<Table>();
-    table_->initialize(*thread_info_.get());
+    table_->initialize(*ThreadInfoManager::get_threadinfo());
   }
 
   ~MasstreeWrapper() {
     if (table_) {
-      table_->destroy(*thread_info_.get());
+      table_->destroy(*ThreadInfoManager::get_threadinfo());
     }
   }
 
@@ -105,43 +113,49 @@ public:
   void map_init(PT P)
   {
     size_t n = P.first.size();
-    for (size_t i = 0; i < n; i++) {
+    // Parallelize initialization for better performance
+    parlay::parallel_for(0, n, [&](size_t i) {
+      threadinfo* ti = ThreadInfoManager::get_threadinfo();
       Cursor lp(*table_, key_to_str(P.first[i]));
-      bool found = lp.find_insert(*thread_info_.get());
+      bool found = lp.find_insert(*ti);
       if (!found) {
         lp.value() = P.second[i];
       }
-      lp.finish(1, *thread_info_.get());
-    }
+      lp.finish(1, *ti);
+    });
   }
 
   template<typename PT>
   void map_insert(PT P)
   {
     size_t n = P.first.size();
-    for (size_t i = 0; i < n; i++) {
+    // Parallelize batch insert for better performance
+    parlay::parallel_for(0, n, [&](size_t i) {
+      threadinfo* ti = ThreadInfoManager::get_threadinfo();
       Cursor lp(*table_, key_to_str(P.first[i]));
-      bool found = lp.find_insert(*thread_info_.get());
+      bool found = lp.find_insert(*ti);
       if (!found) {
         lp.value() = P.second[i];
       }
-      lp.finish(1, *thread_info_.get());
-    }
+      lp.finish(1, *ti);
+    });
   }
 
   template<typename PT>
   void map_delete(PT P)
   {
     size_t n = P.size();
-    for (size_t i = 0; i < n; i++) {
+    // Parallelize batch delete for better performance
+    parlay::parallel_for(0, n, [&](size_t i) {
+      threadinfo* ti = ThreadInfoManager::get_threadinfo();
       Cursor lp(*table_, key_to_str(P[i]));
-      bool found = lp.find_locked(*thread_info_.get());
+      bool found = lp.find_locked(*ti);
       if (found) {
-        lp.finish(-1, *thread_info_.get());
+        lp.finish(-1, *ti);
       } else {
-        lp.finish(0, *thread_info_.get());
+        lp.finish(0, *ti);
       }
-    }
+    });
   }
 
   // APIs
@@ -167,7 +181,8 @@ public:
   {
     pmos::MembershipLogger logger;
     V value;
-    bool found = table_->get(key_to_str(k), value, *thread_info_.get());
+    threadinfo* ti = ThreadInfoManager::get_threadinfo();
+    bool found = table_->get(key_to_str(k), value, *ti);
     return std::make_pair(found, logger);
   }
 
@@ -176,8 +191,9 @@ public:
   {
     pmos::RangeReportLogger logger;
     size_t count = 0;
+    threadinfo* ti = ThreadInfoManager::get_threadinfo();
     CountScannerHelper scanner(count, query_box.second);
-    table_->scan(key_to_str(query_box.first), true, scanner, *thread_info_.get());
+    table_->scan(key_to_str(query_box.first), true, scanner, *ti);
     return { count, logger };
   }
 
@@ -187,17 +203,19 @@ public:
   {
     pmos::RangeReportLogger logger;
     size_t count = 0;
+    threadinfo* ti = ThreadInfoManager::get_threadinfo();
     ReportScannerHelper<Range> scanner(count, query_box.second, out);
-    table_->scan(key_to_str(query_box.first), true, scanner, *thread_info_.get());
+    table_->scan(key_to_str(query_box.first), true, scanner, *ti);
     return { count, logger };
   }
 
   void DeleteTree()
   {
     if (table_) {
-      table_->destroy(*thread_info_.get());
+      threadinfo* ti = ThreadInfoManager::get_threadinfo();
+      table_->destroy(*ti);
       table_ = std::make_unique<Table>();
-      table_->initialize(*thread_info_.get());
+      table_->initialize(*ti);
     }
   }
 
