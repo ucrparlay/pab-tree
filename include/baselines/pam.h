@@ -233,31 +233,35 @@ public:
     return std::make_pair(res, logger);
   }
 
-  template<class T, class MBR>
-  auto RangeCountImpl(T& tree, MBR query_mbr)
-  {
-    // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
-    auto f = [&](TT::K cur_key) {
-      if (cur_key < query_mbr.first) { // query box is to the right
-        return -1;
-      } else if (cur_key >= query_mbr.second) { // query box is to the left
-        return 1;
-      } else { // within the box
-        return 0;
-      }
-    };
-
-    int64_t ret = 0;
-    zmap::range_count(tree, f, ret);
-    return ret;
-  }
+  // template<class T, class MBR>
+  // auto RangeCountImpl(T& tree, MBR query_mbr)
+  // {
+  //   // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
+  //   auto f = [&](TT::K cur_key) {
+  //     if (cur_key < query_mbr.first) { // query box is to the right
+  //       return -1;
+  //     } else if (cur_key >= query_mbr.second) { // query box is to the left
+  //       return 1;
+  //     } else { // within the box
+  //       return 0;
+  //     }
+  //   };
+  //
+  //   int64_t ret = 0;
+  //   zmap::range_count(tree, f, ret);
+  //   return ret;
+  // }
 
   auto RangeCount(TT::Box const query_box)
     -> std::pair<size_t, pmos::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
-    auto rt_size = this->RangeCountImpl(this->pam_aug_map_, query_box);
+    // auto rt_size = this->RangeCountImpl(this->pam_aug_map_, query_box);
+
+    auto rt_tree =
+      zmap::range(this->pam_aug_map_, query_box.first, query_box.second);
+    auto rt_size = zmap::size(rt_tree.root);
     return { rt_size, logger };
   }
 
