@@ -34,6 +34,7 @@
 #include <unordered_set>
 // offsetof() is defined here
 #include <cstddef>
+#include <cstdio>
 #include <vector>
 
 #include <sys/mman.h>
@@ -354,7 +355,8 @@ class BwTreeBase {
 
   // This is the mask we used for address alignment (AND with this)
   static constexpr size_t CACHE_LINE_MASK = ~(CACHE_LINE_SIZE - 1);
-  
+
+ protected:
   // We invoke the GC procedure after this has been reached
   static constexpr size_t GC_NODE_COUNT_THREADHOLD = 1024;
   
@@ -504,7 +506,7 @@ class BwTreeBase {
                 "class PaddedGCMetadata size does"
                 " not conform to the alignment!");
  
- private: 
+ protected: 
   // This is used as the garbage collection ID, and is maintained in a per
   // thread level
   // This is initialized to -1 in order to distinguish between registered 

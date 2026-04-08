@@ -169,6 +169,49 @@ add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
 target_link_libraries(data_generator PUBLIC TEST_FRAME)
 target_include_directories(data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
+set(INDEX_MICROBENCH_DIR "${PROJECT_SOURCE_DIR}/external/index-microbench")
+file(GLOB INDEX_MICROBENCH_SKIPLIST_SOURCES
+	"${INDEX_MICROBENCH_DIR}/nohotspot-skiplist/*.cpp")
+set(INDEX_MICROBENCH_BTREE_SOURCE "${INDEX_MICROBENCH_DIR}/btree-rtm/btree.c")
+set_source_files_properties(${INDEX_MICROBENCH_BTREE_SOURCE} PROPERTIES LANGUAGE CXX)
+
+add_executable(index_microbench_workload
+	"${INDEX_MICROBENCH_DIR}/workload.cpp"
+	"${INDEX_MICROBENCH_DIR}/BwTree/bwtree.cpp"
+	"${INDEX_MICROBENCH_DIR}/ARTOLC/Tree.cpp"
+	"${INDEX_MICROBENCH_BTREE_SOURCE}"
+	${INDEX_MICROBENCH_SKIPLIST_SOURCES}
+)
+set_target_properties(index_microbench_workload PROPERTIES
+	CXX_STANDARD 20
+	CXX_STANDARD_REQUIRED ON
+	CXX_EXTENSIONS ON
+)
+target_include_directories(index_microbench_workload PRIVATE ${INDEX_MICROBENCH_DIR} ${TEST_FRAME_INCLUDE_DIR})
+target_compile_definitions(index_microbench_workload PRIVATE USE_TBB BWTREE_NODEBUG NDEBUG)
+target_compile_options(index_microbench_workload PRIVATE
+	-Wno-invalid-offsetof
+	-include "${INDEX_MICROBENCH_DIR}/masstree/config.h"
+)
+find_package(Threads REQUIRED)
+target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m tbb papi tcmalloc_minimal)
+
+find_library(INDEX_MICROBENCH_ATOMIC_LIB
+	NAMES atomic libatomic.so.1
+	PATHS /lib64 /usr/lib64 /lib /usr/lib
+)
+if(INDEX_MICROBENCH_ATOMIC_LIB)
+	target_link_libraries(index_microbench_workload PRIVATE "${INDEX_MICROBENCH_ATOMIC_LIB}")
+else()
+	message(WARNING "libatomic was not found for index_microbench_workload")
+endif()
+
+if(EXISTS "${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.a")
+	target_link_libraries(index_microbench_workload PRIVATE "${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.a")
+else()
+	message(WARNING "mtIndexAPI.a not found in ${INDEX_MICROBENCH_DIR}/masstree; build masstree before linking index_microbench_workload")
+endif()
+
 
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
 # target_link_libraries(data_washer PUBLIC PMOS)

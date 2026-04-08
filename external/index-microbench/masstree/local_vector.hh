@@ -96,7 +96,7 @@ local_vector<T, N, A>::local_vector(const local_vector<T, NN, AA>& x)
 template <typename T, int N, typename A>
 inline local_vector<T, N, A>::~local_vector() {
     for (size_type i = 0; i != r_.size_; ++i)
-        r_.destroy(&r_.v_[i]);
+        std::allocator_traits<A>::destroy(r_, &r_.v_[i]);
     if (r_.v_ != reinterpret_cast<T*>(r_.lv_))
         r_.deallocate(r_.v_, r_.capacity_);
 }
@@ -125,8 +125,8 @@ template <typename T, int N, typename A>
 void local_vector<T, N, A>::grow() {
     T* m = r_.allocate(r_.capacity_ * 2);
     for (size_type i = 0; i != r_.size_; ++i) {
-        r_.construct(&m[i], std::move(r_.v_[i]));
-        r_.destroy(&r_.v_[i]);
+        std::allocator_traits<A>::construct(r_, &m[i], std::move(r_.v_[i]));
+        std::allocator_traits<A>::destroy(r_, &r_.v_[i]);
     }
     if (r_.v_ != reinterpret_cast<T*>(r_.lv_))
         r_.deallocate(r_.v_, r_.capacity_);
@@ -228,7 +228,7 @@ template <typename T, int N, typename A>
 inline void local_vector<T, N, A>::push_back(const T& x) {
     if (r_.size_ == r_.capacity_)
         grow();
-    r_.construct(&r_.v_[r_.size_], x);
+    std::allocator_traits<A>::construct(r_, &r_.v_[r_.size_], x);
     ++r_.size_;
 }
 
@@ -236,7 +236,7 @@ template <typename T, int N, typename A>
 inline void local_vector<T, N, A>::push_back(T&& x) {
     if (r_.size_ == r_.capacity_)
         grow();
-    r_.construct(&r_.v_[r_.size_], std::move(x));
+    std::allocator_traits<A>::construct(r_, &r_.v_[r_.size_], std::move(x));
     ++r_.size_;
 }
 
@@ -244,7 +244,7 @@ template <typename T, int N, typename A> template <typename... Args>
 inline void local_vector<T, N, A>::emplace_back(Args&&... args) {
     if (r_.size_ == r_.capacity_)
         grow();
-    r_.construct(&r_.v_[r_.size_], std::forward<Args>(args)...);
+    std::allocator_traits<A>::construct(r_, &r_.v_[r_.size_], std::forward<Args>(args)...);
     ++r_.size_;
 }
 
@@ -252,13 +252,13 @@ template <typename T, int N, typename A>
 inline void local_vector<T, N, A>::pop_back() {
     assert(r_.size_ != 0);
     --r_.size_;
-    r_.destroy(&r_.v_[r_.size_]);
+    std::allocator_traits<A>::destroy(r_, &r_.v_[r_.size_]);
 }
 
 template <typename T, int N, typename A>
 inline void local_vector<T, N, A>::clear() {
     for (size_type i = 0; i != r_.size_; ++i)
-        r_.destroy(&r_.v_[i]);
+        std::allocator_traits<A>::destroy(r_, &r_.v_[i]);
     r_.size_ = 0;
 }
 
