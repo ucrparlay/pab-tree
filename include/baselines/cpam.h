@@ -63,7 +63,7 @@ public:
     }
   };
 
-  using zmap = cpam::aug_map<entry, 32>;
+  using zmap = cpam::aug_map<entry, 64>;
   using par = std::tuple<typename entry::key_t, typename entry::val_t>;
 
   using Leaf = zmap::Tree::node;

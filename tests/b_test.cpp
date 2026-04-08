@@ -39,7 +39,7 @@ ApplyOrthogonal(Options const& opts, RunFunc test_func)
 #elif defined(LEAF1024)
   static constexpr uint const kBuf = 1024;
 #else
-  static constexpr uint const kBuf = 32; // Default
+  static constexpr uint const kBuf = 64; // Default
 #endif // LEAF1
 
   using TypeTrait = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
