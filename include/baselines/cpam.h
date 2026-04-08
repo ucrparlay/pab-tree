@@ -198,23 +198,27 @@ public:
     }
   }
 
-  template<class T, class MBR, typename Logger>
-  auto RangeCountImpl(T& tree, MBR query_mbr, Logger& logger)
-  {
-    // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
-    auto f = [&](TT::K cur) { return mbr_mbr_relation(cur, query_mbr); };
-
-    int64_t ret = 0;
-    zmap::range_count(tree, f, ret, logger);
-    return ret;
-  }
+  // template<class T, class MBR, typename Logger>
+  // auto RangeCountImpl(T& tree, MBR query_mbr, Logger& logger)
+  // {
+  //   // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
+  //   auto f = [&](TT::K cur) { return mbr_mbr_relation(cur, query_mbr); };
+  //
+  //   int64_t ret = 0;
+  //   zmap::range_count(tree, f, ret, logger);
+  //   return ret;
+  // }
 
   auto RangeCount(TT::Box const query_box)
     -> std::pair<size_t, pmos::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
-    auto rt_size = this->RangeCountImpl(this->cpam_aug_map_, query_box, logger);
+    // auto rt_size = this->RangeCountImpl(this->cpam_aug_map_, query_box,
+    // logger);
+    auto rt_tree =
+      zmap::range(this->cpam_aug_map_, query_box.first, query_box.second);
+    auto rt_size = zmap::size(rt_tree.root);
     return { rt_size, logger };
   }
 
