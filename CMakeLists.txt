@@ -145,114 +145,6 @@ if(NOT APPLE)
 	target_compile_definitions(pma PUBLIC PARALLEL=1 PARLAY=1)
 endif()
 
-# NOTE: MASSTREE
-set(MASSTREE_DIR "${PMOS_SOURCE_DIR}/external/masstree-beta")
-set(MASSTREE_SOURCES
-	${MASSTREE_DIR}/compiler.cc
-	${MASSTREE_DIR}/str.cc
-	${MASSTREE_DIR}/straccum.cc
-	${MASSTREE_DIR}/string.cc
-	${MASSTREE_DIR}/string_slice.cc
-	${MASSTREE_DIR}/kvthread.cc
-	${MASSTREE_DIR}/json.cc
-	${MASSTREE_DIR}/msgpack.cc
-	${MASSTREE_DIR}/kvrandom.cc
-	${MASSTREE_DIR}/memdebug.cc
-	${MASSTREE_DIR}/misc.cc
-	${MASSTREE_DIR}/query_masstree.cc
-	${MASSTREE_DIR}/value_string.cc
-	${MASSTREE_DIR}/value_array.cc
-	${MASSTREE_DIR}/value_versioned_array.cc
-	${MASSTREE_DIR}/checkpoint.cc
-	${MASSTREE_DIR}/file.cc
-	${MASSTREE_DIR}/log.cc
-	${MASSTREE_DIR}/kvio.cc
-)
-
-add_library(MASSTREE ${MASSTREE_SOURCES})
-target_include_directories(MASSTREE PUBLIC ${MASSTREE_DIR})
-target_compile_definitions(MASSTREE PUBLIC 
-	NOSUPERPAGE=1
-	HAVE___BUILTIN_CLZ=1
-	HAVE___BUILTIN_CLZL=1
-	HAVE___BUILTIN_CLZLL=1
-	HAVE___BUILTIN_CTZ=1
-	HAVE___BUILTIN_CTZL=1
-	HAVE___BUILTIN_CTZLL=1
-	HAVE_TYPE_TRAITS=1
-	ENABLE_PRECONDITIONS=0
-	ENABLE_INVARIANTS=0
-	CACHE_LINE_SIZE=64
-	MASSTREE_MAXKEYLEN=255
-)
-# Define assertion macros as no-ops since we disabled them
-target_compile_options(MASSTREE PRIVATE 
-	-Wno-error -Wno-all -Wno-extra
-	-Dprecondition\(x,...\)=
-	-Dinvariant\(x,...\)=
-	-Dmasstree_precondition\(x,...\)=
-	-Dmasstree_invariant\(x,...\)=
-	-Dalways_assert\(x,...\)=
-	-Dmandatory_assert\(x,...\)=
-)
-target_link_libraries(MASSTREE PUBLIC pthread)
-
-# NOTE: MASSTREE test executable
-add_executable(masstree ${PROJECT_SOURCE_DIR}/tests/masstree.cpp ${PROJECT_SOURCE_DIR}/include/baselines/masstree_globals.cc)
-target_link_libraries(masstree PUBLIC TEST_FRAME MASSTREE)
-target_include_directories(masstree PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${MASSTREE_DIR})
-target_compile_options(masstree PRIVATE
-	-Dprecondition\(x,...\)=
-	-Dinvariant\(x,...\)=
-	-Dmasstree_precondition\(x,...\)=
-	-Dmasstree_invariant\(x,...\)=
-	-Dalways_assert\(x,...\)=
-	-Dmandatory_assert\(x,...\)=
-)
-
-# NOTE: BWTREE
-set(BWTREE_DIR "${PMOS_SOURCE_DIR}/external/BwTree/src")
-find_library(BWTREE_ATOMIC_LIB atomic)
-
-if(NOT BWTREE_ATOMIC_LIB)
-	execute_process(
-		COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libatomic.so
-		OUTPUT_VARIABLE BWTREE_ATOMIC_SO
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-	)
-	if(EXISTS "${BWTREE_ATOMIC_SO}" AND NOT BWTREE_ATOMIC_SO STREQUAL "libatomic.so")
-		set(BWTREE_ATOMIC_LIB "${BWTREE_ATOMIC_SO}")
-	endif()
-endif()
-
-if(NOT BWTREE_ATOMIC_LIB)
-	execute_process(
-		COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libatomic.a
-		OUTPUT_VARIABLE BWTREE_ATOMIC_A
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-	)
-	if(EXISTS "${BWTREE_ATOMIC_A}" AND NOT BWTREE_ATOMIC_A STREQUAL "libatomic.a")
-		set(BWTREE_ATOMIC_LIB "${BWTREE_ATOMIC_A}")
-	endif()
-endif()
-
-if(NOT BWTREE_ATOMIC_LIB AND EXISTS "/usr/lib64/libatomic.so.1")
-	set(BWTREE_ATOMIC_LIB "/usr/lib64/libatomic.so.1")
-endif()
-
-if(NOT BWTREE_ATOMIC_LIB AND EXISTS "/usr/lib/gcc/x86_64-redhat-linux/8/libatomic.so")
-	set(BWTREE_ATOMIC_LIB "/usr/lib/gcc/x86_64-redhat-linux/8/libatomic.so")
-endif()
-
-if(NOT BWTREE_ATOMIC_LIB)
-	message(FATAL_ERROR "libatomic not found for bwtree target")
-endif()
-
-add_executable(bwtree ${PROJECT_SOURCE_DIR}/tests/BwTree.cpp)
-target_link_libraries(bwtree PUBLIC TEST_FRAME pthread ${BWTREE_ATOMIC_LIB})
-target_include_directories(bwtree PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${BWTREE_DIR})
-target_compile_options(bwtree PRIVATE -fpermissive -fno-access-control)
-
 # NOTE: GoogleTest for correctness check
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
 target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
@@ -276,6 +168,49 @@ endif()
 add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
 target_link_libraries(data_generator PUBLIC TEST_FRAME)
 target_include_directories(data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
+set(INDEX_MICROBENCH_DIR "${PROJECT_SOURCE_DIR}/external/index-microbench")
+file(GLOB INDEX_MICROBENCH_SKIPLIST_SOURCES
+	"${INDEX_MICROBENCH_DIR}/nohotspot-skiplist/*.cpp")
+set(INDEX_MICROBENCH_BTREE_SOURCE "${INDEX_MICROBENCH_DIR}/btree-rtm/btree.c")
+set_source_files_properties(${INDEX_MICROBENCH_BTREE_SOURCE} PROPERTIES LANGUAGE CXX)
+
+add_executable(index_microbench_workload
+	"${INDEX_MICROBENCH_DIR}/workload.cpp"
+	"${INDEX_MICROBENCH_DIR}/BwTree/bwtree.cpp"
+	"${INDEX_MICROBENCH_DIR}/ARTOLC/Tree.cpp"
+	"${INDEX_MICROBENCH_BTREE_SOURCE}"
+	${INDEX_MICROBENCH_SKIPLIST_SOURCES}
+)
+set_target_properties(index_microbench_workload PROPERTIES
+	CXX_STANDARD 20
+	CXX_STANDARD_REQUIRED ON
+	CXX_EXTENSIONS ON
+)
+target_include_directories(index_microbench_workload PRIVATE ${INDEX_MICROBENCH_DIR} ${TEST_FRAME_INCLUDE_DIR})
+target_compile_definitions(index_microbench_workload PRIVATE USE_TBB BWTREE_NODEBUG NDEBUG)
+target_compile_options(index_microbench_workload PRIVATE
+	-Wno-invalid-offsetof
+	-include "${INDEX_MICROBENCH_DIR}/masstree/config.h"
+)
+find_package(Threads REQUIRED)
+target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m tbb papi tcmalloc_minimal)
+
+find_library(INDEX_MICROBENCH_ATOMIC_LIB
+	NAMES atomic libatomic.so.1
+	PATHS /lib64 /usr/lib64 /lib /usr/lib
+)
+if(INDEX_MICROBENCH_ATOMIC_LIB)
+	target_link_libraries(index_microbench_workload PRIVATE "${INDEX_MICROBENCH_ATOMIC_LIB}")
+else()
+	message(WARNING "libatomic was not found for index_microbench_workload")
+endif()
+
+if(EXISTS "${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.a")
+	target_link_libraries(index_microbench_workload PRIVATE "${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.a")
+else()
+	message(WARNING "mtIndexAPI.a not found in ${INDEX_MICROBENCH_DIR}/masstree; build masstree before linking index_microbench_workload")
+endif()
 
 
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)

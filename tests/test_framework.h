@@ -936,8 +936,10 @@ static auto constexpr DefaultTestFunc =
       BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
     }
 
+    // PARA: lambda for membership
     auto membership_query = [&](auto const& query_ele) {};
 
+    // PARA: lambda for range query
     auto range_query = [&](auto const& base_points) {
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
         auto [query_box_seq, max_size] = GenRectangles<TT, Tree, false, false>(
@@ -948,6 +950,7 @@ static auto constexpr DefaultTestFunc =
       }
     };
 
+    // PARA: lambda for range count
     auto range_count = [&](auto const& base_points) {
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
         auto [query_box_seq, max_size] = GenRectangles<TT, Tree, false, false>(
@@ -956,7 +959,8 @@ static auto constexpr DefaultTestFunc =
       }
     };
 
-    if (opts.query_type & (1 << 0)) { // NOTE: membership
+    // NOTE: membership
+    if (opts.query_type & (1 << 0)) {
       auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
       auto query_ele =
         wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
@@ -964,13 +968,16 @@ static auto constexpr DefaultTestFunc =
       Membership<TT>(tree, query_ele, opts.rounds, res);
     }
 
-    if (opts.query_type & (1 << 1)) { // NOTE: range query
+    // NOTE: range query
+    if (opts.query_type & (1 << 1)) {
       range_query(wp);
     }
 
-    if (opts.query_type & (1 << 2)) { // NOTE: range count
+    // NOTE: range count
+    if (opts.query_type & (1 << 2)) {
       range_count(wp);
     }
+
     // NOTE: incremental build
     if (opts.tag & (1 << 2)) {
       parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
@@ -1100,6 +1107,20 @@ struct Options
     batch_path.replace(batch_path.find(".base."), 6, ".batch.");
 
     return std::make_pair(base_path, batch_path);
+  }
+
+  void PrintOptionValue() const
+  {
+    std::cout << "Options: " << std::endl;
+    std::cout << "val_n: " << val_n << std::endl;
+    std::cout << "input_file_path: " << input_file_path << std::endl;
+    std::cout << "tag: " << tag << std::endl;
+    std::cout << "rounds: " << rounds << std::endl;
+    std::cout << "query_type: " << query_type << std::endl;
+    std::cout << "summary: " << summary << std::endl;
+    std::cout << "batch_ratio: " << batch_ratio << std::endl;
+    std::cout << "tree_type: " << tree_type << std::endl;
+    std::cout << "dis_type: " << dis_type << std::endl;
   }
 
   int val_n;
