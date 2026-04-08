@@ -7,3 +7,6 @@
 [submodule "external/masstree-beta"]
 	path = external/masstree-beta
 	url = git@github.com:kohler/masstree-beta.git
+[submodule "external/BwTree"]
+	path = external/BwTree
+	url = git@github.com:wangziqi2013/BwTree.git

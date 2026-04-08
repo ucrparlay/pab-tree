@@ -210,6 +210,49 @@ target_compile_options(masstree PRIVATE
 	-Dmandatory_assert\(x,...\)=
 )
 
+# NOTE: BWTREE
+set(BWTREE_DIR "${PMOS_SOURCE_DIR}/external/BwTree/src")
+find_library(BWTREE_ATOMIC_LIB atomic)
+
+if(NOT BWTREE_ATOMIC_LIB)
+	execute_process(
+		COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libatomic.so
+		OUTPUT_VARIABLE BWTREE_ATOMIC_SO
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	if(EXISTS "${BWTREE_ATOMIC_SO}" AND NOT BWTREE_ATOMIC_SO STREQUAL "libatomic.so")
+		set(BWTREE_ATOMIC_LIB "${BWTREE_ATOMIC_SO}")
+	endif()
+endif()
+
+if(NOT BWTREE_ATOMIC_LIB)
+	execute_process(
+		COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libatomic.a
+		OUTPUT_VARIABLE BWTREE_ATOMIC_A
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	if(EXISTS "${BWTREE_ATOMIC_A}" AND NOT BWTREE_ATOMIC_A STREQUAL "libatomic.a")
+		set(BWTREE_ATOMIC_LIB "${BWTREE_ATOMIC_A}")
+	endif()
+endif()
+
+if(NOT BWTREE_ATOMIC_LIB AND EXISTS "/usr/lib64/libatomic.so.1")
+	set(BWTREE_ATOMIC_LIB "/usr/lib64/libatomic.so.1")
+endif()
+
+if(NOT BWTREE_ATOMIC_LIB AND EXISTS "/usr/lib/gcc/x86_64-redhat-linux/8/libatomic.so")
+	set(BWTREE_ATOMIC_LIB "/usr/lib/gcc/x86_64-redhat-linux/8/libatomic.so")
+endif()
+
+if(NOT BWTREE_ATOMIC_LIB)
+	message(FATAL_ERROR "libatomic not found for bwtree target")
+endif()
+
+add_executable(bwtree ${PROJECT_SOURCE_DIR}/tests/BwTree.cpp)
+target_link_libraries(bwtree PUBLIC TEST_FRAME pthread ${BWTREE_ATOMIC_LIB})
+target_include_directories(bwtree PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${BWTREE_DIR})
+target_compile_options(bwtree PRIVATE -fpermissive -fno-access-control)
+
 # NOTE: GoogleTest for correctness check
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
 target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
