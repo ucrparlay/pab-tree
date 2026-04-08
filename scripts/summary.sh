@@ -65,11 +65,17 @@ function run_cmake() {
 	cd "${cur_path}" || exit
 }
 
-# PMA
-tree=3
-solver="pma"
+# Masstree
+tree=5
+solver="masstree"
 run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
+
+# # PMA
+# tree=3
+# solver="pma"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # PAM
 tree=2
@@ -84,9 +90,9 @@ run_cmake 4 "${solver}"
 run_test 4 "${solver}" "${tree}"
 
 # ours
-solver="b_test"
-tree=0
-for idx in "${!leaf_wrap_seq[@]}"; do
-	run_cmake "${idx}" "${solver}"
-	run_test "${idx}" "${solver}" "${tree}"
-done
+# solver="b_test"
+# tree=0
+# for idx in "${!leaf_wrap_seq[@]}"; do
+# 	run_cmake "${idx}" "${solver}"
+# 	run_test "${idx}" "${solver}" "${tree}"
+# done
