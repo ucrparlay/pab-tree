@@ -98,7 +98,7 @@ enable_testing()
 
 # NOTE: PMOS
 add_library(PMOS INTERFACE)
-set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos" "${PMOS_SOURCE_DIR}/include/")
+set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos" "${PMOS_SOURCE_DIR}/include/" "${PMOS_SOURCE_DIR}/external")
 target_link_libraries(PMOS INTERFACE parlay)
 target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
@@ -109,7 +109,7 @@ target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
 
 # NOTE: CPAM
 add_library(CPAM INTERFACE)
-set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/baselines/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/include/baselines/CPAM/include/pam")
+set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/external/CPAM/include/pam")
 target_link_libraries(CPAM INTERFACE parlay PMOS)
 target_include_directories(CPAM INTERFACE ${CPAM_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
 

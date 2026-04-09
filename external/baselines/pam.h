@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "CPAM/include/pam/pam.h"
 #include "b_tree.h"
+#include <pam.h>
 // #include "geobase.h"
 // #include "hilbert.h"
 
@@ -285,8 +285,8 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+  auto RangeReport(TT::Box const query_box,
+                   Range&& out) -> std::pair<size_t, pmos::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
