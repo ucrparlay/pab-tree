@@ -167,6 +167,17 @@ public:
   }
 
   //#################################################################################
+  // Remove
+  //#################################################################################
+  inline bool remove(const Str &key, threadinfo *ti) {
+    return q_[0].run_remove(table_->table(), key, *ti);
+  }
+
+  bool remove(const char *key, int keylen, threadinfo *ti) {
+    return remove(Str(key, keylen), ti);
+  }
+
+  //#################################################################################
   // Get (unique value)
   //#################################################################################
   inline bool dynamic_get(const Str &key, Str &value, threadinfo *ti) {

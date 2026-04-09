@@ -188,7 +188,8 @@ set_target_properties(index_microbench_workload PROPERTIES
 	CXX_EXTENSIONS ON
 )
 target_include_directories(index_microbench_workload PRIVATE ${INDEX_MICROBENCH_DIR} ${TEST_FRAME_INCLUDE_DIR})
-target_compile_definitions(index_microbench_workload PRIVATE USE_TBB BWTREE_NODEBUG NDEBUG)
+# target_compile_definitions(index_microbench_workload PRIVATE USE_TBB BWTREE_NODEBUG NDEBUG)
+target_compile_definitions(index_microbench_workload PRIVATE BWTREE_NODEBUG NDEBUG)
 target_compile_options(index_microbench_workload PRIVATE
 	-Wno-invalid-offsetof
 	-include "${INDEX_MICROBENCH_DIR}/masstree/config.h"

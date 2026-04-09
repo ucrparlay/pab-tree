@@ -549,25 +549,19 @@ struct BwTreeWrapper
 
 template<int kPrint>
 void
-ConInsert(auto num_thread, auto idx, const auto& wp)
+ConDelete(auto num_thread, auto idx, const auto& wp)
 {
-  tbb::task_scheduler_init init{ num_thread };
-
-  std::atomic<int> next_thread_id;
-  next_thread_id.store(0);
-
-  auto func = [idx, &wp, &next_thread_id](const tbb::blocked_range<size_t>& r) {
-    size_t start_index = r.begin();
-    size_t end_index = r.end();
+  auto func = [idx, &wp, num_thread](uint64_t thread_id, bool) {
+    size_t total_num_key = wp.size();
+    size_t key_per_thread = total_num_key / num_thread;
+    size_t start_index = key_per_thread * thread_id;
+    size_t end_index = start_index + key_per_thread;
 
     threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
 
-    int thread_id = next_thread_id.fetch_add(1);
-    idx->AssignGCID(thread_id);
-
     int gc_counter = 0;
     for (size_t i = start_index; i < end_index; i++) {
-      idx->insert(wp[i].key, wp[i].val, ti);
+      idx->remove(wp[i].GetKey(), wp[i].GetVal(), ti);
       gc_counter++;
       if (gc_counter % 4096 == 0) {
         ti->rcu_quiesce();
@@ -575,20 +569,49 @@ ConInsert(auto num_thread, auto idx, const auto& wp)
     }
 
     ti->rcu_quiesce();
-    idx->UnregisterThread(thread_id);
 
     return;
   };
 
-  idx->UpdateThreadLocal(num_thread);
+  parlay::internal::timer t;
+  t.reset(), t.start();
+  StartThreads(idx, num_thread, func, false);
+  t.stop();
+  if constexpr (kPrint) {
+    std::cout << t.total_time() << " ";
+  }
+}
+
+template<int kPrint>
+void
+ConInsert(auto num_thread, auto idx, const auto& wp)
+{
+  auto func = [idx, &wp, num_thread](uint64_t thread_id, bool) {
+    size_t total_num_key = wp.size();
+    size_t key_per_thread = total_num_key / num_thread;
+    size_t start_index = key_per_thread * thread_id;
+    size_t end_index = start_index + key_per_thread;
+
+    threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+
+    int gc_counter = 0;
+    for (size_t i = start_index; i < end_index; i++) {
+      idx->insert(wp[i].GetKey(), wp[i].GetVal(), ti);
+      gc_counter++;
+      if (gc_counter % 4096 == 0) {
+        ti->rcu_quiesce();
+      }
+    }
+
+    ti->rcu_quiesce();
+
+    return;
+  };
 
   parlay::internal::timer t;
   t.reset(), t.start();
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, wp.size()), func);
+  StartThreads(idx, num_thread, func, false);
   t.stop();
-
-  idx->UpdateThreadLocal(1);
-
   if constexpr (kPrint) {
     std::cout << t.total_time() << " ";
   }
@@ -679,6 +702,7 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
 
   // NOTE: build
   auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
+  // std::cout << "build" << std::endl;
 
   // NOTE: insert
   if (opts.tag & (1 << 0)) {
@@ -701,6 +725,36 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
       auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
       auto* idx = ConBuild<0>(num_thread, index_type, wp);
       ConInsert<1>(num_thread, idx, wi);
+      // std::cout << "after insert" << std::endl;
+      delete idx;
+    }
+  }
+
+  // NOTE: batch delete
+  if (opts.tag & (1 << 1)) {
+    if (opts.summary) {
+      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+      // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
+      for (auto ratio : ratio_seq) {
+        // puts("------------------------------");
+        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConDelete<1>(num_thread, idx, wi);
+        delete idx;
+      }
+    } else {
+      auto [base_path, batch_path] =
+        opts.ParseDeleteBatchPath(opts.batch_ratio);
+      // std::cout << base_path << " " << batch_path << std::endl;
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+      auto* idx = ConBuild<0>(num_thread, index_type, wp);
+      // std::cout << "after delete build" << std::endl;
+      ConDelete<1>(num_thread, idx, wi);
+      // std::cout << "after delete " << std::endl;
       delete idx;
     }
   }
