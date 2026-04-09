@@ -547,44 +547,10 @@ struct BwTreeWrapper
   // using TreeType = typename PAMTree::PamRaw<TypeTrait>;
 };
 
-template<typename Options, typename RunFunc>
+template<int kPrint>
 void
-ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
+ConInsert(auto num_thread, auto idx, const auto& wp)
 {
-  opts.PrintOptionValue();
-
-  using E = typename Wrapper::E;
-  // using EleType = Element<uint32_t, uint32_t>;
-  using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                  16,
-                                  Wrapper::LeafAugEmpty,
-                                  Wrapper::InteriorAugEmpty,
-                                  8,
-                                  pmos::ProtoNode>;
-
-  using EntrySeq = TT::EntrySeq;
-
-  int index_type = 0;
-  if (opts.tree_type == 5) {
-    index_type = TYPE_MASSTREE;
-  } else if (opts.tree_type == 6) {
-    index_type = TYPE_BWTREE;
-  } else {
-    std::cout << "Unsupported tree type: " << opts.tree_type << std::endl;
-    return;
-  }
-
-  int num_thread = parlay::num_workers();
-  parlay::internal::timer t;
-
-  Index<keytype, keycomp>* idx =
-    getInstance<keytype, keycomp>(index_type, key_type);
-
-  EntrySeq wp;
-  EntrySeq wi;
-  ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
-
-  // NOTE: build tree
   tbb::task_scheduler_init init{ num_thread };
 
   std::atomic<int> next_thread_id;
@@ -615,20 +581,36 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
   };
 
   idx->UpdateThreadLocal(num_thread);
+
+  parlay::internal::timer t;
   t.reset(), t.start();
   tbb::parallel_for(tbb::blocked_range<size_t>(0, wp.size()), func);
   t.stop();
-  idx->UpdateThreadLocal(1);
-  std::cout << "Build tree time: " << t.total_time() << " seconds\n";
 
-  // Membership query
-  auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
-  // auto query_ele =
-  //   wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
-  auto query_ele = parlay::tabulate(batch_size, [&](size_t i) {
-    return wi.size() ? wi[i].GetKey() : wp[i].GetKey();
-  });
-  auto func2 = [&](uint64_t thread_id, bool) {
+  idx->UpdateThreadLocal(1);
+
+  if constexpr (kPrint) {
+    std::cout << t.total_time() << " ";
+  }
+}
+
+template<int kPrint>
+auto
+ConBuild(auto num_thread, int index_type, const auto& wp)
+{
+  // instantiate the index
+  Index<keytype, keycomp>* idx =
+    getInstance<keytype, keycomp>(index_type, key_type);
+
+  ConInsert<kPrint>(num_thread, idx, wp);
+
+  return idx;
+}
+
+void
+ConMembership(auto num_thread, auto idx, const auto& query_ele)
+{
+  auto func2 = [num_thread, idx, &query_ele](uint64_t thread_id, bool) {
     size_t total_num_op = query_ele.size();
     size_t op_per_thread = total_num_op / num_thread;
     size_t start_index = op_per_thread * thread_id;
@@ -655,10 +637,84 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
     return;
   };
 
+  parlay::internal::timer t;
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << "Membership query time: " << t.total_time() << " seconds\n";
+  std::cout << t.total_time() << " ";
+}
+
+template<typename Options, typename RunFunc>
+void
+ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
+{
+  // opts.PrintOptionValue();
+
+  using E = typename Wrapper::E;
+  // using EleType = Element<uint32_t, uint32_t>;
+  using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+                                  16,
+                                  Wrapper::LeafAugEmpty,
+                                  Wrapper::InteriorAugEmpty,
+                                  8,
+                                  pmos::ProtoNode>;
+
+  using EntrySeq = TT::EntrySeq;
+
+  int index_type = 0;
+  if (opts.tree_type == 5) {
+    index_type = TYPE_MASSTREE;
+  } else if (opts.tree_type == 6) {
+    index_type = TYPE_BWTREE;
+  } else {
+    std::cout << "Unsupported tree type: " << opts.tree_type << std::endl;
+    return;
+  }
+
+  int num_thread = parlay::num_workers();
+
+  EntrySeq wp;
+  EntrySeq wi;
+  ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+
+  // NOTE: build
+  auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
+
+  // NOTE: insert
+  if (opts.tag & (1 << 0)) {
+    if (opts.summary) {
+      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConInsert<1>(num_thread, idx, wi);
+        delete idx;
+      }
+    } else {
+      auto [base_path, batch_path] =
+        opts.ParseInsertBatchPath(opts.batch_ratio);
+      // std::cout << base_path << " " << batch_path << std::endl;
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+      auto* idx = ConBuild<0>(num_thread, index_type, wp);
+      ConInsert<1>(num_thread, idx, wi);
+      delete idx;
+    }
+  }
+
+  // NOTE: Membership query
+  if (opts.query_type & (1 << 0)) {
+    auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+    // auto query_ele =
+    //   wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
+    auto query_ele = parlay::tabulate(batch_size, [&](size_t i) {
+      return wi.size() ? wi[i].GetKey() : wp[i].GetKey();
+    });
+    ConMembership(num_thread, primal_idx, query_ele);
+  }
 }
 
 int
