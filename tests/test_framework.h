@@ -72,7 +72,7 @@ GetRandomIndex(size_t a, size_t b)
   return size_t((rand() % (b - a)) + a);
 }
 
-template<typename TT, typename Tree, bool SavePoint, bool FixSize>
+template<typename TT, bool SavePoint, bool FixSize>
 auto
 GenRectangles(int rec_num, int const type, auto const& WP)
 {
@@ -417,7 +417,7 @@ RangeCount(auto const& wp,
   using EntrySeq = typename TT::EntrySeq;
 
   auto [query_box_seq, max_size] =
-    GenRectangles<TT, Tree, false, false>(rec_num, rec_type, wp);
+    GenRectangles<TT, false, false>(rec_num, rec_type, wp);
   parlay::sequence<size_t> kdknn(rec_num, 0);
 
   double ave_query = time_loop(
@@ -462,7 +462,7 @@ RangeQuery(auto const& wp,
   using EntrySeq = typename TT::EntrySeq;
 
   auto [query_box_seq, max_size] =
-    GenRectangles<TT, Tree, true, false>(rec_num, rec_type, wp);
+    GenRectangles<TT, true, false>(rec_num, rec_type, wp);
   auto [offset, tot_size] = parlay::scan(
     parlay::delayed_tabulate(
       rec_num,
@@ -942,7 +942,7 @@ static auto constexpr DefaultTestFunc =
     // PARA: lambda for range query
     auto range_query = [&](auto const& base_points) {
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        auto [query_box_seq, max_size] = GenRectangles<TT, Tree, false, false>(
+        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
           kRangeQueryNum, rec_type, base_points);
         typename TT::EntrySeq Out;
         RangeQueryFix<TT>(
@@ -953,7 +953,7 @@ static auto constexpr DefaultTestFunc =
     // PARA: lambda for range count
     auto range_count = [&](auto const& base_points) {
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        auto [query_box_seq, max_size] = GenRectangles<TT, Tree, false, false>(
+        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
           kRangeQueryNum, rec_type, base_points);
         RangeCountFix<TT>(tree, opts.rounds, kRangeQueryNum, query_box_seq);
       }

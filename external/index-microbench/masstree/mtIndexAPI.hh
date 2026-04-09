@@ -195,11 +195,12 @@ public:
   //#################################################################################
   // Get Next (ordered)
   //#################################################################################
-  bool dynamic_get_next(Str &value, char *cur_key, int *cur_keylen, threadinfo *ti) {
+  bool dynamic_get_next(Str &key, Str &value, char *cur_key, int *cur_keylen, threadinfo *ti) {
     Json req = Json::array(0, 0, Str(cur_key, *cur_keylen), 2);
     q_[0].run_scan(table_->table(), req, *ti);
     if (req.size() < 4)
       return false;
+    key = req[2].as_s();
     value = req[3].as_s();
     if (req.size() < 6) {
       *cur_keylen = 0;
@@ -211,6 +212,11 @@ public:
     }
     
     return true;
+  }
+
+  bool dynamic_get_next(Str &value, char *cur_key, int *cur_keylen, threadinfo *ti) {
+    Str key;
+    return dynamic_get_next(key, value, cur_key, cur_keylen, ti);
   }
 
   //#################################################################################

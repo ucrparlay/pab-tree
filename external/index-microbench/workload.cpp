@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cctype>
 #include <cstring>
+#include <limits>
 
 thread_local long skiplist_steps = 0;
 std::atomic<long> skiplist_total_steps;
@@ -667,6 +668,83 @@ ConMembership(auto num_thread, auto idx, const auto& query_ele)
   std::cout << t.total_time() << " ";
 }
 
+void
+ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
+{
+  auto func2 = [num_thread, idx, &query_box_seq](uint64_t thread_id, bool) {
+    size_t total_num_op = query_box_seq.size();
+    size_t op_per_thread = total_num_op / num_thread;
+    size_t start_index = op_per_thread * thread_id;
+    size_t end_index = start_index + op_per_thread;
+
+    threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+
+    int counter = 0;
+    for (size_t i = start_index; i < end_index; i++) {
+      idx->range_count(query_box_seq[i].first, ti);
+
+      counter++;
+      if (counter % 4096 == 0) {
+        ti->rcu_quiesce();
+      }
+    }
+
+    // Perform GC after all operations
+    ti->rcu_quiesce();
+
+    return;
+  };
+
+  parlay::internal::timer t;
+  t.reset(), t.start();
+  StartThreads(idx, num_thread, func2, false);
+  t.stop();
+  std::cout << t.total_time() << " ";
+}
+
+void
+ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
+{
+  auto [offset, tot_size] = parlay::scan(
+    parlay::delayed_tabulate(
+      rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
+    parlay::addm<size_t>());
+  offset.push_back(tot_size);
+
+  auto func2 = [num_thread, idx, &offset, &query_box_seq](uint64_t thread_id,
+                                                          bool) {
+    size_t total_num_op = query_box_seq.size();
+    size_t op_per_thread = total_num_op / num_thread;
+    size_t start_index = op_per_thread * thread_id;
+    size_t end_index = start_index + op_per_thread;
+
+    threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+
+    std::vector<std::pair<keytype, uint64_t>> v;
+    v.resize(offset[end_index] - offset[start_index]);
+
+    int counter = 0;
+    for (size_t i = start_index; i < end_index; i++) {
+      idx->range_report(query_box_seq[i].first, &v, ti);
+
+      counter++;
+      if (counter % 4096 == 0) {
+        ti->rcu_quiesce();
+      }
+    }
+
+    // Perform GC after all operations
+    ti->rcu_quiesce();
+
+    return;
+  };
+
+  parlay::internal::timer t;
+  t.reset(), t.start();
+  StartThreads(idx, num_thread, func2, false);
+  t.stop();
+  std::cout << t.total_time() << " ";
+}
 template<typename Options, typename RunFunc>
 void
 ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
@@ -768,6 +846,34 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
       return wi.size() ? wi[i].GetKey() : wp[i].GetKey();
     });
     ConMembership(num_thread, primal_idx, query_ele);
+  }
+
+  // PARA: lambda for range query
+  auto range_query = [&](auto const& base_points) {
+    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      auto [query_box_seq, max_size] =
+        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
+      ConRangeQuery(num_thread, primal_idx, kRangeQueryNum, query_box_seq);
+    }
+  };
+
+  // PARA: lambda for range count
+  auto range_count = [&](auto const& base_points) {
+    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      auto [query_box_seq, max_size] =
+        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
+      ConRangeCount(num_thread, primal_idx, query_box_seq);
+    }
+  };
+
+  // NOTE: range query
+  if (opts.query_type & (1 << 1)) {
+    range_query(wp);
+  }
+
+  // NOTE: range count
+  if (opts.query_type & (1 << 2)) {
+    range_count(wp);
   }
 }
 

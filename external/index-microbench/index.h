@@ -11,6 +11,8 @@
 #endif
 #include "BwTree/bwtree.h"
 #include <byteswap.h>
+#include <utility>
+#include <vector>
 
 #include "btree-rtm/btree.h"
 #include "masstree/mtIndexAPI.hh"
@@ -47,6 +49,22 @@ public:
   virtual bool upsert(KeyType key, uint64_t value, threadinfo* ti) = 0;
 
   virtual uint64_t scan(KeyType key, int range, threadinfo* ti) = 0;
+  virtual uint64_t range_count(std::pair<KeyType, KeyType> key_range,
+                               threadinfo* ti)
+  {
+    (void)key_range;
+    (void)ti;
+    return 0UL;
+  }
+  virtual uint64_t range_report(std::pair<KeyType, KeyType> key_range,
+                                std::vector<std::pair<KeyType, uint64_t>>* out,
+                                threadinfo* ti)
+  {
+    (void)key_range;
+    (void)out;
+    (void)ti;
+    return 0UL;
+  }
 
   virtual int64_t getMemory() const = 0;
 
@@ -666,6 +684,50 @@ public:
     return sum;
   }
 
+  uint64_t range_report(std::pair<KeyType, KeyType> key_range,
+                        std::vector<std::pair<KeyType, uint64_t>>* out,
+                        threadinfo*)
+  {
+    size_t write_idx = 0;
+    KeyComparator comp;
+    if (!comp(key_range.first, key_range.second)) {
+      out->resize(0);
+      return 0UL;
+    }
+
+    auto it = index_p->Begin(key_range.first);
+    while (!it.IsEnd() && comp(it->first, key_range.second)) {
+      std::pair<KeyType, uint64_t> kv{ it->first, it->second };
+      if (write_idx < out->size()) {
+        (*out)[write_idx] = kv;
+      } else {
+        out->push_back(kv);
+      }
+      ++write_idx;
+      ++it;
+    }
+    out->resize(write_idx);
+
+    return write_idx;
+  }
+
+  uint64_t range_count(std::pair<KeyType, KeyType> key_range, threadinfo*)
+  {
+    uint64_t count = 0;
+    KeyComparator comp;
+    if (!comp(key_range.first, key_range.second)) {
+      return 0UL;
+    }
+
+    auto it = index_p->Begin(key_range.first);
+    while (!it.IsEnd() && comp(it->first, key_range.second)) {
+      ++count;
+      ++it;
+    }
+
+    return count;
+  }
+
   int64_t getMemory() const
   {
     return 0L;
@@ -769,6 +831,94 @@ public:
       idx->get_next_n(results, (char*)&key, &key_len, range, ti);
     // printf("scan: requested: %d, actual: %d\n", range, resultCount);
     return resultCount;
+  }
+
+  uint64_t range_report(std::pair<KeyType, KeyType> key_range,
+                        std::vector<std::pair<KeyType, uint64_t>>* out,
+                        threadinfo* ti)
+  {
+    size_t write_idx = 0;
+    KeyComparator comp;
+    if (!comp(key_range.first, key_range.second)) {
+      out->resize(0);
+      return 0UL;
+    }
+
+    KeyType lower = key_range.first;
+    swap_endian(lower);
+    char cursor_key[sizeof(KeyType)];
+    memcpy(cursor_key, &lower, sizeof(KeyType));
+    int cursor_len = sizeof(KeyType);
+
+    while (cursor_len > 0) {
+      Str current_key;
+      Str current_value;
+      if (!idx->dynamic_get_next(
+            current_key, current_value, cursor_key, &cursor_len, ti)) {
+        break;
+      }
+      if (current_key.len != sizeof(KeyType) || current_value.len < 8) {
+        break;
+      }
+
+      KeyType key;
+      memcpy(&key, current_key.s, sizeof(KeyType));
+      swap_endian(key);
+
+      if (!comp(key, key_range.second)) {
+        break;
+      }
+      uint64_t value;
+      memcpy(&value, current_value.s, sizeof(uint64_t));
+      std::pair<KeyType, uint64_t> kv{ key, value };
+      if (write_idx < out->size()) {
+        (*out)[write_idx] = kv;
+      } else {
+        out->push_back(kv);
+      }
+      ++write_idx;
+    }
+    out->resize(write_idx);
+
+    return write_idx;
+  }
+
+  uint64_t range_count(std::pair<KeyType, KeyType> key_range, threadinfo* ti)
+  {
+    uint64_t count = 0;
+    KeyComparator comp;
+    if (!comp(key_range.first, key_range.second)) {
+      return 0UL;
+    }
+
+    KeyType lower = key_range.first;
+    swap_endian(lower);
+    char cursor_key[sizeof(KeyType)];
+    memcpy(cursor_key, &lower, sizeof(KeyType));
+    int cursor_len = sizeof(KeyType);
+
+    while (cursor_len > 0) {
+      Str current_key;
+      Str current_value;
+      if (!idx->dynamic_get_next(
+            current_key, current_value, cursor_key, &cursor_len, ti)) {
+        break;
+      }
+      if (current_key.len != sizeof(KeyType)) {
+        break;
+      }
+
+      KeyType key;
+      memcpy(&key, current_key.s, sizeof(KeyType));
+      swap_endian(key);
+
+      if (!comp(key, key_range.second)) {
+        break;
+      }
+      ++count;
+    }
+
+    return count;
   }
 
   int64_t getMemory() const
