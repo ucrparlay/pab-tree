@@ -475,10 +475,10 @@ public:
     (void)kt;
 
     // Print the size of preallocated storage
-    fprintf(stderr,
-            "Inner prealloc size = %lu; Leaf prealloc size = %lu\n",
-            index_type::INNER_PREALLOCATION_SIZE,
-            index_type::LEAF_PREALLOCATION_SIZE);
+    // fprintf(stderr,
+    //         "Inner prealloc size = %lu; Leaf prealloc size = %lu\n",
+    //         index_type::INNER_PREALLOCATION_SIZE,
+    //         index_type::LEAF_PREALLOCATION_SIZE);
 
     return;
   }
@@ -492,28 +492,28 @@ public:
 #ifdef BWTREE_COLLECT_STATISTICS
   void CollectStatisticalCounter(int thread_num)
   {
-    static constexpr int counter_count =
-      BwTreeBase::GCMetaData::CounterType::COUNTER_COUNT;
-    int counters[counter_count];
-
-    // Aggregate on the array of counters
-    memset(counters, 0x00, sizeof(counters));
-
-    for (int i = 0; i < thread_num; i++) {
-      for (int j = 0; j < counter_count; j++) {
-        counters[j] += index_p->GetGCMetaData(i)->counters[j];
-      }
-    }
-
-    fprintf(stderr, "Statistical counters:\n");
-    for (int j = 0; j < counter_count; j++) {
-      fprintf(stderr,
-              "    counter %s = %d\n",
-              BwTreeBase::GCMetaData::COUNTER_NAME_LIST[j],
-              counters[j]);
-    }
-
-    return;
+    // static constexpr int counter_count =
+    //   BwTreeBase::GCMetaData::CounterType::COUNTER_COUNT;
+    // int counters[counter_count];
+    //
+    // // Aggregate on the array of counters
+    // memset(counters, 0x00, sizeof(counters));
+    //
+    // for (int i = 0; i < thread_num; i++) {
+    //   for (int j = 0; j < counter_count; j++) {
+    //     counters[j] += index_p->GetGCMetaData(i)->counters[j];
+    //   }
+    // }
+    //
+    // fprintf(stderr, "Statistical counters:\n");
+    // for (int j = 0; j < counter_count; j++) {
+    //   fprintf(stderr,
+    //           "    counter %s = %d\n",
+    //           BwTreeBase::GCMetaData::COUNTER_NAME_LIST[j],
+    //           counters[j]);
+    // }
+    //
+    // return;
   }
 #endif
 
