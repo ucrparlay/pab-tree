@@ -11,6 +11,7 @@
 #endif
 #include "BwTree/bwtree.h"
 #include <byteswap.h>
+#include "parlay/sequence.h"
 #include <utility>
 #include <vector>
 
@@ -57,7 +58,7 @@ public:
     return 0UL;
   }
   virtual uint64_t range_report(std::pair<KeyType, KeyType> key_range,
-                                std::vector<std::pair<KeyType, uint64_t>>* out,
+                                parlay::sequence<std::pair<KeyType, uint64_t>>* out,
                                 threadinfo* ti)
   {
     (void)key_range;
@@ -685,7 +686,7 @@ public:
   }
 
   uint64_t range_report(std::pair<KeyType, KeyType> key_range,
-                        std::vector<std::pair<KeyType, uint64_t>>* out,
+                        parlay::sequence<std::pair<KeyType, uint64_t>>* out,
                         threadinfo*)
   {
     size_t write_idx = 0;
@@ -834,7 +835,7 @@ public:
   }
 
   uint64_t range_report(std::pair<KeyType, KeyType> key_range,
-                        std::vector<std::pair<KeyType, uint64_t>>* out,
+                        parlay::sequence<std::pair<KeyType, uint64_t>>* out,
                         threadinfo* ti)
   {
     size_t write_idx = 0;

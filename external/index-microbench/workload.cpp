@@ -6,6 +6,7 @@
 #include "parlay/primitives.h"
 #include <atomic>
 #include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
@@ -720,7 +721,7 @@ ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
 
     threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
 
-    std::vector<std::pair<keytype, uint64_t>> v;
+    parlay::sequence<std::pair<keytype, uint64_t>> v;
     v.resize(offset[end_index] - offset[start_index]);
 
     int counter = 0;
@@ -880,6 +881,8 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
 int
 main(int argc, char* argv[])
 {
+  // Suppress tcmalloc large-allocation warnings for benchmark runs.
+  setenv("TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD", "1099511627776", 0);
 
   commandLine params(argc, argv);
   Options opts(params);
