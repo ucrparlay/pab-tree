@@ -36,8 +36,8 @@ using namespace pmos;
 static constexpr double kMemberQueryRatio = 0.01;
 static constexpr size_t kMemberQueryOsmSize = 10000000;
 // NOTE: rectangle numbers
-// static constexpr int kRangeQueryNum = 50000;
-static constexpr int kRangeQueryNum = 500;
+static constexpr int kRangeQueryNum = 50000;
+// static constexpr int kRangeQueryNum = 500;
 static constexpr int kRangeQueryType = 3;
 static constexpr int kSingleQueryLogRepeatNum = 100;
 
@@ -652,7 +652,7 @@ RangeQueryFix(Tree& pkd,
   parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num);
 
   auto [offset, tot_size] = parlay::scan(
-    parlay::delayed_tabulate(
+    parlay::tabulate(
       rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
     parlay::addm<size_t>());
   offset.push_back(tot_size);
@@ -1182,7 +1182,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In){};
+    LeafAugEmpty(Slice In) {};
 
     template<typename Slice>
     void UpdateAug(Slice In)

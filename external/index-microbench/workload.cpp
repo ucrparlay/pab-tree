@@ -667,7 +667,7 @@ ConMembership(auto num_thread, auto idx, const auto& query_ele)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << t.total_time() << " ";
+  std::cout << t.total_time() << " " << std::flush;
 }
 
 void
@@ -701,12 +701,16 @@ ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << t.total_time() << " ";
+  std::cout << t.total_time() << " " << std::flush;
   // std::cout << "9999999" << " ";
 }
 
 void
-ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
+ConRangeQuery(auto num_thread,
+              auto idx,
+              int index_type,
+              int rec_num,
+              auto const& query_box_seq)
 {
   auto [offset, tot_size] = parlay::scan(
     parlay::tabulate(
@@ -715,33 +719,36 @@ ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
   offset.push_back(tot_size);
   parlay::sequence<std::pair<keytype, uint64_t>> v(tot_size);
 
-  auto func2 =
-    [num_thread, idx, &v, &offset, &query_box_seq](uint64_t thread_id, bool) {
-      size_t total_num_op = query_box_seq.size();
-      size_t op_per_thread = total_num_op / num_thread;
-      size_t start_index = op_per_thread * thread_id;
-      size_t end_index = start_index + op_per_thread;
+  auto func2 = [num_thread, idx, index_type, &v, &offset, &query_box_seq](
+                 uint64_t thread_id, bool) {
+    size_t total_num_op = query_box_seq.size();
+    size_t op_per_thread = total_num_op / num_thread;
+    size_t start_index = op_per_thread * thread_id;
+    size_t end_index = start_index + op_per_thread;
 
-      threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+    threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
 
-      int counter = 0;
-      for (size_t i = start_index; i < end_index; i++) {
+    int counter = 0;
+    for (size_t i = start_index; i < end_index; i++) {
+      if (index_type == TYPE_MASSTREE) {
+        auto box = query_box_seq[i].first;
+        idx->scan(box.first, query_box_seq[i].second, ti);
+      } else if (index_type == TYPE_BWTREE) {
         idx->range_report(
           query_box_seq[i].first, v.begin() + offset[start_index], ti);
-        // auto box = query_box_seq[i].first;
-        // idx->scan(box.first, query_box_seq[i].second, ti);
-
-        counter++;
-        if (counter % 4096 == 0) {
-          ti->rcu_quiesce();
-        }
       }
 
-      // Perform GC after all operations
-      ti->rcu_quiesce();
+      counter++;
+      if (counter % 4096 == 0) {
+        ti->rcu_quiesce();
+      }
+    }
 
-      return;
-    };
+    // Perform GC after all operations
+    ti->rcu_quiesce();
+
+    return;
+  };
 
   parlay::internal::timer t;
   t.reset(), t.start();
@@ -749,6 +756,7 @@ ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
   t.stop();
   std::cout << t.total_time() << " " << std::flush;
 }
+
 template<typename Options>
 void
 ApplyConcurrentIndex(Options const& opts)
@@ -878,22 +886,25 @@ ApplyConcurrentIndex(Options const& opts)
   // PARA: lambda for range query
   auto range_query = [&](auto const& base_points) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      if (index_type == TYPE_MASSTREE && rec_type == 3) {
+      if (index_type == TYPE_MASSTREE && rec_type == kRangeQueryType - 1) {
         // Skip the largest rectangle type for masstree since it segfaults
-        std::cout << "9999999" << " ";
+        std::cout << "- " << " ";
+        continue;
       }
       auto [query_box_seq, max_size] =
         GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
-      ConRangeQuery(num_thread, primal_idx, kRangeQueryNum, query_box_seq);
+      ConRangeQuery(
+        num_thread, primal_idx, index_type, kRangeQueryNum, query_box_seq);
     }
   };
 
   // PARA: lambda for range count
   auto range_count = [&](auto const& base_points) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      if (index_type == TYPE_MASSTREE && rec_type == 3) {
+      if (index_type == TYPE_MASSTREE) {
         // Skip the largest rectangle type for masstree since it segfaults
-        std::cout << "9999999" << " ";
+        std::cout << "- " << " ";
+        continue;
       }
       auto [query_box_seq, max_size] =
         GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
