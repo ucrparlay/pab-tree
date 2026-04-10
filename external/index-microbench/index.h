@@ -10,8 +10,8 @@
 #include "BTreeOLC/BTreeOLC_child_layout.h"
 #endif
 #include "BwTree/bwtree.h"
-#include <byteswap.h>
 #include "parlay/sequence.h"
+#include <byteswap.h>
 #include <utility>
 #include <vector>
 
@@ -57,9 +57,10 @@ public:
     (void)ti;
     return 0UL;
   }
-  virtual uint64_t range_report(std::pair<KeyType, KeyType> key_range,
-                                parlay::sequence<std::pair<KeyType, uint64_t>>* out,
-                                threadinfo* ti)
+  virtual uint64_t range_report(
+    std::pair<KeyType, KeyType> key_range,
+    parlay::sequence<std::pair<KeyType, uint64_t>>::iterator out,
+    threadinfo* ti)
   {
     (void)key_range;
     (void)out;
@@ -685,29 +686,31 @@ public:
     return sum;
   }
 
-  uint64_t range_report(std::pair<KeyType, KeyType> key_range,
-                        parlay::sequence<std::pair<KeyType, uint64_t>>* out,
-                        threadinfo*)
+  uint64_t range_report(
+    std::pair<KeyType, KeyType> key_range,
+    parlay::sequence<std::pair<KeyType, uint64_t>>::iterator out_iter,
+    threadinfo*)
   {
     size_t write_idx = 0;
     KeyComparator comp;
     if (!comp(key_range.first, key_range.second)) {
-      out->resize(0);
       return 0UL;
     }
 
     auto it = index_p->Begin(key_range.first);
     while (!it.IsEnd() && comp(it->first, key_range.second)) {
       std::pair<KeyType, uint64_t> kv{ it->first, it->second };
-      if (write_idx < out->size()) {
-        (*out)[write_idx] = kv;
-      } else {
-        out->push_back(kv);
-      }
+      // if (write_idx < out->size()) {
+      //   (*out)[write_idx] = kv;
+      // } else {
+      //   out->push_back(kv);
+      // }
+      *out_iter = kv;
+      out_iter++;
       ++write_idx;
       ++it;
     }
-    out->resize(write_idx);
+    // out->resize(write_idx);
 
     return write_idx;
   }
@@ -834,14 +837,14 @@ public:
     return resultCount;
   }
 
-  uint64_t range_report(std::pair<KeyType, KeyType> key_range,
-                        parlay::sequence<std::pair<KeyType, uint64_t>>* out,
-                        threadinfo* ti)
+  uint64_t range_report(
+    std::pair<KeyType, KeyType> key_range,
+    parlay::sequence<std::pair<KeyType, uint64_t>>::iterator output_iter,
+    threadinfo* ti)
   {
     size_t write_idx = 0;
     KeyComparator comp;
     if (!comp(key_range.first, key_range.second)) {
-      out->resize(0);
       return 0UL;
     }
 
@@ -872,14 +875,16 @@ public:
       uint64_t value;
       memcpy(&value, current_value.s, sizeof(uint64_t));
       std::pair<KeyType, uint64_t> kv{ key, value };
-      if (write_idx < out->size()) {
-        (*out)[write_idx] = kv;
-      } else {
-        out->push_back(kv);
-      }
+      // if (write_idx < out->size()) {
+      //   (*out)[write_idx] = kv;
+      // } else {
+      //   out->push_back(kv);
+      // }
+      *output_iter = kv;
+      output_iter++;
       ++write_idx;
     }
-    out->resize(write_idx);
+    // out->resize(write_idx);
 
     return write_idx;
   }

@@ -616,7 +616,7 @@ ConInsert(auto num_thread, auto idx, const auto& wp)
   StartThreads(idx, num_thread, func, false);
   t.stop();
   if constexpr (kPrint) {
-    std::cout << t.total_time() << " ";
+    std::cout << t.total_time() << " " << std::flush;
   }
 }
 
@@ -702,50 +702,52 @@ ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
   StartThreads(idx, num_thread, func2, false);
   t.stop();
   std::cout << t.total_time() << " ";
+  // std::cout << "9999999" << " ";
 }
 
 void
 ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
 {
   auto [offset, tot_size] = parlay::scan(
-    parlay::delayed_tabulate(
+    parlay::tabulate(
       rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
     parlay::addm<size_t>());
   offset.push_back(tot_size);
+  parlay::sequence<std::pair<keytype, uint64_t>> v(tot_size);
 
-  auto func2 = [num_thread, idx, &offset, &query_box_seq](uint64_t thread_id,
-                                                          bool) {
-    size_t total_num_op = query_box_seq.size();
-    size_t op_per_thread = total_num_op / num_thread;
-    size_t start_index = op_per_thread * thread_id;
-    size_t end_index = start_index + op_per_thread;
+  auto func2 =
+    [num_thread, idx, &v, &offset, &query_box_seq](uint64_t thread_id, bool) {
+      size_t total_num_op = query_box_seq.size();
+      size_t op_per_thread = total_num_op / num_thread;
+      size_t start_index = op_per_thread * thread_id;
+      size_t end_index = start_index + op_per_thread;
 
-    threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+      threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
 
-    parlay::sequence<std::pair<keytype, uint64_t>> v;
-    v.resize(offset[end_index] - offset[start_index]);
+      int counter = 0;
+      for (size_t i = start_index; i < end_index; i++) {
+        idx->range_report(
+          query_box_seq[i].first, v.begin() + offset[start_index], ti);
+        // auto box = query_box_seq[i].first;
+        // idx->scan(box.first, query_box_seq[i].second, ti);
 
-    int counter = 0;
-    for (size_t i = start_index; i < end_index; i++) {
-      idx->range_report(query_box_seq[i].first, &v, ti);
-
-      counter++;
-      if (counter % 4096 == 0) {
-        ti->rcu_quiesce();
+        counter++;
+        if (counter % 4096 == 0) {
+          ti->rcu_quiesce();
+        }
       }
-    }
 
-    // Perform GC after all operations
-    ti->rcu_quiesce();
+      // Perform GC after all operations
+      ti->rcu_quiesce();
 
-    return;
-  };
+      return;
+    };
 
   parlay::internal::timer t;
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << t.total_time() << " ";
+  std::cout << t.total_time() << " " << std::flush;
 }
 template<typename Options>
 void
