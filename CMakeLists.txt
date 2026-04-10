@@ -195,8 +195,13 @@ target_compile_options(index_microbench_workload PRIVATE
 	-include "${INDEX_MICROBENCH_DIR}/masstree/config.h"
 )
 find_package(Threads REQUIRED)
-find_package(TBB REQUIRED)
-target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m TBB::tbb papi tcmalloc_minimal)
+find_package(TBB QUIET)
+if(TBB_FOUND)
+	target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m TBB::tbb papi tcmalloc_minimal)
+else()
+	message(WARNING "TBB CMake package not found; falling back to plain tbb link target")
+	target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m tbb papi tcmalloc_minimal)
+endif()
 
 find_library(INDEX_MICROBENCH_ATOMIC_LIB
 	NAMES atomic libatomic.so.1
