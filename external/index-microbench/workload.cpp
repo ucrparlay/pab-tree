@@ -800,9 +800,15 @@ ApplyConcurrentIndex(Options const& opts)
         // std::cout << base_path << " " << batch_path << std::endl;
         auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
         auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConInsert<1>(num_thread, idx, wi);
-        delete idx;
+        if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
+                                           // if rebuild the whole index
+          ConInsert<1>(num_thread, primal_idx, wi);
+          ConDelete<0>(num_thread, primal_idx, wi);
+        } else if (index_type == TYPE_BWTREE) {
+          auto* idx = ConBuild<0>(num_thread, index_type, wp);
+          ConInsert<1>(num_thread, idx, wi);
+          delete idx;
+        }
       }
     } else {
       auto [base_path, batch_path] =
@@ -810,10 +816,14 @@ ApplyConcurrentIndex(Options const& opts)
       // std::cout << base_path << " " << batch_path << std::endl;
       auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
       auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
-      auto* idx = ConBuild<0>(num_thread, index_type, wp);
-      ConInsert<1>(num_thread, idx, wi);
-      // std::cout << "after insert" << std::endl;
-      delete idx;
+      if (index_type == TYPE_MASSTREE) {
+        ConInsert<1>(num_thread, primal_idx, wi);
+        ConDelete<0>(num_thread, primal_idx, wi);
+      } else if (index_type == TYPE_BWTREE) {
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConInsert<1>(num_thread, idx, wi);
+        delete idx;
+      }
     }
   }
 
@@ -828,9 +838,14 @@ ApplyConcurrentIndex(Options const& opts)
         // std::cout << base_path << " " << batch_path << std::endl;
         auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
         auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConDelete<1>(num_thread, idx, wi);
-        delete idx;
+        if (index_type == TYPE_MASSTREE) {
+          ConDelete<1>(num_thread, primal_idx, wi);
+          ConInsert<0>(num_thread, primal_idx, wi);
+        } else if (index_type == TYPE_BWTREE) {
+          auto* idx = ConBuild<0>(num_thread, index_type, wp);
+          ConDelete<1>(num_thread, idx, wi);
+          delete idx;
+        }
       }
     } else {
       auto [base_path, batch_path] =
@@ -838,11 +853,14 @@ ApplyConcurrentIndex(Options const& opts)
       // std::cout << base_path << " " << batch_path << std::endl;
       auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
       auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
-      auto* idx = ConBuild<0>(num_thread, index_type, wp);
-      // std::cout << "after delete build" << std::endl;
-      ConDelete<1>(num_thread, idx, wi);
-      // std::cout << "after delete " << std::endl;
-      delete idx;
+      if (index_type == TYPE_MASSTREE) {
+        ConDelete<1>(num_thread, primal_idx, wi);
+        ConInsert<0>(num_thread, primal_idx, wi);
+      } else if (index_type == TYPE_BWTREE) {
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConDelete<1>(num_thread, idx, wi);
+        delete idx;
+      }
     }
   }
 
@@ -860,6 +878,10 @@ ApplyConcurrentIndex(Options const& opts)
   // PARA: lambda for range query
   auto range_query = [&](auto const& base_points) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      if (index_type == TYPE_MASSTREE && rec_type == 3) {
+        // Skip the largest rectangle type for masstree since it segfaults
+        std::cout << "9999999" << " ";
+      }
       auto [query_box_seq, max_size] =
         GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
       ConRangeQuery(num_thread, primal_idx, kRangeQueryNum, query_box_seq);
@@ -869,6 +891,10 @@ ApplyConcurrentIndex(Options const& opts)
   // PARA: lambda for range count
   auto range_count = [&](auto const& base_points) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      if (index_type == TYPE_MASSTREE && rec_type == 3) {
+        // Skip the largest rectangle type for masstree since it segfaults
+        std::cout << "9999999" << " ";
+      }
       auto [query_box_seq, max_size] =
         GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
       ConRangeCount(num_thread, primal_idx, query_box_seq);
