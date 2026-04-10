@@ -119,7 +119,7 @@ struct LeafNode : TypeTrait::Node
                })()
              : (std::ranges::find_if(this->elements.begin(),
                                      this->elements.begin() + this->size,
-                                     [&](E const e) {
+                                     [&](E const& e) {
                                        return Entry::GetKey(e) == k;
                                      }) != this->elements.begin() + this->size);
   }

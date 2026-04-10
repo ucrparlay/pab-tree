@@ -33,10 +33,11 @@ using Typename = Coord;
 using namespace pmos;
 
 // NOTE: KNN size
-static constexpr double kBatchQueryRatio = 0.01;
-static constexpr size_t kBatchQueryOsmSize = 10000000;
+static constexpr double kMemberQueryRatio = 0.01;
+static constexpr size_t kMemberQueryOsmSize = 10000000;
 // NOTE: rectangle numbers
-static constexpr int kRangeQueryNum = 50000;
+// static constexpr int kRangeQueryNum = 50000;
+static constexpr int kRangeQueryNum = 500;
 static constexpr int kRangeQueryType = 3;
 static constexpr int kSingleQueryLogRepeatNum = 100;
 
@@ -754,7 +755,8 @@ template<typename TT, typename Tree>
 void
 InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
                 Tree& pkd,
-                const int sliding_window_len)
+                const int sliding_window_len,
+                const size_t member_query_n)
 {
   pkd.DeleteTree();
   const int time_period_num = node_by_time.size();
@@ -762,18 +764,33 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
   // typename TT::Points query_points(batchQueryOsmSize);
+  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto step = member_query_n / time_period_num;
+  if (member_query_n % time_period_num != 0) {
+    std::cout << "the member query num should be divisible by time period num"
+              << std::endl;
+    return;
+  }
+
   for (int i = 0; i < time_period_num; i++) {
-    // parlay::copy(node_by_time[i].cut(0, input_offset),
-    //              query_points.cut(i * input_offset, (i + 1) * input_offset));
     insert_entry[i] = Tree::ParseInput(node_by_time[i]);
     delete_entry[i] = Tree::ParseDeleteInput(node_by_time[i]);
+
+    if (node_by_time[i].size() < step) {
+      std::cout << "not enough points in time period " << i
+                << " for member query, need " << step << std::endl;
+      return;
+    }
+    parlay::parallel_for(0, step, [&](size_t j) {
+      query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
+    });
   }
 
   // NOTE: begin revert
   int within_num = 0;
   std::cout << std::endl;
   for (int i = 0; i < time_period_num; i++) {
-    // std::cout << insert_entry[i].size() << " ";
+    std::cout << node_by_time[i].size() << " ";
     parlay::internal::timer t;
     t.reset(), t.start();
     pkd.BatchInsert(insert_entry[i]);
@@ -789,7 +806,14 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       within_num++;
       std::cout << "-1 ";
     }
-    std::cout << std::endl;
+
+    // NOTE: test membership query
+    t.reset(), t.start();
+    parlay::parallel_for(0, member_query_n, [&](size_t j) {
+      [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
+    });
+    t.stop();
+    std::cout << t.total_time() << std::endl;
 
     // if (time_period_num < 12) {
     //   queryKNN(Dim, query_points, rounds, pkd, kdknn, K, true);
@@ -930,7 +954,7 @@ static auto constexpr DefaultTestFunc =
 
     if (opts.query_type != 0 && opts.tag != 0) {
       auto [base_path, batch_path] =
-        opts.ParseInsertBatchPath(kBatchQueryRatio);
+        opts.ParseInsertBatchPath(kMemberQueryRatio);
       auto [n, d] =
         ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
       BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
@@ -961,7 +985,7 @@ static auto constexpr DefaultTestFunc =
 
     // NOTE: membership
     if (opts.query_type & (1 << 0)) {
-      auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+      auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
       auto query_ele =
         wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
       auto res = parlay::sequence<bool>(query_ele.size(), true);
@@ -1003,7 +1027,7 @@ static auto constexpr DefaultTestFunc =
         ReadEntries(path.c_str(), node_by_year[i]);
       }
 
-      InsertOsmByTime<TT>(node_by_year, tree, 5);
+      InsertOsmByTime<TT>(node_by_year, tree, kMemberQueryOsmSize, 5);
     }
 
     std::cout << "\n" << std::flush;

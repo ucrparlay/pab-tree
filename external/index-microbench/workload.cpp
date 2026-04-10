@@ -1,5 +1,6 @@
 #include "./papi_util.cpp"
 
+// yum install papi papi-devel gperftools-libs gperftools-devel
 #include "microbench.h"
 
 #include "../../tests/test_framework.h"
@@ -840,7 +841,7 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
 
   // NOTE: Membership query
   if (opts.query_type & (1 << 0)) {
-    auto batch_size = static_cast<size_t>(wp.size() * kBatchQueryRatio);
+    auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
     // auto query_ele =
     //   wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
     auto query_ele = parlay::tabulate(batch_size, [&](size_t i) {
