@@ -66,8 +66,16 @@ function run_cmake() {
 }
 
 # Masstree
+export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+
 tree=5
-solver="masstree"
+solver="index_microbench_workload"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+# BwTree
+tree=6
+solver="index_microbench_workload"
 run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
 
@@ -78,16 +86,16 @@ run_test 0 "${solver}" "${tree}"
 # run_test 0 "${solver}" "${tree}"
 
 # PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=2
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # CPAM
-tree=1
-solver="cpam"
-run_cmake 4 "${solver}"
-run_test 4 "${solver}" "${tree}"
+# tree=1
+# solver="cpam"
+# run_cmake 4 "${solver}"
+# run_test 4 "${solver}" "${tree}"
 
 # ours
 # solver="b_test"

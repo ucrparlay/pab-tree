@@ -730,13 +730,13 @@ ConRangeQuery(auto num_thread,
 
     int counter = 0;
     for (size_t i = start_index; i < end_index; i++) {
-      if (index_type == TYPE_MASSTREE) {
-        auto box = query_box_seq[i].first;
-        idx->scan(box.first, query_box_seq[i].second, ti);
-      } else if (index_type == TYPE_BWTREE) {
-        idx->range_report(
-          query_box_seq[i].first, v.begin() + offset[start_index], ti);
-      }
+      // if (index_type == TYPE_MASSTREE) {
+      auto box = query_box_seq[i].first;
+      idx->scan(box.first, query_box_seq[i].second, ti);
+      // } else if (index_type == TYPE_BWTREE) {
+      //   idx->range_report(
+      //     query_box_seq[i].first, v.begin() + offset[start_index], ti);
+      // }
 
       counter++;
       if (counter % 4096 == 0) {
@@ -921,6 +921,8 @@ ApplyConcurrentIndex(Options const& opts)
   if (opts.query_type & (1 << 2)) {
     range_count(wp);
   }
+
+  std::cout << "\n" << std::flush;
 }
 
 int

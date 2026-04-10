@@ -235,8 +235,8 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(TT::Box const query_box,
-                   Range&& out) -> std::pair<size_t, pmos::RangeReportLogger>
+  auto RangeReport(TT::Box const query_box, Range&& out)
+    -> std::pair<size_t, pmos::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
@@ -258,6 +258,7 @@ public:
   void DeleteTree()
   {
     cpam_aug_map_.clear();
+    cpam_aug_map_.root = nullptr;
   }
 
   [[nodiscard]] size_t GetSize() const
