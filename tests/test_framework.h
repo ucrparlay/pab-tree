@@ -875,13 +875,11 @@ ReadPointsSerial(char const* iFile,
   return std::make_pair(N, dim);
 }
 
-template<typename TreeWrapper>
 void
-PrintTreeParam()
+PrintTreeParam(char const* tree_name, int leaf_size)
 {
-  std::cout << "Tree: " << TreeWrapper::TreeType::GetTreeName() << "; ";
-  std::cout << "Buf: " << static_cast<int>(TreeWrapper::TreeType::TT::kBuf)
-            << "; ";
+  std::cout << "Tree: " << tree_name << "; ";
+  std::cout << "Buf: " << leaf_size << "; ";
 }
 
 // NOTE: default test functions for all custom tree
@@ -1167,7 +1165,8 @@ Run(Options const& opts, RunFunc test_func)
   using E = typename TT::E;
   using EntrySeq = typename TT::EntrySeq;
 
-  PrintTreeParam<TreeWrapper>();
+  PrintTreeParam(TreeWrapper::TreeType::GetTreeName(),
+                 TreeWrapper::TreeType::GetLeafSize());
   opts.PrintOptions();
   std::cout << "\n" << std::flush;
 

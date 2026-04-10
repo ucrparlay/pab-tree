@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <utility>
 
-#include <cpam.h>
 #include "pmos/b_tree.h"
+#include <cpam.h>
 // #include "geobase.h"
 // #include "hilbert.h"
 
@@ -63,7 +63,8 @@ public:
     }
   };
 
-  using zmap = cpam::aug_map<entry, 64>;
+  constexpr static size_t kCpamBufferSize = 64;
+  using zmap = cpam::aug_map<entry, kCpamBufferSize>;
   using par = std::tuple<typename entry::key_t, typename entry::val_t>;
 
   using Leaf = zmap::Tree::node;
@@ -266,6 +267,10 @@ public:
   constexpr static char const* GetTreeName()
   {
     return "CPAM";
+  }
+  constexpr static int GetLeafSize()
+  {
+    return kCpamBufferSize;
   }
   constexpr static char const* CheckHasBox()
   {

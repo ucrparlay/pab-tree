@@ -126,8 +126,8 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+  auto RangeReport(TT::Box const query_box,
+                   Range&& out) -> std::pair<size_t, pmos::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pmos::RangeReportLogger logger;
@@ -161,6 +161,10 @@ public:
     return this->pma_tree_.size();
   }
 
+  constexpr static int GetLeafSize()
+  {
+    return 1;
+  }
   constexpr static char const* GetTreeName()
   {
     return "PMA";

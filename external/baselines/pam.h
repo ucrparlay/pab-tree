@@ -307,6 +307,10 @@ public:
   {
     return "PAM";
   }
+  constexpr static int GetLeafSize()
+  {
+    return 1;
+  }
   constexpr static char const* CheckHasBox()
   {
     return "HasBox";

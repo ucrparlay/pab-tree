@@ -436,8 +436,8 @@ public:
                      RangeReportLogger& logger) const;
 
   template<typename Range>
-  auto RangeReport(TT::Box query_box, Range&& out) const
-    -> std::pair<SizeT, RangeReportLogger>;
+  auto RangeReport(TT::Box query_box,
+                   Range&& out) const -> std::pair<SizeT, RangeReportLogger>;
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,
@@ -475,6 +475,11 @@ public:
   constexpr static char const* GetTreeName()
   {
     return "BTree";
+  }
+
+  constexpr static int GetLeafSize()
+  {
+    return TT::kBuf;
   }
 
 private:

@@ -747,9 +747,9 @@ ConRangeQuery(auto num_thread, auto idx, int rec_num, auto const& query_box_seq)
   t.stop();
   std::cout << t.total_time() << " ";
 }
-template<typename Options, typename RunFunc>
+template<typename Options>
 void
-ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
+ApplyConcurrentIndex(Options const& opts)
 {
   // opts.PrintOptionValue();
 
@@ -767,12 +767,17 @@ ApplyConcurrentIndex(Options const& opts, RunFunc test_func)
   int index_type = 0;
   if (opts.tree_type == 5) {
     index_type = TYPE_MASSTREE;
+    PrintTreeParam("MassTree", 1);
   } else if (opts.tree_type == 6) {
     index_type = TYPE_BWTREE;
+    PrintTreeParam("BwTree", 1);
   } else {
     std::cout << "Unsupported tree type: " << opts.tree_type << std::endl;
     return;
   }
+
+  opts.PrintOptions();
+  std::cout << "\n" << std::flush;
 
   int num_thread = parlay::num_workers();
 
@@ -888,10 +893,7 @@ main(int argc, char* argv[])
   commandLine params(argc, argv);
   Options opts(params);
 
-  auto test_func =
-    []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {};
-
-  ApplyConcurrentIndex(opts, test_func);
+  ApplyConcurrentIndex(opts);
 
   return 0;
   // if (argc < 5) {
