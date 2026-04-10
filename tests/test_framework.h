@@ -775,6 +775,18 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   for (int i = 0; i < time_period_num; i++) {
     insert_entry[i] = Tree::ParseInput(node_by_time[i]);
     delete_entry[i] = Tree::ParseDeleteInput(node_by_time[i]);
+    // std::cout << i << " "
+    //           << *parlay::max_element(node_by_time[i],
+    //                                   [&](auto a, auto b) {
+    //                                     return TT::Entry::GetKey(a) <
+    //                                            TT::Entry::GetKey(b);
+    //                                   })
+    //           << *parlay::min_element(node_by_time[i],
+    //                                   [&](auto a, auto b) {
+    //                                     return TT::Entry::GetKey(a) <
+    //                                            TT::Entry::GetKey(b);
+    //                                   })
+    //           << std::endl;
 
     if (node_by_time[i].size() < step) {
       std::cout << "not enough points in time period " << i
@@ -785,6 +797,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
     });
   }
+  // return;
 
   // NOTE: begin revert
   int within_num = 0;
@@ -1016,16 +1029,16 @@ static auto constexpr DefaultTestFunc =
     // NOTE: real world sliding window
     if (opts.tag & (1 << 3)) {
       string osm_prefix = "/data/zmen002/geometry/africa/africa_";
-      const std::vector<std::string> files = { "2014", "2015", "2016", "2017",
-                                               "2018", "2019", "2020", "2021",
-                                               "2022", "2023" };
+      const std::vector<std::string> files = { "2015", "2016", "2017", "2018",
+                                               "2019", "2020", "2021", "2022",
+                                               "2023", "2024" };
       parlay::sequence<EntrySeq> node_by_year(files.size());
       for (int i = 0; i < files.size(); i++) {
         std::string path = osm_prefix + files[i] + ".csv";
         ReadEntries(path.c_str(), node_by_year[i]);
       }
 
-      InsertOsmByTime<TT>(node_by_year, tree, kMemberQueryOsmSize, 5);
+      InsertOsmByTime<TT>(node_by_year, tree, 5, kMemberQueryOsmSize);
     }
 
     std::cout << "\n" << std::flush;
@@ -1182,7 +1195,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In) {};
+    LeafAugEmpty(Slice In){};
 
     template<typename Slice>
     void UpdateAug(Slice In)
