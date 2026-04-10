@@ -195,7 +195,8 @@ target_compile_options(index_microbench_workload PRIVATE
 	-include "${INDEX_MICROBENCH_DIR}/masstree/config.h"
 )
 find_package(Threads REQUIRED)
-target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m tbb papi tcmalloc_minimal)
+find_package(TBB REQUIRED)
+target_link_libraries(index_microbench_workload PRIVATE TEST_FRAME Threads::Threads m TBB::tbb papi tcmalloc_minimal)
 
 find_library(INDEX_MICROBENCH_ATOMIC_LIB
 	NAMES atomic libatomic.so.1
@@ -210,7 +211,27 @@ endif()
 if(EXISTS "${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.a")
 	target_link_libraries(index_microbench_workload PRIVATE "${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.a")
 else()
-	message(WARNING "mtIndexAPI.a not found in ${INDEX_MICROBENCH_DIR}/masstree; build masstree before linking index_microbench_workload")
+	message(WARNING "mtIndexAPI.a not found in ${INDEX_MICROBENCH_DIR}/masstree; compiling required masstree sources directly for index_microbench_workload")
+	target_sources(index_microbench_workload PRIVATE
+		"${INDEX_MICROBENCH_DIR}/masstree/mtIndexAPI.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/kvthread.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/json.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/str.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/string.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/straccum.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/misc.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/kvio.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/kvrandom.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/value_string.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/value_array.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/value_versioned_array.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/perfstat.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/string_slice.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/file.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/compiler.cc"
+		"${INDEX_MICROBENCH_DIR}/masstree/clp.c"
+	)
+	set_source_files_properties("${INDEX_MICROBENCH_DIR}/masstree/clp.c" PROPERTIES LANGUAGE CXX)
 endif()
 
 
