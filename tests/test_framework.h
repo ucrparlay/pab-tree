@@ -799,7 +799,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   }
   // return;
 
-  // NOTE: begin revert
   int within_num = 0;
   std::cout << std::endl;
   for (int i = 0; i < time_period_num; i++) {
@@ -836,11 +835,81 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   return;
 }
 
-template<typename E>
+template<typename TT, typename Tree>
+void
+TestDynamicGraph(const auto& insert_batch_seq,
+                 const auto& delete_batch_seq,
+                 Tree& pkd,
+                 const size_t member_query_n)
+{
+  pkd.DeleteTree();
+  const int time_period_num = insert_batch_seq.size();
+  parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
+    time_period_num);
+  // typename TT::Points query_points(batchQueryOsmSize);
+  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto step = member_query_n / time_period_num;
+
+  // check memer query size
+  if (member_query_n % time_period_num != 0) {
+    std::cout << "the member query num should be divisible by time period num"
+              << std::endl;
+    return;
+  }
+
+  for (int i = 0; i < time_period_num; i++) {
+    insert_entry[i] = Tree::ParseInput(insert_batch_seq[i]);
+    delete_entry[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
+
+    if (insert_entry[i].size() - delete_entry.size() < step) {
+      std::cout << "not enough points in time period " << i
+                << " for member query, need " << step << std::endl;
+      return;
+    }
+    // parlay::parallel_for(0, step, [&](size_t j) {
+    //   query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
+    // });
+  }
+  // return;
+
+  int within_num = 0;
+  std::cout << std::endl;
+  for (int i = 0; i < time_period_num; i++) {
+    std::cout << insert_entry[i].size() << " " << delete_entry[i].size() << " ";
+
+    // INFO: batch insert
+    parlay::internal::timer t;
+    t.reset(), t.start();
+    pkd.BatchInsert(insert_entry[i]);
+    t.stop();
+    std::cout << t.total_time() << " ";
+
+    // INFO: batch delete
+    t.reset(), t.start();
+    pkd.BatchDelete(delete_entry[i]);
+    t.stop();
+    std::cout << t.total_time() << " ";
+
+    // NOTE: test membership query
+    // t.reset(), t.start();
+    // parlay::parallel_for(0, member_query_n, [&](size_t j) {
+    //   [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
+    // });
+    // t.stop();
+    // std::cout << t.total_time();
+
+    // if (time_period_num < 12) {
+    //   queryKNN(Dim, query_points, rounds, pkd, kdknn, K, true);
+    // }
+    std::cout << std::endl;
+  }
+}
+
+template<typename E, int kDynamicGraph = 0>
 auto
 ReadEntries(char const* iFile,
-            parlay::sequence<E>& wp,
-            [[maybe_unused]] int id_offset = 0) -> std::pair<size_t, int>
+            parlay::sequence<E>& wp) -> std::pair<size_t, int>
 {
   using K = E::K;
   using V = E::V;
@@ -856,8 +925,13 @@ ReadEntries(char const* iFile,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
-    wp[i].ReadKey(pts[i * dim]);
-    wp[i].ReadVal(pts[(i * dim) + 1]); // WARN: assume #val = 1
+    if constexpr (kDynamicGraph) { // WARN: assume #val = 1
+      wp[i].ReadKey(pts[i * dim], pts[(i * dim) + 1]);
+      wp[i].ReadVal(std::to_string(i));
+    } else {
+      wp[i].ReadKey(pts[i * dim]);
+      wp[i].ReadVal(pts[(i * dim) + 1]);
+    }
   });
   return std::make_pair(N, dim);
 }
@@ -914,7 +988,7 @@ static auto constexpr DefaultTestFunc =
     return;
 #endif // MEMCHECK
 
-    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
     // // NOTE: batch insert
@@ -924,17 +998,16 @@ static auto constexpr DefaultTestFunc =
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-          auto [n2, d2] =
-            ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
           BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       } else {
         auto [base_path, batch_path] =
           opts.ParseInsertBatchPath(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
         BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
       }
     }
@@ -948,17 +1021,16 @@ static auto constexpr DefaultTestFunc =
           // puts("------------------------------");
           auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-          auto [n2, d2] =
-            ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
           BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       } else {
         auto [base_path, batch_path] =
           opts.ParseDeleteBatchPath(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
         BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
       }
     }
@@ -966,8 +1038,7 @@ static auto constexpr DefaultTestFunc =
     if (opts.query_type != 0 && opts.tag != 0) {
       auto [base_path, batch_path] =
         opts.ParseInsertBatchPath(kMemberQueryRatio);
-      auto [n, d] =
-        ReadEntries<typename TT::E>(base_path.c_str(), wp, wp.size());
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
       BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
     }
 
@@ -1019,8 +1090,8 @@ static auto constexpr DefaultTestFunc =
       for (auto ratio : ratio_seq) {
         auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
         BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
         range_query(wp);
       }
@@ -1028,7 +1099,7 @@ static auto constexpr DefaultTestFunc =
 
     // NOTE: real world sliding window
     if (opts.tag & (1 << 3)) {
-      string osm_prefix = "/data/zmen002/geometry/africa/africa_";
+      string osm_prefix = "/data/zmen002/geometry/osm_by_year/africa/africa_";
       const std::vector<std::string> files = { "2015", "2016", "2017", "2018",
                                                "2019", "2020", "2021", "2022",
                                                "2023", "2024" };
@@ -1048,6 +1119,39 @@ static auto constexpr DefaultTestFunc =
     return;
   };
 
+static auto constexpr TestTemporalGraph =
+  []<class TreeDesc, typename TypeTrait, typename Options>(Options opts) {
+    using Tree = TreeDesc::TreeType;
+    using TT = TypeTrait;
+    using EntrySeq = TT::EntrySeq;
+    EntrySeq wp;
+    EntrySeq wi;
+
+    Tree tree;
+    constexpr bool kTestTime = true;
+    constexpr int kUseDynamicGraph = 1;
+
+    // NOTE: real world sliding window
+    string dynamic_graph_path =
+      "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+
+    constexpr int kDynamicGraphBatchNum = 10;
+    std::array<std::string, kDynamicGraphBatchNum> insert_files;
+    std::array<std::string, kDynamicGraphBatchNum> delete_files;
+    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+      insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
+      delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
+    }
+    parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
+    parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
+    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+      ReadEntries<typename TT::E, kUseDynamicGraph>(insert_files[i].c_str(),
+                                                    insert_batch_seq[i]);
+      ReadEntries<typename TT::E, kUseDynamicGraph>(delete_files[i].c_str(),
+                                                    delete_batch_seq[i]);
+    }
+  };
+
 struct Options
 {
   Options(commandLine& params)
@@ -1061,6 +1165,7 @@ struct Options
     this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
     this->tree_type = params.getOptionIntValue("-T", 0);
     this->dis_type = std::string(params.getOptionValue("-D"));
+    this->temporal_graph = params.getOptionIntValue("-G", 0);
   }
 
   void PrintOptions() const
@@ -1166,6 +1271,7 @@ struct Options
   bool summary;
   double batch_ratio; // decides the default batch file path
   int tree_type;
+  int temporal_graph;
   std::string dis_type;
 };
 
@@ -1187,9 +1293,13 @@ Run(Options const& opts, RunFunc test_func)
   test_func.template operator()<TreeWrapper, TT>(opts);
 };
 
+template<typename Key, typename Val>
 class Wrapper
 {
 public:
+  using K = Key;
+  using V = Val;
+
   struct LeafAugEmpty
   {
     LeafAugEmpty() = default;
@@ -1261,6 +1371,12 @@ public:
     }
 
     template<typename StrRange>
+    void ReadKey(StrRange str, StrRange str2)
+    {
+      this->key = { std::stol(str), std::stol(str2) };
+    }
+
+    template<typename StrRange>
     void ReadKey(StrRange str)
     {
       this->key = std::stol(str);
@@ -1317,7 +1433,5 @@ public:
     };
   };
 
-  using K = uint32_t;
-  using V = uint32_t;
   using E = Element<K, V>;
 };

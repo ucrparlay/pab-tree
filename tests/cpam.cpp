@@ -18,7 +18,12 @@ template<typename Options, typename RunFunc>
 void
 ApplyCPAM(Options const& opts, RunFunc test_func)
 {
-  // using K = std::pair<uint32_t, uint32_t>;
+#ifndef DYNAMIC_GRAPH
+  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#else
+  using Wrapper = Wrapper<std::pair<uint32_t, uint32_t>, uint32_t>;
+#endif // DYNAMIC_GRAPH
+
   using K = Wrapper::K;
   using V = Wrapper::V;
   using E = Wrapper::E;
@@ -48,7 +53,12 @@ main(int argc, char* argv[])
     []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {};
 
   // Wrapper::ApplyBaselines(opts, test_func);
-  ApplyCPAM(opts, DefaultTestFunc);
+  // ApplyCPAM(opts, DefaultTestFunc);
 
+#ifndef DYNAMIC_GRAPH
+  ApplyCPAM(opts, DefaultTestFunc);
+#else
+  ApplyCPAM(opts, TestTemporalGraph);
+#endif // DYNAMIC_GRAPH
   return 0;
 }
