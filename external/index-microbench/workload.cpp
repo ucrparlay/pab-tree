@@ -759,10 +759,57 @@ ConRangeQuery(auto num_thread,
 
 template<typename Options>
 void
+ApplyConcurrentIndexDynamicGraph(Options const& opts)
+{
+  // opts.PrintOptionValue();
+
+  using Wrapper = Wrapper<std::pair<uint32_t, uint32_t>, uint32_t>;
+  using E = typename Wrapper::E;
+  // using EleType = Element<uint32_t, uint32_t>;
+  using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+                                  16,
+                                  Wrapper::LeafAugEmpty,
+                                  Wrapper::InteriorAugEmpty,
+                                  8,
+                                  pmos::ProtoNode>;
+
+  using EntrySeq = TT::EntrySeq;
+
+  int index_type = 0;
+  if (opts.tree_type == 5) {
+    index_type = TYPE_MASSTREE;
+    PrintTreeParam("MassTree", 1);
+  } else if (opts.tree_type == 6) {
+    index_type = TYPE_BWTREE;
+    PrintTreeParam("BwTree", 1);
+  } else {
+    std::cout << "Unsupported tree type: " << opts.tree_type << std::endl;
+    return;
+  }
+
+  opts.PrintOptions();
+  std::cout << "\n" << std::flush;
+
+  int num_thread = parlay::num_workers();
+
+  EntrySeq wp;
+  EntrySeq wi;
+  ReadEntries<typename TT::E, 1>(opts.input_file_path.c_str(), wp);
+
+  // NOTE: build
+  // auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
+  // std::cout << "build" << std::endl;
+
+  std::cout << "\n" << std::flush;
+}
+
+template<typename Options>
+void
 ApplyConcurrentIndex(Options const& opts)
 {
   // opts.PrintOptionValue();
 
+  using Wrapper = Wrapper<uint32_t, uint32_t>;
   using E = typename Wrapper::E;
   // using EleType = Element<uint32_t, uint32_t>;
   using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
@@ -934,7 +981,12 @@ main(int argc, char* argv[])
   commandLine params(argc, argv);
   Options opts(params);
 
+#ifndef DYNAMIC_GRAPH
   ApplyConcurrentIndex(opts);
+#else
+  ApplyConcurrentIndexDynamicGraph(opts);
+#endif // DYNAMIC_GRAPH
+  // ApplyConcurrentIndex(opts);
 
   return 0;
   // if (argc < 5) {
