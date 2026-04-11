@@ -840,7 +840,7 @@ ApplyConcurrentIndex(Options const& opts)
 
   EntrySeq wp;
   EntrySeq wi;
-  ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+  ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
 
   // NOTE: build
   auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
@@ -853,8 +853,8 @@ ApplyConcurrentIndex(Options const& opts)
       for (auto ratio : ratio_seq) {
         auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
         if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
                                            // if rebuild the whole index
           ConInsert<1>(num_thread, primal_idx, wi);
@@ -869,8 +869,8 @@ ApplyConcurrentIndex(Options const& opts)
       auto [base_path, batch_path] =
         opts.ParseInsertBatchPath(opts.batch_ratio);
       // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
       if (index_type == TYPE_MASSTREE) {
         ConInsert<1>(num_thread, primal_idx, wi);
         ConDelete<0>(num_thread, primal_idx, wi);
@@ -891,8 +891,8 @@ ApplyConcurrentIndex(Options const& opts)
         // puts("------------------------------");
         auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
         if (index_type == TYPE_MASSTREE) {
           ConDelete<1>(num_thread, primal_idx, wi);
           ConInsert<0>(num_thread, primal_idx, wi);
@@ -906,8 +906,8 @@ ApplyConcurrentIndex(Options const& opts)
       auto [base_path, batch_path] =
         opts.ParseDeleteBatchPath(opts.batch_ratio);
       // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
       if (index_type == TYPE_MASSTREE) {
         ConDelete<1>(num_thread, primal_idx, wi);
         ConInsert<0>(num_thread, primal_idx, wi);

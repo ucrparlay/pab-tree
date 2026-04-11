@@ -126,7 +126,9 @@ main(int argc, char* argv[])
     std::cout << newpath << std::endl;
     rand_seed = i;
     if (val_n == 1) {
-      generate.operator()<Wrapper::Element<Axis, std::tuple<Axis>>>(newpath);
+      generate.operator()<
+        Wrapper<Axis, std::tuple<Axis>>::Element<Axis, std::tuple<Axis>>>(
+        newpath);
     }
     // else if (pts_dim == 3) {
     //   generate.operator()<psi::BasicPoint<Axis, 3>>(newpath);

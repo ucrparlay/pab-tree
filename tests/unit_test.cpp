@@ -25,6 +25,7 @@ static void
 CheckOrthogonal(Options const& opts, RunFunc test_func)
 {
   // using K = std::pair<uint32_t, uint32_t>;
+  using Wrapper = Wrapper<uint32_t, uint32_t>;
   using K = Wrapper::K;
   using V = Wrapper::V;
   using E = Wrapper::E;
@@ -107,8 +108,8 @@ protected:
     EntrySeq wp;
     EntrySeq wi;
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
-    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp, 0);
-    auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi, n);
+    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+    auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
     tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
 
