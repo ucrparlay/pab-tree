@@ -807,29 +807,30 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     t.reset(), t.start();
     pkd.BatchInsert(insert_entry[i]);
     t.stop();
-    std::cout << t.total_time() << " ";
+    std::cout << t.total_time() << " " << std::flush;
     if (within_num == sliding_window_len) {
       // std::cout << "begin delete " << wi[i - within_num].size() << " ";
       t.reset(), t.start();
       pkd.BatchDelete(delete_entry[i - within_num]);
       t.stop();
-      std::cout << t.total_time() << " ";
+      std::cout << t.total_time() << " " << std::flush;
     } else {
       within_num++;
-      std::cout << "-1 ";
+      std::cout << "-1 " << std::flush;
     }
 
     // NOTE: test membership query
-    t.reset(), t.start();
-    parlay::parallel_for(0, member_query_n, [&](size_t j) {
-      [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
-    });
-    t.stop();
-    std::cout << t.total_time() << std::endl;
+    // t.reset(), t.start();
+    // parlay::parallel_for(0, member_query_n, [&](size_t j) {
+    //   [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
+    // });
+    // t.stop();
+    // std::cout << t.total_time() ;
 
     // if (time_period_num < 12) {
     //   queryKNN(Dim, query_points, rounds, pkd, kdknn, K, true);
     // }
+    std::cout << std::endl;
   }
 
   return;
@@ -908,8 +909,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
 
 template<typename E, int kDynamicGraph = 0>
 auto
-ReadEntries(char const* iFile,
-            parlay::sequence<E>& wp) -> std::pair<size_t, int>
+ReadEntries(char const* iFile, parlay::sequence<E>& wp)
+  -> std::pair<size_t, int>
 {
   using K = E::K;
   using V = E::V;
@@ -1305,7 +1306,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In){};
+    LeafAugEmpty(Slice In) {};
 
     template<typename Slice>
     void UpdateAug(Slice In)
