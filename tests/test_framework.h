@@ -13,6 +13,7 @@
 #include "common/time_loop.h"
 #include "dependence/tree_node.h"
 #include "dependence/type_trait.h"
+#include "options.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"
@@ -20,6 +21,7 @@
 #include "parlay/random.h"
 #include "parlay/slice.h"
 #include "pmos/b_tree.h"
+#include "wrapper.h"
 
 #ifdef CCP
 using Coord = long;
@@ -807,12 +809,14 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     t.reset(), t.start();
     pkd.BatchInsert(insert_entry[i]);
     t.stop();
+    pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
     std::cout << t.total_time() << " " << std::flush;
     if (within_num == sliding_window_len) {
       // std::cout << "begin delete " << wi[i - within_num].size() << " ";
       t.reset(), t.start();
       pkd.BatchDelete(delete_entry[i - within_num]);
       t.stop();
+      pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
       std::cout << t.total_time() << " " << std::flush;
     } else {
       within_num++;
@@ -884,13 +888,13 @@ TestDynamicGraph(const auto& insert_batch_seq,
     t.reset(), t.start();
     pkd.BatchInsert(insert_entry[i]);
     t.stop();
-    std::cout << t.total_time() << " ";
+    std::cout << t.total_time() << " " << std::flush;
 
     // INFO: batch delete
     t.reset(), t.start();
     pkd.BatchDelete(delete_entry[i]);
     t.stop();
-    std::cout << t.total_time() << " ";
+    std::cout << t.total_time() << " " << std::flush;
 
     // NOTE: test membership query
     // t.reset(), t.start();
@@ -909,8 +913,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
 
 template<typename E, int kDynamicGraph = 0>
 auto
-ReadEntries(char const* iFile, parlay::sequence<E>& wp)
-  -> std::pair<size_t, int>
+ReadEntries(char const* iFile,
+            parlay::sequence<E>& wp) -> std::pair<size_t, int>
 {
   using K = E::K;
   using V = E::V;
@@ -989,8 +993,8 @@ static auto constexpr DefaultTestFunc =
     return;
 #endif // MEMCHECK
 
-    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
-    BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+    // ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    // BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
     // // NOTE: batch insert
     if (opts.tag & (1 << 0)) {
@@ -1151,130 +1155,12 @@ static auto constexpr TestTemporalGraph =
       ReadEntries<typename TT::E, kUseDynamicGraph>(delete_files[i].c_str(),
                                                     delete_batch_seq[i]);
     }
+
+    TestDynamicGraph<TT, Tree>(
+      insert_batch_seq, delete_batch_seq, tree, kMemberQueryOsmSize);
   };
 
-struct Options
-{
-  Options(commandLine& params)
-  {
-    this->val_n = params.getOptionIntValue("-d", 1);
-    this->input_file_path = std::string(params.getOptionValue("-p"));
-    this->tag = params.getOptionIntValue("-t", 1);
-    this->rounds = params.getOptionIntValue("-r", 3);
-    this->query_type = params.getOptionIntValue("-q", 0);
-    this->summary = params.getOptionIntValue("-s", 0);
-    this->batch_ratio = params.getOptionDoubleValue("-b", 0.1);
-    this->tree_type = params.getOptionIntValue("-T", 0);
-    this->dis_type = std::string(params.getOptionValue("-D"));
-    this->temporal_graph = params.getOptionIntValue("-G", 0);
-  }
-
-  void PrintOptions() const
-  {
-    std::cout << "InputFile: "
-              << std::filesystem::path(input_file_path).filename().string()
-              << "; ";
-    std::cout << "Dis: " << this->dis_type << "; ";
-  }
-
-  static auto ExtractPrefixes(std::string const& path)
-    -> std::pair<std::string, std::string>
-  {
-    // locate pivot: first occurrence of "/ins/" or "/del/"
-    size_t posIns = path.find("/ins/");
-    size_t posDel = path.find("/del/");
-    size_t pivot = std::string::npos;
-    if (posIns != std::string::npos) {
-      pivot = posIns;
-    }
-    if (posDel != std::string::npos &&
-        (pivot == std::string::npos || posDel < pivot)) {
-      pivot = posDel;
-    }
-
-    if (pivot == std::string::npos) {
-      // pattern not found
-      return { "", "" };
-    }
-
-    // directory prefix (up to just before /ins/ or /del/)
-    std::string dirPrefix = path.substr(0, pivot) + "/";
-
-    // filename part
-    size_t lastSlash = path.find_last_of('/');
-    std::string filename =
-      (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
-    // strip extensions
-    auto strip_suffix = [](std::string& s, std::string const& suf) {
-      if (s.size() >= suf.size() &&
-          s.compare(s.size() - suf.size(), suf.size(), suf) == 0) {
-        s.erase(s.size() - suf.size());
-      }
-    };
-    strip_suffix(filename, ".in");
-    strip_suffix(filename, ".base");
-
-    return { dirPrefix, filename };
-  }
-
-  [[nodiscard]] auto ParseInsertBatchPath(double batch_ratio) const
-    -> std::pair<std::string, std::string>
-  {
-    // PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
-    // PARA: dir_pre: ../kdtree/uni/1000000_1/
-    // PARA: file_pre: 1
-    auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
-    std::string base_path =
-      dir_prefix + "ins/" +
-      std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" + file_prefix +
-      ".base.in";
-
-    std::string batch_path = base_path;
-    batch_path.replace(batch_path.find(".base."), 6, ".batch.");
-    return std::make_pair(base_path, batch_path);
-  }
-
-  [[nodiscard]] auto ParseDeleteBatchPath(double batch_ratio) const
-    -> std::pair<std::string, std::string>
-  {
-    // NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
-    auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
-    std::string base_path =
-      dir_prefix + "del/" +
-      std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" + file_prefix +
-      ".base.in";
-
-    std::string batch_path = base_path;
-    batch_path.replace(batch_path.find(".base."), 6, ".batch.");
-
-    return std::make_pair(base_path, batch_path);
-  }
-
-  void PrintOptionValue() const
-  {
-    std::cout << "Options: " << std::endl;
-    std::cout << "val_n: " << val_n << std::endl;
-    std::cout << "input_file_path: " << input_file_path << std::endl;
-    std::cout << "tag: " << tag << std::endl;
-    std::cout << "rounds: " << rounds << std::endl;
-    std::cout << "query_type: " << query_type << std::endl;
-    std::cout << "summary: " << summary << std::endl;
-    std::cout << "batch_ratio: " << batch_ratio << std::endl;
-    std::cout << "tree_type: " << tree_type << std::endl;
-    std::cout << "dis_type: " << dis_type << std::endl;
-  }
-
-  int val_n;
-  std::string input_file_path = "";
-  int tag;
-  int rounds;
-  int query_type;
-  bool summary;
-  double batch_ratio; // decides the default batch file path
-  int tree_type;
-  int temporal_graph;
-  std::string dis_type;
-};
+;
 
 // NOTE: driven functions
 template<typename TreeWrapper, typename RunFunc>
@@ -1292,147 +1178,4 @@ Run(Options const& opts, RunFunc test_func)
 
   // Apply the test function
   test_func.template operator()<TreeWrapper, TT>(opts);
-};
-
-template<typename Key, typename Val>
-class Wrapper
-{
-public:
-  using K = Key;
-  using V = Val;
-
-  struct LeafAugEmpty
-  {
-    LeafAugEmpty() = default;
-
-    template<typename Slice>
-    LeafAugEmpty(Slice In) {};
-
-    template<typename Slice>
-    void UpdateAug(Slice In)
-    {
-    }
-
-    void Reset()
-    {
-    }
-  };
-
-  struct InteriorAugEmpty
-  {
-    InteriorAugEmpty() = default;
-
-    template<typename TreeNodes>
-    static bool Create(TreeNodes const& /*nodes*/)
-    {
-      return true;
-    }
-
-    [[nodiscard]] static bool ForceParallel(size_t /*sz*/,
-                                            size_t /*granularity*/)
-    {
-      return true;
-    }
-
-    template<typename TreeNodes, typename SplitSeq>
-    void Update(TreeNodes const& /*nodes*/, SplitSeq const& /*splits*/)
-    {
-    }
-
-    void Update()
-    {
-    }
-
-    void Reset()
-    {
-    }
-  };
-
-  // NOTE: the element we use
-  template<typename KeyType, typename ValType>
-  struct Element
-  {
-    using K = KeyType;
-    using V = ValType;
-
-    K GetKey() const
-    {
-      return key;
-    }
-
-    V GetVal() const
-    {
-      return val;
-    }
-
-    template<typename StrRange>
-    void ReadKey(StrRange str, size_t i)
-    {
-      this->key = { std::stol(str), i };
-    }
-
-    template<typename StrRange>
-    void ReadKey(StrRange str, StrRange str2)
-    {
-      this->key = { std::stol(str), std::stol(str2) };
-    }
-
-    template<typename StrRange>
-    void ReadKey(StrRange str)
-    {
-      this->key = std::stol(str);
-    }
-
-    template<typename StrRange>
-    void ReadVal(StrRange In)
-    {
-      this->val = std::stol(In);
-    }
-
-    bool operator<(Element const& rhs) const
-    {
-      return this->key < rhs.key;
-    }
-
-    bool operator==(Element const& rhs) const
-    {
-      return this->key == rhs.key;
-    }
-
-    friend std::ostream& operator<<(std::ostream& o, Element const& a)
-    {
-      o << "(";
-      o << a.key << " " << a.val;
-      o << ") " << std::flush;
-      return o;
-    }
-
-    K key;
-    V val;
-  };
-
-  // NOTE: user needs to add a layer to expose API to b_tree
-  template<typename EntryType>
-  struct ElementWrapper
-  {
-    using E = EntryType;
-    using K = typename E::K;
-    using V = typename E::V;
-
-    // differs from different entry, interface for pmos structure
-    static auto GetKey(E const& e)
-    {
-      return e.GetKey();
-    }
-    static auto GetVal(E const& e)
-    {
-      return e.GetVal();
-    }
-    static E ToEntry(K const& k, V const& v)
-    {
-      return E{ .key = k, .val = v };
-    };
-  };
-
-  using E = Element<K, V>;
 };
