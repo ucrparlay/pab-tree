@@ -18,11 +18,13 @@ template<typename Options, typename RunFunc>
 void
 ApplyCPAM(Options const& opts, RunFunc test_func)
 {
-#ifndef DYNAMIC_GRAPH
-  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#if defined(DYNAMIC_GRAPH)
+  using Wrapper = Wrapper<std::tuple<uint32_t, uint32_t, uint32_t>, uint32_t>;
+#elif defined(OSM)
+  using Wrapper = Wrapper<std::pair<uint64_t, uint64_t>, uint32_t>;
 #else
-  using Wrapper = Wrapper<std::pair<uint32_t, uint32_t>, uint32_t>;
-#endif // DYNAMIC_GRAPH
+  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#endif
 
   using K = Wrapper::K;
   using V = Wrapper::V;
@@ -55,10 +57,11 @@ main(int argc, char* argv[])
   // Wrapper::ApplyBaselines(opts, test_func);
   // ApplyCPAM(opts, DefaultTestFunc);
 
-#ifndef DYNAMIC_GRAPH
-  ApplyCPAM(opts, DefaultTestFunc);
-#else
+#if defined(DYNAMIC_GRAPH) || defined(OSM)
   ApplyCPAM(opts, TestTemporalGraph);
+#else
+  ApplyCPAM(opts, DefaultTestFunc);
 #endif // DYNAMIC_GRAPH
+
   return 0;
 }
