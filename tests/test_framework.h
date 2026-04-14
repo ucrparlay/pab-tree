@@ -38,7 +38,7 @@ using namespace pmos;
 static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
 static constexpr size_t kMemberQueryOsmSize = 10'000'000;
-static constexpr int kOsmWindowLen = 5;
+static constexpr int kOsmWindowLen = 3;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
@@ -819,6 +819,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     }
     // running the osm
     parlay::internal::timer t;
+    pkd.DeleteTree();
     for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
       // std::cout << node_by_time[i].size() << " ";
       t.reset(), t.start();
