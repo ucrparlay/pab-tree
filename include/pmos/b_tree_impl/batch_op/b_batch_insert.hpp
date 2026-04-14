@@ -136,11 +136,11 @@ BTree<TT>::BatchInsertRecursive(Node* T,
 
   SizeBufUBArr split_pos_seq;
   assert(TI->GetNodeN() > 0);
-  // if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
-  SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
-  // } else {
-  //   SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
-  // }
+  if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
+    SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
+  } else {
+    SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
+  }
 
   // if (In.size() < TT::kSplitFactor * TI->GetSplitN()) {
   //   SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
@@ -158,7 +158,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   }
 #endif // DEBUG
 
-  SizeBufUBArr new_split_node_n_arr = { 0 };
+  SizeBufUBArr new_split_node_n_arr;
   BufSizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
