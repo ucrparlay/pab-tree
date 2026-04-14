@@ -42,13 +42,17 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
     return Build_(In);
   }
 
-  EntrySlice sorted_slice = In;
+  auto sorted_slice = In;
   if (!sorted) {
-    auto sorted_seq = parlay::sort(In);
-    sorted_slice = parlay::make_slice(sorted_seq);
+    parlay::sort_inplace(In);
+    sorted_slice = parlay::make_slice(In);
+    // for (SizeT i = 1; i < 20; i++) {
+    //   std::cout << Entry::GetKey(sorted_slice[i]) << std::endl;
+    // }
   }
 
-  NodeSplitPairSeq node_split_seq = NodeSplitPairSeq::uninitialized(In.size());
+  NodeSplitPairSeq node_split_seq =
+    NodeSplitPairSeq::uninitialized(2 * In.size());
   // auto cur_height =
   //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
   SizeT new_node_n = BatchInsertRecursive(
@@ -84,6 +88,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
       };
 
       while (node_in.size() >= TT::kBufUB) {
+        std::cout << "recursive split, node num: " << node_in.size()
+                  << std::endl;
         SizeT interior_bkt_n = GenerateInteriorNodes(
           node_in,
           key_in,
@@ -107,7 +113,8 @@ BTree<TT>::BatchInsertRecursive(Node* T,
                                 EntrySlice In,
                                 NodeSplitPairSlice node_split_slice)
 {
-  assert(In.size() == node_split_slice.size());
+  assert(In[0].key != std::pair(0, 0));
+  assert(2 * In.size() == node_split_slice.size());
 
   SizeT n = In.size();
   if (n == 0) {
@@ -128,11 +135,11 @@ BTree<TT>::BatchInsertRecursive(Node* T,
 
   SizeBufUBArr split_pos_seq;
   assert(TI->GetNodeN() > 0);
-  if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
-    SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
-  } else {
-    SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
-  }
+  // if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
+  SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
+  // } else {
+  //   SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
+  // }
 
   // if (In.size() < TT::kSplitFactor * TI->GetSplitN()) {
   //   SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
@@ -150,7 +157,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   }
 #endif // DEBUG
 
-  SizeBufUBArr new_split_node_n_arr;
+  SizeBufUBArr new_split_node_n_arr = { 0 };
   BufSizeBufUBArr nodes_map;
   BufSizeT cnt = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
@@ -170,8 +177,10 @@ BTree<TT>::BatchInsertRecursive(Node* T,
       SizeT l = nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
       SizeT r =
         nodes_map[i] == TI->GetNodeN() - 1 ? n : split_pos_seq[nodes_map[i]];
-      new_split_node_n_arr[nodes_map[i]] = BatchInsertRecursive(
-        TI->tree_nodes[nodes_map[i]], In.cut(l, r), node_split_slice.cut(l, r));
+      new_split_node_n_arr[nodes_map[i]] =
+        BatchInsertRecursive(TI->tree_nodes[nodes_map[i]],
+                             In.cut(l, r),
+                             node_split_slice.cut(2 * l, 2 * r));
     },
     // In.size() > 2048 ? 1 : cnt);
     1);

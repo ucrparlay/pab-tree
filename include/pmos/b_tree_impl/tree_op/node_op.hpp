@@ -91,7 +91,7 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
       new_nodes[node_idx++] = TI->tree_nodes[i];
       tot_entry_sz += new_nodes[node_idx - 1]->size;
     } else {
-      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+      SizeT st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
       for (BufSizeT j = 0; j < return_node_n_arr[i]; j++) {
         new_nodes[node_idx++] = node_split_slice[st + j].first;
         tot_entry_sz += new_nodes[node_idx - 1]->size;
@@ -102,9 +102,10 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
   // merge split
   // NOTE:the original split will always stay
   typename Interior::SplitArr new_splits;
+  typename Interior::SplitArr old_splits = TI->split;
   BufSizeT split_idx = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
-    SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+    SizeT st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
     // HACK: if return_node_n_arr[i] == 0, then no new splits from this child
     // should skip; but -1 always smaller than 0, so the loop never runs.
     // Needs to handle the type carefully.
@@ -168,7 +169,7 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
     if (return_node_n_arr[i] == 0) {
       flatten_node_seq[node_idx++] = TI->tree_nodes[i];
     } else {
-      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+      SizeT st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
 
       parlay::parallel_for(0, return_node_n_arr[i], [&](SizeT j) {
         flatten_node_seq[node_idx + j] = node_split_slice[st + j].first;
@@ -181,7 +182,7 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
   SizeT split_idx = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     if (return_node_n_arr[i] > 0) {
-      SizeT st = (i == 0 ? 0 : split_pos_arr[i - 1]);
+      SizeT st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
       assert(return_node_n_arr[i] > 0 ||
              static_cast<int>(return_node_n_arr[i]) - 1 < 0);
 

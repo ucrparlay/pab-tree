@@ -45,16 +45,16 @@ BTree<TT>::GetNodeSliceBox(typename TT::NodeSlice const node_slice)
   return GetNodeSliceBox<TT>(parlay::make_slice(node_slice));
 }
 
-template<typename TT>
-TT::Box
-BTree<TT>::GetNodeSliceBox(typename TT::ConstNodeSlice node_slice)
-{
-  auto box = GetEmptyBox<TT>();
-  for (auto node : node_slice) {
-    box = pmos::GetBox<TT>(box, GetNodeBox(node));
-  }
-  return box;
-}
+// template<typename TT>
+// TT::Box
+// BTree<TT>::GetNodeSliceBox(typename TT::ConstNodeSlice node_slice)
+// {
+//   auto box = GetEmptyBox<TT>();
+//   for (auto node : node_slice) {
+//     box = pmos::GetBox<TT>(box, GetNodeBox(node));
+//   }
+//   return box;
+// }
 } // namespace pmos
 
 #endif // PMOS_B_TREE_IMPL_B_BOX_OP_HPP_

@@ -5,12 +5,12 @@
 #include "utility"
 
 namespace pmos {
-template<typename TT>
-TT::Box
-GetEmptyBox()
-{
-  return typename TT::Box(TT::Num::MaxVal(), TT::Num::MinVal());
-}
+// template<typename TT>
+// TT::Box
+// GetEmptyBox()
+// {
+//   return typename TT::Box(TT::Num::MaxVal(), TT::Num::MinVal());
+// }
 
 template<typename TT>
 TT::Box
