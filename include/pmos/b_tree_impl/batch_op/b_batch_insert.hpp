@@ -43,9 +43,10 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
   }
 
   auto sorted_slice = In;
+  typename TT::EntrySeq sorted_seq;
   if (!sorted) {
-    parlay::sort_inplace(In);
-    sorted_slice = parlay::make_slice(In);
+    sorted_seq = parlay::sort(In);
+    sorted_slice = parlay::make_slice(sorted_seq);
     // for (SizeT i = 1; i < 20; i++) {
     //   std::cout << Entry::GetKey(sorted_slice[i]) << std::endl;
     // }
@@ -88,8 +89,8 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
       };
 
       while (node_in.size() >= TT::kBufUB) {
-        std::cout << "recursive split, node num: " << node_in.size()
-                  << std::endl;
+        // std::cout << "recursive split, node num: " << node_in.size()
+        //           << std::endl;
         SizeT interior_bkt_n = GenerateInteriorNodes(
           node_in,
           key_in,
