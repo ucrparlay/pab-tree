@@ -777,6 +777,10 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   for (int i = 0; i < time_period_num; i++) {
     insert_entry[i] = Tree::ParseInput(node_by_time[i]);
     delete_entry[i] = Tree::ParseDeleteInput(node_by_time[i]);
+    // insert_entry[i] =
+    // Tree::ParseInput(parlay::random_shuffle(node_by_time[i]));
+    // delete_entry[i] =
+    //   Tree::ParseDeleteInput(parlay::random_shuffle(node_by_time[i]));
     // std::cout << i << " "
     //           << *parlay::max_element(node_by_time[i],
     //                                   [&](auto a, auto b) {
@@ -805,23 +809,27 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   std::cout << std::endl;
   for (int i = 0; i < time_period_num; i++) {
     std::cout << node_by_time[i].size() << " ";
+    // for (size_t j = 1; j < 20; j++) {
+    //   std::cout << node_by_time[i][j] << std::endl;
+    // }
+    puts("before sort");
     parlay::internal::timer t;
     t.reset(), t.start();
     pkd.BatchInsert(insert_entry[i]);
     t.stop();
+    std::cout << t.total_time() << " " << std::endl;
     pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
-    std::cout << t.total_time() << " " << std::flush;
-    if (within_num == sliding_window_len) {
-      // std::cout << "begin delete " << wi[i - within_num].size() << " ";
-      t.reset(), t.start();
-      pkd.BatchDelete(delete_entry[i - within_num]);
-      t.stop();
-      pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
-      std::cout << t.total_time() << " " << std::flush;
-    } else {
-      within_num++;
-      std::cout << "-1 " << std::flush;
-    }
+    // if (within_num == sliding_window_len) {
+    //   // std::cout << "begin delete " << wi[i - within_num].size() << " ";
+    //   t.reset(), t.start();
+    //   pkd.BatchDelete(delete_entry[i - within_num]);
+    //   t.stop();
+    //   pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    //   std::cout << t.total_time() << " " << std::flush;
+    // } else {
+    //   within_num++;
+    //   std::cout << "-1 " << std::flush;
+    // }
 
     // NOTE: test membership query
     // t.reset(), t.start();
@@ -911,10 +919,11 @@ TestDynamicGraph(const auto& insert_batch_seq,
   }
 }
 
-template<typename E, int kDynamicGraph = 0>
+template<typename E, int kInputType = 0>
 auto
 ReadEntries(char const* iFile,
-            parlay::sequence<E>& wp) -> std::pair<size_t, int>
+            parlay::sequence<E>& wp,
+            size_t offset = 0) -> std::pair<size_t, int>
 {
   using K = E::K;
   using V = E::V;
@@ -930,9 +939,12 @@ ReadEntries(char const* iFile,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
-    if constexpr (kDynamicGraph) { // WARN: assume #val = 1
+    if constexpr (kInputType == 1) { // Dynamic graph
       wp[i].ReadKey(pts[i * dim], pts[(i * dim) + 1]);
       wp[i].ReadVal(std::to_string(i));
+    } else if constexpr (kInputType == 2) { // OSM
+      wp[i].ReadKey(pts[i * dim], offset + i);
+      wp[i].ReadVal(pts[(i * dim) + 1]);
     } else {
       wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
@@ -1102,21 +1114,6 @@ static auto constexpr DefaultTestFunc =
       }
     }
 
-    // NOTE: real world sliding window
-    if (opts.tag & (1 << 3)) {
-      string osm_prefix = "/data/zmen002/geometry/osm_by_year/africa/africa_";
-      const std::vector<std::string> files = { "2015", "2016", "2017", "2018",
-                                               "2019", "2020", "2021", "2022",
-                                               "2023", "2024" };
-      parlay::sequence<EntrySeq> node_by_year(files.size());
-      for (int i = 0; i < files.size(); i++) {
-        std::string path = osm_prefix + files[i] + ".csv";
-        ReadEntries(path.c_str(), node_by_year[i]);
-      }
-
-      InsertOsmByTime<TT>(node_by_year, tree, 5, kMemberQueryOsmSize);
-    }
-
     std::cout << "\n" << std::flush;
 
     tree.DeleteTree();
@@ -1134,33 +1131,56 @@ static auto constexpr TestTemporalGraph =
 
     Tree tree;
     constexpr bool kTestTime = true;
-    constexpr int kUseDynamicGraph = 1;
+#if defined(DYNAMIC_GRAPH)
+    constexpr int kInputType = 1;
+#elif defined(OSM)
+    constexpr int kInputType = 2;
+#else
+    constexpr int kInputType = 0;
+#endif
 
     // NOTE: real world sliding window
-    string dynamic_graph_path =
-      "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+    if (opts.tag & (1 << 3)) {
+      string osm_prefix = "/data/zmen002/geometry/osm_by_year/africa/africa_";
+      const std::vector<std::string> files = { "2015", "2016", "2017", "2018",
+                                               "2019", "2020", "2021", "2022",
+                                               "2023", "2024" };
+      parlay::sequence<EntrySeq> node_by_year(files.size());
+      size_t offset = 0;
+      for (int i = 0; i < files.size(); i++) {
+        std::string path = osm_prefix + files[i] + ".csv";
+        auto [input_num, input_dim] = ReadEntries<typename TT::E, kInputType>(
+          path.c_str(), node_by_year[i], offset);
+        offset += input_num;
+      }
 
-    constexpr int kDynamicGraphBatchNum = 10;
-    std::array<std::string, kDynamicGraphBatchNum> insert_files;
-    std::array<std::string, kDynamicGraphBatchNum> delete_files;
-    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-      insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
-      delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
-    }
-    parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
-    parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
-    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-      ReadEntries<typename TT::E, kUseDynamicGraph>(insert_files[i].c_str(),
-                                                    insert_batch_seq[i]);
-      ReadEntries<typename TT::E, kUseDynamicGraph>(delete_files[i].c_str(),
-                                                    delete_batch_seq[i]);
+      InsertOsmByTime<TT>(node_by_year, tree, 5, kMemberQueryOsmSize);
     }
 
-    TestDynamicGraph<TT, Tree>(
-      insert_batch_seq, delete_batch_seq, tree, kMemberQueryOsmSize);
+    if (opts.tag & (1 << 4)) { // NOTE: real world sliding window
+      string dynamic_graph_path =
+        "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+
+      constexpr int kDynamicGraphBatchNum = 10;
+      std::array<std::string, kDynamicGraphBatchNum> insert_files;
+      std::array<std::string, kDynamicGraphBatchNum> delete_files;
+      for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+        insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
+        delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
+      }
+      parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
+      parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
+      for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+        ReadEntries<typename TT::E, kInputType>(insert_files[i].c_str(),
+                                                insert_batch_seq[i]);
+        ReadEntries<typename TT::E, kInputType>(delete_files[i].c_str(),
+                                                delete_batch_seq[i]);
+      }
+
+      TestDynamicGraph<TT, Tree>(
+        insert_batch_seq, delete_batch_seq, tree, kMemberQueryOsmSize);
+    }
   };
-
-;
 
 // NOTE: driven functions
 template<typename TreeWrapper, typename RunFunc>

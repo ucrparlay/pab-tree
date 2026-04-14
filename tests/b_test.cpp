@@ -39,11 +39,14 @@ ApplyOrthogonal(Options const& opts, RunFunc test_func)
   static constexpr uint const kBuf = 64; // Default
 #endif // LEAF1
 
-#ifndef DYNAMIC_GRAPH
-  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#if defined(DYNAMIC_GRAPH)
+  using Wrapper = Wrapper<std::tuple<uint32_t, uint32_t, uint32_t>, uint32_t>;
+#elif defined(OSM)
+  using Wrapper = Wrapper<std::pair<uint64_t, uint64_t>, uint32_t>;
 #else
-  using Wrapper = Wrapper<std::pair<uint32_t, uint32_t>, uint32_t>;
-#endif // DYNAMIC_GRAPH
+  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#endif
+
   using K = Wrapper::K;
   using V = Wrapper::V;
   using E = Wrapper::E;
@@ -64,10 +67,10 @@ main(int argc, char* argv[])
   commandLine params(argc, argv);
   Options opts(params);
 
-#ifndef DYNAMIC_GRAPH
-  ApplyOrthogonal(opts, DefaultTestFunc);
-#else
+#if defined(DYNAMIC_GRAPH) || defined(OSM)
   ApplyOrthogonal(opts, TestTemporalGraph);
+#else
+  ApplyOrthogonal(opts, DefaultTestFunc);
 #endif // DYNAMIC_GRAPH
 
   return EXIT_SUCCESS;

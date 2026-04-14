@@ -109,9 +109,9 @@ public:
 
     friend std::ostream& operator<<(std::ostream& o, Element const& a)
     {
-      o << "(";
+      o << "[";
       o << a.key << " " << a.val;
-      o << ") " << std::flush;
+      o << "] " << std::flush;
       return o;
     }
 
