@@ -759,8 +759,10 @@ template<typename TT, typename Tree>
 void
 InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
                 Tree& pkd,
+                const int rounds,
                 const int sliding_window_len,
-                const size_t member_query_n)
+                const size_t member_query_n,
+                auto& res)
 {
   pkd.DeleteTree();
   const int time_period_num = node_by_time.size();
@@ -779,10 +781,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   for (int i = 0; i < time_period_num; i++) {
     insert_entry[i] = Tree::ParseInput(node_by_time[i]);
     delete_entry[i] = Tree::ParseDeleteInput(node_by_time[i]);
-    // insert_entry[i] =
-    // Tree::ParseInput(parlay::random_shuffle(node_by_time[i]));
-    // delete_entry[i] =
-    //   Tree::ParseDeleteInput(parlay::random_shuffle(node_by_time[i]));
     // std::cout << i << " "
     //           << *parlay::max_element(node_by_time[i],
     //                                   [&](auto a, auto b) {
@@ -807,42 +805,66 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   }
   // return;
 
-  int within_num = 0;
-  std::cout << std::endl;
-  for (int i = 0; i < time_period_num; i++) {
-    std::cout << node_by_time[i].size() << " ";
-    // for (size_t j = 1; j < 20; j++) {
-    //   std::cout << node_by_time[i][j] << std::endl;
-    // }
-    // puts("before sort");
-    parlay::internal::timer t;
-    t.reset(), t.start();
-    pkd.BatchInsert(insert_entry[i]);
-    t.stop();
-    std::cout << t.total_time() << " " << std::endl;
-    // pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
-    if (within_num == sliding_window_len) {
-      puts("begin delete");
-      std::cout << delete_entry[i - within_num].size() << " ";
-      t.reset(), t.start();
-      pkd.BatchDelete(delete_entry[i - within_num]);
-      t.stop();
-      std::cout << t.total_time() << " " << std::endl;
-      // pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
-    } else {
-      within_num++;
-      std::cout << "-1 " << std::flush;
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  parlay::sequence<double> query_time(time_period_num, 0.0);
+
+  for (int r = 0; r < rounds; r++) {
+    if (r == 1) { // omit the first rounds
+      for (int i = 0; i < time_period_num; i++) {
+        insert_time[i] = 0.0;
+        delete_time[i] = 0.0;
+        query_time[i] = 0.0;
+      }
     }
+    // running the osm
+    parlay::internal::timer t;
+    for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+      // std::cout << node_by_time[i].size() << " ";
+      t.reset(), t.start();
+      pkd.BatchInsert(insert_entry[batch_id]);
+      t.stop();
+      insert_time[batch_id] += t.total_time();
+      // std::cout << t.total_time() << " " << std::endl;
+      // pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+      if (batch_id >= sliding_window_len) {
+        // puts("begin delete");
+        // std::cout << delete_entry[i - cur_batch_id].size() << " ";
+        t.reset(), t.start();
+        pkd.BatchDelete(delete_entry[batch_id - sliding_window_len]);
+        t.stop();
+        delete_time[batch_id] += t.total_time();
+        // std::cout << t.total_time() << " " << std::endl;
+        // pkd.template Validate<typename Tree::Leaf, typename
+        // Tree::Interior>();
+      } else {
+        // std::cout << "-1 " << std::flush;
+        delete_time[batch_id] = 0.0;
+      }
 
-    // NOTE: test membership query
-    t.reset(), t.start();
-    parlay::parallel_for(0, member_query_n, [&](size_t j) {
-      [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
-    });
-    t.stop();
-    std::cout << t.total_time();
+      // NOTE: test membership query
+      t.reset(), t.start();
+      parlay::parallel_for(0, member_query_n, [&](size_t j) {
+        auto [contain, logger] = pkd.Contain(query_points[j]);
+        res[j] = contain;
+      });
+      t.stop();
+      query_time[batch_id] += t.total_time();
+      // std::cout << t.total_time();
+      // std::cout << std::endl;
+    }
+  }
 
-    std::cout << std::endl;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    std::cout << node_by_time[batch_id].size() << " ";
+    if (batch_id >= sliding_window_len) {
+      std::cout << node_by_time[batch_id - sliding_window_len].size() << " ";
+    } else {
+      std::cout << 0 << " ";
+    }
+    std::cout << insert_time[batch_id] / (rounds - 1) << " "
+              << delete_time[batch_id] / (rounds - 1) << " "
+              << query_time[batch_id] / (rounds - 1) << std::endl;
   }
 
   return;
@@ -905,16 +927,13 @@ TestDynamicGraph(const auto& insert_batch_seq,
     std::cout << t.total_time() << " " << std::flush;
 
     // NOTE: test membership query
-    // t.reset(), t.start();
-    // parlay::parallel_for(0, member_query_n, [&](size_t j) {
-    //   [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
-    // });
-    // t.stop();
-    // std::cout << t.total_time();
+    t.reset(), t.start();
+    parlay::parallel_for(0, member_query_n, [&](size_t j) {
+      [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
+    });
+    t.stop();
+    std::cout << t.total_time();
 
-    // if (time_period_num < 12) {
-    //   queryKNN(Dim, query_points, rounds, pkd, kdknn, K, true);
-    // }
     std::cout << std::endl;
   }
 }
@@ -1151,11 +1170,17 @@ static auto constexpr TestTemporalGraph =
         std::string path = osm_prefix + files[i] + ".csv";
         auto [input_num, input_dim] = ReadEntries<typename TT::E, kInputType>(
           path.c_str(), node_by_year[i], offset);
+        node_by_year[i] = parlay::random_shuffle(node_by_year[i]);
         offset += input_num;
       }
 
-      InsertOsmByTime<TT>(
-        node_by_year, tree, kOsmWindowLen, kMemberQueryOsmSize);
+      auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      InsertOsmByTime<TT>(node_by_year,
+                          tree,
+                          opts.rounds,
+                          kOsmWindowLen,
+                          kMemberQueryOsmSize,
+                          res);
     }
 
     if (opts.tag & (1 << 4)) { // NOTE: real world sliding window
