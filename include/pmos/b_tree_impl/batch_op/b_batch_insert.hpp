@@ -114,7 +114,6 @@ BTree<TT>::BatchInsertRecursive(Node* T,
                                 EntrySlice In,
                                 NodeSplitPairSlice node_split_slice)
 {
-  assert(In[0].key != std::pair(0, 0));
   assert(2 * In.size() == node_split_slice.size());
 
   SizeT n = In.size();

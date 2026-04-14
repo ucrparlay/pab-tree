@@ -90,7 +90,7 @@ struct LeafNode : TypeTrait::Node
   }
 
   // return the first idx s.t. Entry::GetKey(elements[idx]) >= k
-  auto BinarySearchKey(K const k) const
+  auto BinarySearchKey(K const& k) const
   {
     assert(this->is_sorted);
     return pmos::BinarySearch<8>(
@@ -109,7 +109,7 @@ struct LeafNode : TypeTrait::Node
       [k](E const e) { return Entry::GetKey(e) <= k; });
   }
 
-  bool Contain(K const k) const
+  bool Contain(K const& k) const
   {
     return this->is_sorted
              ? ([&] {

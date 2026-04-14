@@ -419,9 +419,9 @@ public:
   template<typename Leaf, typename Interior>
   void Validate();
 
-  auto Contain(K k) const -> std::pair<bool, MembershipLogger>;
+  auto Contain(K const& k) const -> std::pair<bool, MembershipLogger>;
 
-  bool ContainRec(Node const* T, K k) const;
+  bool ContainRec(Node const* T, K const& k) const;
 
   auto RangeCount(TT::Box query_box) const
     -> std::pair<SizeT, RangeReportLogger>;
@@ -436,8 +436,8 @@ public:
                      RangeReportLogger& logger) const;
 
   template<typename Range>
-  auto RangeReport(TT::Box query_box,
-                   Range&& out) const -> std::pair<SizeT, RangeReportLogger>;
+  auto RangeReport(TT::Box query_box, Range&& out) const
+    -> std::pair<SizeT, RangeReportLogger>;
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,
