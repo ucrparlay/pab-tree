@@ -37,10 +37,10 @@ using namespace pmos;
 // NOTE: membership size
 static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
-static constexpr size_t kMemberQueryOsmSize = 10000000;
-static constexpr int kOsmWindowLen = 2;
+static constexpr size_t kMemberQueryOsmSize = 10'000'000;
+static constexpr int kOsmWindowLen = 5;
 // NOTE: rectangle numbers
-static constexpr int kRangeQueryNum = 50000;
+static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
 static constexpr int kRangeQueryType = 3;
 static constexpr int kSingleQueryLogRepeatNum = 100;
@@ -897,11 +897,11 @@ TestDynamicGraph(const auto& insert_batch_seq,
     insert_entry[i] = Tree::ParseInput(insert_batch_seq[i]);
     delete_entry[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
 
-    if (insert_entry[i].size() - delete_entry.size() < step) {
-      std::cout << "not enough points in time period " << i
-                << " for member query, need " << step << std::endl;
-      return;
-    }
+    // if (insert_entry[i].size() - delete_entry.size() < step) {
+    //   std::cout << "not enough points in time period " << i
+    //             << " for member query, need " << step << std::endl;
+    //   return;
+    // }
     // parlay::parallel_for(0, step, [&](size_t j) {
     //   query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
     // });
@@ -911,7 +911,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
   int within_num = 0;
   std::cout << std::endl;
   for (int i = 0; i < time_period_num; i++) {
-    std::cout << insert_entry[i].size() << " " << delete_entry[i].size() << " ";
+    std::cout << insert_batch_seq[i].size() << " " << delete_batch_seq[i].size()
+              << " ";
 
     // INFO: batch insert
     parlay::internal::timer t;
@@ -940,9 +941,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
 
 template<typename E, int kInputType = 0>
 auto
-ReadEntries(char const* iFile,
-            parlay::sequence<E>& wp,
-            size_t offset = 0) -> std::pair<size_t, int>
+ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+  -> std::pair<size_t, int>
 {
   using K = E::K;
   using V = E::V;
@@ -958,10 +958,10 @@ ReadEntries(char const* iFile,
   size_t n = pts.size() / dim;
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
-    if constexpr (kInputType == 1) { // Dynamic graph
+    if constexpr (kInputType == InputType::kDynamicGraphInput) {
       wp[i].ReadKey(pts[i * dim], pts[(i * dim) + 1]);
       wp[i].ReadVal(std::to_string(i));
-    } else if constexpr (kInputType == 2) { // OSM
+    } else if constexpr (kInputType == InputType::kOsmInput) {
       wp[i].ReadKey(pts[i * dim], offset + i);
       wp[i].ReadVal(pts[(i * dim) + 1]);
     } else {
@@ -1151,11 +1151,11 @@ static auto constexpr TestTemporalGraph =
     Tree tree;
     constexpr bool kTestTime = true;
 #if defined(DYNAMIC_GRAPH)
-    constexpr int kInputType = 1;
+    constexpr int kInputType = InputType::kDynamicGraphInput;
 #elif defined(OSM)
-    constexpr int kInputType = 2;
+    constexpr int kInputType = InputType::kOsmInput;
 #else
-    constexpr int kInputType = 0;
+    constexpr int kInputType = InputType::kNormalInput;
 #endif
 
     // NOTE: real world sliding window

@@ -1,6 +1,14 @@
 #pragma once
 
+#include <cstdint>
 #include <iostream>
+
+enum InputType : std::uint8_t
+{
+  kNormalInput = 0,
+  kOsmInput,
+  kDynamicGraphInput,
+};
 
 template<typename Key, typename Val>
 class Wrapper
@@ -14,7 +22,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In){};
+    LeafAugEmpty(Slice In) {};
 
     template<typename Slice>
     void UpdateAug(Slice In)
