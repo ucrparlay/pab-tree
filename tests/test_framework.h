@@ -1025,8 +1025,8 @@ static auto constexpr DefaultTestFunc =
     return;
 #endif // MEMCHECK
 
-    // ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
-    // BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 
     // // NOTE: batch insert
     if (opts.tag & (1 << 0)) {

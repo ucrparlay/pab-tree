@@ -60,24 +60,24 @@ function run_cmake() {
 	cur_path=$(pwd)
 	cd ../build || exit
 	# cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=clang++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	rm -rf *
 	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
 	make "${solver}"
 	cd "${cur_path}" || exit
 }
 
 # Masstree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-
-tree=5
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=5
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # BwTree
-tree=6
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=6
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # # PMA
 # tree=3
@@ -98,9 +98,9 @@ run_test 0 "${solver}" "${tree}"
 # run_test 4 "${solver}" "${tree}"
 
 # ours
-# solver="b_test"
-# tree=0
-# for idx in "${!leaf_wrap_seq[@]}"; do
-# 	run_cmake "${idx}" "${solver}"
-# 	run_test "${idx}" "${solver}" "${tree}"
-# done
+solver="b_test"
+tree=0
+for idx in "${!leaf_wrap_seq[@]}"; do
+	run_cmake "${idx}" "${solver}"
+	run_test "${idx}" "${solver}" "${tree}"
+done
