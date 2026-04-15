@@ -181,9 +181,17 @@ add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
 target_link_libraries(data_generator PUBLIC TEST_FRAME)
 target_include_directories(data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
+# to generate temporal graph
 add_executable(temporal_graph_info ${PROJECT_SOURCE_DIR}/tests/temporal_graph_info.cpp)
 target_link_libraries(temporal_graph_info PUBLIC TEST_FRAME)
 target_include_directories(temporal_graph_info PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
+# to generate osm
+add_subdirectory(external/libmorton)
+
+add_executable(filter_csv_year ${PROJECT_SOURCE_DIR}/tests/filter_csv_year.cpp)
+target_link_libraries(filter_csv_year PUBLIC TEST_FRAME libmorton)
+target_include_directories(filter_csv_year PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
 set(INDEX_MICROBENCH_DIR "${PROJECT_SOURCE_DIR}/external/index-microbench")
 file(GLOB INDEX_MICROBENCH_SKIPLIST_SOURCES
