@@ -20,11 +20,15 @@ ApplyPMA(Options const& opts, RunFunc test_func)
 {
   // using K = std::pair<uint32_t, uint32_t>;
 
-#ifndef DYNAMIC_GRAPH
-  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#if defined(DYNAMIC_GRAPH)
+  using Wrapper = Wrapper<std::tuple<uint32_t, uint32_t, uint32_t>, uint32_t>;
+#elif defined(OSM)
+  // using Wrapper = Wrapper<std::pair<uint64_t, uint64_t>, uint32_t>;
+  using Wrapper = Wrapper<uint64_t, uint32_t>;
 #else
-  using Wrapper = Wrapper<std::pair<uint32_t, uint32_t>, uint32_t>;
-#endif // DYNAMIC_GRAPH
+  using Wrapper = Wrapper<uint32_t, uint32_t>;
+#endif
+
   using K = Wrapper::K;
   using V = Wrapper::V;
   using E = Wrapper::E;
@@ -103,10 +107,10 @@ main(int argc, char* argv[])
   // Wrapper::ApplyBaselines(opts, test_func);
   // ApplyPMA(opts, DefaultTestFunc);
 
-#ifndef DYNAMIC_GRAPH
-  ApplyPMA(opts, DefaultTestFunc);
-#else
+#if defined(DYNAMIC_GRAPH) || defined(OSM)
   ApplyPMA(opts, TestTemporalGraph);
+#else
+  ApplyPMA(opts, DefaultTestFunc);
 #endif // DYNAMIC_GRAPH
   return 0;
 }
