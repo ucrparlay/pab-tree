@@ -5,12 +5,12 @@
 #include "utility"
 
 namespace pmos {
-// template<typename TT>
-// TT::Box
-// GetEmptyBox()
-// {
-//   return typename TT::Box(TT::Num::MaxVal(), TT::Num::MinVal());
-// }
+template<typename TT>
+TT::Box
+GetEmptyBox()
+{
+  return typename TT::Box(TT::Num::MaxVal(), TT::Num::MinVal());
+}
 
 template<typename TT>
 TT::Box
@@ -25,6 +25,9 @@ template<typename TT>
 TT::Box
 GetBox(typename TT::ConstEntrySlice ele_slice)
 {
+  if (ele_slice.size() == 0) {
+    return GetEmptyBox<TT>();
+  }
   auto box = std::make_pair(TT::Entry::GetKey(ele_slice[0]),
                             TT::Entry::GetKey(ele_slice[0]));
   for (typename TT::BufSizeT i = 1; i < ele_slice.size(); i++) {

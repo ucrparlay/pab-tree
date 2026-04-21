@@ -91,8 +91,15 @@ template<typename TT>
 TT::SizeT
 BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
 {
-  assert(T->size >= In.size());
   auto TL = static_cast<Leaf*>(T);
+
+  assert(T->size >= In.size());
+  assert(parlay::all_of(In, [&](auto a) {
+    return std::find_if(TL->elements.begin(),
+                        TL->elements.begin() + TL->size,
+                        [&](auto const e) { return Entry::GetKey(e) == a; }) !=
+           TL->elements.begin() + TL->size;
+  }));
 
   auto it = TL->elements.begin();
   auto end = TL->elements.begin() + TL->size;

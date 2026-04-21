@@ -188,6 +188,13 @@ public:
       return this->aug.ForceParallel(this->size, kSerialBuildCutoff);
     }
 
+    void ResetDeletionFlag()
+    {
+      this->valid = true;
+      this->invalid_subtree_num = 0;
+      this->reinsert_size = 0;
+    }
+
     bool valid;
     SizeT invalid_subtree_num;
     SizeT reinsert_size;
@@ -213,22 +220,32 @@ public:
   };
 
   // PARA: return whether a node is invalid
-  static bool GetNodeInvalidStatus(Node* T)
+  static bool HasLeafChildren(const Node* T)
+  {
+    return T->is_leaf;
+  }
+
+  static bool GetNodeInvalidStatus(const Node* T)
   {
     return T->is_leaf ? (T->size < TT::kBufLB)
-                      : (!static_cast<Interior*>(T)->valid);
+                      : (!static_cast<const Interior*>(T)->valid);
   }
 
-  static SizeT GetNodeInvalidSubtreeNum(Node* T)
+  static bool NodeIsValid(const Node* T)
+  {
+    return !GetNodeInvalidStatus(T);
+  }
+
+  static SizeT GetNodeInvalidSubtreeNum(const Node* T)
   {
     return T->is_leaf ? (T->size < TT::kBufLB ? 1 : 0)
-                      : static_cast<Interior*>(T)->invalid_subtree_num;
+                      : static_cast<const Interior*>(T)->invalid_subtree_num;
   }
 
-  static SizeT GetNodeReinsertSize(Node* T)
+  static SizeT GetNodeReinsertSize(const Node* T)
   {
     return T->is_leaf ? (T->size < TT::kBufLB ? T->size : 0)
-                      : static_cast<Interior*>(T)->reinsert_size;
+                      : static_cast<const Interior*>(T)->reinsert_size;
   }
 
   // NOTE: build tree
@@ -401,7 +418,7 @@ public:
 
   // static TT::Box GetNodeBox(Node const* T);
 
-  template<typename Leaf, typename Interior>
+  template<bool kCheckSize = true>
   TT::Box VerifyTreeProperty(Node const* T);
 
   bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice);
@@ -416,8 +433,11 @@ public:
   template<typename Leaf, typename Interior>
   int GetTreeNodesNum(Node const* T);
 
-  template<typename Leaf, typename Interior>
-  void Validate();
+  template<bool kCheckSize = true, bool kVerbose = true>
+  bool Validate(Node const* T = nullptr);
+
+  std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
+  CheckTreeAugAfterDelete(Node* T);
 
   auto Contain(K const& k) const -> std::pair<bool, MembershipLogger>;
 

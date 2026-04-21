@@ -111,7 +111,7 @@ protected:
     auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
     auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
-    tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    tree.Validate();
 
     {
       EntrySeq tmp(wp.size());
@@ -122,7 +122,7 @@ protected:
     if (opts.tag & (1 << 0)) {
       BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
       ASSERT_EQ(tree.GetSize(), wp.size() + wi.size());
-      tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+      tree.Validate();
 
       {
         EntrySeq tmp(wp.size() + wi.size());
@@ -137,7 +137,7 @@ protected:
       // WARN: must happen after the insertion
       BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, 2);
       assert(tree.GetSize() == wp.size());
-      tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+      tree.Validate();
 
       EntrySeq tmp(wp.size());
       Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));

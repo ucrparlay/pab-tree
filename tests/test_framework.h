@@ -827,7 +827,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       pkd.BatchInsert(insert_entry[batch_id]);
       t.stop();
       insert_time[batch_id] += t.total_time();
-      pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+      pkd.Validate();
 
       if (batch_id >= sliding_window_len) {
         // puts("begin delete");
@@ -839,7 +839,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         t.stop();
         delete_time[batch_id] += t.total_time();
         // std::cout << t.total_time() << " " << std::endl;
-        pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+        pkd.Validate();
       } else {
         // std::cout << "-1 " << std::flush;
         delete_time[batch_id] = 0.0;
@@ -1195,6 +1195,7 @@ static auto constexpr TestTemporalGraph =
           return TT::Entry::GetVal(record) == files[i];
         });
       });
+      // TODO: shufle the records
 
       auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
       InsertOsmByTime<TT>(node_by_year,

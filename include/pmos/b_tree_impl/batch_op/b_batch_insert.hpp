@@ -59,6 +59,10 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
   SizeT new_node_n = BatchInsertRecursive(
     this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
+#ifdef DEBUG
+  assert(!sorted || new_node_n == 0);
+#endif // DEBUG
+
   if (new_node_n > 0) {
     auto updated_node_seq = parlay::tabulate(
       new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
