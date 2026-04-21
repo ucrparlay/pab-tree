@@ -267,9 +267,11 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
     flatten_node_slice[0] = T;
     SizeT size = T->size;
+    assert(T != nullptr);
     FlattenRec<decltype(reinsert_entries), true, kSortReinsertEntries>(
       T, reinsert_entries);
-    // DeleteTreeRec(T);
+    DeleteTreeRec(T);
+    T = nullptr;
     return size;
   }
 
@@ -293,9 +295,9 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   }
 
   // this node is valid, but contains invalid subtree
-  typename Interior::NodeArr nodes_contain_invalid_subtree{ nullptr };
-  typename Interior::NodeArr new_tree_nodes{ nullptr };
-  typename Interior::SplitArr new_splits{ 0 };
+  typename Interior::NodeArr nodes_contain_invalid_subtree;
+  // typename Interior::NodeArr new_tree_nodes;
+  // typename Interior::SplitArr new_splits;
   assert(nodes_contain_invalid_subtree.size() == TT::kBufUB);
   BufSizeT invalid_idx = 0;
   BufSizeT tree_node_idx = 0;
@@ -320,61 +322,54 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     assert(GetNodeInvalidSubtreeNum(node) == 0 ? NodeIsValid(node) : true);
     assert(NodeIsValid(node) ? 1 : GetNodeInvalidSubtreeNum(node) == 1);
 
-    // now we need to decide whether we want to save this child node.
-    // We save it if this child contain invalid subtree, or this child node
-    // is valid after delete
-    // if (!GetNodeInvalidSubtreeNum(node) || !GetNodeInvalidStatus(node)) {
-
     if (NodeIsValid(node)) {
-      new_tree_nodes[tree_node_idx] = node;
-      tree_node_idx++;
-      if (i < TI->GetSplitN()) {
-        new_splits[split_idx] = TI->split[i];
-        split_idx++;
-      }
-      // const bool has_split = i < TI->GetSplitN();
-      // if (i != tree_node_idx) {
-      //   TI->tree_nodes[tree_node_idx] = node;
-      //   if (has_split) {
-      //     TI->split[split_idx] = TI->split[i];
-      //   }
+      // new_tree_nodes[tree_node_idx] = node;
+      // tree_node_idx++;
+      // if (i < TI->GetSplitN()) {
+      //   new_splits[split_idx] = TI->split[i];
+      //   split_idx++;
       // }
-      // ++tree_node_idx;
-      // split_idx += has_split;
+
+      const bool has_split = i < TI->GetSplitN();
+      if (i != tree_node_idx) {
+        TI->tree_nodes[tree_node_idx] = node;
+        if (has_split) {
+          TI->split[split_idx] = TI->split[i];
+        }
+      }
+      tree_node_idx += 1;
+      split_idx += has_split;
     }
   }
-  TI->tree_nodes = std::move(new_tree_nodes);
-  TI->split = std::move(new_splits);
+  // TI->tree_nodes = std::move(new_tree_nodes);
+  // TI->split = std::move(new_splits);
   assert(TI->node_n >= invalid_idx);
   TI->node_n = tree_node_idx;
 
-#ifdef DEBUG
-  auto size = std::accumulate(
-    nodes_contain_invalid_subtree.begin(),
-    nodes_contain_invalid_subtree.begin() + invalid_idx,
-    static_cast<SizeT>(0),
-    [](SizeT sum, Node* node) { return sum + GetNodeReinsertSize(node); });
-  assert(size == reinsert_entries.size());
-#endif // DEBUG
-
   SizeBufUBArr remove_entries_num;
+  SizeBufUBArr subtree_sum;
+  SizeBufUBArr reinsert_sum;
+  subtree_sum[0] = 0;
+  reinsert_sum[0] = 0;
+  for (BufSizeT i = 1; i < invalid_idx; i++) {
+    subtree_sum[i] =
+      subtree_sum[i - 1] +
+      GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[i - 1]);
+    reinsert_sum[i] = reinsert_sum[i - 1] +
+                      GetNodeReinsertSize(nodes_contain_invalid_subtree[i - 1]);
+  }
 
   // for (BufSizeT i = 0; i < invalid_idx; i++) {
-  //   SizeT subtree_sum = 0;
-  //   SizeT reinsert_sum = 0;
   //   auto node = nodes_contain_invalid_subtree[i];
-  //   for (BufSizeT j = 0; j < i; j++) {
-  //     subtree_sum +=
-  //     GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
-  //     reinsert_sum += GetNodeReinsertSize(nodes_contain_invalid_subtree[j]);
-  //   }
   //
   //   remove_entries_num[i] = FetchInvalidSubtreeNodes(
   //     node,
-  //     flatten_node_slice.cut(subtree_sum,
-  //                            subtree_sum + GetNodeInvalidSubtreeNum(node)),
-  //     reinsert_entries.cut(reinsert_sum,
-  //                          reinsert_sum + GetNodeReinsertSize(node)),
+  //     flatten_node_slice.cut(subtree_sum[i],
+  //                            i == invalid_idx - 1 ? flatten_node_slice.size()
+  //                                                 : subtree_sum[i + 1]),
+  //     reinsert_entries.cut(reinsert_sum[i],
+  //                          i == invalid_idx - 1 ? reinsert_entries.size()
+  //                                               : reinsert_sum[i + 1]),
   //     has_tomb ? !reinsert_flag : false);
   // }
 
@@ -382,31 +377,18 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     0,
     invalid_idx,
     [&](BufSizeT i) {
-      SizeT subtree_sum = 0;
-      SizeT reinsert_sum = 0;
-      auto node = nodes_contain_invalid_subtree[i];
-      for (BufSizeT j = 0; j < i; j++) {
-        subtree_sum +=
-          GetNodeInvalidSubtreeNum(nodes_contain_invalid_subtree[j]);
-        reinsert_sum += GetNodeReinsertSize(nodes_contain_invalid_subtree[j]);
-      }
-
       remove_entries_num[i] = FetchInvalidSubtreeNodes(
-        node,
-        flatten_node_slice.cut(subtree_sum,
-                               subtree_sum + GetNodeInvalidSubtreeNum(node)),
-        reinsert_entries.cut(reinsert_sum,
-                             reinsert_sum + GetNodeReinsertSize(node)),
+        nodes_contain_invalid_subtree[i],
+        flatten_node_slice.cut(subtree_sum[i],
+                               i == invalid_idx - 1 ? flatten_node_slice.size()
+                                                    : subtree_sum[i + 1]),
+        reinsert_entries.cut(reinsert_sum[i],
+                             i == invalid_idx - 1 ? reinsert_entries.size()
+                                                  : reinsert_sum[i + 1]),
         has_tomb ? !reinsert_flag : false);
     },
     1);
 
-  // for (int i = 0; i < invalid_idx; i++) {
-  //   auto node = nodes_contain_invalid_subtree[i];
-  //   if (node->is_leaf && GetNodeInvalidStatus(node)) {
-  //     FreeNode<Leaf>(node);
-  //   }
-  // }
   SizeT total_remove_entries_n =
     std::accumulate(remove_entries_num.begin(),
                     remove_entries_num.begin() + invalid_idx,
@@ -417,26 +399,19 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     return Entry::GetKey(a) < Entry::GetKey(b) &&
            Entry::GetKey(a) != Entry::GetKey(b);
   }));
-  assert(parlay::all_of(flatten_node_slice,
-                        [&](auto node) { return node != nullptr; }));
-  assert(parlay::all_of(flatten_node_slice, [&](auto node) {
-    return VerifyUnoverlappedTree(node, flatten_node_slice);
-  }));
-  assert((this->Validate<true, false>(T)));
+  // assert(parlay::all_of(flatten_node_slice, [&](auto node) {
+  //   return node != nullptr && VerifyUnoverlappedTree(node,
+  //   flatten_node_slice);
+  // }));
+  // assert((this->Validate<true, false>(T)));
 
-  // TI->box = GetNodeSliceBox(TI->GetNodeSlice());
   if (reinsert_flag && has_tomb) {
     TI->size -= total_remove_entries_n;
-    assert(parlay::all_of(reinsert_entries, [&](auto e) {
-      return Entry::GetKey(e) != 0 && Entry::GetVal(e) != 0;
-    }));
     NodeSplitPairSeq node_split_seq =
       NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());
-    // BatchInsert_(parlay::make_slice(reinsert_entries), true);
     SizeT new_node_n = BatchInsertRecursive(
       T, reinsert_entries, parlay::make_slice(node_split_seq));
     assert(new_node_n == 0);
-    assert((this->Validate<true, false>(T)));
   } else { // the subtrees may perform reinsertion
     TI->size =
       std::accumulate(TI->tree_nodes.begin(),
@@ -444,6 +419,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                       static_cast<SizeT>(0),
                       [](SizeT sum, Node* node) { return sum + node->size; });
   }
+
+  assert((this->Validate<true, false>(T)));
 
   return total_remove_entries_n;
 }

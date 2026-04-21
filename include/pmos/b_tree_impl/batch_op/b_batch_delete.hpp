@@ -113,9 +113,11 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     // std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
     // std::cout << "Max reinsert batch size: " << this->max_reinsert_batch_size
     //           << std::endl;
-    parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
-      DeleteTreeRec(flatten_node_seq[i]);
-    });
+
+    // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
+    //   DeleteTreeRec(flatten_node_seq[i]);
+    // });
+
     // t.next("DeleteTreeRec");
     // assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
     //   return Entry::GetKey(a) < Entry::GetKey(b);

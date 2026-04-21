@@ -942,9 +942,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
 
 template<typename E, int kInputType = 0>
 auto
-ReadEntries(char const* iFile,
-            parlay::sequence<E>& wp,
-            size_t offset = 0) -> std::pair<size_t, int>
+ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+  -> std::pair<size_t, int>
 {
   using K = E::K;
   using V = E::V;
