@@ -294,7 +294,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     return 0;
   }
 
-  // this node is valid, but contains invalid subtree
+  // PARA: this node is valid, but contains invalid subtree
   typename Interior::NodeArr nodes_contain_invalid_subtree;
   // typename Interior::NodeArr new_tree_nodes;
   // typename Interior::SplitArr new_splits;
@@ -407,11 +407,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
   if (reinsert_flag && has_tomb) {
     TI->size -= total_remove_entries_n;
-    NodeSplitPairSeq node_split_seq =
-      NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());
-    SizeT new_node_n = BatchInsertRecursive(
-      T, reinsert_entries, parlay::make_slice(node_split_seq));
-    assert(new_node_n == 0);
+    ReInsertTreeAfterDelete(T, reinsert_entries);
   } else { // the subtrees may perform reinsertion
     TI->size =
       std::accumulate(TI->tree_nodes.begin(),
@@ -423,6 +419,17 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   assert((this->Validate<true, false>(T)));
 
   return total_remove_entries_n;
+}
+
+template<typename TT>
+void
+BTree<TT>::ReInsertTreeAfterDelete(Node* T, EntrySlice reinsert_entries)
+{
+  NodeSplitPairSeq node_split_seq =
+    NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());
+  SizeT new_node_n = BatchInsertRecursive(
+    T, reinsert_entries, parlay::make_slice(node_split_seq));
+  assert(new_node_n == 0);
 }
 
 template<typename TT>

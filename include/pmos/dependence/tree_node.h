@@ -79,9 +79,12 @@ struct LeafNode : TypeTrait::Node
     assert(In.size() <= TT::kBufUB);
     assert(parlay::is_sorted(
       In, [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b); }));
-    std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
-      parlay::assign_dispatch(elements[i++], x, EleAssignTag());
-    });
+    // TODO: maybe double check a better way to initialize the array
+    // maybe SIMD?
+    std::ranges::copy_n(In.begin(), In.size(), elements.begin());
+    // std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
+    //   parlay::assign_dispatch(elements[i++], x, EleAssignTag());
+    // });
   }
 
   [[nodiscard]] bool CapacityFull() const
@@ -131,17 +134,17 @@ struct LeafNode : TypeTrait::Node
                     this->elements.begin() + this->size);
   }
 
-  auto GetEleBeginIter() const
+  auto GetEleBeginIter()
   {
     return this->elements.begin();
   }
 
-  auto GetEleRbeginIter() const
+  auto GetEleRbeginIter()
   {
     return this->elements.begin() + this->size - 1;
   }
 
-  auto GetEleEndIter() const
+  auto GetEleEndIter()
   {
     return this->elements.begin() + this->size;
   }

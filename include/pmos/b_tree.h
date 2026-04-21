@@ -220,9 +220,10 @@ public:
   };
 
   // PARA: return whether a node is invalid
-  static bool HasLeafChildren(const Node* T)
+  static bool NodeHasLeafChildren(const Node* T)
   {
-    return T->is_leaf;
+    return T->is_leaf ? false
+                      : static_cast<const Interior*>(T)->tree_nodes[0]->is_leaf;
   }
 
   static bool GetNodeInvalidStatus(const Node* T)
@@ -293,18 +294,15 @@ public:
 
   );
 
-  // void BatchInsertRecursive(Node* T, EntrySlice In);
+  std::pair<Node*, Node*> SplitLeaf(const Entry* a,
+                                    TT::BufSizeT n,
+                                    const Entry* b,
+                                    TT::BufSizeT m);
 
-  // static inline BucketType FindBucket(Point const& p,
-  //                                     HyperPlaneSeq const& pivots);
-  //
-  // template <IsBinaryNode Interior, bool UpdateParFlag = true>
-  // static inline void UpdateInterior(Node* T, Node* L, Node* R);
-  //
-  // template <IsBinaryNode Interior, bool UpdateParFlag = true>
-  // static inline void UpdateInterior(Node* T, NodeBox const& L,
-  //                                   NodeBox const& R);
-  //
+  std::pair<Node*, Node*> InsertToLeafNoOverflow(Node* T, EntrySlice In);
+
+  void ReInsertTreeAfterDelete(Node* T, EntrySlice reinsert_entries);
+
   static Node* BatchInsertUpdateInterior(Node* T,
                                          NodeSplitPairSlice node_split_slice,
                                          SizeBufUBArr const& split_pos_arr,

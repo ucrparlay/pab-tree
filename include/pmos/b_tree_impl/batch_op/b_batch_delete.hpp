@@ -192,7 +192,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
       // NOTE: if a tree node receive no deletion, we need to explicitly reset
       // its deletion information, because the reinsertion phase needs to access
       // the reinsert information from the tree node directly
-      if (!TI->tree_nodes[i]->is_leaf) {
+      if (!NodeHasLeafChildren(T)) {
         static_cast<Interior*>(TI->tree_nodes[i])->ResetDeletionFlag();
       }
     }
