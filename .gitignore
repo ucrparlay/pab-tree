@@ -11,6 +11,7 @@ run_transfer.sh
 transfer.sh
 .clangd
 venv
+__pycache__
 
 # Debug files
 # *.log
