@@ -822,37 +822,39 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     pkd.DeleteTree();
     for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
       // std::cout << node_by_time[i].size() << " ";
+      std::cerr << " insert batch: " << batch_id << std::flush;
       t.reset(), t.start();
       pkd.BatchInsert(insert_entry[batch_id]);
       t.stop();
       insert_time[batch_id] += t.total_time();
-      // std::cout << t.total_time() << " " << std::endl;
-      // pkd.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+      pkd.Validate();
+
       if (batch_id >= sliding_window_len) {
         // puts("begin delete");
         // std::cout << delete_entry[i - cur_batch_id].size() << " ";
+        std::cerr << " delete batch: " << batch_id - sliding_window_len
+                  << std::flush;
         t.reset(), t.start();
         pkd.BatchDelete(delete_entry[batch_id - sliding_window_len]);
         t.stop();
         delete_time[batch_id] += t.total_time();
         // std::cout << t.total_time() << " " << std::endl;
-        // pkd.template Validate<typename Tree::Leaf, typename
-        // Tree::Interior>();
+        pkd.Validate();
       } else {
         // std::cout << "-1 " << std::flush;
         delete_time[batch_id] = 0.0;
       }
 
       // NOTE: test membership query
-      t.reset(), t.start();
-      parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(query_points[j]);
-        res[j] = contain;
-      });
-      t.stop();
-      query_time[batch_id] += t.total_time();
-      // std::cout << t.total_time();
-      // std::cout << std::endl;
+      // t.reset(), t.start();
+      // parlay::parallel_for(0, member_query_n, [&](size_t j) {
+      //   auto [contain, logger] = pkd.Contain(query_points[j]);
+      //   res[j] = contain;
+      // });
+      // t.stop();
+      // query_time[batch_id] += t.total_time();
+
+      std::cout << std::endl;
     }
   }
 
@@ -867,8 +869,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
               << delete_time[batch_id] / (rounds - 1) << " "
               << query_time[batch_id] / (rounds - 1) << std::endl;
   }
-
-  return;
 }
 
 template<typename TT, typename Tree>
@@ -963,8 +963,10 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
       wp[i].ReadKey(pts[i * dim], pts[(i * dim) + 1]);
       wp[i].ReadVal(std::to_string(i));
     } else if constexpr (kInputType == InputType::kOsmInput) {
-      wp[i].ReadKey(pts[i * dim], offset + i);
+      wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
+      // wp[i].ReadKey(pts[i * dim], offset + i);
+      // wp[i].ReadVal(pts[(i * dim) + 1]);
     } else {
       wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
@@ -1161,19 +1163,38 @@ static auto constexpr TestTemporalGraph =
 
     // NOTE: real world sliding window
     if (opts.tag & (1 << 3)) {
-      string osm_prefix = "/data/zmen002/geometry/osm_by_year/africa/africa_";
-      const std::vector<std::string> files = { "2015", "2016", "2017", "2018",
-                                               "2019", "2020", "2021", "2022",
-                                               "2023", "2024" };
-      parlay::sequence<EntrySeq> node_by_year(files.size());
-      size_t offset = 0;
-      for (int i = 0; i < files.size(); i++) {
-        std::string path = osm_prefix + files[i] + ".csv";
-        auto [input_num, input_dim] = ReadEntries<typename TT::E, kInputType>(
-          path.c_str(), node_by_year[i], offset);
-        node_by_year[i] = parlay::random_shuffle(node_by_year[i]);
-        offset += input_num;
-      }
+      // string osm_prefix =
+      // "/data/zmen002/geometry/osm_by_year/africa/africa_"; const
+      // std::vector<std::string> files = { "2015", "2016", "2017", "2018",
+      //                                          "2019", "2020", "2021",
+      //                                          "2022", "2023", "2024" };
+      // parlay::sequence<EntrySeq> node_by_year(files.size());
+      // size_t offset = 0;
+      // for (int i = 0; i < files.size(); i++) {
+      //   std::string path = osm_prefix + files[i] + ".csv";
+      //   auto [input_num, input_dim] = ReadEntries<typename TT::E,
+      //   kInputType>(
+      //     path.c_str(), node_by_year[i], offset);
+      //   node_by_year[i] = parlay::random_shuffle(node_by_year[i]);
+      //   offset += input_num;
+      // }
+
+      string osm_path =
+        "/data/zmen002/geometry/osm_by_year/africa_year_zcode.in";
+      EntrySeq osm_records;
+      auto [input_num, input_dim] =
+        ReadEntries<typename TT::E, kInputType>(osm_path.c_str(), osm_records);
+      parlay::sort_inplace(osm_records, [&](auto const& a, auto const& b) {
+        return TT::Entry::GetVal(a) < TT::Entry::GetVal(b);
+      });
+      const std::vector<int> files = { 2015, 2016, 2017, 2018, 2019,
+                                       2020, 2021, 2022, 2023, 2024 };
+      auto node_by_year = parlay::tabulate(files.size(), [&](size_t i) {
+        return parlay::filter(osm_records, [&](auto const& record) {
+          return TT::Entry::GetVal(record) == files[i];
+        });
+      });
+      // TODO: shufle the records
 
       auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
       InsertOsmByTime<TT>(node_by_year,

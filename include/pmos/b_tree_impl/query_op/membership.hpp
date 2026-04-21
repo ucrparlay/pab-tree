@@ -7,7 +7,7 @@
 namespace pmos {
 template<typename TT>
 auto
-BTree<TT>::Contain(K const k) const -> std::pair<bool, MembershipLogger>
+BTree<TT>::Contain(K const& k) const -> std::pair<bool, MembershipLogger>
 {
   MembershipLogger logger;
   return { ContainRec(this->root_, k), logger };
@@ -15,7 +15,7 @@ BTree<TT>::Contain(K const k) const -> std::pair<bool, MembershipLogger>
 
 template<typename TT>
 bool
-BTree<TT>::ContainRec(Node const* T, K const k) const
+BTree<TT>::ContainRec(Node const* T, K const& k) const
 {
   if (T->is_leaf) {
     return static_cast<Leaf const*>(T)->Contain(k);

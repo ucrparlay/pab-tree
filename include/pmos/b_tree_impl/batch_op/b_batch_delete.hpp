@@ -28,6 +28,7 @@ BTree<TT>::BatchDelete(Range&& In)
 template<typename TT>
 void
 BTree<TT>::BatchDelete_(TT::KeySlice In)
+// TODO: try leaf level reinsrt optimization
 {
   if (this->root_ == nullptr) {
     return;
@@ -61,8 +62,17 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   if (invalid_subtree_num) {
     // std::cout << "Reinsert entries num: " << reinsert_entry_num << std::endl;
 
-    auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
-    auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
+    // auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
+    auto flatten_node_seq = typename TT::NodeSeq(invalid_subtree_num, nullptr);
+    // auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
+    auto reinsert_entries = typename TT::EntrySeq(reinsert_entry_num, { 0, 0 });
+
+#ifdef DEBUG
+    this->Validate<false>();
+    // this->CheckTreeAugAfterDelete(this->root_);
+    puts(">>> pass tree aug after delete");
+#endif // DEBUG
+
     // TODO: we can check the tag in leaf to avoid additional sort
     auto total = FetchInvalidSubtreeNodes(this->root_,
                                           parlay::make_slice(flatten_node_seq),
@@ -103,9 +113,11 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
     // std::cout << "Reinsert entry num: " << reinsert_entry_num << std::endl;
     // std::cout << "Max reinsert batch size: " << this->max_reinsert_batch_size
     //           << std::endl;
-    parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
-      DeleteTreeRec(flatten_node_seq[i]);
-    });
+
+    // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
+    //   DeleteTreeRec(flatten_node_seq[i]);
+    // });
+
     // t.next("DeleteTreeRec");
     // assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
     //   return Entry::GetKey(a) < Entry::GetKey(b);
@@ -115,7 +127,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   }
 }
 
-// PARA: return whether T is valid, invalid subtree num, and total # of
+// PARA: return whether T is invalid, invalid subtree num, and total # of
 // entries needs to be reinserted
 template<typename TT>
 std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
@@ -124,15 +136,23 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
 
   if (In.size() == 0) {
     // stop here, than all subtree is valid
-    return std::make_tuple(true, 0, 0);
+    if (!T->is_leaf) {
+      static_cast<Interior*>(T)->ResetDeletionFlag();
+    }
+    assert(NodeIsValid(T) && GetNodeInvalidSubtreeNum(T) == 0 &&
+           GetNodeReinsertSize(T) == 0);
+    return std::make_tuple(false, 0, 0);
   }
 
   if (T->is_leaf) {
     [[maybe_unused]] auto delete_cnt = DeletePoints4Leaf(T, In);
     assert(delete_cnt == In.size());
-    return std::make_tuple(T->size < TT::kBufLB,
-                           T->size < TT::kBufLB ? 1 : 0,
-                           T->size < TT::kBufLB ? T->size : 0);
+    // return std::make_tuple(T->size < TT::kBufLB,
+    //                        T->size < TT::kBufLB ? 1 : 0,
+    //                        T->size < TT::kBufLB ? T->size : 0);
+    return std::make_tuple(GetNodeInvalidStatus(T),
+                           GetNodeInvalidSubtreeNum(T),
+                           GetNodeReinsertSize(T));
   }
 
   auto TI = static_cast<Interior*>(T);
@@ -169,6 +189,12 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
       invalid_subtree_flag[i] = false;
       invalid_subtree_num[i] = 0;
       reinsert_entries_num[i] = 0;
+      // NOTE: if a tree node receive no deletion, we need to explicitly reset
+      // its deletion information, because the reinsertion phase needs to access
+      // the reinsert information from the tree node directly
+      if (!NodeHasLeafChildren(T)) {
+        static_cast<Interior*>(TI->tree_nodes[i])->ResetDeletionFlag();
+      }
     }
   }
 

@@ -59,7 +59,7 @@ def main():
     print()
 
     # Open output file
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         handler = OSMHandler(f)
 
         # Process the OSM file
@@ -72,5 +72,5 @@ def main():
         print(f"Output saved to: {output_file}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

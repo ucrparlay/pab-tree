@@ -19,6 +19,8 @@ template<bool granularity>
 inline bool
 BTree<TT>::ForceParallelRecursion(Interior const* TI)
 {
+  // NOTE: return true -> force parallel
+  // return false -> serial
   return (granularity && TI->size > kSerialBuildCutoff) ||
          (!granularity && TI->ForceParallel());
 }

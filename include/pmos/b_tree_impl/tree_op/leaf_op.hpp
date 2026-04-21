@@ -46,9 +46,10 @@ BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In)
     assert(TL->elements.size() == TT::kBufUB);
   }
   // PERF: BufSizeT should be enough since total size fits within
-  for (BufSizeT i = 0; i < In.size(); i++) {
-    TL->elements[TL->size + i] = In[i];
-  }
+  std::ranges::copy_n(In.begin(), In.size(), TL->GetEleEndIter());
+  // for (BufSizeT i = 0; i < In.size(); i++) {
+  //   TL->elements[TL->size + i] = In[i];
+  // }
   TL->size += In.size();
   TL->is_sorted = false;
 
@@ -67,11 +68,14 @@ BTree<TT>::HandlingLeafSplitOverflow(Node* T,
   auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
   Leaf* TL = static_cast<Leaf*>(T);
 
-  for (SizeT i = 0; i < T->size; i++) { // Assume the TT::kBufUB is constant
-    entry_seq[i] = TL->elements[i];
-  }
-  parlay::parallel_for(
-    0, In.size(), [&](SizeT i) { entry_seq[T->size + i] = In[i]; });
+  // for (SizeT i = 0; i < T->size; i++) { // Assume the TT::kBufUB is constant
+  //   entry_seq[i] = TL->elements[i];
+  // }
+  std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, entry_seq.begin());
+  parlay::copy(
+    In, parlay::make_slice(entry_seq.begin() + TL->size, entry_seq.end()));
+  // parlay::parallel_for(
+  //   0, In.size(), [&](SizeT i) { entry_seq[T->size + i] = In[i]; });
   FreeNode<Leaf>(T);
 
   // NOTE: split
@@ -91,8 +95,15 @@ template<typename TT>
 TT::SizeT
 BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
 {
-  assert(T->size >= In.size());
   auto TL = static_cast<Leaf*>(T);
+
+  assert(T->size >= In.size());
+  assert(parlay::all_of(In, [&](auto a) {
+    return std::find_if(TL->elements.begin(),
+                        TL->elements.begin() + TL->size,
+                        [&](auto const e) { return Entry::GetKey(e) == a; }) !=
+           TL->elements.begin() + TL->size;
+  }));
 
   auto it = TL->elements.begin();
   auto end = TL->elements.begin() + TL->size;

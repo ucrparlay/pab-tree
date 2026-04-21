@@ -11,7 +11,7 @@
 
 namespace pmos {
 template<typename TT>
-template<typename Leaf, typename Interior>
+template<bool kCheckSize>
 TT::Box
 BTree<TT>::VerifyTreeProperty(Node const* T)
 {
@@ -21,8 +21,10 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
            parlay::is_sorted(TL->GetEle(), [&](auto const& e1, auto const& e2) {
              return Entry::GetKey(e1) < Entry::GetKey(e2);
            }));
-    assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
-                                TL->GetEle().size() <= TT::kBufUB));
+    if constexpr (kCheckSize) {
+      assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
+                                  TL->GetEle().size() <= TT::kBufUB));
+    }
     return pmos::GetBox<TT>(TL->GetEle());
   }
 
@@ -39,7 +41,7 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
   // check the box of each child node falls within the split between
   parlay::sequence<typename TT::Box> box_seq(TI->GetNodeN());
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
-    box_seq[i] = VerifyTreeProperty<Leaf, Interior>(TI->tree_nodes[i]);
+    box_seq[i] = VerifyTreeProperty<kCheckSize>(TI->tree_nodes[i]);
     auto node = TI->tree_nodes[i];
     auto box = box_seq[i];
     // assert(node->is_leaf || static_cast<Interior*>(node)->box == box);
@@ -77,6 +79,7 @@ BTree<TT>::VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice)
   return cnt == 1;
 }
 
+// check whether node P is in the tree T
 template<typename TT>
 bool
 BTree<TT>::CheckContainNode(Node const* T, Node const* P)
@@ -161,124 +164,77 @@ BTree<TT>::GetTreeNodesNum(Node const* T)
 }
 
 template<typename TT>
-template<typename Leaf, typename Interior>
-void
-BTree<TT>::Validate()
+template<bool kCheckSize, bool kVerbose>
+bool
+BTree<TT>::Validate(Node const* T)
 {
-  std::cout << ">>> begin validate tree\n" << std::flush;
+  if (T == nullptr) {
+    T = this->root_;
+  }
 
-  VerifyTreeProperty<Leaf, Interior>(this->root_);
-  std::cout << "Tree property.\n" << std::flush;
+  if constexpr (kVerbose) {
+    std::cerr << std::endl;
+    std::cerr << ">>> begin validate tree\n" << std::flush;
+  }
+
+  VerifyTreeProperty<kCheckSize>(T);
 
   // typename TT::HeightT height =
   //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
-  CheckHeight(this->root_);
-  // std::cout << "Tree height validated.\n" << std::flush;
+  CheckHeight(T);
+  // std::cerr << "Tree height validated.\n" << std::flush;
 
-  std::cout << "<<< end validate tree\n" << std::flush;
-  return;
+  if constexpr (kVerbose) {
+    std::cerr << "<<< end validate tree\n" << std::flush;
+  }
+  return true;
 }
 
-// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-//           uint_fast8_t kImbaRatio>
-// template <typename Leaf, typename Interior>
-// size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::GetTreeHeight() {
-//   size_t deep = 0;
-//   return GetMaxTreeDepth<Leaf, Interior>(this->root_, deep);
-// }
+template<typename TT>
+std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
+BTree<TT>::CheckTreeAugAfterDelete(Node* T)
+{
+  if (T->is_leaf) {
+    return { GetNodeInvalidStatus(T),
+             GetNodeInvalidSubtreeNum(T),
+             GetNodeReinsertSize(T) };
+  }
 
-// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-//           uint_fast8_t kImbaRatio>
-// template <typename Leaf, typename Interior>
-// size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::GetMaxTreeDepth(
-//     Node* T, size_t deep) {
-//   if (T->is_leaf) {
-//     return deep;
-//   }
+  auto TI = static_cast<Interior*>(T);
+  auto node_n = TI->GetNodeN();
+  parlay::sequence<int> invalid_seq(node_n);
+  parlay::sequence<typename TT::SizeT> invalid_subtree_num_seq(node_n);
+  parlay::sequence<typename TT::SizeT> reinsert_size_seq(node_n);
+  parlay::parallel_for(0, node_n, [&](size_t i) {
+    auto [invalid, invalid_subtree_num, reinsert_size] =
+      CheckTreeAugAfterDelete(TI->tree_nodes[i]);
+    invalid_seq[i] = invalid ? 1 : 0;
+    invalid_subtree_num_seq[i] = invalid_subtree_num;
+    reinsert_size_seq[i] = reinsert_size;
+  });
 
-//   Interior* TI = static_cast<Interior*>(T);
-//   if constexpr (IsBinaryNode<Interior>) {
-//     int l = GetMaxTreeDepth<Leaf, Interior>(TI->left, deep + 1);
-//     int r = GetMaxTreeDepth<Leaf, Interior>(TI->right, deep + 1);
-//     return std::max(l, r);
-//   } else if constexpr (IsMultiNode<Interior>) {
-//     size_t max_depth = 0;
-//     for (size_t i = 0; i < TI->GetNodeN(); i++) {
-//       max_depth = std::max(max_depth, GetMaxTreeDepth<Leaf, Interior>(
-//                                           TI->tree_nodes[i], deep + 1));
-//     }
-//     return max_depth;
-//   } else {
-//     return 0;
-//   }
-// }
+  auto sum_invalid = parlay::reduce(invalid_seq);
+  auto sum_invalid_subtree_num = parlay::reduce(invalid_subtree_num_seq);
+  auto sum_reinsert_size = parlay::reduce(reinsert_size_seq);
 
-// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-//           uint_fast8_t kImbaRatio>
-// template <typename Leaf, typename Interior>
-// double BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::GetAveTreeHeight() {
-//   // std::cout << IsBinaryNode<Interior> << std::endl;
-//   parlay::sequence<size_t> heights(this->root_->size);
-//   size_t idx = 0;
-//   CountTreeHeights<Leaf, Interior>(this->root_, 0, idx, heights);
-//   // auto kv = parlay::histogram_by_key( heights.cut( 0, idx ) );
-//   // std::sort( kv.begin(), kv.end(),
-//   //            [&]( auto a, auto b ) { return a.first < b.first; } );
-//   // for ( auto i : kv )
-//   //     std::cout << i.first << " " << i.second << std::endl;
-//   return double(1.0 * parlay::reduce(heights.cut(0, idx)) / idx);
-// }
+  if (T == this->root_) {
+    assert(TI->valid == ((TI->GetNodeN() - sum_invalid) > 0));
+  } else {
+    assert(TI->valid == ((TI->GetNodeN() - sum_invalid) >= TT::kBufLB));
+  }
 
-// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-//           uint_fast8_t kImbaRatio>
-// template <typename Leaf, typename Interior>
-// size_t BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::CountTreeNodesNum(
-//     Node* T) {
-//   if (T->is_leaf) {
-//     return 1;
-//   }
+  if (NodeIsValid(T)) {
+    assert(sum_invalid_subtree_num == GetNodeInvalidSubtreeNum(T));
+    assert(sum_reinsert_size == GetNodeReinsertSize(T));
+  } else {
+    assert(GetNodeInvalidSubtreeNum(T) == 1);
+    assert(GetNodeReinsertSize(T) == TI->size);
+  }
 
-//   Interior* TI = static_cast<Interior*>(T);
-//   if constexpr (IsBinaryNode<Interior>) {
-//     size_t l, r;
-//     parlay::par_do([&]() { l = CountTreeNodesNum<Leaf, Interior>(TI->left);
-//     },
-//                    [&]() { r = CountTreeNodesNum<Leaf, Interior>(TI->right);
-//                    });
-//     return l + r + 1;
-//   } else {
-//     size_t sum = 0;
-//     for (int i = 0; i < TI->GetNodeN(); i++) {
-//       sum += CountTreeNodesNum<Leaf, Interior>(TI->tree_nodes[i]);
-//     }
-//     return sum + 1;
-//   }
-// }
-
-// template <typename Point, typename DerivedTree, uint_fast8_t kSkHeight,
-//           uint_fast8_t kImbaRatio>
-// template <typename Leaf, typename Interior>
-// void BTree<Point, DerivedTree, kSkHeight, kImbaRatio>::CountTreeHeights(
-//     Node* T, size_t deep, size_t& idx, parlay::sequence<size_t>& heights) {
-//   if (T->is_leaf) {
-//     heights[idx++] = deep;
-//     return;
-//   }
-
-//   Interior* TI = static_cast<Interior*>(T);
-//   if constexpr (IsBinaryNode<Interior>) {
-//     CountTreeHeights<Leaf, Interior>(TI->left, deep + 1, idx, heights);
-//     CountTreeHeights<Leaf, Interior>(TI->right, deep + 1, idx, heights);
-//   } else if constexpr (IsMultiNode<Interior>) {
-//     for (size_t i = 0; i < TI->tree_nodes.size(); i++) {
-//       CountTreeHeights<Leaf, Interior>(TI->tree_nodes[i], deep + 1, idx,
-//                                        heights);
-//     }
-//   } else {
-//     return;
-//   }
-//   return;
-// }
+  return { GetNodeInvalidStatus(T),
+           NodeIsValid(T) ? sum_invalid_subtree_num : 1,
+           NodeIsValid(T) ? sum_reinsert_size : TI->size };
+}
 
 } // namespace pmos
 

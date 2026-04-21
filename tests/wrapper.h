@@ -22,7 +22,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In) {};
+    LeafAugEmpty(Slice In){};
 
     template<typename Slice>
     void UpdateAug(Slice In)
@@ -84,25 +84,25 @@ public:
     template<typename StrRange>
     void ReadKey(StrRange str, size_t i)
     {
-      this->key = { std::stol(str), i };
+      this->key = { std::stoul(str), i };
     }
 
     template<typename StrRange>
     void ReadKey(StrRange str, StrRange str2)
     {
-      this->key = { std::stol(str), std::stol(str2) };
+      this->key = { std::stoul(str), std::stoul(str2) };
     }
 
     template<typename StrRange>
     void ReadKey(StrRange str)
     {
-      this->key = std::stol(str);
+      this->key = std::stoul(str);
     }
 
     template<typename StrRange>
     void ReadVal(StrRange In)
     {
-      this->val = std::stol(In);
+      this->val = std::stoul(In);
     }
 
     bool operator<(Element const& rhs) const

@@ -1,6 +1,7 @@
 #ifndef PMOS_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_HPP_
 #define PMOS_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_HPP_
 
+#include <algorithm>
 #include <numeric>
 
 #include "../../b_tree.h"
@@ -59,6 +60,10 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
   SizeT new_node_n = BatchInsertRecursive(
     this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
+#ifdef DEBUG
+  assert(!sorted || new_node_n == 0);
+#endif // DEBUG
+
   if (new_node_n > 0) {
     auto updated_node_seq = parlay::tabulate(
       new_node_n, [&](SizeT i) { return node_split_seq[i].first; });
@@ -114,7 +119,6 @@ BTree<TT>::BatchInsertRecursive(Node* T,
                                 EntrySlice In,
                                 NodeSplitPairSlice node_split_slice)
 {
-  assert(In[0].key != std::pair(0, 0));
   assert(2 * In.size() == node_split_slice.size());
 
   SizeT n = In.size();
@@ -259,7 +263,8 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
   auto TI = static_cast<Interior*>(T);
 
   // SizeBufUBArr split_pos_seq;
-  // // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
+  // // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0,
+  // 0);
   // // TODO: maybe we can decide it by skewed distribution
   // SizeT offset = 0;
   // for (int i = 0; i < TI->GetSplitN(); i++) {
@@ -383,8 +388,10 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
 // NOTE: return the updated Node and the split sequence
 // template <typename TT>
 // BTree<TT>::NodeSplitSeqPair BTree<TT>::BatchInsertRecursive(Node* T,
-//                                                             EntrySlice In,
-//                                                             EntrySlice Out)
+//                                                             EntrySlice
+//                                                             In,
+//                                                             EntrySlice
+//                                                             Out)
 //                                                             {
 //   size_t n = In.size();
 //
@@ -417,7 +424,8 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
 //       new_node_n)},
 //               typename TT::SplitSeq()};
 //     }
-//     return HandlingInteriorSplitOverflow(T, node_seq_list, split_seq_list);
+//     return HandlingInteriorSplitOverflow(T, node_seq_list,
+//     split_seq_list);
 //   };
 //
 //   // NOTE: serial build when In is small
@@ -425,15 +433,18 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
 //     // if (1) {
 //     parlay::sort_inplace(In);
 //
-//     auto split_pos_seq = parlay::tabulate(TI->split.size(), [&](size_t i) {
+//     auto split_pos_seq = parlay::tabulate(TI->split.size(), [&](size_t i)
+//     {
 //       // return index to first key where is less is false
 //       return parlay::internal::binary_search(
-//           In, [&](E const e) { return Entry::GetKey(e) < TI->split[i]; });
+//           In, [&](E const e) { return Entry::GetKey(e) < TI->split[i];
+//           });
 //     });
 // #ifdef DEBUG
 //     assert(split_pos_seq.size() == TI->split.size());
 //     for (int i = 1; i < split_pos_seq.size(); i++) {
-//       assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
+//       assert(parlay::all_of(In.cut(split_pos_seq[i - 1],
+//       split_pos_seq[i]),
 //                             [&](E const e) {
 //                               return Entry::GetKey(e) >= TI->split[i - 1]
 //                               &&
@@ -445,7 +456,8 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
 //     auto split_seq_list = SplitSeqList(TI->GetNodeN());
 //
 //     for (int i = 0; i < TI->GetNodeN(); i++) {
-//       std::tie(node_seq_list[i], split_seq_list[i]) = BatchInsertRecursive(
+//       std::tie(node_seq_list[i], split_seq_list[i]) =
+//       BatchInsertRecursive(
 //           TI->tree_nodes[i],
 //           In.cut(i == 0 ? 0 : split_pos_seq[i - 1],
 //                  i == TI->GetNodeN() - 1 ? n : split_pos_seq[i]),
