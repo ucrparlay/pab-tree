@@ -17,14 +17,14 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
 {
   if (T->is_leaf) {
     Leaf const* TL = static_cast<Leaf const*>(T);
-    assert(!TL->is_sorted ||
-           parlay::is_sorted(TL->GetEle(), [&](auto const& e1, auto const& e2) {
-             return Entry::GetKey(e1) < Entry::GetKey(e2);
-           }));
     if constexpr (kCheckSize) {
       assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
                                   TL->GetEle().size() <= TT::kBufUB));
     }
+    assert(!TL->is_sorted ||
+           parlay::is_sorted(TL->GetEle(), [&](auto const& e1, auto const& e2) {
+             return Entry::GetKey(e1) < Entry::GetKey(e2);
+           }));
     return pmos::GetBox<TT>(TL->GetEle());
   }
 

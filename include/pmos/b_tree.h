@@ -226,6 +226,11 @@ public:
                       : static_cast<const Interior*>(T)->tree_nodes[0]->is_leaf;
   }
 
+  static bool SelfBalanceNode(const Node* T, const bool tomb)
+  {
+    return NodeHasLeafChildren(T) && tomb && NodeIsValid(T);
+  }
+
   static bool GetNodeInvalidStatus(const Node* T)
   {
     return T->is_leaf ? (T->size < TT::kBufLB)
@@ -302,6 +307,10 @@ public:
   std::pair<Node*, Node*> InsertToLeafNoOverflow(Node* T, EntrySlice In);
 
   void ReInsertTreeAfterDelete(Node* T, EntrySlice reinsert_entries);
+
+  void PruneOutEmptyTree(Node* T);
+
+  void BalanceOverLeaves(Node* T, const SizeT reinsert_size);
 
   static Node* BatchInsertUpdateInterior(Node* T,
                                          NodeSplitPairSlice node_split_slice,

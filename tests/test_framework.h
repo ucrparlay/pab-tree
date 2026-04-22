@@ -755,6 +755,7 @@ RangeQuerySerialWithLog(Tree& pkd,
   return;
 }
 
+// TODO: cpam change to slow insert
 template<typename TT, typename Tree>
 void
 InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,

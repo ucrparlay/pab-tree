@@ -78,7 +78,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
                                           parlay::make_slice(flatten_node_seq),
                                           parlay::make_slice(reinsert_entries),
                                           true);
-    assert(total == reinsert_entry_num);
+    // assert(total == reinsert_entry_num);
     // t.next("FetchInvalidSubtreeNodes");
     // parlay::parallel_for(0, invalid_subtree_num, [&](SizeT i) {
     //   SizeT sum = 0;
