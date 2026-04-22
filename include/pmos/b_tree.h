@@ -292,9 +292,9 @@ public:
   // Needs to compact the tree_nodes if find a invalid subtree and update the
   // interior node size and valid flag after the compaction
   // Return the total number entries in the tree that needs to rebuild
-  SizeT FetchInvalidSubtreeNodes(Node* T,
-                                 EntrySlice reinsert_entries,
-                                 bool has_tomb
+  void FetchInvalidSubtreeNodes(Node* T,
+                                EntrySlice reinsert_entries,
+                                bool has_tomb
 
   );
 

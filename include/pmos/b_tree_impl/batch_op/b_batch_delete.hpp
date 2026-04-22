@@ -63,9 +63,10 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
 
     // auto flatten_node_seq = TT::NodeSeq::uninitialized(invalid_subtree_num);
     // auto flatten_node_seq = typename TT::NodeSeq(invalid_subtree_num,
-    // nullptr); auto reinsert_entries =
-    // TT::EntrySeq::uninitialized(reinsert_entry_num);
-    auto reinsert_entries = typename TT::EntrySeq(reinsert_entry_num, { 0, 0 });
+    // nullptr);
+    auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
+    // auto reinsert_entries = typename TT::EntrySeq(reinsert_entry_num, { 0, 0
+    // });
 
 #ifdef DEBUG
     this->Validate<false>();
@@ -74,7 +75,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
 #endif // DEBUG
 
     // TODO: we can check the tag in leaf to avoid additional sort
-    auto total = FetchInvalidSubtreeNodes(
+    FetchInvalidSubtreeNodes(
       this->root_, parlay::make_slice(reinsert_entries), true);
     // assert(total == reinsert_entry_num);
     // t.next("FetchInvalidSubtreeNodes");

@@ -236,7 +236,6 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
     tot_invalid_subtree_n += invalid_subtree_num_arr[i];
     reinsert_entries_n += reinsert_entries_num_arr[i];
   }
-  // TODO: these values should be reset in following operations
   TI->size = tot_entry_sz;
   TI->valid =
     (T != this->root_ ? (TI->GetNodeN() - invalid_tree_n) >= TT::kBufLB
@@ -250,7 +249,7 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
 }
 
 template<typename TT>
-TT::SizeT
+void
 BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                     EntrySlice reinsert_entries,
                                     const bool has_tomb)
@@ -267,15 +266,14 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     FlattenRec<decltype(reinsert_entries), true, kSortReinsertEntries>(
       T, reinsert_entries);
     DeleteTreeRec(T);
-    T = nullptr;
-    return size;
+    return;
   }
 
   assert(NodeIsValid(T));
 
   if (T->is_leaf) { // do nothing for a valid leaf
     assert(reinsert_entries.size() == 0);
-    return 0;
+    return;
   }
 
   auto TI = static_cast<Interior*>(T);
@@ -284,7 +282,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     // no subtree is invalid, fully valid
     assert(TI->valid);
     assert(reinsert_entries.size() == 0);
-    return 0;
+    return;
   }
 
   if (SelfBalanceNode(T, has_tomb)) { // so far a good tree
@@ -292,11 +290,13 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     if (GetNodeReinsertSize(T) == 0) {
       assert(TI->invalid_subtree_num != 0);
       PruneOutEmptyTree(T);
-      return 0;
+      TI->ResetDeletionFlag();
+      return;
     }
 
     BalanceOverLeaves(T, TI->reinsert_size);
-    return 0;
+    TI->ResetDeletionFlag();
+    return;
   }
 
   // PARA: this node is valid, but contains invalid subtree
@@ -351,7 +351,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   assert(TI->node_n >= invalid_idx);
   TI->node_n = tree_node_idx;
 
-  SizeBufUBArr remove_entries_num;
   SizeBufUBArr reinsert_sum;
   reinsert_sum[0] = 0;
   for (BufSizeT i = 1; i < invalid_idx; i++) {
@@ -378,13 +377,12 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     0,
     invalid_idx,
     [&](BufSizeT i) {
-      auto node = invalid_subtree[i];
-      remove_entries_num[i] = FetchInvalidSubtreeNodes(
-        node,
-        reinsert_entries.cut(reinsert_sum[i],
-                             i == invalid_idx - 1 ? reinsert_entries.size()
-                                                  : reinsert_sum[i + 1]),
-        next_tomb);
+      FetchInvalidSubtreeNodes(invalid_subtree[i],
+                               reinsert_entries.cut(reinsert_sum[i],
+                                                    i == invalid_idx - 1
+                                                      ? reinsert_entries.size()
+                                                      : reinsert_sum[i + 1]),
+                               next_tomb);
     },
     1);
 
@@ -419,7 +417,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   assert((this->Validate<true, false>(T)));
   TI->ResetDeletionFlag();
 
-  return 0;
+  return;
 }
 
 template<typename TT>
@@ -428,7 +426,7 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
 {
   // std::cerr << "BalanceOverLeaves: " << reinsert_size << std::endl;
   auto TI = static_cast<Interior*>(T);
-  BufSizeBufUBArr tree_group = { -1 };
+  BufSizeBufUBArr tree_group;
   auto rightmost_pivot_idx = TT::kBufUB;
   auto pivot = TT::kBufUB;
   for (int i = TI->GetNodeN() - 1; i >= 0; --i) { // WARN: caution with --i
@@ -460,8 +458,8 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
 #endif // DEBUG
 
   auto entry_buf = TT::EntrySeq::uninitialized(reinsert_size + TT::kBufUB);
-  typename Interior::NodeArr new_tree_nodes = { nullptr };
-  typename Interior::SplitArr new_splits = { 0 };
+  typename Interior::NodeArr new_tree_nodes;
+  typename Interior::SplitArr new_splits;
   BufSizeT tree_idx = 0;
   BufSizeT split_idx = 0;
   BufSizeT i = 0;
@@ -484,7 +482,7 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
     assert(tree_group[i] < TT::kBufUB);
     BufSizeT j = i;
     SizeT sum = 0;
-    while (j < tree_group.size() && tree_group[j] == tree_group[i]) {
+    while (j < TI->GetNodeN() && tree_group[j] == tree_group[i]) {
       sum += TI->tree_nodes[j]->size;
       j++;
     }
