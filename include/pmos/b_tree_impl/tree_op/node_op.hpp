@@ -252,20 +252,16 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
 template<typename TT>
 TT::SizeT
 BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
-                                    TT::NodeSlice flatten_node_slice,
                                     EntrySlice reinsert_entries,
                                     const bool has_tomb)
 {
   constexpr bool kSortReinsertEntries = true;
-  assert(flatten_node_slice.size() == GetNodeInvalidSubtreeNum(T));
   assert(reinsert_entries.size() == GetNodeReinsertSize(T));
 
   if (GetNodeInvalidStatus(T)) { // every invalid tree should be flatten
-    assert(flatten_node_slice.size() == 1);
     assert(reinsert_entries.size() == T->size);
     assert(has_tomb == false);
 
-    flatten_node_slice[0] = T;
     auto size = T->size;
     assert(T != nullptr);
     FlattenRec<decltype(reinsert_entries), true, kSortReinsertEntries>(
@@ -278,7 +274,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   assert(NodeIsValid(T));
 
   if (T->is_leaf) { // do nothing for a valid leaf
-    assert(flatten_node_slice.size() == 0);
     assert(reinsert_entries.size() == 0);
     return 0;
   }
@@ -288,7 +283,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   if (TI->invalid_subtree_num == 0 && TI->reinsert_size == 0) {
     // no subtree is invalid, fully valid
     assert(TI->valid);
-    assert(flatten_node_slice.size() == 0);
     assert(reinsert_entries.size() == 0);
     return 0;
   }
@@ -357,15 +351,11 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   assert(TI->node_n >= invalid_idx);
   TI->node_n = tree_node_idx;
 
-  bool const next_tomb = has_tomb ? !reinsert_flag : false;
   SizeBufUBArr remove_entries_num;
-  SizeBufUBArr subtree_sum;
   SizeBufUBArr reinsert_sum;
-  subtree_sum[0] = 0;
   reinsert_sum[0] = 0;
   for (BufSizeT i = 1; i < invalid_idx; i++) {
     auto node = invalid_subtree[i - 1];
-    subtree_sum[i] = subtree_sum[i - 1] + GetNodeInvalidSubtreeNum(node);
     reinsert_sum[i] = reinsert_sum[i - 1] + GetNodeReinsertSize(node);
   }
 
@@ -383,6 +373,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   //     next_tomb);
   // }
 
+  bool const next_tomb = has_tomb ? !reinsert_flag : false;
   parlay::parallel_for(
     0,
     invalid_idx,
@@ -390,9 +381,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       auto node = invalid_subtree[i];
       remove_entries_num[i] = FetchInvalidSubtreeNodes(
         node,
-        flatten_node_slice.cut(subtree_sum[i],
-                               i == invalid_idx - 1 ? flatten_node_slice.size()
-                                                    : subtree_sum[i + 1]),
         reinsert_entries.cut(reinsert_sum[i],
                              i == invalid_idx - 1 ? reinsert_entries.size()
                                                   : reinsert_sum[i + 1]),
