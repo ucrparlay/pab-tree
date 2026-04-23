@@ -68,21 +68,28 @@ BTree<TT>::HandlingLeafSplitOverflow(Node* T,
                                      Range In,
                                      NodeSplitPairSlice node_split_slice)
 {
-  auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
   Leaf* TL = static_cast<Leaf*>(T);
+  auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
 
-  // for (SizeT i = 0; i < T->size; i++) { // Assume the TT::kBufUB is constant
-  //   entry_seq[i] = TL->elements[i];
-  // }
-  std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, entry_seq.begin());
-  parlay::copy(
-    In, parlay::make_slice(entry_seq.begin() + TL->size, entry_seq.end()));
-  // parlay::parallel_for(
-  //   0, In.size(), [&](SizeT i) { entry_seq[T->size + i] = In[i]; });
-  FreeNode<Leaf>(T);
-
-  // NOTE: split
-  entry_seq = parlay::sort(entry_seq); // PERF: we need sort as In is unsorted
+  if (TL->is_sorted) {
+    // In is always sorted (sorted by BatchInsert_ before descent).
+    // Both halves sorted: O(n) merge instead of O(n log n) sort.
+    std::ranges::merge(TL->GetEleBeginIter(),
+                       TL->GetEleEndIter(),
+                       In.begin(),
+                       In.end(),
+                       entry_seq.begin(),
+                       [](E const& a, E const& b) {
+                         return Entry::GetKey(a) < Entry::GetKey(b);
+                       });
+    FreeNode<Leaf>(T);
+  } else {
+    std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, entry_seq.begin());
+    parlay::copy(
+      In, parlay::make_slice(entry_seq.begin() + TL->size, entry_seq.end()));
+    FreeNode<Leaf>(T);
+    entry_seq = parlay::sort(entry_seq);
+  }
 
   SizeT rt_bkt_n = GenerateLeafNodes(
     parlay::make_slice(entry_seq),

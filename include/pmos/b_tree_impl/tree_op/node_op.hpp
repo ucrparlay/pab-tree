@@ -81,8 +81,22 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
 
   auto TI = static_cast<Interior*>(T);
 
-  // merge node
   assert(std::numeric_limits<BufSizeT>::max() >= new_node_n);
+
+  // Fast path: no child split — tree_nodes/split arrays unchanged, only size differs.
+  // return_node_n_arr[i] is always 0 or >=2 (GenerateLeafNodes/GenerateInteriorNodes
+  // always produce >=2 buckets), so new_node_n == GetNodeN() iff all are 0.
+  if (new_node_n == static_cast<SizeT>(TI->GetNodeN())) {
+    SizeT tot = 0;
+    for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
+      tot += TI->tree_nodes[i]->size;
+    }
+    TI->size = tot;
+    TI->UpdateAug();
+    return T;
+  }
+
+  // Slow path: some child split — rebuild tree_nodes and split arrays.
   SizeT tot_entry_sz = 0;
   BufSizeT node_idx = 0;
   typename Interior::NodeArr new_nodes;
@@ -99,10 +113,8 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
     }
   }
 
-  // merge split
-  // NOTE:the original split will always stay
+  // NOTE: the original split will always stay
   typename Interior::SplitArr new_splits;
-  typename Interior::SplitArr old_splits = TI->split;
   BufSizeT split_idx = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     SizeT st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
@@ -112,8 +124,7 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
     for (int j = 0; j < static_cast<int>(return_node_n_arr[i]) - 1; j++) {
       new_splits[split_idx++] = node_split_slice[st + j].second;
     }
-    // append the tree split
-    if (i < TI->GetNodeN() - 1) { // skip the new splits for last node
+    if (i < TI->GetNodeN() - 1) {
       new_splits[split_idx++] = TI->split[i];
     }
   }

@@ -234,6 +234,46 @@ At each interior node: find `l` = first child overlapping `[first, second)`, `r`
 
 `RangeReportRec` and `RangeCountRec` are templated on `Range` and are never instantiated in `unit_test`. Always compile `b_test` to catch template body errors in these functions.
 
+## Batch insert path (`BatchInsert_` / `BatchInsertRecursive`)
+
+### `BatchInsert_` (`b_batch_insert.hpp`)
+
+Entry point. Sorts input once via `parlay::sort`, then calls `BatchInsertRecursive` on the root. If the root splits (returns `new_node_n > 0`), assembles the new root via `AssembleInteriorLevels`.
+
+### `BatchInsertRecursive` (`b_batch_insert.hpp`)
+
+Recursive parallel descent. Input `In` is always a sorted slice (sorted once in `BatchInsert_` before descent — all recursive calls pass `In.cut(l, r)` which are subarrays of the sorted input).
+
+- **Leaf case**: if fits (`size + n <= kBufUB`) → `InsertPoints2Leaf` in-place; else → `HandlingLeafSplitOverflow`.
+- **Interior case**: partitions input across children using `SplitBatchBinarySearch` (when `n > kSplitFactor * split_n`) or `SplitBatchMerge`; recurses in parallel via `parlay::parallel_for` with granularity 1.
+- `new_node_n` is accumulated in O(cnt) — iterating only touched children — starting from `GetNodeN()` and adding `split_n - 1` for children that split. `return_node_n_arr[i]` is always 0 or ≥2 (never 1), so this is correct.
+
+### `BatchInsertUpdateInterior` (`node_op.hpp`)
+
+Updates the interior node after recursive insert.
+
+**Fast path** (common case): if `new_node_n == TI->GetNodeN()` (no child split), only recomputes `TI->size` by summing child sizes and calls `UpdateAug`. Avoids two O(kBufUB) `std::array` copies (~4KB) that would otherwise rebuild `tree_nodes`/`split` to identical values.
+
+**Why the invariant holds**: `return_node_n_arr[i]` is always 0 or ≥2, because `GenerateLeafNodes` and `GenerateInteriorNodes` always produce ≥2 buckets (since input to overflow path has ≥ kBufUB elements, and `GetBktNum = item_n / kBufMD`, so ≥2). Therefore `new_node_n == GetNodeN()` iff all `return_node_n_arr[i] == 0`.
+
+**Slow path** (some child split): rebuilds `new_nodes`/`new_splits` arrays in a temporary, then moves into `TI`. Cannot write directly in-place because the expansion ratio means write index overtakes read index.
+
+### `HandlingLeafSplitOverflow` (`leaf_op.hpp`)
+
+Handles leaf overflow. Allocates a merged entry buffer, then splits via `GenerateLeafNodes`.
+
+**Sorted fast path**: when `TL->is_sorted` is true (after `Build` or after distribute in `BalanceOverLeaves`), uses `std::ranges::merge` O(n) instead of concatenate + `parlay::sort` O(n log n). Safe because `In` is always sorted.
+
+### `AssembleInteriorLevels` (`b_build_tree.hpp`)
+
+Shared helper used by both `BuildRecursive` and `BatchInsert_` (when root splits). Takes a flat (node, key) slice and iteratively calls `GenerateInteriorNodes` until the result fits in a single root. Allocates its own aux ping-pong buffers internally. Replaced the duplicated while-loop that existed in both call sites.
+
+### Points-op helpers (`points_op.hpp`)
+
+- `SplitBatchBinarySearch`: sequential binary searches narrowing the range, O(split_n · log(n/split_n)).
+- `SplitBatchMerge`: single O(n + split_n) merge pass; used when `n <= kSplitFactor * split_n`.
+- `SeievePoints`: parallel histogram-based scatter (used in `BatchInsertSieve` / `-DSIEVE` path only).
+
 ## Concrete element type in tests
 
 Default: `Wrapper<uint32_t, uint32_t>::Element` → key=uint32_t (4B), val=uint32_t (4B) → E is 8 bytes.
