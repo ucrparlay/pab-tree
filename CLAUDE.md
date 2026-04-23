@@ -274,6 +274,39 @@ Shared helper used by both `BuildRecursive` and `BatchInsert_` (when root splits
 - `SplitBatchMerge`: single O(n + split_n) merge pass; used when `n <= kSplitFactor * split_n`.
 - `SeievePoints`: parallel histogram-based scatter (used in `BatchInsertSieve` / `-DSIEVE` path only).
 
+## Batch delete path (`BatchDelete_` / `BatchDeleteRecursive`)
+
+### `BatchDelete_` (`b_batch_delete.hpp`)
+
+Entry point. Sorts input keys once via `parlay::sort`, then calls `BatchDeleteRecursive` on the root. If the result is `invalid_flag` (tree emptied), calls `DeleteTree`. If any invalid subtrees remain, calls `FetchInvalidSubtreeNodes` with `has_tomb = true` to compact and reinsert.
+
+### `BatchDeleteRecursive` (`b_batch_delete.hpp`)
+
+Recursive parallel descent. `In` (sorted key slice) is partitioned across children using `SplitBatchBinarySearch` or `SplitBatchMerge` (same threshold as insert). Results `(invalid_flag, invalid_subtree_num, reinsert_size)` per child are collected, then `BatchDeleteUpdateInteriorSize` aggregates them into the current node's validity state.
+
+**Precomputed l/r**: `touched_l[cnt]` / `touched_r[cnt]` are stored alongside `nodes_map[cnt]` to avoid recomputing child ranges inside the `parallel_for` lambda.
+
+**Hoisted `NodeHasLeafChildren`**: whether children are interior nodes is computed once before the loop (same result for every child of a given interior node), avoiding a repeated function call per untouched child.
+
+**Untouched children**: `invalid_subtree_flag[i] = false`, counts = 0 are set directly; if children are interior nodes, `ResetDeletionFlag()` is called so the reinsertion phase sees clean state.
+
+### `DeletePoints4Leaf` (`leaf_op.hpp`)
+
+`In` is always sorted (sorted once in `BatchDelete_` before descent). Replaces the original O(n × m) scan (linear search per key × leaf size) with:
+
+1. If `!TL->is_sorted`: sort the leaf in-place O(m log m), set `is_sorted = true`.
+2. Two-pointer O(m + n) compaction: walk sorted leaf and sorted `In` together, copying surviving elements to a write cursor.
+
+Result: O(m + n) for already-sorted leaves, O(m log m + n) otherwise — vs O(n × m) previously. The result is always sorted, so `is_sorted` stays `true`.
+
+### `BatchDeleteUpdateInteriorSize` (`node_op.hpp`)
+
+Aggregates per-child validity info into the current interior node. Updates `TI->size`, `TI->valid`, `TI->invalid_subtree_num`, `TI->reinsert_size`. Called unconditionally from `BatchDeleteRecursive` (unlike insert, there is no fast path here because validity state always needs updating even when no children became invalid).
+
+### `FetchInvalidSubtreeNodes` / `BalanceOverLeaves`
+
+See `BalanceOverLeaves` section above — these are shared between delete and the general rebalancing path.
+
 ## Concrete element type in tests
 
 Default: `Wrapper<uint32_t, uint32_t>::Element` → key=uint32_t (4B), val=uint32_t (4B) → E is 8 bytes.

@@ -83,9 +83,10 @@ BTree<TT>::BatchInsertUpdateInterior(Node* T,
 
   assert(std::numeric_limits<BufSizeT>::max() >= new_node_n);
 
-  // Fast path: no child split — tree_nodes/split arrays unchanged, only size differs.
-  // return_node_n_arr[i] is always 0 or >=2 (GenerateLeafNodes/GenerateInteriorNodes
-  // always produce >=2 buckets), so new_node_n == GetNodeN() iff all are 0.
+  // Fast path: no child split — tree_nodes/split arrays unchanged, only size
+  // differs. return_node_n_arr[i] is always 0 or >=2
+  // (GenerateLeafNodes/GenerateInteriorNodes always produce >=2 buckets), so
+  // new_node_n == GetNodeN() iff all are 0.
   if (new_node_n == static_cast<SizeT>(TI->GetNodeN())) {
     SizeT tot = 0;
     for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
@@ -312,8 +313,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
   // PARA: this node is valid, but contains invalid subtree
   typename Interior::NodeArr invalid_subtree;
-  // typename Interior::NodeArr new_tree_nodes;
-  // typename Interior::SplitArr new_splits;
   assert(invalid_subtree.size() == TT::kBufUB);
   BufSizeT invalid_idx = 0;
   BufSizeT tree_node_idx = 0;
@@ -339,13 +338,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     assert(NodeIsValid(node) ? 1 : GetNodeInvalidSubtreeNum(node) == 1);
 
     if (NodeIsValid(node)) {
-      // new_tree_nodes[tree_node_idx] = node;
-      // tree_node_idx++;
-      // if (i < TI->GetSplitN()) {
-      //   new_splits[split_idx] = TI->split[i];
-      //   split_idx++;
-      // }
-
       const bool has_split = i < TI->GetSplitN();
       if (i != tree_node_idx) {
         TI->tree_nodes[tree_node_idx] = node;
@@ -357,8 +349,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       split_idx += has_split;
     }
   }
-  // TI->tree_nodes = std::move(new_tree_nodes);
-  // TI->split = std::move(new_splits);
   assert(TI->node_n >= invalid_idx);
   TI->node_n = tree_node_idx;
 
@@ -396,18 +386,6 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                next_tomb);
     },
     1);
-
-  // SizeT total_remove_entries_n =
-  //   std::accumulate(remove_entries_num.begin(),
-  //                   remove_entries_num.begin() + invalid_idx,
-  //                   static_cast<SizeT>(0));
-  //
-  // assert(total_remove_entries_n == reinsert_entries.size());
-  // assert(parlay::all_of(flatten_node_slice, [&](auto node) {
-  //   return node != nullptr && VerifyUnoverlappedTree(node,
-  //   flatten_node_slice);
-  // }));
-  // assert((this->Validate<true, false>(T)));
 
   TI->size =
     std::accumulate(TI->tree_nodes.begin(),
