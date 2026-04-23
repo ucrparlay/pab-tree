@@ -168,7 +168,7 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
   // size_t n = 100;
   // EntrySeq wp = EntrySeq::uninitialized(n);
   auto parsed_input = Tree::ParseInput(WP);
-  auto wp = parsed_input;
+  auto const& wp = parsed_input;
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -205,8 +205,8 @@ BatchInsert(Tree& pkd,
 {
   typename Tree::InputRangeT parsed_base = Tree::ParseInput(WP);
   typename Tree::InputRangeT parsed_batch = Tree::ParseInput(WI);
-  auto wp = parsed_base;
-  auto wi = parsed_batch;
+  auto const& wp = parsed_base;
+  auto const& wi = parsed_batch;
   double loop_late = rounds > 1 ? 0.01 : -100;
 
   if constexpr (kTestTime) { // NOTE: clean and measure time
@@ -297,8 +297,8 @@ BatchDelete(Tree& pkd,
 {
   auto parsed_base = Tree::ParseInput(WP);
   auto parsed_batch = Tree::ParseDeleteInput(WI);
-  auto wp = parsed_base;
-  auto wi = parsed_batch;
+  auto const& wp = parsed_base;
+  auto const& wi = parsed_batch;
   double loop_late = rounds > 1 ? 0.01 : -100;
 
   if constexpr (kTestTime) { // NOTE: clean and measure time
@@ -324,91 +324,6 @@ BatchDelete(Tree& pkd,
     pkd.BatchDelete(wi);
     std::cout << "finish ccp delete" << std::endl;
   }
-}
-
-template<typename Point, typename Tree, bool kTestTime = true>
-void
-BatchDiff(Tree& pkd,
-          parlay::sequence<Point> const& WP,
-          int const& rounds,
-          double const total_ratio = 1.0,
-          double const overlap_ratio = 0.5)
-{
-  using Points = typename Tree::Points;
-  size_t total_batch_size = static_cast<size_t>(WP.size() * total_ratio);
-  size_t overlap_size = static_cast<size_t>(total_batch_size * overlap_ratio);
-
-  Points WI = parlay::tabulate(total_batch_size, [&](size_t i) -> Point {
-    if (i < overlap_size) {
-      return WP[i];
-    } else {
-      Point p = WP[i];
-      if constexpr (IsAugPoint<Point>) {
-        p.aug.id = -1 * p.aug.id - 1;
-      } else {
-        std::transform(
-          p.pnt.begin(), p.pnt.end(), p.pnt.begin(), std::negate<Coord>());
-      }
-      return p;
-    }
-  });
-
-  Points wp = Points::uninitialized(WP.size());
-  Points wi = Points::uninitialized(WI.size());
-
-  if constexpr (kTestTime) {
-    pkd.DeleteTree();
-    double aveDelete = time_loop(
-      rounds,
-      0.01,
-      [&]() {
-        BuildTree<Point, Tree, false>(WP, rounds, pkd);
-        parlay::copy(WI, wi);
-      },
-      [&]() { pkd.BatchDiff(wi.cut(0, total_batch_size)); },
-      [&]() { pkd.DeleteTree(); });
-    std::cout << aveDelete << " " << std::flush;
-    BuildTree<Point, Tree, false>(WP, rounds, pkd);
-  } else {
-    parlay::copy(WI, wi);
-    pkd.BatchDiff(wi.cut(0, total_batch_size));
-  }
-}
-
-template<typename Point, typename Tree>
-void
-rangeCountRadius(parlay::sequence<Point> const& wp,
-                 Tree& pkd,
-                 Typename* kdknn,
-                 int const& rounds,
-                 int const& queryNum)
-{
-  // using Points = typename Tree::Points;
-  // using node = typename Tree::node;
-  using Box = typename Tree::Box;
-  using circle = typename Tree::circle;
-
-  int n = wp.size();
-
-  double aveCount = time_loop(
-    rounds,
-    0.01,
-    [&]() {},
-    [&]() {
-      parlay::parallel_for(0, queryNum, [&](size_t i) {
-        Box query_box_seq = pkd.get_box(
-          Box(wp[i], wp[i]), Box(wp[(i + n / 2) % n], wp[(i + n / 2) % n]));
-        auto d = Tree::p2p_distance(wp[i], wp[(i + n / 2) % n], wp[i].GetDim());
-        d = static_cast<Coord>(std::sqrt(d));
-        circle cl = circle(wp[i], d);
-        kdknn[i] = pkd.range_count(cl);
-      });
-    },
-    [&]() {});
-
-  std::cout << aveCount << " " << std::flush;
-
-  return;
 }
 
 template<typename TT, typename Tree>
