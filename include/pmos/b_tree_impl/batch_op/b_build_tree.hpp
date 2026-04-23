@@ -39,6 +39,40 @@ BTree<TT>::Build_(Range In)
 }
 
 template<typename TT>
+TT::Node*
+BTree<TT>::AssembleInteriorLevels(TT::NodeSlice nodes, TT::SplitSlice keys)
+{
+  auto aux_node_seq = TT::NodeSeq::uninitialized(nodes.size());
+  auto aux_key_seq = TT::KeySeq::uninitialized(keys.size());
+  auto node_in = nodes;
+  auto node_out = parlay::make_slice(aux_node_seq);
+  auto key_in = keys;
+  auto key_out = parlay::make_slice(aux_key_seq);
+
+  auto swap_key_node = [&](SizeT bkt_n) {
+    key_in = key_in.cut(0, bkt_n - 1);
+    key_out = key_out.cut(0, bkt_n - 1);
+    node_in = node_in.cut(0, bkt_n);
+    node_out = node_out.cut(0, bkt_n);
+    std::ranges::swap(key_in, key_out);
+    std::ranges::swap(node_in, node_out);
+  };
+
+  while (node_in.size() >= TT::kBufUB) {
+    SizeT interior_bkt_n = GenerateInteriorNodes(
+      node_in,
+      key_in,
+      GenNodesOutputHandler{
+        .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
+        .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
+    swap_key_node(interior_bkt_n);
+    assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
+  }
+
+  return AllocInteriorNode<Interior, TT>(node_in, key_in);
+}
+
+template<typename TT>
 template<typename Range>
 TT::Node*
 BTree<TT>::BuildRecursive(Range In)
@@ -51,55 +85,23 @@ BTree<TT>::BuildRecursive(Range In)
     return AllocNormalLeafNode<Range, Leaf>(In);
   }
 
-  auto tree_node_seq_in =
-    parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
-  auto tree_node_seq_out =
-    parlay::sequence<Node*>::uninitialized((In.size() / TT::kBufMD) + 1);
-  auto node_in = parlay::make_slice(tree_node_seq_in);
-  auto node_out = parlay::make_slice(tree_node_seq_out);
+  SizeT estimated_bkt_n = (In.size() / TT::kBufMD) + 1;
+  auto node_seq = parlay::sequence<Node*>::uninitialized(estimated_bkt_n);
+  auto key_seq =
+    parlay::sequence<typename TT::K>::uninitialized(estimated_bkt_n);
+  auto node_out = parlay::make_slice(node_seq);
+  auto key_out = parlay::make_slice(key_seq);
 
-  auto key_seq_in = parlay::sequence<typename TT::K>::uninitialized(
-    (In.size() / TT::kBufMD) + 1);
-  auto key_seq_out = parlay::sequence<typename TT::K>::uninitialized(
-    (In.size() / TT::kBufMD) + 1);
-  auto key_in = parlay::make_slice(key_seq_in);
-  auto key_out = parlay::make_slice(key_seq_out);
-
-  auto swap_key_node = [&](size_t bkt_n) {
-    key_in = key_in.cut(0, bkt_n - 1);
-    key_out = key_out.cut(0, bkt_n - 1);
-    node_in = node_in.cut(0, bkt_n);
-    node_out = node_out.cut(0, bkt_n);
-    std::ranges::swap(key_in, key_out);
-    std::ranges::swap(node_in, node_out);
-  };
-
-  // NOTE: build leaf
   SizeT bkt_n = GenerateLeafNodes(
     In,
     GenNodesOutputHandler{
       .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
       .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
-  swap_key_node(bkt_n);
-  assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
+  assert(parlay::is_sorted(key_out.cut(0, bkt_n - 1),
+                           [&](TT::K a, TT::K b) { return a < b; }));
 
-  // NOTE: build Interior
-  typename TT::HeightT cur_height = 1;
-  while (node_in.size() >= TT::kBufUB) {
-    SizeT interior_bkt_n = GenerateInteriorNodes(
-      node_in,
-      key_in,
-      // ++cur_height,
-      GenNodesOutputHandler{
-        .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
-        .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
-    swap_key_node(interior_bkt_n);
-    assert(parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
-  }
-
-  // this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in,
-  // ++cur_height);
-  this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
+  this->root_ =
+    AssembleInteriorLevels(node_out.cut(0, bkt_n), key_out.cut(0, bkt_n - 1));
   return this->root_;
 }
 

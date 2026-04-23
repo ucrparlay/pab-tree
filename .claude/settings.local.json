@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(mv /home/zmen002/ParallelMultiwayOrderedSet/MEMORY.md /home/zmen002/ParallelMultiwayOrderedSet/.claude/MEMORY.md)",
+      "Bash(mv /home/zmen002/ParallelMultiwayOrderedSet/feedback_claude_md.md /home/zmen002/ParallelMultiwayOrderedSet/.claude/feedback_claude_md.md)"
     ]
   }
 }

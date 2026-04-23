@@ -4,6 +4,8 @@
 
 - **Keep this file updated.** After any session where new files are read, new functions are understood, or new design decisions are uncovered, append or update the relevant section here. This file is the persistent knowledge store for this project and travels across machines.
 
+- **Check `.claude/` for memory.** At the start of each session, also check `.claude/MEMORY.md` and the memory files under `.claude/projects/` for additional persistent context (user preferences, feedback, project decisions) that supplements this file.
+
 
 - Don't need to run the unit_test after the updates. just make sure the compilation is passed.
 
@@ -167,6 +169,24 @@ Uses `parlay::parallel_for` for tree-level operations. `BalanceOverLeaves` itsel
 | `GetNodeIdContainingKey(k)` | `tree_node.h:333` | Binary search on `split[]` → child index |
 | `Leaf::Contain(k)` | `tree_node.h:115` | Binary search on `elements[]`; branches on `is_sorted` |
 | `BinarySearch<8>` | `dependence/binary_search.h` | Core search primitive used by all the above |
+
+### `kBinarySearchBase` — cache-line-sized linear scan base
+
+Both `LeafNode` and `MultiWayNode` expose a `static constexpr BufSizeT kBinarySearchBase` that sets the linear-scan threshold for `BinarySearch<N>`. It is computed from the hardware cache line size at compile time using `std::hardware_constructive_interference_size` (from `<new>`, C++17):
+
+```cpp
+// LeafNode — searches E (entry = key + val)
+static constexpr TT::BufSizeT kBinarySearchBase =
+    std::hardware_constructive_interference_size / sizeof(E);
+
+// MultiWayNode — searches K (split keys only)
+static constexpr BufSizeT kBinarySearchBase =
+    std::hardware_constructive_interference_size / sizeof(TT::K);
+```
+
+They differ because leaf search scans entries (`sizeof(E)`) while interior search scans bare split keys (`sizeof(K)`). Example with key=uint64+val=uint32 (E=16B, K=8B) on a 64B-line machine: leaf base=4, interior base=8.
+
+`hardware_constructive_interference_size` (not `destructive`) is correct here: it gives the max size that fits within one cache line, which is exactly the linear-scan budget we want.
 
 ### Optimizations already applied
 

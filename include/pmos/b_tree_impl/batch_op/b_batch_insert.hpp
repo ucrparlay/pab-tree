@@ -49,15 +49,10 @@ BTree<TT>::BatchInsert_(Range In, bool sorted)
   if (!sorted) {
     sorted_seq = parlay::sort(In);
     sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
-    // for (SizeT i = 1; i < 20; i++) {
-    //   std::cout << Entry::GetKey(sorted_slice[i]) << std::endl;
-    // }
   }
 
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());
-  // auto cur_height =
-  //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
   SizeT new_node_n = BatchInsertRecursive(
     this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
@@ -71,42 +66,8 @@ BTree<TT>::BatchInsert_(Range In, bool sorted)
     auto updated_split_seq = parlay::tabulate(
       new_node_n - 1, [&](SizeT i) { return node_split_seq[i].second; });
 
-    if (updated_node_seq.size() < TT::kBufUB) {
-      this->root_ =
-        AllocInteriorNode<Interior, TT>(updated_node_seq, updated_split_seq);
-      // updated_node_seq, updated_split_seq, cur_height + 1);
-    } else {
-      // the returned new nodes exceeds the node capacity, needs further split
-      auto node_in = parlay::make_slice(updated_node_seq);
-      auto key_in = parlay::make_slice(updated_split_seq);
-
-      auto aux_node_seq = TT::NodeSeq::uninitialized(updated_node_seq.size());
-      auto aux_key_seq = TT::KeySeq::uninitialized(updated_split_seq.size());
-      auto node_out = parlay::make_slice(updated_node_seq);
-      auto key_out = parlay::make_slice(updated_split_seq);
-
-      auto swap_key_node = [&](size_t bkt_n) {
-        key_in = key_in.cut(0, bkt_n - 1);
-        key_out = key_out.cut(0, bkt_n - 1);
-        node_in = node_in.cut(0, bkt_n);
-        node_out = node_out.cut(0, bkt_n);
-        std::ranges::swap(key_in, key_out);
-        std::ranges::swap(node_in, node_out);
-      };
-
-      while (node_in.size() >= TT::kBufUB) {
-        SizeT interior_bkt_n = GenerateInteriorNodes(
-          node_in,
-          key_in,
-          GenNodesOutputHandler{
-            .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
-            .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
-        swap_key_node(interior_bkt_n);
-        assert(
-          parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
-      }
-      this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
-    }
+    this->root_ = AssembleInteriorLevels(parlay::make_slice(updated_node_seq),
+                                         parlay::make_slice(updated_split_seq));
   }
 }
 

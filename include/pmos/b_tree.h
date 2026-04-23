@@ -264,6 +264,8 @@ public:
   template<typename Range>
   Node* BuildRecursive(Range In);
 
+  Node* AssembleInteriorLevels(TT::NodeSlice nodes, TT::SplitSlice keys);
+
   template<typename Range>
   void BatchInsert(Range&& In);
 

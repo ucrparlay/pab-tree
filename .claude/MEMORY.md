@@ -1,0 +1,1 @@
+- [Keep CLAUDE.md updated](feedback_claude_md.md) — update project CLAUDE.md whenever new codebase knowledge is gained
