@@ -38,7 +38,7 @@ using namespace pmos;
 static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
 static constexpr size_t kMemberQueryOsmSize = 10'000'000;
-static constexpr int kOsmWindowLen = 3;
+static constexpr int kOsmWindowLen = 5;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
@@ -809,8 +809,10 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
   parlay::sequence<double> query_time(time_period_num, 0.0);
+  parlay::sequence<size_t> tree_size(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
+    size_t current_tree_size = 0;
     if (r == 1) { // omit the first rounds
       for (int i = 0; i < time_period_num; i++) {
         insert_time[i] = 0.0;
@@ -823,52 +825,64 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     pkd.DeleteTree();
     for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
       // std::cout << node_by_time[i].size() << " ";
-      std::cerr << " insert batch: " << batch_id << std::flush;
       t.reset(), t.start();
       pkd.BatchInsert(insert_entry[batch_id]);
       t.stop();
       insert_time[batch_id] += t.total_time();
+      current_tree_size += node_by_time[batch_id].size();
+#ifdef DEBUG
+      std::cerr << " insert batch: " << batch_id << std::flush;
       pkd.Validate();
+#endif // DEBUG
 
       if (batch_id >= sliding_window_len) {
         // puts("begin delete");
         // std::cout << delete_entry[i - cur_batch_id].size() << " ";
-        std::cerr << " delete batch: " << batch_id - sliding_window_len
-                  << std::flush;
         t.reset(), t.start();
         pkd.BatchDelete(delete_entry[batch_id - sliding_window_len]);
         t.stop();
         delete_time[batch_id] += t.total_time();
-        // std::cout << t.total_time() << " " << std::endl;
+        current_tree_size -= node_by_time[batch_id - sliding_window_len].size();
+#ifdef DEBUG
+        // std::cerr << " delete batch: " << batch_id - sliding_window_len
+        //           << std::flush;
         pkd.Validate();
+#endif // DEBUG
       } else {
         // std::cout << "-1 " << std::flush;
         delete_time[batch_id] = 0.0;
       }
+      tree_size[batch_id] = current_tree_size;
 
       // NOTE: test membership query
-      // t.reset(), t.start();
-      // parlay::parallel_for(0, member_query_n, [&](size_t j) {
-      //   auto [contain, logger] = pkd.Contain(query_points[j]);
-      //   res[j] = contain;
-      // });
-      // t.stop();
-      // query_time[batch_id] += t.total_time();
+      t.reset(), t.start();
+      parlay::parallel_for(0, member_query_n, [&](size_t j) {
+        auto [contain, logger] = pkd.Contain(query_points[j]);
+        res[j] = contain;
+      });
+      t.stop();
+      query_time[batch_id] += t.total_time();
 
-      std::cout << std::endl;
+      // std::cout << std::endl;
     }
   }
 
+  std::cout << std::right << std::setw(10) << "insert_n" << std::setw(10)
+            << "delete_n" << std::setw(10) << "tree_n" << std::setw(12)
+            << "insert_t(s)" << std::setw(12) << "delete_t(s)" << std::setw(12)
+            << "query_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
-    std::cout << node_by_time[batch_id].size() << " ";
-    if (batch_id >= sliding_window_len) {
-      std::cout << node_by_time[batch_id - sliding_window_len].size() << " ";
-    } else {
-      std::cout << 0 << " ";
-    }
-    std::cout << insert_time[batch_id] / (rounds - 1) << " "
-              << delete_time[batch_id] / (rounds - 1) << " "
-              << query_time[batch_id] / (rounds - 1) << std::endl;
+    size_t const delete_n =
+      batch_id >= sliding_window_len
+        ? node_by_time[batch_id - sliding_window_len].size()
+        : 0;
+    std::cout << std::right << std::setw(10) << node_by_time[batch_id].size()
+              << std::setw(10) << delete_n << std::setw(10)
+              << tree_size[batch_id] << std::setw(12) << std::fixed
+              << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
+              << std::setw(12) << delete_time[batch_id] / (rounds - 1)
+              << std::setw(12) << query_time[batch_id] / (rounds - 1)
+              << std::endl;
   }
 }
 
