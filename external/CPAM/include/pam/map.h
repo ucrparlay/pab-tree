@@ -616,7 +616,8 @@ public:
 
   bool contains(K const& key) const
   {
-    return (Tree::find(root, key) != NULL) ? true : false;
+    // return (Tree::find(root, key) != NULL) ? true : false;
+    return find(key, K()) != K();
   }
 
   maybe_E next(K const& key) const
