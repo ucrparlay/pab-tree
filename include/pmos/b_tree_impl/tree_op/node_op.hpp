@@ -515,6 +515,7 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
         FreeNode<Leaf>(leaf);
       }
       dest->size = static_cast<SizeT>(dst - dest->GetEleBeginIter());
+      // TODO: try sort it as well
       dest->is_sorted = false;
       TI->tree_nodes[tree_idx++] = dest;
       if (!is_rightmost) {

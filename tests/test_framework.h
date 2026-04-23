@@ -37,7 +37,7 @@ using namespace pmos;
 // NOTE: membership size
 static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
-static constexpr size_t kMemberQueryOsmSize = 10'000'000;
+static constexpr size_t kMemberQueryOsmSize = 100'000'000;
 static constexpr int kOsmWindowLen = 5;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
@@ -767,10 +767,11 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 {
   pkd.DeleteTree();
   const int time_period_num = node_by_time.size();
+  parlay::sequence<typename Tree::InputRangeT> wi(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> wd(time_period_num);
   parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
-  // typename TT::Points query_points(batchQueryOsmSize);
   auto query_points = TT::KeySeq::uninitialized(member_query_n);
   auto step = member_query_n / time_period_num;
   if (member_query_n % time_period_num != 0) {
@@ -780,8 +781,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   }
 
   for (int i = 0; i < time_period_num; i++) {
-    insert_entry[i] = Tree::ParseInput(node_by_time[i]);
-    delete_entry[i] = Tree::ParseDeleteInput(node_by_time[i]);
+    wi[i] = Tree::ParseInput(node_by_time[i]);
+    wd[i] = Tree::ParseDeleteInput(node_by_time[i]);
     // std::cout << i << " "
     //           << *parlay::max_element(node_by_time[i],
     //                                   [&](auto a, auto b) {
@@ -812,6 +813,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<size_t> tree_size(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
+    insert_entry = wi;
+    delete_entry = wd;
     size_t current_tree_size = 0;
     if (r == 1) { // omit the first rounds
       for (int i = 0; i < time_period_num; i++) {
@@ -867,21 +870,21 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     }
   }
 
-  std::cout << std::right << std::setw(10) << "insert_n" << std::setw(10)
-            << "delete_n" << std::setw(10) << "tree_n" << std::setw(12)
-            << "insert_t(s)" << std::setw(12) << "delete_t(s)" << std::setw(12)
+  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
+            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
+            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
             << "query_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     size_t const delete_n =
       batch_id >= sliding_window_len
         ? node_by_time[batch_id - sliding_window_len].size()
         : 0;
-    std::cout << std::right << std::setw(10) << node_by_time[batch_id].size()
-              << std::setw(10) << delete_n << std::setw(10)
-              << tree_size[batch_id] << std::setw(12) << std::fixed
+    std::cout << std::right << std::setw(12) << node_by_time[batch_id].size()
+              << std::setw(12) << delete_n << std::setw(12)
+              << tree_size[batch_id] << std::setw(14) << std::fixed
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
-              << std::setw(12) << delete_time[batch_id] / (rounds - 1)
-              << std::setw(12) << query_time[batch_id] / (rounds - 1)
+              << std::setw(14) << delete_time[batch_id] / (rounds - 1)
+              << std::setw(14) << query_time[batch_id] / (rounds - 1)
               << std::endl;
   }
 }
@@ -1178,24 +1181,7 @@ static auto constexpr TestTemporalGraph =
 
     // NOTE: real world sliding window
     if (opts.tag & (1 << 3)) {
-      // string osm_prefix =
-      // "/data/zmen002/geometry/osm_by_year/africa/africa_"; const
-      // std::vector<std::string> files = { "2015", "2016", "2017", "2018",
-      //                                          "2019", "2020", "2021",
-      //                                          "2022", "2023", "2024" };
-      // parlay::sequence<EntrySeq> node_by_year(files.size());
-      // size_t offset = 0;
-      // for (int i = 0; i < files.size(); i++) {
-      //   std::string path = osm_prefix + files[i] + ".csv";
-      //   auto [input_num, input_dim] = ReadEntries<typename TT::E,
-      //   kInputType>(
-      //     path.c_str(), node_by_year[i], offset);
-      //   node_by_year[i] = parlay::random_shuffle(node_by_year[i]);
-      //   offset += input_num;
-      // }
-
-      string osm_path =
-        "/data/zmen002/geometry/osm_by_year/africa_year_zcode.in";
+      string osm_path = opts.input_file_path;
       EntrySeq osm_records;
       auto [input_num, input_dim] =
         ReadEntries<typename TT::E, kInputType>(osm_path.c_str(), osm_records);
@@ -1220,7 +1206,7 @@ static auto constexpr TestTemporalGraph =
                           res);
     }
 
-    if (opts.tag & (1 << 4)) { // NOTE: real world sliding window
+    if (opts.tag & (1 << 4)) { // NOTE: temporal graph
       string dynamic_graph_path =
         "/data/zmen002/geometry/osm_temporal_graph/north_america/";
 
