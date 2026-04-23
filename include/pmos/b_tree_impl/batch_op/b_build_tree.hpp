@@ -24,13 +24,14 @@ BTree<TT>::Build(Range&& In)
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
-  EntrySlice A = parlay::make_slice(std::forward<Range>(In));
+  auto A = parlay::make_slice(std::forward<Range>(In));
   Build_(A);
 }
 
 template<typename TT>
+template<typename Range>
 void
-BTree<TT>::Build_(EntrySlice In)
+BTree<TT>::Build_(Range In)
 {
   auto sort_seq = parlay::sort(In);
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
@@ -38,15 +39,16 @@ BTree<TT>::Build_(EntrySlice In)
 }
 
 template<typename TT>
+template<typename Range>
 TT::Node*
-BTree<TT>::BuildRecursive(EntrySlice In)
+BTree<TT>::BuildRecursive(Range In)
 {
   if (In.size() == 0) {
-    return AllocEmptyLeafNode<EntrySlice, Leaf>();
+    return AllocEmptyLeafNode<Range, Leaf>();
   }
 
   if (In.size() < TT::kBufUB) {
-    return AllocNormalLeafNode<EntrySlice, Leaf>(In);
+    return AllocNormalLeafNode<Range, Leaf>(In);
   }
 
   auto tree_node_seq_in =

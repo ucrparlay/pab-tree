@@ -813,8 +813,9 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<size_t> tree_size(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
-    insert_entry = wi;
-    delete_entry = wd;
+    auto const& insert_entry = wi;
+    auto const& delete_entry = wd;
+
     size_t current_tree_size = 0;
     if (r == 1) { // omit the first rounds
       for (int i = 0; i < time_period_num; i++) {

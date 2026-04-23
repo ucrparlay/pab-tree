@@ -26,8 +26,9 @@ BTree<TT>::BatchDelete(Range&& In)
 }
 
 template<typename TT>
+template<typename Range>
 void
-BTree<TT>::BatchDelete_(TT::KeySlice In)
+BTree<TT>::BatchDelete_(Range In)
 {
   if (this->root_ == nullptr) {
     return;

@@ -34,8 +34,9 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
 }
 
 template<typename TT>
+template<typename Range>
 TT::Node*
-BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In)
+BTree<TT>::InsertPoints2Leaf(Node* T, Range In)
 {
   Leaf* TL = static_cast<Leaf*>(T);
 
@@ -61,9 +62,10 @@ BTree<TT>::InsertPoints2Leaf(Node* T, EntrySlice In)
 }
 
 template<typename TT>
+template<typename Range>
 TT::SizeT
 BTree<TT>::HandlingLeafSplitOverflow(Node* T,
-                                     EntrySlice In,
+                                     Range In,
                                      NodeSplitPairSlice node_split_slice)
 {
   auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());

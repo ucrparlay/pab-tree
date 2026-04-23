@@ -258,30 +258,37 @@ public:
   template<typename Range>
   void Build(Range&& In);
 
-  void Build_(EntrySlice In);
+  template<typename Range>
+  void Build_(Range In);
 
-  Node* BuildRecursive(EntrySlice In);
+  template<typename Range>
+  Node* BuildRecursive(Range In);
 
   template<typename Range>
   void BatchInsert(Range&& In);
 
-  void BatchInsert_(EntrySlice In, bool sorted = false);
+  template<typename Range>
+  void BatchInsert_(Range In, bool sorted = false);
 
-  void BatchInsertSieve(EntrySlice In);
+  template<typename Range>
+  void BatchInsertSieve(Range In);
 
+  template<typename Range>
   SizeT BatchInsertRecursive(Node* T,
-                             EntrySlice In,
+                             Range In,
                              NodeSplitPairSlice node_split_slice);
 
+  template<typename Range>
   SizeT BatchInsertSieveRecursive(Node* T,
-                                  EntrySlice In,
-                                  EntrySlice Out,
+                                  Range In,
+                                  Range Out,
                                   NodeSplitPairSlice node_split_slice);
 
   template<typename Range>
   void BatchDelete(Range&& In);
 
-  void BatchDelete_(TT::KeySlice In);
+  template<typename Range>
+  void BatchDelete_(Range In);
 
   // PARA: return whether T is valid, invalid subtree num, and total # of
   // entries needs to be reinserted
@@ -348,7 +355,8 @@ public:
                                      TT::SplitSlice key_in,
                                      OutputHandler&& output_handler);
   // NOTE: batch insert
-  static Node* InsertPoints2Leaf(Node* T, EntrySlice In);
+  template<typename Range>
+  static Node* InsertPoints2Leaf(Node* T, Range In);
 
   static void PartitionBinarySearchRec(auto split_seq_s,
                                        // parlay::sequence<int>& split_pos_seq,
@@ -357,8 +365,9 @@ public:
                                        size_t split_offset,
                                        size_t In_offset);
 
+  template<typename Range>
   static SizeT HandlingLeafSplitOverflow(Node* T,
-                                         EntrySlice In,
+                                         Range In,
                                          NodeSplitPairSlice node_split_slice);
 
   static SizeT HandlingInteriorSplitOverflow(
@@ -392,8 +401,9 @@ public:
   template<typename T>
   static inline BufSizeT RetriveTag(T e, TT::SplitSliceConst split_slice);
 
-  static TT::BallSeq SeievePoints(EntrySlice A,
-                                  EntrySlice B,
+  template<typename Range>
+  static TT::BallSeq SeievePoints(Range A,
+                                  Range B,
                                   TT::SplitSliceConst split_seq);
   // NOTE: delete tree
   // template <SupportsForceParallel Interior, bool granularity>

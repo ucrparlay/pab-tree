@@ -21,7 +21,7 @@ BTree<TT>::BatchInsert(Range&& In)
   static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
                                         parlay::range_reference_type_t<Range>>);
 
-  EntrySlice A = parlay::make_slice(std::forward<Range>(In));
+  auto A = parlay::make_slice(std::forward<Range>(In));
 
 #ifndef SIEVE
   BatchInsert_(A);
@@ -31,8 +31,9 @@ BTree<TT>::BatchInsert(Range&& In)
 }
 
 template<typename TT>
+template<typename Range>
 void
-BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
+BTree<TT>::BatchInsert_(Range In, bool sorted)
 {
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
@@ -43,18 +44,18 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
     return Build_(In);
   }
 
-  auto sorted_slice = In;
+  parlay::slice<const E*, const E*> sorted_slice{ In.begin(), In.end() };
   typename TT::EntrySeq sorted_seq;
   if (!sorted) {
     sorted_seq = parlay::sort(In);
-    sorted_slice = parlay::make_slice(sorted_seq);
+    sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
     // for (SizeT i = 1; i < 20; i++) {
     //   std::cout << Entry::GetKey(sorted_slice[i]) << std::endl;
     // }
   }
 
   NodeSplitPairSeq node_split_seq =
-    NodeSplitPairSeq::uninitialized(2 * In.size());
+    NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());
   // auto cur_height =
   //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
   SizeT new_node_n = BatchInsertRecursive(
@@ -94,12 +95,9 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
       };
 
       while (node_in.size() >= TT::kBufUB) {
-        // std::cout << "recursive split, node num: " << node_in.size()
-        //           << std::endl;
         SizeT interior_bkt_n = GenerateInteriorNodes(
           node_in,
           key_in,
-          // ++cur_height,
           GenNodesOutputHandler{
             .set_key = [&](SizeT i, auto key) { key_out[i] = key; },
             .set_node = [&](SizeT i, auto node) { node_out[i] = node; } });
@@ -108,15 +106,15 @@ BTree<TT>::BatchInsert_(EntrySlice In, bool sorted)
           parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
       }
       this->root_ = AllocInteriorNode<Interior, TT>(node_in, key_in);
-      // AllocInteriorNode<Interior, TT>(node_in, key_in, ++cur_height);
     }
   }
 }
 
 template<typename TT>
+template<typename Range>
 TT::SizeT
 BTree<TT>::BatchInsertRecursive(Node* T,
-                                EntrySlice In,
+                                Range In,
                                 NodeSplitPairSlice node_split_slice)
 {
   assert(2 * In.size() == node_split_slice.size());
@@ -210,8 +208,9 @@ BTree<TT>::BatchInsertRecursive(Node* T,
 
 // NOTE: Start as sieve
 template<typename TT>
+template<typename Range>
 void
-BTree<TT>::BatchInsertSieve(EntrySlice In)
+BTree<TT>::BatchInsertSieve(Range In)
 {
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
@@ -237,10 +236,11 @@ BTree<TT>::BatchInsertSieve(EntrySlice In)
 
 // NOTE: Start as sieve
 template<typename TT>
+template<typename Range>
 TT::SizeT
 BTree<TT>::BatchInsertSieveRecursive(Node* T,
-                                     EntrySlice In,
-                                     EntrySlice Out,
+                                     Range In,
+                                     Range Out,
                                      NodeSplitPairSlice node_split_slice)
 {
   assert(In.size() == node_split_slice.size());

@@ -63,10 +63,9 @@ BTree<TT>::RetriveTag(T const e, TT::SplitSliceConst split_slice)
 // sums is the number of elemenets within each bucket, the tags_num is the total
 // number of buckets in the skeleton
 template<typename TT>
+template<typename Range>
 typename TT::BallSeq
-BTree<TT>::SeievePoints(EntrySlice A,
-                        EntrySlice B,
-                        TT::SplitSliceConst split_seq)
+BTree<TT>::SeievePoints(Range A, Range B, TT::SplitSliceConst split_seq)
 {
   size_t n = A.size();
   size_t num_block = (n + kBlockSize - 1) >> kLog2Base;
