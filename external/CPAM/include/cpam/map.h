@@ -642,7 +642,7 @@ public:
 
   bool contains(K const& key) const
   {
-    return Tree::find(key, K());
+    return Tree::find(ptr(root, true), key).has_value();
   }
 
   // TODO
