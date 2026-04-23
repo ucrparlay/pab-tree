@@ -59,9 +59,8 @@ function run_cmake() {
 	local cur_path
 	cur_path=$(pwd)
 	cd ../build || exit
-	# cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=clang++ -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
 	rm -rf *
-	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DOSM=OFF -DDYNAMIC_GRAPH=OFF -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
 	make "${solver}"
 	cd "${cur_path}" || exit
 }
@@ -86,16 +85,16 @@ function run_cmake() {
 # run_test 0 "${solver}" "${tree}"
 
 # PAM
-# tree=2
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+tree=2
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # CPAM
-# tree=1
-# solver="cpam"
-# run_cmake 4 "${solver}"
-# run_test 4 "${solver}" "${tree}"
+tree=1
+solver="cpam"
+run_cmake 4 "${solver}"
+run_test 4 "${solver}" "${tree}"
 
 # ours
 solver="b_test"
