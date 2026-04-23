@@ -167,8 +167,7 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
   size_t n = WP.size();
   // size_t n = 100;
   // EntrySeq wp = EntrySeq::uninitialized(n);
-  auto parsed_input = Tree::ParseInput(WP);
-  auto const& wp = parsed_input;
+  auto const wp = Tree::ParseInput(WP);
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -176,11 +175,10 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
     double aveBuild = time_loop(
       rounds,
       loop_late,
-      [&]() { wp = parsed_input; },
+      [&]() {},
       [&]() { pkd.Build(wp); },
       [&]() { pkd.DeleteTree(); });
 
-    wp = parsed_input;
     pkd.Build(wp);
     if constexpr (kPrint) {
       std::cout << aveBuild << " " << std::flush;
@@ -188,7 +186,6 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
-    wp = parsed_input;
     pkd.Build(wp);
   }
 }
@@ -203,10 +200,8 @@ BatchInsert(Tree& pkd,
             typename TypeTrait::EntrySeq const& WI,
             int const rounds)
 {
-  typename Tree::InputRangeT parsed_base = Tree::ParseInput(WP);
-  typename Tree::InputRangeT parsed_batch = Tree::ParseInput(WI);
-  auto const& wp = parsed_base;
-  auto const& wi = parsed_batch;
+  auto const wp = Tree::ParseInput(WP);
+  auto const wi = Tree::ParseInput(WI);
   double loop_late = rounds > 1 ? 0.01 : -100;
 
   if constexpr (kTestTime) { // NOTE: clean and measure time
@@ -214,11 +209,7 @@ BatchInsert(Tree& pkd,
     double aveInsert = time_loop(
       rounds,
       loop_late,
-      [&]() {
-        wp = parsed_base;
-        wi = parsed_batch;
-        pkd.Build(wp);
-      },
+      [&]() { pkd.Build(wp); },
       [&]() { pkd.BatchInsert(wi); },
       [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
@@ -295,10 +286,8 @@ BatchDelete(Tree& pkd,
             typename TypeTrait::EntrySeq const& WI,
             int const rounds)
 {
-  auto parsed_base = Tree::ParseInput(WP);
-  auto parsed_batch = Tree::ParseDeleteInput(WI);
-  auto const& wp = parsed_base;
-  auto const& wi = parsed_batch;
+  auto const wp = Tree::ParseInput(WP);
+  auto const wi = Tree::ParseDeleteInput(WI);
   double loop_late = rounds > 1 ? 0.01 : -100;
 
   if constexpr (kTestTime) { // NOTE: clean and measure time
@@ -306,15 +295,8 @@ BatchDelete(Tree& pkd,
     double aveInsert = time_loop(
       rounds,
       loop_late,
-      [&]() {
-        wp = parsed_base;
-        wi = parsed_batch;
-        pkd.Build(wp);
-      },
-      [&]() {
-        // puts("-----------------------");
-        pkd.BatchDelete(wi);
-      },
+      [&]() { pkd.Build(wp); },
+      [&]() { pkd.BatchDelete(wi); },
       [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
