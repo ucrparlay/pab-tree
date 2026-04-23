@@ -477,6 +477,12 @@ public:
                       SizeT& offset,
                       Range out,
                       RangeReportLogger& logger) const;
+
+  template<typename Range>
+  void RangeReportFlattenRec(Node const* T,
+                             SizeT& offset,
+                             Range out,
+                             RangeReportLogger& logger) const;
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return input_seq;

@@ -32,7 +32,7 @@ BTree<TT>::BatchDelete_(TT::KeySlice In)
   if (this->root_ == nullptr) {
     return;
   }
-  parlay::internal::timer t(">>> BatchDelete");
+  // parlay::internal::timer t(">>> BatchDelete");
   // std::cout << "Tree nodes before delete: "
   //           << GetTreeNodesNum<Leaf, Interior>(this->root_) << std::endl;
   static_assert(

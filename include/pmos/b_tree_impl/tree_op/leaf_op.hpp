@@ -27,9 +27,10 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
     }
   }
   assert(Out.size() >= TL->size);
-  for (BufSizeT i = 0; i < TL->size; i++) {
-    Out[i] = TL->elements[i];
-  }
+  std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, Out.begin());
+  // for (BufSizeT i = 0; i < TL->size; i++) {
+  //   Out[i] = TL->elements[i];
+  // }
 }
 
 template<typename TT>

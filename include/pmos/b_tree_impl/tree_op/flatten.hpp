@@ -50,16 +50,20 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
                                        return acc + n->size;
                                      }));
 
+  std::array<SizeT, TT::kBufUB + 1> child_offsets;
+  child_offsets[0] = 0;
+  auto node_n = TI->GetNodeN();
+  for (BufSizeT i = 0; i < node_n; ++i) {
+    child_offsets[i + 1] = child_offsets[i] + TI->tree_nodes[i]->size;
+  }
+
   parlay::parallel_for(
     0,
-    TI->GetNodeN(),
+    node_n,
     [&](BufSizeT i) {
-      SizeT start = 0;
-      for (BufSizeT j = 0; j < i; ++j) {
-        start += TI->tree_nodes[j]->size;
-      }
+      auto start = child_offsets[i];
       FlattenRec<Range, granularity, sorted>(
-        TI->tree_nodes[i], Out.cut(start, start + TI->tree_nodes[i]->size));
+        TI->tree_nodes[i], Out.cut(start, child_offsets[i + 1]));
     },
     // NOTE: In our btree when we flatten the tree, the size is always match the
     // corresponding size, so we can use it as the granularity indicator

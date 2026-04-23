@@ -416,35 +416,48 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
   assert((this->Validate<true, false>(T)));
   TI->ResetDeletionFlag();
-
-  return;
 }
 
 template<typename TT>
 void
 BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
 {
-  // std::cerr << "BalanceOverLeaves: " << reinsert_size << std::endl;
   auto TI = static_cast<Interior*>(T);
+
+  // ── Phase 1: Group assignment ──────────────────────────────────────────────
+  // Each child is assigned to the nearest valid node on its right (its pivot).
+  // group_sum[pivot] accumulates the total entry count for that group.
+  // Invalid nodes right of all valid nodes are handled in the fix-up loop.
   BufSizeBufUBArr tree_group;
-  auto rightmost_pivot_idx = TT::kBufUB;
-  auto pivot = TT::kBufUB;
-  for (int i = TI->GetNodeN() - 1; i >= 0; --i) { // WARN: caution with --i
-    if (NodeIsValid(TI->tree_nodes[i])) {
-      if (rightmost_pivot_idx == TT::kBufUB) { // meet the rightmost valid tree
-        rightmost_pivot_idx = i;
+  SizeBufUBArr group_sum;
+  const BufSizeT rightmost_pivot_idx = [&]() -> BufSizeT {
+    BufSizeT rpidx = TT::kBufUB;
+    BufSizeT pivot = TT::kBufUB;
+
+    // WARN: signed; --i from 0 is safe
+    for (int i = TI->GetNodeN() - 1; i >= 0; --i) {
+      const SizeT sz = TI->tree_nodes[i]->size;
+      if (NodeIsValid(TI->tree_nodes[i])) {
+        if (rpidx == TT::kBufUB) {
+          rpidx = i;
+        }
+        pivot = i;
+        tree_group[i] = i;
+        group_sum[i] = sz;
+      } else {
+        tree_group[i] = pivot;
+        if (pivot != TT::kBufUB) {
+          group_sum[pivot] += sz;
+        }
       }
-      pivot = i;
-      tree_group[i] = pivot;
-      continue;
     }
-    tree_group[i] = pivot;
-  }
-  assert(rightmost_pivot_idx != TT::kBufUB);
-  for (BufSizeT i = rightmost_pivot_idx + 1; i < TI->GetNodeN(); ++i) {
-    assert(tree_group[i] == TT::kBufUB);
-    tree_group[i] = rightmost_pivot_idx;
-  }
+    assert(rpidx != TT::kBufUB);
+    for (BufSizeT i = rpidx + 1; i < TI->GetNodeN(); ++i) {
+      tree_group[i] = rpidx;
+      group_sum[rpidx] += TI->tree_nodes[i]->size;
+    }
+    return rpidx;
+  }();
 
 #ifdef DEBUG
   for (BufSizeT i = 0; i < TI->GetNodeN(); ++i) {
@@ -457,131 +470,138 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
   }
 #endif // DEBUG
 
-  auto entry_buf = TT::EntrySeq::uninitialized(reinsert_size + TT::kBufUB);
-  typename Interior::NodeArr new_tree_nodes;
-  typename Interior::SplitArr new_splits;
+  // ── Phase 2: Compact and redistribute ─────────────────────────────────────
+  // Results written directly into TI's arrays.
+  // Safety: tree_idx ≤ i holds throughout, so writes never clobber unread data.
+  typename TT::EntrySeq
+    entry_buf; // heap-allocated lazily; only if distribute fires
   BufSizeT tree_idx = 0;
   BufSizeT split_idx = 0;
-  BufSizeT i = 0;
 
-  auto quick_check = [&](auto group_id) -> bool {
-    auto cur_tree_idx = tree_idx - 1;
-    auto cur_split_idx = split_idx - 1;
-    auto box = GetNodeBoxRec(new_tree_nodes[cur_tree_idx]);
+  // Validates that the last-emitted node falls inside its expected key range.
+  // Called only from assert(), so has no cost in release builds.
+  auto quick_check = [&](BufSizeT g) -> bool {
+    const auto box = GetNodeBoxRec(TI->tree_nodes[tree_idx - 1]);
     if (tree_idx == 1) {
-      return box.second < new_splits[cur_split_idx];
-    } else if (group_id == rightmost_pivot_idx) {
-      return box.first >= new_splits[cur_split_idx];
-    } else {
-      return box.first >= new_splits[cur_split_idx - 1] &&
-             box.second < new_splits[cur_split_idx];
+      return box.second < TI->split[split_idx - 1];
     }
+    if (g == rightmost_pivot_idx) {
+      return box.first >= TI->split[split_idx - 1];
+    }
+    return box.first >= TI->split[split_idx - 2] &&
+           box.second < TI->split[split_idx - 1];
   };
 
-  while (i < TI->GetNodeN()) {
-    assert(tree_group[i] < TT::kBufUB);
-    BufSizeT j = i;
-    SizeT sum = 0;
-    while (j < TI->GetNodeN() && tree_group[j] == tree_group[i]) {
-      sum += TI->tree_nodes[j]->size;
-      j++;
+  // Case A: group is a single valid node — slide its pointer/split into place.
+  auto handle_single = [&](BufSizeT i, BufSizeT g, bool is_rightmost) {
+    assert(NodeIsValid(TI->tree_nodes[i]));
+    TI->tree_nodes[tree_idx++] = TI->tree_nodes[i];
+    if (!is_rightmost) {
+      TI->split[split_idx++] = TI->split[i];
     }
+    assert(quick_check(g));
+  };
 
-    // NOTE: [i, j-1] is the tree nodes in same group
-    if (j == i + 1) {
-      assert(NodeIsValid(TI->tree_nodes[i]));
-      new_tree_nodes[tree_idx++] = TI->tree_nodes[i];
-      if (tree_group[i] != rightmost_pivot_idx) {
-        new_splits[split_idx++] = TI->split[i];
-      }
-      assert(quick_check(tree_group[i]));
-      i = j;
-      continue;
-    }
-
-    if (sum < TT::kBufUB) { // fit into one leaf
-      auto dest_idx = j - 1;
-      auto dest_node = static_cast<Leaf*>(TI->tree_nodes[dest_idx]);
-      assert(NodeIsValid(dest_node) || tree_group[i] == rightmost_pivot_idx);
-      for (BufSizeT k = i; k < dest_idx; ++k) {
-        auto leaf = static_cast<Leaf*>(TI->tree_nodes[k]);
-        assert(GetNodeInvalidStatus(leaf) ||
-               tree_group[i] == rightmost_pivot_idx);
-        std::ranges::copy_n(
-          leaf->GetEleBeginIter(), leaf->size, dest_node->GetEleEndIter());
-        dest_node->size += leaf->size;
+  // Case B: group total fits in one leaf — merge all into the rightmost leaf.
+  auto handle_merge =
+    [&](BufSizeT i, BufSizeT j, BufSizeT g, bool is_rightmost) {
+      auto* dest = static_cast<Leaf*>(TI->tree_nodes[j - 1]);
+      assert(NodeIsValid(dest) || is_rightmost);
+      auto* dst = dest->GetEleEndIter();
+      for (BufSizeT k = i; k < j - 1; ++k) {
+        auto* leaf = static_cast<Leaf*>(TI->tree_nodes[k]);
+        assert(GetNodeInvalidStatus(leaf) || is_rightmost);
+        dst = std::copy_n(leaf->GetEleBeginIter(), leaf->size, dst);
         FreeNode<Leaf>(leaf);
       }
-      dest_node->is_sorted = false;
-      new_tree_nodes[tree_idx++] = dest_node;
-      if (tree_group[i] != rightmost_pivot_idx) {
-        new_splits[split_idx++] = TI->split[dest_idx];
+      dest->size = static_cast<SizeT>(dst - dest->GetEleBeginIter());
+      dest->is_sorted = false;
+      TI->tree_nodes[tree_idx++] = dest;
+      if (!is_rightmost) {
+        TI->split[split_idx++] = TI->split[j - 1];
       }
-      assert(quick_check(tree_group[i]));
-      i = j;
-      // TODO: may sort as well
-      continue;
+      assert(quick_check(g));
+    };
+
+  // Case C: group must be redistributed — gather all entries, sort, scatter
+  // into evenly-sized buckets while reusing existing leaf node objects.
+  auto handle_distribute = [&](BufSizeT i, BufSizeT j, bool is_rightmost) {
+    if (entry_buf.empty()) [[unlikely]] {
+      entry_buf = TT::EntrySeq::uninitialized(reinsert_size + TT::kBufUB);
     }
 
-    // need to distribute
-    SizeT item_n = 0;
+    auto* ep = entry_buf.begin();
     for (BufSizeT k = i; k < j; ++k) {
-      auto leaf = static_cast<Leaf*>(TI->tree_nodes[k]);
-      std::ranges::copy_n(
-        leaf->GetEleBeginIter(), leaf->size, entry_buf.begin() + item_n);
-      item_n += leaf->size;
+      auto* leaf = static_cast<Leaf*>(TI->tree_nodes[k]);
+      ep = std::copy_n(leaf->GetEleBeginIter(), leaf->size, ep);
     }
+    const auto item_n = static_cast<SizeT>(ep - entry_buf.begin());
 
     std::sort(entry_buf.begin(),
               entry_buf.begin() + item_n,
-              [&](auto const& a, auto const& b) {
+              [](auto const& a, auto const& b) {
                 return Entry::GetKey(a) < Entry::GetKey(b);
               });
 
-    auto const bkt_n = GetBktNum(item_n);
+    const BufSizeT bkt_n = GetBktNum(item_n);
     assert(bkt_n <= j - i);
+    auto* sp = entry_buf.begin();
+    SizeT ele_l = 0;
     for (BufSizeT k = 0; k < bkt_n; ++k) {
-      auto const ele_l = GetBktStIdx(k, bkt_n, item_n);
-      auto const ele_r =
+      const SizeT ele_r =
         (k == bkt_n - 1) ? item_n : GetBktEndIdx(k, bkt_n, item_n);
-      auto leaf = static_cast<Leaf*>(TI->tree_nodes[i + k]);
-      std::ranges::copy_n(
-        entry_buf.begin() + ele_l, ele_r - ele_l, leaf->GetEleBeginIter());
-      leaf->size = ele_r - ele_l;
+      const SizeT bkt_size = ele_r - ele_l;
+      auto* leaf = static_cast<Leaf*>(TI->tree_nodes[i + k]);
+      std::copy_n(sp, bkt_size, leaf->GetEleBeginIter());
+      sp += bkt_size;
+      leaf->size = bkt_size;
       leaf->is_sorted = true;
-      new_tree_nodes[tree_idx++] = leaf;
+      TI->tree_nodes[tree_idx++] = leaf;
       if (k < bkt_n - 1) {
-        new_splits[split_idx++] = Entry::GetKey(entry_buf[ele_r]);
-        // assert(quick_check(tree_group[i]));
+        TI->split[split_idx++] = Entry::GetKey(*sp);
       }
+      ele_l = ele_r;
     }
-    if (tree_group[i] != rightmost_pivot_idx) {
-      new_splits[split_idx++] = TI->split[j - 1];
+    if (!is_rightmost) {
+      TI->split[split_idx++] = TI->split[j - 1];
     }
-    assert(quick_check(tree_group[i]));
     for (BufSizeT k = i + bkt_n; k < j; ++k) {
       FreeNode<Leaf>(TI->tree_nodes[k]);
+    }
+  };
+
+  // ── Dispatch loop ──────────────────────────────────────────────────────────
+  for (BufSizeT i = 0; i < TI->GetNodeN();) {
+    const BufSizeT g = tree_group[i];
+    const bool is_rightmost = (g == rightmost_pivot_idx);
+    const SizeT sum = group_sum[g];
+    BufSizeT j = i + 1;
+    while (j < TI->GetNodeN() && tree_group[j] == g) {
+      ++j;
+    }
+
+    if (j == i + 1) [[likely]] {
+      handle_single(i, g, is_rightmost);
+    } else if (sum < TT::kBufUB) {
+      handle_merge(i, j, g, is_rightmost);
+    } else {
+      handle_distribute(i, j, is_rightmost);
     }
 
     i = j;
   }
 
   assert(tree_idx == split_idx + 1);
-  TI->tree_nodes = std::move(new_tree_nodes);
-  TI->split = std::move(new_splits);
   TI->node_n = tree_idx;
   TI->ResetDeletionFlag();
 
 #ifdef DEBUG
-  // ensure the tree structure is correct after the compaction,
-  // i.e., all the nodes in the interior node are valid and the split is
-  // correct
   for (int i = 0; i < TI->GetNodeN(); i++) {
     assert(TI->tree_nodes[i] != nullptr);
     if (TI->GetNodeN() == 1) {
       continue;
     }
-    auto box = GetNodeBoxRec(TI->tree_nodes[i]);
+    const auto box = GetNodeBoxRec(TI->tree_nodes[i]);
     if (i == 0) {
       assert(box.second < TI->split[0]);
     } else if (i == TI->GetNodeN() - 1) {
@@ -591,7 +611,6 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
     }
   }
 #endif // DEBUG
-  // this->Validate<true, false>(T);
 }
 
 template<typename TT>
