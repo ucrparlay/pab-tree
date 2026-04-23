@@ -757,13 +757,85 @@ ConRangeQuery(auto num_thread,
   std::cout << t.total_time() << " " << std::flush;
 }
 
+template<typename TT>
+void
+ConcurrentIdxOSM(auto num_thread,
+                 auto primal_idx,
+                 int index_type,
+                 const parlay::sequence<typename TT::EntrySeq>& node_by_time,
+                 const int sliding_window_len,
+                 const size_t member_query_n)
+{
+  const int time_period_num = node_by_time.size();
+  auto const& insert_entry = node_by_time;
+  auto const& delete_entry = node_by_time;
+  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto step = member_query_n / time_period_num;
+  for (int i = 0; i < time_period_num; i++) {
+    parlay::parallel_for(0, step, [&](size_t j) {
+      query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
+    });
+  }
+
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  parlay::sequence<double> query_time(time_period_num, 0.0);
+  parlay::sequence<size_t> tree_size(time_period_num, 0);
+
+  size_t current_tree_size = 0;
+  // running the osm
+  parlay::internal::timer t;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    t.reset(), t.start();
+    ConInsert<0>(num_thread, primal_idx, insert_entry[batch_id]);
+    t.stop();
+    insert_time[batch_id] += t.total_time();
+    current_tree_size += node_by_time[batch_id].size();
+
+    if (batch_id >= sliding_window_len) {
+      t.reset(), t.start();
+      ConDelete<0>(
+        num_thread, primal_idx, delete_entry[batch_id - sliding_window_len]);
+      t.stop();
+      delete_time[batch_id] += t.total_time();
+      current_tree_size -= node_by_time[batch_id - sliding_window_len].size();
+    } else {
+      delete_time[batch_id] = 0.0;
+    }
+    tree_size[batch_id] = current_tree_size;
+
+    // NOTE: test membership query
+    t.reset(), t.start();
+    ConMembership(num_thread, primal_idx, query_points);
+    t.stop();
+    query_time[batch_id] += t.total_time();
+  }
+
+  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
+            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
+            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
+            << "query_t(s)" << std::endl;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    size_t const delete_n =
+      batch_id >= sliding_window_len
+        ? node_by_time[batch_id - sliding_window_len].size()
+        : 0;
+    std::cout << std::right << std::setw(12) << node_by_time[batch_id].size()
+              << std::setw(12) << delete_n << std::setw(12)
+              << tree_size[batch_id] << std::setw(14) << std::fixed
+              << std::setprecision(6) << insert_time[batch_id] << std::setw(14)
+              << delete_time[batch_id] << std::setw(14) << query_time[batch_id]
+              << std::endl;
+  }
+}
+
 template<typename Options>
 void
 ApplyConcurrentIndexDynamicGraph(Options const& opts)
 {
   // opts.PrintOptionValue();
 
-  using Wrapper = Wrapper<std::pair<uint32_t, uint32_t>, uint32_t>;
+  using Wrapper = Wrapper<uint64_t, uint32_t>;
   using E = typename Wrapper::E;
   // using EleType = Element<uint32_t, uint32_t>;
   using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
@@ -772,6 +844,14 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
                                   Wrapper::InteriorAugEmpty,
                                   8,
                                   pmos::ProtoNode>;
+
+#if defined(DYNAMIC_GRAPH)
+  constexpr int kInputType = InputType::kDynamicGraphInput;
+#elif defined(OSM)
+  constexpr int kInputType = InputType::kOsmInput;
+#else
+  constexpr int kInputType = InputType::kNormalInput;
+#endif
 
   using EntrySeq = TT::EntrySeq;
 
@@ -791,10 +871,33 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
   std::cout << "\n" << std::flush;
 
   int num_thread = parlay::num_workers();
+  Index<keytype, keycomp>* idx =
+    getInstance<keytype, keycomp>(index_type, key_type);
 
-  EntrySeq wp;
-  EntrySeq wi;
-  ReadEntries<typename TT::E, 1>(opts.input_file_path.c_str(), wp);
+  // NOTE: real world sliding window
+  if (opts.tag & (1 << 3)) {
+    string osm_path = opts.input_file_path;
+    EntrySeq osm_records;
+    auto [input_num, input_dim] =
+      ReadEntries<typename TT::E, kInputType>(osm_path.c_str(), osm_records);
+    parlay::sort_inplace(osm_records, [&](auto const& a, auto const& b) {
+      return TT::Entry::GetVal(a) < TT::Entry::GetVal(b);
+    });
+    const std::vector<int> files = { 2015, 2016, 2017, 2018, 2019,
+                                     2020, 2021, 2022, 2023, 2024 };
+    auto node_by_year = parlay::tabulate(files.size(), [&](size_t i) {
+      return parlay::filter(osm_records, [&](auto const& record) {
+        return TT::Entry::GetVal(record) == files[i];
+      });
+    });
+
+    ConcurrentIdxOSM<TT>(num_thread,
+                         idx,
+                         index_type,
+                         node_by_year,
+                         kOsmWindowLen,
+                         kMemberQueryOsmSize);
+  }
 
   // NOTE: build
   // auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
@@ -981,10 +1084,10 @@ main(int argc, char* argv[])
   commandLine params(argc, argv);
   Options opts(params);
 
-#ifndef DYNAMIC_GRAPH
-  ApplyConcurrentIndex(opts);
-#else
+#if defined(DYNAMIC_GRAPH) || defined(OSM)
   ApplyConcurrentIndexDynamicGraph(opts);
+#else
+  ApplyConcurrentIndex(opts);
 #endif // DYNAMIC_GRAPH
   // ApplyConcurrentIndex(opts);
 
