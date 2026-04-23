@@ -8,6 +8,7 @@
 #include <bitset>
 #include <concepts>
 #include <cstdint>
+#include <new>
 #include <numeric>
 #include <tuple>
 #include <type_traits>
@@ -53,6 +54,10 @@ struct LeafNode : TypeTrait::Node
   using AT = typename TT::LeafAug;
   using EleAssignTagType = EleAssignTag;
 
+  static constexpr typename TT::BufSizeT kBinarySearchBase =
+    static_cast<typename TT::BufSizeT>(
+      std::hardware_constructive_interference_size / sizeof(E));
+
   // NOTE: default allocator
   LeafNode()
     : Node{ true, static_cast<size_t>(0) }
@@ -96,7 +101,7 @@ struct LeafNode : TypeTrait::Node
   auto BinarySearchKey(K const& k) const
   {
     assert(this->is_sorted);
-    return pmos::BinarySearch<8>(
+    return pmos::BinarySearch<kBinarySearchBase>(
       parlay::make_slice(this->elements.begin(),
                          this->elements.begin() + this->size),
       [k](E const e) { return Entry::GetKey(e) < k; });
@@ -106,7 +111,7 @@ struct LeafNode : TypeTrait::Node
   auto BinarySearchKeyExclusive(K const k) const
   {
     assert(this->is_sorted);
-    return pmos::BinarySearch<8>(
+    return pmos::BinarySearch<kBinarySearchBase>(
       parlay::make_slice(this->elements.begin(),
                          this->elements.begin() + this->size),
       [k](E const e) { return Entry::GetKey(e) <= k; });
@@ -263,6 +268,10 @@ struct MultiWayNode : TypeTrait::Node
   using NodeArr = std::array<Node*, TT::kBufUB>;
   using SplitArr = std::array<typename TT::Split, TT::kBufUB>;
 
+  static constexpr BufSizeT kBinarySearchBase =
+    static_cast<BufSizeT>(
+      std::hardware_constructive_interference_size / sizeof(typename TT::K));
+
   MultiWayNode(TT::NodeSeq const& _tree_nodes,
                TT::SplitSeq const& _split,
                TT::InteriorAug const& _aug)
@@ -334,7 +343,7 @@ struct MultiWayNode : TypeTrait::Node
   {
     // return the first idx s.t. split[idx] > k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
-    return pmos::BinarySearch<8>(this->GetSplitSlice(),
+    return pmos::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key <= k; });
     // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
     //   if (split[i] > k) {
@@ -348,7 +357,7 @@ struct MultiWayNode : TypeTrait::Node
   {
     // return the first idx s.t. split[idx] >= k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[1]
-    return pmos::BinarySearch<8>(this->GetSplitSlice(),
+    return pmos::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key < k; });
     // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
     //   if (split[i] >= k) {
