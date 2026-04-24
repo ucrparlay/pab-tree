@@ -292,10 +292,10 @@ public:
   template<typename Range>
   void BatchDelete_(Range In);
 
-  // PARA: return whether T is valid, invalid subtree num, and total # of
-  // entries needs to be reinserted
-  // Only needs to ensure the tree size is correct
-  std::tuple<bool, SizeT, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
+  // Returns (invalid_flag, needs_fetch, reinsert_entry_num).
+  // needs_fetch: any subtree needs FetchInvalidSubtreeNodes (not stored in
+  // node).
+  std::tuple<bool, bool, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
@@ -454,10 +454,11 @@ public:
   template<bool kCheckSize = true, bool kVerbose = true>
   bool Validate(Node const* T = nullptr);
 
-  std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
-  CheckTreeAugAfterDelete(Node* T);
+  std::tuple<bool, bool, typename TT::SizeT> CheckTreeAugAfterDelete(Node* T);
 
   auto Contain(K const& k) const -> std::pair<bool, MembershipLogger>;
+
+  bool ContainIter(Node const* T, K const& k) const;
 
   bool ContainRec(Node const* T, K const& k) const;
 
@@ -484,6 +485,13 @@ public:
                        Range out) const;
 
   template<typename Range>
+  void RangeReportIter(Node const* T,
+                       TT::Box const& query_box,
+                       SizeT& offset,
+                       Range out,
+                       RangeReportLogger& logger) const;
+
+  template<typename Range>
   void RangeReportRec(Node const* T,
                       TT::Box const& query_box,
                       SizeT& offset,
@@ -495,6 +503,7 @@ public:
                              SizeT& offset,
                              Range out,
                              RangeReportLogger& logger) const;
+
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return input_seq;

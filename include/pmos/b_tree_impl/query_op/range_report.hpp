@@ -22,7 +22,7 @@ BTree<TT>::RangeReport(TT::Box const query_box, Range&& out) const
 
   RangeReportLogger logger;
   SizeT rt_size = 0;
-  RangeReportRec(
+  RangeReportIter(
     this->root_, query_box, rt_size, parlay::make_slice(out), logger);
   return { rt_size, logger };
 }
@@ -72,11 +72,11 @@ BTree<TT>::RangeReportLeaf(Node const* T,
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::RangeReportRec(Node const* T,
-                          TT::Box const& query_box,
-                          SizeT& offset,
-                          Range out,
-                          RangeReportLogger& logger) const
+BTree<TT>::RangeReportIter(Node const* T,
+                           TT::Box const& query_box,
+                           SizeT& offset,
+                           Range out,
+                           RangeReportLogger& logger) const
 {
   // Iterative descent: avoids O(height) recursive-call overhead for narrow
   // queries that fall inside a single child at each interior level.
@@ -122,7 +122,7 @@ BTree<TT>::RangeReportRec(Node const* T,
     // Query spans children [l, r].
 
     // Left boundary: partially covered, recurse.
-    RangeReportRec(nodes[l], query_box, offset, out, logger);
+    RangeReportIter(nodes[l], query_box, offset, out, logger);
 
     // Middle children [l+1, r): fully covered by the query.
     // Pre-compute each child's output position, then flatten in parallel.
@@ -145,7 +145,7 @@ BTree<TT>::RangeReportRec(Node const* T,
     }
 
     // Right boundary: partially covered, recurse.
-    RangeReportRec(nodes[r], query_box, offset, out, logger);
+    RangeReportIter(nodes[r], query_box, offset, out, logger);
     return;
   }
 
@@ -179,6 +179,54 @@ BTree<TT>::RangeReportFlattenRec(Node const* T,
   }
 }
 
+template<typename TT>
+template<typename Range>
+void
+BTree<TT>::RangeReportRec(Node const* T,
+                          TT::Box const& query_box,
+                          SizeT& offset,
+                          Range out,
+                          RangeReportLogger& logger) const
+{
+  if (T->is_leaf) {
+    logger.vis_leaf_num++;
+    RangeReportLeaf(T, query_box, offset, out);
+    return;
+  }
+
+  logger.vis_interior_num++;
+  auto const* TI = static_cast<Interior const*>(T);
+  auto l = TI->GetNodeIdContainingKey(query_box.first);
+  auto r = TI->GetNodeIdContainingKeyExclusive(query_box.second);
+
+  assert(l < TI->GetNodeN());
+  assert(r < TI->GetNodeN());
+  assert(TI->ValidateKeyInNode(l, query_box.first));
+  assert(TI->ValidateKeyInNode(r, query_box.second) ||
+         TI->split[r] == query_box.second);
+
+  // NOTE: visit nodes [l, r]
+  // for (BufSizeT i = l; i <= r; i++) {
+  //   RangeReportRec(TI->tree_nodes[i], query_box, offset, out, logger);
+  // }
+  // return;
+
+  if (l == r) { // falls into one node
+    RangeReportRec(TI->tree_nodes[l], query_box, offset, out, logger);
+    return;
+  }
+
+  RangeReportRec(TI->tree_nodes[l], query_box, offset, out, logger);
+  RangeReportRec(TI->tree_nodes[r], query_box, offset, out, logger);
+
+  if (r > l + 1) {
+    for (BufSizeT i = l + 1; i < r; i++) {
+      FlattenRec<decltype(out), false>(
+        TI->tree_nodes[i], out.cut(offset, offset + TI->tree_nodes[i]->size));
+      offset += TI->tree_nodes[i]->size;
+    }
+  }
+}
 } // namespace pmos
 
 #endif // PMOS_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
