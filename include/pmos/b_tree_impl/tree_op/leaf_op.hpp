@@ -106,49 +106,43 @@ TT::SizeT
 BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
 {
   auto TL = static_cast<Leaf*>(T);
+
   assert(T->size >= In.size());
   assert(parlay::all_of(In, [&](auto a) {
-    return std::ranges::find_if(TL->elements.begin(),
-                                TL->elements.begin() + TL->size,
-                                [&](auto const e) {
-                                  return Entry::GetKey(e) == a;
-                                }) != TL->elements.begin() + TL->size;
+    return std::find_if(TL->elements.begin(),
+                        TL->elements.begin() + TL->size,
+                        [&](auto const e) { return Entry::GetKey(e) == a; }) !=
+           TL->elements.begin() + TL->size;
   }));
 
-  auto* begin = TL->GetEleBeginIter();
-  const BufSizeT m = static_cast<BufSizeT>(TL->size);
-
-  // Sort leaf if unsorted — In is always sorted (sorted once in BatchDelete_).
-  // O(m log m) sort pays off against the O(n*m) linear scan whenever n > log m.
-  if (!TL->is_sorted) {
-    std::sort(begin, begin + m, [](E const& a, E const& b) {
-      return Entry::GetKey(a) < Entry::GetKey(b);
+  auto it = TL->elements.begin();
+  auto end = TL->elements.begin() + TL->size;
+  BufSizeT delete_cnt = 0;
+  for (SizeT i = 0; i < In.size(); i++) {
+    it = std::ranges::find_if(TL->elements.begin(), end, [&](auto const& e) {
+      return Entry::GetKey(e) == In[i];
     });
-    TL->is_sorted = true;
-  }
-
-  // Two-pointer O(m + n) compaction: walk sorted leaf and sorted In together.
-  BufSizeT write = 0;
-  BufSizeT j = 0;
-  const BufSizeT n = static_cast<BufSizeT>(In.size());
-  for (BufSizeT i = 0; i < m; ++i) {
-    if (j < n && Entry::GetKey(begin[i]) == In[j]) {
-      ++j; // delete: skip this element
-    } else {
-      if (write != i) {
-        begin[write] = begin[i];
-      }
-      ++write;
+    if (it != end) {
+      std::ranges::iter_swap(it, --end);
+      delete_cnt++;
+    }
+    if (end == TL->elements.begin()) { // all elements are deleted
+      break;
     }
   }
 
-  assert(j == n); // all keys in In were found and deleted
-  TL->size = write;
-  // is_sorted stays true: surviving elements are a sorted subsequence
+  assert(end == TL->elements.begin() ||
+         std::cmp_equal(std::distance(TL->elements.begin(), end),
+                        TL->size - In.size()));
+  TL->size = std::distance(TL->elements.begin(), end);
+  TL->is_sorted = false;
+  assert(TL->size >= 0);
+  // TL->UpdateAug(TL->elements.cut(0, TL->size));
   TL->UpdateAug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
-  return static_cast<SizeT>(j);
+  return delete_cnt;
 }
+
 } // namespace pmos
 
 #endif // PMOS_B_TREE_IMPL_LEAF_OP_HPP_
