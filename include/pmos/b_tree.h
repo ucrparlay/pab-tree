@@ -142,7 +142,7 @@ public:
                       TT::SplitSeq const& _split)
       : BaseNode(_tree_nodes, _split, typename TT::InteriorAug())
       , valid(true)
-      , invalid_subtree_num(0)
+      , contain_invalid_subtree(0)
     {
     } // TODO:finish AT
 
@@ -150,7 +150,7 @@ public:
                       TT::SplitSlice _split_slice)
       : BaseNode(_tree_nodes_slice, _split_slice, typename TT::InteriorAug())
       , valid(true)
-      , invalid_subtree_num(0)
+      , contain_invalid_subtree(0)
     {
     } // TODO:finish AT
 
@@ -159,7 +159,7 @@ public:
                       TT::InteriorAug const& _aug)
       : BaseNode(_tree_nodes, _split, _aug)
       , valid(true)
-      , invalid_subtree_num(0)
+      , contain_invalid_subtree(0)
     {
     }
 
@@ -191,12 +191,12 @@ public:
     void ResetDeletionFlag()
     {
       this->valid = true;
-      this->invalid_subtree_num = 0;
+      this->contain_invalid_subtree = 0;
       this->reinsert_size = 0;
     }
 
     bool valid;
-    SizeT invalid_subtree_num;
+    bool contain_invalid_subtree;
     SizeT reinsert_size;
   };
 
@@ -242,10 +242,11 @@ public:
     return !GetNodeInvalidStatus(T);
   }
 
-  static SizeT GetNodeInvalidSubtreeNum(const Node* T)
+  static bool NodeContainInvalidSubtree(const Node* T)
   {
-    return T->is_leaf ? (T->size < TT::kBufLB ? 1 : 0)
-                      : static_cast<const Interior*>(T)->invalid_subtree_num;
+    return T->is_leaf
+             ? (T->size < TT::kBufLB ? true : false)
+             : static_cast<const Interior*>(T)->contain_invalid_subtree;
   }
 
   static SizeT GetNodeReinsertSize(const Node* T)
@@ -326,9 +327,9 @@ public:
                                          SizeT new_node_n,
                                          SizeBufUBArr const& return_node_n_arr);
 
-  std::tuple<bool, SizeT, SizeT> BatchDeleteUpdateInteriorSize(
+  std::tuple<bool, bool, SizeT> BatchDeleteUpdateInteriorSize(
     Node* T,
-    SizeBufUBArr const& invalid_subtree_num_arr,
+    BooleanBufUBArr const& invalid_subtree_num_arr,
     BooleanBufUBArr const& invalid_subtree_flag_arr,
     SizeBufUBArr const& reinsert_entries_num_arr);
 

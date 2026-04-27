@@ -64,7 +64,7 @@ BTree<TT>::BatchDelete_(Range In)
 // needs_fetch: any descendant needs FetchInvalidSubtreeNodes (not stored in
 // node).
 template<typename TT>
-std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
+std::tuple<bool, bool, typename TT::SizeT>
 BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
 {
 
@@ -73,7 +73,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     if (!T->is_leaf) {
       static_cast<Interior*>(T)->ResetDeletionFlag();
     }
-    assert(NodeIsValid(T) && GetNodeInvalidSubtreeNum(T) == 0 &&
+    assert(NodeIsValid(T) && NodeContainInvalidSubtree(T) == 0 &&
            GetNodeReinsertSize(T) == 0);
     return std::make_tuple(false, 0, 0);
   }
@@ -85,7 +85,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     //                        T->size < TT::kBufLB ? 1 : 0,
     //                        T->size < TT::kBufLB ? T->size : 0);
     return std::make_tuple(GetNodeInvalidStatus(T),
-                           GetNodeInvalidSubtreeNum(T),
+                           NodeContainInvalidSubtree(T),
                            GetNodeReinsertSize(T));
   }
 
@@ -108,7 +108,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
   }
 #endif // DEBUG
 
-  SizeBufUBArr invalid_subtree_num;
+  BooleanBufUBArr contain_invalid_subtree;
   BooleanBufUBArr invalid_subtree_flag;
   SizeBufUBArr reinsert_entries_num;
 
@@ -127,7 +127,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
       nodes_map[cnt++] = i;
     } else { // no element in this subtree, so it's valid
       invalid_subtree_flag[i] = false;
-      invalid_subtree_num[i] = 0;
+      contain_invalid_subtree[i] = 0;
       reinsert_entries_num[i] = 0;
       // NOTE: if a tree node receive no deletion, we need to explicitly reset
       // its deletion information, because the reinsertion phase needs to access
@@ -143,7 +143,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     cnt,
     [&](BufSizeT i) {
       std::tie(invalid_subtree_flag[nodes_map[i]],
-               invalid_subtree_num[nodes_map[i]],
+               contain_invalid_subtree[nodes_map[i]],
                reinsert_entries_num[nodes_map[i]]) =
         BatchDeleteRecursive(TI->tree_nodes[nodes_map[i]],
                              In.cut(touched_l[i], touched_r[i]));
@@ -151,7 +151,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     1);
 
   return BatchDeleteUpdateInteriorSize(
-    T, invalid_subtree_num, invalid_subtree_flag, reinsert_entries_num);
+    T, contain_invalid_subtree, invalid_subtree_flag, reinsert_entries_num);
 }
 
 } // namespace pmos

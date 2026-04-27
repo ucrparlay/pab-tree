@@ -227,10 +227,10 @@ BTree<TT>::HandlingInteriorSplitOverflow(Node* T,
 }
 
 template<typename TT>
-std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
+std::tuple<bool, bool, typename TT::SizeT>
 BTree<TT>::BatchDeleteUpdateInteriorSize(
   Node* T,
-  SizeBufUBArr const& invalid_subtree_num_arr,
+  BooleanBufUBArr const& invalid_subtree_num_arr,
   BooleanBufUBArr const& invalid_subtree_flag_arr,
   SizeBufUBArr const& reinsert_entries_num_arr)
 // update the size and valid status of the interior node, return the number of
@@ -239,13 +239,13 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
   assert(!T->is_leaf);
   auto TI = static_cast<Interior*>(T);
   SizeT tot_entry_sz = 0;
-  SizeT tot_invalid_subtree_n = 0;
+  bool contain_invalid = 0;
   SizeT reinsert_entries_n = 0;
   BufSizeT invalid_tree_n = 0;
   for (BufSizeT i = 0; i < TI->GetNodeN(); i++) {
     tot_entry_sz += TI->tree_nodes[i]->size;
     invalid_tree_n += invalid_subtree_flag_arr[i] ? 1 : 0;
-    tot_invalid_subtree_n += invalid_subtree_num_arr[i];
+    contain_invalid |= invalid_subtree_num_arr[i];
     reinsert_entries_n += reinsert_entries_num_arr[i];
   }
   TI->size = tot_entry_sz;
@@ -253,10 +253,10 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
     (T != this->root_ ? (TI->GetNodeN() - invalid_tree_n) >= TT::kBufLB
                       : (TI->GetNodeN() - invalid_tree_n) > 0);
   // TI->box = GetNodeSliceBox(TI->GetNodeSlice());
-  TI->invalid_subtree_num = TI->valid ? tot_invalid_subtree_n : 1;
+  TI->contain_invalid_subtree = TI->valid ? contain_invalid : true;
   TI->reinsert_size = TI->valid ? reinsert_entries_n : TI->size;
   return std::make_tuple(GetNodeInvalidStatus(T),
-                         GetNodeInvalidSubtreeNum(T),
+                         NodeContainInvalidSubtree(T),
                          GetNodeReinsertSize(T));
 }
 
@@ -290,7 +290,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
   auto TI = static_cast<Interior*>(T);
 
-  if (TI->invalid_subtree_num == 0 && TI->reinsert_size == 0) {
+  if (!NodeContainInvalidSubtree(T) && !GetNodeReinsertSize(T)) {
     // no subtree is invalid, fully valid
     assert(TI->valid);
     assert(reinsert_entries.size() == 0);
@@ -300,7 +300,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
   if (SelfBalanceNode(T, has_tomb)) { // so far a good tree
     assert(NodeIsValid(T));
     if (GetNodeReinsertSize(T) == 0) {
-      assert(TI->invalid_subtree_num != 0);
+      assert(NodeContainInvalidSubtree(T));
       PruneOutEmptyTree(T);
       TI->ResetDeletionFlag();
       return;
@@ -323,7 +323,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     auto node = TI->tree_nodes[i];
 
     // this node contain invalid subtree
-    if (GetNodeInvalidSubtreeNum(node)) {
+    if (NodeContainInvalidSubtree(node)) {
       invalid_subtree[invalid_idx] = node;
       invalid_idx++;
     }
@@ -334,8 +334,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
     // check if this child node contain no invalid subtree, then itself must
     // be valid
-    assert(GetNodeInvalidSubtreeNum(node) == 0 ? NodeIsValid(node) : true);
-    assert(NodeIsValid(node) ? 1 : GetNodeInvalidSubtreeNum(node) == 1);
+    assert(NodeContainInvalidSubtree(node) == 0 ? NodeIsValid(node) : true);
+    assert(NodeIsValid(node) ? 1 : NodeContainInvalidSubtree(node));
 
     if (NodeIsValid(node)) {
       const bool has_split = i < TI->GetSplitN();

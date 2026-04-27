@@ -191,12 +191,12 @@ BTree<TT>::Validate(Node const* T)
 }
 
 template<typename TT>
-std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
+std::tuple<bool, bool, typename TT::SizeT>
 BTree<TT>::CheckTreeAugAfterDelete(Node* T)
 {
   if (T->is_leaf) {
     return { GetNodeInvalidStatus(T),
-             GetNodeInvalidSubtreeNum(T),
+             NodeContainInvalidSubtree(T),
              GetNodeReinsertSize(T) };
   }
 
@@ -224,10 +224,10 @@ BTree<TT>::CheckTreeAugAfterDelete(Node* T)
   }
 
   if (NodeIsValid(T)) {
-    assert(sum_invalid_subtree_num == GetNodeInvalidSubtreeNum(T));
+    assert(sum_invalid_subtree_num == NodeContainInvalidSubtree(T));
     assert(sum_reinsert_size == GetNodeReinsertSize(T));
   } else {
-    assert(GetNodeInvalidSubtreeNum(T) == 1);
+    assert(NodeContainInvalidSubtree(T) == 1);
     assert(GetNodeReinsertSize(T) == TI->size);
   }
 

@@ -92,7 +92,7 @@ Inherits `MultiWayNode<TT>`:
 ```cpp
 GetNodeInvalidStatus(T)     // leaf: size < kBufLB; interior: !valid
 NodeIsValid(T)              // !GetNodeInvalidStatus(T)
-GetNodeInvalidSubtreeNum(T) // leaf: 0 or 1; interior: invalid_subtree_num
+NodeContainInvalidSubtree(T) // leaf: 0 or 1; interior: contain_invalid_subtree
 GetNodeReinsertSize(T)      // leaf: size if invalid, else 0; interior: reinsert_size
 NodeHasLeafChildren(T)      // true if first child is a leaf
 SelfBalanceNode(T, tomb)    // NodeHasLeafChildren && tomb && NodeIsValid
