@@ -60,8 +60,9 @@ BTree<TT>::BatchDelete_(Range In)
   }
 }
 
-// PARA: return whether T is invalid, invalid subtree num, and total # of
-// entries needs to be reinserted
+// Returns (invalid_flag, needs_fetch, reinsert_entry_num).
+// needs_fetch: any descendant needs FetchInvalidSubtreeNodes (not stored in
+// node).
 template<typename TT>
 std::tuple<bool, typename TT::SizeT, typename TT::SizeT>
 BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)

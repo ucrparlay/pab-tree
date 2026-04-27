@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <ios>
 #include <iostream>
+#include <string>
 #include <utility>
 
 #include "common/geometryIO.h"
@@ -792,18 +793,19 @@ void
 TestDynamicGraph(const auto& insert_batch_seq,
                  const auto& delete_batch_seq,
                  Tree& pkd,
-                 const size_t member_query_n)
+                 const int rounds,
+                 const size_t member_query_n,
+                 auto& res)
 {
   pkd.DeleteTree();
-  const int time_period_num = insert_batch_seq.size();
+  auto time_period_num = insert_batch_seq.size();
+  parlay::sequence<typename Tree::InputRangeT> wi(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> wd(time_period_num);
   parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
-  // typename TT::Points query_points(batchQueryOsmSize);
   auto query_points = TT::KeySeq::uninitialized(member_query_n);
   auto step = member_query_n / time_period_num;
-
-  // check memer query size
   if (member_query_n % time_period_num != 0) {
     std::cout << "the member query num should be divisible by time period num"
               << std::endl;
@@ -811,48 +813,89 @@ TestDynamicGraph(const auto& insert_batch_seq,
   }
 
   for (int i = 0; i < time_period_num; i++) {
-    insert_entry[i] = Tree::ParseInput(insert_batch_seq[i]);
-    delete_entry[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
-
-    // if (insert_entry[i].size() - delete_entry.size() < step) {
-    //   std::cout << "not enough points in time period " << i
-    //             << " for member query, need " << step << std::endl;
-    //   return;
-    // }
-    // parlay::parallel_for(0, step, [&](size_t j) {
-    //   query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
-    // });
+    wi[i] = Tree::ParseInput(insert_batch_seq[i]);
+    wd[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
+    assert(insert_batch_seq[i].size() >= step);
+    parlay::parallel_for(0, step, [&](size_t j) {
+      query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
+    });
   }
   // return;
 
-  int within_num = 0;
-  std::cout << std::endl;
-  for (int i = 0; i < time_period_num; i++) {
-    std::cout << insert_batch_seq[i].size() << " " << delete_batch_seq[i].size()
-              << " ";
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  parlay::sequence<double> query_time(time_period_num, 0.0);
+  parlay::sequence<size_t> tree_size(time_period_num, 0);
 
-    // INFO: batch insert
+  for (int r = 0; r < rounds; r++) {
+    auto const& insert_entry = wi;
+    auto const& delete_entry = wd;
+
+    size_t current_tree_size = 0;
+    if (r == 1) { // omit the first rounds
+      for (int i = 0; i < time_period_num; i++) {
+        insert_time[i] = 0.0;
+        delete_time[i] = 0.0;
+        query_time[i] = 0.0;
+      }
+    }
+    // running the osm
     parlay::internal::timer t;
-    t.reset(), t.start();
-    pkd.BatchInsert(insert_entry[i]);
-    t.stop();
-    std::cout << t.total_time() << " " << std::flush;
+    pkd.DeleteTree();
+    for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+      // std::cout << node_by_time[i].size() << " ";
+      t.reset(), t.start();
+      pkd.BatchInsert(insert_entry[batch_id]);
+      t.stop();
+      insert_time[batch_id] += t.total_time();
+      current_tree_size += insert_batch_seq[batch_id].size();
+#ifdef DEBUG
+      std::cerr << " insert batch: " << batch_id << std::flush;
+      pkd.Validate();
+#endif // DEBUG
 
-    // INFO: batch delete
-    t.reset(), t.start();
-    pkd.BatchDelete(delete_entry[i]);
-    t.stop();
-    std::cout << t.total_time() << " " << std::flush;
+      t.reset(), t.start();
+      pkd.BatchDelete(delete_entry[batch_id]);
+      t.stop();
+      delete_time[batch_id] += t.total_time();
+      current_tree_size -= delete_batch_seq[batch_id].size();
+#ifdef DEBUG
+      std::cerr << " delete batch: " << batch_id << std::flush;
+      pkd.Validate();
+#endif // DEBUG
 
-    // NOTE: test membership query
-    t.reset(), t.start();
-    parlay::parallel_for(0, member_query_n, [&](size_t j) {
-      [[maybe_unused]] auto [contain, logger] = pkd.Contain(query_points[j]);
-    });
-    t.stop();
-    std::cout << t.total_time();
+      tree_size[batch_id] = current_tree_size;
 
-    std::cout << std::endl;
+      // NOTE: test membership query
+      t.reset(), t.start();
+      parlay::parallel_for(0, member_query_n, [&](size_t j) {
+        auto [contain, logger] = pkd.Contain(query_points[j]);
+        res[j] = contain;
+      });
+      t.stop();
+      query_time[batch_id] += t.total_time();
+
+      // std::cout << std::endl;
+    }
+  }
+
+  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
+            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
+            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
+            << "query_t(s)" << std::endl;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    // size_t const delete_n =
+    //   batch_id >= sliding_window_len
+    //     ? node_by_time[batch_id - sliding_window_len].size()
+    //     : 0;
+    std::cout << std::right << std::setw(12)
+              << insert_batch_seq[batch_id].size() << std::setw(12)
+              << delete_batch_seq[batch_id].size() << std::setw(12)
+              << tree_size[batch_id] << std::setw(14) << std::fixed
+              << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
+              << std::setw(14) << delete_time[batch_id] / (rounds - 1)
+              << std::setw(14) << query_time[batch_id] / (rounds - 1)
+              << std::endl;
   }
 }
 
@@ -876,8 +919,11 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
     if constexpr (kInputType == InputType::kDynamicGraphInput) {
-      wp[i].ReadKey(pts[i * dim], pts[(i * dim) + 1]);
-      wp[i].ReadVal(std::to_string(i));
+      uint32_t u = std::stoul(pts[i * dim]);
+      uint32_t v = std::stoul(pts[(i * dim) + 1]);
+      uint64_t k = u | (v << 32);
+      wp[i].ReadKey(std::to_string(k));
+      wp[i].ReadVal(std::to_string(i + offset));
     } else if constexpr (kInputType == InputType::kOsmInput) {
       wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
@@ -1083,9 +1129,11 @@ static auto constexpr TestTemporalGraph =
       EntrySeq osm_records;
       auto [input_num, input_dim] =
         ReadEntries<typename TT::E, kInputType>(osm_path.c_str(), osm_records);
-      parlay::sort_inplace(osm_records, [&](auto const& a, auto const& b) {
-        return TT::Entry::GetVal(a) < TT::Entry::GetVal(b);
-      });
+
+      parlay::stable_sort_inplace(
+        osm_records, [&](auto const& a, auto const& b) {
+          return TT::Entry::GetVal(a) < TT::Entry::GetVal(b);
+        });
       const std::vector<int> files = { 2015, 2016, 2017, 2018, 2019,
                                        2020, 2021, 2022, 2023, 2024 };
       auto node_by_year = parlay::tabulate(files.size(), [&](size_t i) {
@@ -1093,7 +1141,6 @@ static auto constexpr TestTemporalGraph =
           return TT::Entry::GetVal(record) == files[i];
         });
       });
-      // TODO: shufle the records
 
       auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
       InsertOsmByTime<TT>(node_by_year,
@@ -1117,15 +1164,24 @@ static auto constexpr TestTemporalGraph =
       }
       parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
       parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
+      size_t total_entries = 0;
       for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-        ReadEntries<typename TT::E, kInputType>(insert_files[i].c_str(),
-                                                insert_batch_seq[i]);
-        ReadEntries<typename TT::E, kInputType>(delete_files[i].c_str(),
-                                                delete_batch_seq[i]);
+        auto [n1, dim1] = ReadEntries<typename TT::E, kInputType>(
+          insert_files[i].c_str(), insert_batch_seq[i], total_entries);
+        total_entries += n1;
+
+        auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
+          delete_files[i].c_str(), delete_batch_seq[i], total_entries);
+        total_entries += n2;
       }
 
-      TestDynamicGraph<TT, Tree>(
-        insert_batch_seq, delete_batch_seq, tree, kMemberQueryOsmSize);
+      auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      TestDynamicGraph<TT, Tree>(insert_batch_seq,
+                                 delete_batch_seq,
+                                 tree,
+                                 opts.rounds,
+                                 kMemberQueryOsmSize,
+                                 res);
     }
   };
 

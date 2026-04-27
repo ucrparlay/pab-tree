@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "common/temporal_graph_io.h"
+#include "parlay/primitives.h"
 
 struct EdgeRecord
 {
@@ -84,6 +85,14 @@ main(int argc, char** argv)
 
   std::cout << "Original edge: " << edges_by_timestamp.size() << std::endl;
   std::cout << "Deduplicated to " << deduped_edges.size() << " unique edges\n";
+  auto* max_u = parlay::max_element(
+    deduped_edges, [&](auto const& a, auto const& b) { return a.src < b.src; });
+  auto* max_v =
+    parlay::max_element(deduped_edges, [&](auto const& a, auto const& b) {
+      return a.dest < b.dest;
+    });
+  std::cout << "max elements are: " << (*max_u).src << " " << (*max_v).dest
+            << std::endl;
 
   const size_t deduped_total = deduped_edges.size();
 

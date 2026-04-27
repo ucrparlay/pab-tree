@@ -40,7 +40,7 @@ ApplyOrthogonal(Options const& opts, RunFunc test_func)
 #endif // LEAF1
 
 #if defined(DYNAMIC_GRAPH)
-  using Wrapper = Wrapper<std::tuple<uint32_t, uint32_t, uint32_t>, uint32_t>;
+  using Wrapper = Wrapper<uint64_t, uint32_t>;
 #elif defined(OSM)
   // using Wrapper = Wrapper<std::pair<uint64_t, uint64_t>, uint32_t>;
   using Wrapper = Wrapper<uint64_t, uint32_t>;
