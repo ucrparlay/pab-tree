@@ -16,7 +16,7 @@ round=4
 log_path="logs/temp"
 mkdir -p "${log_path}"
 
-data_path="/data/zmen002/geometry/osm_temporal_graph/europe/"
+data_path="/data/zmen002/geometry/osm_temporal_graph/planet/"
 
 batch_op_seq=("ins")
 dis_seq=("temp")
@@ -88,8 +88,8 @@ run_test 0 "${solver}" "${tree}"
 # CPAM
 tree=1
 solver="cpam"
-run_cmake 4 "${solver}"
-run_test 4 "${solver}" "${tree}"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # ours
 solver="b_test"
