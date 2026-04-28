@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "common/temporal_graph_io.h"
+#include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
 
 struct EdgeRecord
@@ -96,6 +97,12 @@ main(int argc, char** argv)
 
   const size_t deduped_total = deduped_edges.size();
 
+  auto kv_num = parlay::histogram_by_key(
+    parlay::map(all_inserts, [&](auto& e) { return e.src; }));
+  auto* max_degree_vertex = parlay::max_element(
+    kv_num, [&](auto const& a, auto const& b) { return a.second < b.second; });
+  std::cout << "Max degree: " << (*max_degree_vertex).second << std::endl;
+
   // generate batch
   constexpr size_t kNumBatches = 10;
   using BatchSplit =
@@ -137,6 +144,8 @@ main(int argc, char** argv)
     }
     return true;
   };
+
+  // return 0;
 
   std::cout << "Created " << edge_batches.size()
             << " timestamp-ordered batches\n";

@@ -40,6 +40,9 @@ static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
 static constexpr size_t kMemberQueryOsmSize = 100'000'000;
 static constexpr int kOsmWindowLen = 5;
+// NOTE: Dynamic Graph
+constexpr uint64_t kDynamicGraphRangeNum = 1e7;
+constexpr uint64_t kDynamicGraphMaxSingleRange = 100;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
@@ -794,8 +797,9 @@ TestDynamicGraph(const auto& insert_batch_seq,
                  const auto& delete_batch_seq,
                  Tree& pkd,
                  const int rounds,
-                 const size_t member_query_n,
-                 auto& res)
+                 auto& membership_res,
+                 auto& box_seq,
+                 auto& range_report_output)
 {
   pkd.DeleteTree();
   auto time_period_num = insert_batch_seq.size();
@@ -804,6 +808,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
   parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
+  const size_t member_query_n = membership_res.size();
   auto query_points = TT::KeySeq::uninitialized(member_query_n);
   auto step = member_query_n / time_period_num;
   if (member_query_n % time_period_num != 0) {
@@ -820,11 +825,11 @@ TestDynamicGraph(const auto& insert_batch_seq,
       query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
     });
   }
-  // return;
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
-  parlay::sequence<double> query_time(time_period_num, 0.0);
+  parlay::sequence<double> member_query_time(time_period_num, 0.0);
+  parlay::sequence<double> range_query_time(time_period_num, 0.0);
   parlay::sequence<size_t> tree_size(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
@@ -836,7 +841,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
       for (int i = 0; i < time_period_num; i++) {
         insert_time[i] = 0.0;
         delete_time[i] = 0.0;
-        query_time[i] = 0.0;
+        member_query_time[i] = 0.0;
+        range_query_time[i] = 0.0;
       }
     }
     // running the osm
@@ -870,10 +876,20 @@ TestDynamicGraph(const auto& insert_batch_seq,
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
         auto [contain, logger] = pkd.Contain(query_points[j]);
-        res[j] = contain;
+        membership_res[j] = contain;
       });
       t.stop();
-      query_time[batch_id] += t.total_time();
+      member_query_time[batch_id] += t.total_time();
+
+      t.reset(), t.start();
+      parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
+        auto [size, logger] = pkd.RangeReport(
+          box_seq[j],
+          range_report_output.cut(kDynamicGraphMaxSingleRange * j,
+                                  kDynamicGraphMaxSingleRange * (j + 1)));
+      });
+      t.stop();
+      range_query_time[batch_id] += t.total_time();
 
       // std::cout << std::endl;
     }
@@ -882,7 +898,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
   std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
             << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
             << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "query_t(s)" << std::endl;
+            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
     //   batch_id >= sliding_window_len
@@ -894,7 +910,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
               << tree_size[batch_id] << std::setw(14) << std::fixed
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
               << std::setw(14) << delete_time[batch_id] / (rounds - 1)
-              << std::setw(14) << query_time[batch_id] / (rounds - 1)
+              << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
+              << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
               << std::endl;
   }
 }
@@ -921,7 +938,7 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
     if constexpr (kInputType == InputType::kDynamicGraphInput) {
       uint64_t u = std::stoull(pts[i * dim]);
       uint64_t v = std::stoull(pts[(i * dim) + 1]);
-      uint64_t k = u | (v << 32);
+      uint64_t k = (u << 32) | v;
       wp[i].ReadKey(std::to_string(k));
       wp[i].ReadVal(std::to_string(i + offset));
     } else if constexpr (kInputType == InputType::kOsmInput) {
@@ -1177,13 +1194,25 @@ static auto constexpr TestTemporalGraph =
         // std::cout << n1 << " " << n2 << std::endl;
       }
 
-      auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      // generate box
+      auto random_wi = parlay::random_shuffle(insert_batch_seq[0]);
+      auto box_seq = parlay::tabulate(kDynamicGraphRangeNum, [&](size_t i) {
+        auto e = random_wi[i];
+        uint64_t key = TT::Entry::GetKey(e);
+        uint64_t u = key >> 32;
+        return std::make_pair(u << 32, (u + 1) << 32);
+      });
+      auto range_report_output =
+        typename TT::EntrySeq(box_seq.size() * kDynamicGraphMaxSingleRange);
+
+      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
       TestDynamicGraph<TT, Tree>(insert_batch_seq,
                                  delete_batch_seq,
                                  tree,
                                  opts.rounds,
-                                 kMemberQueryOsmSize,
-                                 res);
+                                 membership_res,
+                                 box_seq,
+                                 range_report_output);
     }
   };
 
