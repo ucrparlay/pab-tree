@@ -42,7 +42,7 @@ static constexpr size_t kMemberQueryOsmSize = 100'000'000;
 static constexpr int kOsmWindowLen = 5;
 // NOTE: Dynamic Graph
 constexpr uint64_t kDynamicGraphRangeNum = 1e7;
-constexpr uint64_t kDynamicGraphMaxSingleRange = 100;
+constexpr uint64_t kDynamicGraphMaxSingleRange = 220;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
@@ -1169,8 +1169,9 @@ static auto constexpr TestTemporalGraph =
     }
 
     if (opts.tag & (1 << 4)) { // NOTE: temporal graph
-      string dynamic_graph_path =
-        "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+      // string dynamic_graph_path =
+      //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+      string dynamic_graph_path = opts.input_file_path;
 
       constexpr int kDynamicGraphBatchNum = 10;
       std::array<std::string, kDynamicGraphBatchNum> insert_files;
