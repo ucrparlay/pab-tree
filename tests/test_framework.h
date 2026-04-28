@@ -1115,6 +1115,28 @@ static auto constexpr DefaultTestFunc =
       }
     }
 
+    // NOTE: batch update by size
+    if (opts.tag & (1 << 3)) {
+      parlay::sequence<double> const ratio_seq = {
+        0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+        0.02,   0.05,   0.1,    0.2,   0.5,   1.0
+      };
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
+
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
+    }
     std::cout << "\n" << std::flush;
 
     tree.DeleteTree();
