@@ -669,7 +669,7 @@ public:
     auto it = index_p->Begin(key);
 
     if (it.IsEnd() == true) {
-      std::cout << "Iterator reaches the end\n";
+      // std::cout << "Iterator reaches the end\n";
       return 0UL;
     }
 

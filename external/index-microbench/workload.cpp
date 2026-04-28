@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <utility>
 
 thread_local long skiplist_steps = 0;
 std::atomic<long> skiplist_total_steps;
@@ -633,7 +634,8 @@ ConBuild(auto num_thread, int index_type, const auto& wp)
   return idx;
 }
 
-void
+template<int kPrint = 1>
+double
 ConMembership(auto num_thread, auto idx, const auto& query_ele)
 {
   auto func2 = [num_thread, idx, &query_ele](uint64_t thread_id, bool) {
@@ -667,10 +669,14 @@ ConMembership(auto num_thread, auto idx, const auto& query_ele)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << t.total_time() << " " << std::flush;
+  if constexpr (kPrint) {
+    std::cout << t.total_time() << " " << std::flush;
+  }
+  return t.total_time();
 }
 
-void
+template<int kPrint = 1>
+double
 ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
 {
   auto func2 = [num_thread, idx, &query_box_seq](uint64_t thread_id, bool) {
@@ -701,11 +707,14 @@ ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << t.total_time() << " " << std::flush;
-  // std::cout << "9999999" << " ";
+  if constexpr (kPrint) {
+    std::cout << t.total_time() << " " << std::flush;
+  }
+  return t.total_time();
 }
 
-void
+template<int kPrint = 1>
+double
 ConRangeQuery(auto num_thread,
               auto idx,
               int index_type,
@@ -754,7 +763,10 @@ ConRangeQuery(auto num_thread,
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  std::cout << t.total_time() << " " << std::flush;
+  if constexpr (kPrint) {
+    std::cout << t.total_time() << " " << std::flush;
+  }
+  return t.total_time();
 }
 
 template<typename TT>
@@ -806,9 +818,9 @@ ConcurrentIdxOSM(auto num_thread,
 
     // NOTE: test membership query
     t.reset(), t.start();
-    ConMembership(num_thread, primal_idx, query_points);
+    double time = ConMembership(num_thread, primal_idx, query_points);
     t.stop();
-    query_time[batch_id] += t.total_time();
+    query_time[batch_id] += time;
   }
 
   std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
@@ -826,6 +838,90 @@ ConcurrentIdxOSM(auto num_thread,
               << std::setprecision(6) << insert_time[batch_id] << std::setw(14)
               << delete_time[batch_id] << std::setw(14) << query_time[batch_id]
               << std::endl;
+  }
+}
+
+template<typename TT>
+void
+ConcurrentIdxDynamicGraph(auto num_thread,
+                          auto primal_idx,
+                          int index_type,
+                          const auto& insert_batch_seq,
+                          const auto& delete_batch_seq,
+                          const auto& box_seq,
+                          const size_t member_query_n)
+{
+  auto time_period_num = insert_batch_seq.size();
+  auto const& insert_entry = insert_batch_seq;
+  auto const& delete_entry = delete_batch_seq;
+  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto step = member_query_n / time_period_num;
+  if (member_query_n % time_period_num != 0) {
+    std::cout << "the member query num should be divisible by time period num"
+              << std::endl;
+    return;
+  }
+
+  for (int i = 0; i < time_period_num; i++) {
+    parlay::parallel_for(0, step, [&](size_t j) {
+      query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
+    });
+  }
+
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  parlay::sequence<double> member_query_time(time_period_num, 0.0);
+  parlay::sequence<double> range_query_time(time_period_num, 0.0);
+  parlay::sequence<size_t> tree_size(time_period_num, 0);
+
+  size_t current_tree_size = 0;
+  // running the osm
+  parlay::internal::timer t;
+  double time = 0;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    t.reset(), t.start();
+    ConInsert<0>(num_thread, primal_idx, insert_entry[batch_id]);
+    t.stop();
+    insert_time[batch_id] += t.total_time();
+    current_tree_size += insert_entry[batch_id].size();
+
+    t.reset(), t.start();
+    ConDelete<0>(num_thread, primal_idx, delete_entry[batch_id]);
+    t.stop();
+    delete_time[batch_id] += t.total_time();
+    current_tree_size -= delete_entry[batch_id].size();
+    tree_size[batch_id] = current_tree_size;
+
+    // NOTE: test membership query
+    t.reset(), t.start();
+    time = ConMembership<0>(num_thread, primal_idx, query_points);
+    t.stop();
+    member_query_time[batch_id] += time;
+
+    t.reset(), t.start();
+    time = ConRangeQuery<0>(
+      num_thread, primal_idx, index_type, box_seq.size(), box_seq);
+    t.stop();
+    range_query_time[batch_id] += time;
+  }
+
+  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
+            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
+            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
+            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::endl;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    // size_t const delete_n =
+    //   batch_id >= sliding_window_len
+    //     ? node_by_time[batch_id - sliding_window_len].size()
+    //     : 0;
+    std::cout << std::right << std::setw(12)
+              << insert_batch_seq[batch_id].size() << std::setw(12)
+              << delete_batch_seq[batch_id].size() << std::setw(12)
+              << tree_size[batch_id] << std::setw(14) << std::fixed
+              << std::setprecision(6) << insert_time[batch_id] << std::setw(14)
+              << delete_time[batch_id] << std::setw(14)
+              << member_query_time[batch_id] << std::setw(14)
+              << range_query_time[batch_id] << std::endl;
   }
 }
 
@@ -899,9 +995,50 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
                          kMemberQueryOsmSize);
   }
 
-  // NOTE: build
-  // auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
-  // std::cout << "build" << std::endl;
+  if (opts.tag & (1 << 4)) { // NOTE: temporal graph
+    // string dynamic_graph_path =
+    //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+    string dynamic_graph_path = opts.input_file_path;
+
+    constexpr int kDynamicGraphBatchNum = 10;
+    std::array<std::string, kDynamicGraphBatchNum> insert_files;
+    std::array<std::string, kDynamicGraphBatchNum> delete_files;
+    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+      insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
+      delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
+    }
+    parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
+    parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
+    size_t total_entries = 0;
+    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+      auto [n1, dim1] = ReadEntries<typename TT::E, kInputType>(
+        insert_files[i].c_str(), insert_batch_seq[i], total_entries);
+      total_entries += n1;
+
+      auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
+        delete_files[i].c_str(), delete_batch_seq[i], total_entries);
+      total_entries += n2;
+
+      // std::cout << n1 << " " << n2 << std::endl;
+    }
+
+    // generate box
+    auto random_wi = parlay::random_shuffle(insert_batch_seq[0]);
+    auto box_seq = parlay::tabulate(kDynamicGraphRangeNum, [&](size_t i) {
+      auto e = random_wi[i];
+      uint64_t key = TT::Entry::GetKey(e);
+      uint64_t u = key >> 32;
+      auto box = std::make_pair(u << 32, (u + 1) << 32);
+      return std::make_pair(box, 20);
+    });
+    ConcurrentIdxDynamicGraph<TT>(num_thread,
+                                  idx,
+                                  index_type,
+                                  insert_batch_seq,
+                                  delete_batch_seq,
+                                  box_seq,
+                                  kMemberQueryOsmSize);
+  }
 
   std::cout << "\n" << std::flush;
 }
