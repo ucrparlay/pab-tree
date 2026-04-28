@@ -919,8 +919,8 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
     if constexpr (kInputType == InputType::kDynamicGraphInput) {
-      uint32_t u = std::stoul(pts[i * dim]);
-      uint32_t v = std::stoul(pts[(i * dim) + 1]);
+      uint64_t u = std::stoull(pts[i * dim]);
+      uint64_t v = std::stoull(pts[(i * dim) + 1]);
       uint64_t k = u | (v << 32);
       wp[i].ReadKey(std::to_string(k));
       wp[i].ReadVal(std::to_string(i + offset));
@@ -1173,6 +1173,8 @@ static auto constexpr TestTemporalGraph =
         auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
           delete_files[i].c_str(), delete_batch_seq[i], total_entries);
         total_entries += n2;
+
+        // std::cout << n1 << " " << n2 << std::endl;
       }
 
       auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
