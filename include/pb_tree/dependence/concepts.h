@@ -1,12 +1,12 @@
-#ifndef PMOS_DEPENDENCE_CONCEPTS_H_
-#define PMOS_DEPENDENCE_CONCEPTS_H_
+#ifndef PBTREE_DEPENDENCE_CONCEPTS_H_
+#define PBTREE_DEPENDENCE_CONCEPTS_H_
 
 #include <concepts>
 #include <type_traits>
 #include <utility>
 #include <variant>
 
-namespace pmos {
+namespace pb_tree {
 
 // NOTE: In memory of SFINE
 // template<typename>
@@ -192,6 +192,6 @@ struct FullCoveredTag
 struct PartialCoverTag
 {};
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_CONCEPTS_H_
+#endif // PBTREE_DEPENDENCE_CONCEPTS_H_

@@ -1,9 +1,9 @@
-#ifndef PMOS_DEPENDENCE_LOGGERS_H
-#define PMOS_DEPENDENCE_LOGGERS_H
+#ifndef PBTREE_DEPENDENCE_LOGGERS_H
+#define PBTREE_DEPENDENCE_LOGGERS_H
 
 #include <cstddef>
 
-namespace pmos {
+namespace pb_tree {
 
 struct MembershipLogger
 {
@@ -36,6 +36,6 @@ struct RangeQueryLogger
   size_t skip_box_num = 0;
 };
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_LOGGERS_H_
+#endif // PBTREE_DEPENDENCE_LOGGERS_H_

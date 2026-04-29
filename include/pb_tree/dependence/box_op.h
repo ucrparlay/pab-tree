@@ -1,10 +1,10 @@
-#ifndef PMOS_DEPENDENCE_BOX_OP_HPP_
-#define PMOS_DEPENDENCE_BOX_OP_HPP_
+#ifndef PBTREE_DEPENDENCE_BOX_OP_HPP_
+#define PBTREE_DEPENDENCE_BOX_OP_HPP_
 
 #include "dependence/type_trait.h"
 #include "utility"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 TT::Box
 GetEmptyBox()
@@ -56,6 +56,6 @@ GetBox(typename TT::BoxSeq const& box_seq)
   }
   return box;
 }
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_BOX_OP_HPP_
+#endif // PBTREE_DEPENDENCE_BOX_OP_HPP_

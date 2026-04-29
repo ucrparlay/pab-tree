@@ -21,7 +21,7 @@
 #include "parlay/primitives.h"
 #include "parlay/random.h"
 #include "parlay/slice.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 #include "wrapper.h"
 
 #ifdef CCP
@@ -33,7 +33,7 @@ using Coord = long;
 #endif // CCP
 
 using Typename = Coord;
-using namespace pmos;
+using namespace pb_tree;
 
 // NOTE: membership size
 static constexpr double kMemberQueryRatio = 0.01;

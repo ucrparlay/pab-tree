@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <utility>
 
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 #include <cpam.h>
 // #include "geobase.h"
 // #include "hilbert.h"
@@ -183,7 +183,7 @@ public:
 
   auto Contain(K const k) const
   {
-    pmos::RangeQueryLogger logger;
+    pb_tree::RangeQueryLogger logger;
     auto res = this->cpam_aug_map_.contains(k);
     return std::make_pair(res, logger);
   }
@@ -211,10 +211,10 @@ public:
   // }
 
   auto RangeCount(TT::Box const query_box)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
     // auto rt_size = this->RangeCountImpl(this->cpam_aug_map_, query_box,
     // logger);
     auto rt_tree =
@@ -236,10 +236,10 @@ public:
 
   template<typename Range>
   auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
     auto rt_size =
       this->RangeReportImpl(this->cpam_aug_map_, query_box, out, logger);
     // auto rt_tree =

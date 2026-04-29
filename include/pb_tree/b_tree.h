@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_H_
-#define PMOS_B_TREE_H_
+#ifndef PBTREE_B_TREE_H_
+#define PBTREE_B_TREE_H_
 
 #include <cstdint>
 
@@ -9,7 +9,7 @@
 #include "dependence/tree_node.h"
 #include "dependence/type_trait.h"
 
-namespace pmos {
+namespace pb_tree {
 // Template definition for the operator
 template<typename T1, typename T2>
 auto
@@ -554,7 +554,7 @@ private:
   std::atomic<size_t> max_reinsert_batch_size = 0;
 };
 
-} // namespace pmos
+} // namespace pb_tree
 
 #include "b_tree_impl/b_box_op.hpp"
 #include "b_tree_impl/batch_op/b_batch_delete.hpp"
@@ -571,4 +571,4 @@ private:
 #include "b_tree_impl/tree_op/node_op.hpp"
 #include "b_tree_impl/validation.hpp"
 
-#endif // PMOS_B_TREE_H_
+#endif // PBTREE_B_TREE_H_

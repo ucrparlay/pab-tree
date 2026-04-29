@@ -7,7 +7,7 @@
 #include "StructOfArrays/multipointer.hpp"
 #include "dependence/loggers.h"
 #include "parlay/primitives.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
 namespace PMA {
 
@@ -107,16 +107,16 @@ public:
 
   auto Contain(K const k) const
   {
-    pmos::MembershipLogger logger;
+    pb_tree::MembershipLogger logger;
     auto res = this->pma_tree_->has(k);
     return std::make_pair(res, logger);
   }
 
   auto RangeCount(TT::Box const query_box)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
 
     auto cnt = 0;
     auto f = [&](auto ele) { cnt++; };
@@ -127,10 +127,10 @@ public:
 
   template<typename Range>
   auto RangeReport(TT::Box const query_box,
-                   Range&& out) -> std::pair<size_t, pmos::RangeReportLogger>
+                   Range&& out) -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
 
     auto cnt = 0;
     auto f = [&](auto ele) {

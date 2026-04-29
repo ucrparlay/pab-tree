@@ -1,5 +1,5 @@
-#ifndef PMOS_DEPENDENCE_BASIC_POINT_H_
-#define PMOS_DEPENDENCE_BASIC_POINT_H_
+#ifndef PBTREE_DEPENDENCE_BASIC_POINT_H_
+#define PBTREE_DEPENDENCE_BASIC_POINT_H_
 
 #include <cstdint>
 #include <tuple>
@@ -14,7 +14,7 @@
 #include "parlay/type_traits.h"
 #include "parlay/utilities.h"
 
-namespace pmos {
+namespace pb_tree {
 
 template<typename T, uint_fast8_t d>
 struct BasicPoint
@@ -293,6 +293,6 @@ struct AugPoint : BasicPoint<T, d>
   AugType aug;
 };
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_BASIC_POINT_H_
+#endif // PBTREE_DEPENDENCE_BASIC_POINT_H_

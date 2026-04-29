@@ -15,12 +15,12 @@ ApplyMasstree(Options const& opts, RunFunc test_func)
   using K = Wrapper::K;
   using V = Wrapper::V;
   using E = Wrapper::E;
-  using TypeTrait = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
                                          16,
                                          Wrapper::LeafAugEmpty,
                                          Wrapper::InteriorAugEmpty,
                                          8,
-                                         pmos::ProtoNode>;
+                                         pb_tree::ProtoNode>;
 
   if (opts.tree_type == 5) {
     Run<MasstreeWrapperType<TypeTrait>>(opts, test_func);

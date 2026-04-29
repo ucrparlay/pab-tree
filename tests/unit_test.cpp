@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 template<typename TypeTrait>
 struct BTreeWrapper
 {
-  using TreeType = typename pmos::BTree<TypeTrait>;
+  using TreeType = typename pb_tree::BTree<TypeTrait>;
 };
 
 template<typename Options, typename RunFunc>
@@ -56,12 +56,12 @@ CheckOrthogonal(Options const& opts, RunFunc test_func)
   static constexpr uint const kBuf = 32; // Default
 #endif // LEAF1
 
-  using TypeTrait = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
                                          kBuf,
                                          Wrapper::LeafAugEmpty,
                                          Wrapper::InteriorAugEmpty,
                                          8,
-                                         pmos::ProtoNode>;
+                                         pb_tree::ProtoNode>;
   if (opts.tree_type == 0) {
     Run<BTreeWrapper<TypeTrait>>(opts, test_func);
   }

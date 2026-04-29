@@ -12,7 +12,7 @@
 
 #include "dependence/loggers.h"
 #include "parlay/primitives.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
 #include "../../external/BwTree/src/bwtree.h"
 
@@ -128,16 +128,16 @@ public:
 
   auto Contain(K const k) const
   {
-    pmos::MembershipLogger logger;
+    pb_tree::MembershipLogger logger;
     std::vector<V> values;
     tree_->GetValue(k, values);
     return std::make_pair(!values.empty(), logger);
   }
 
   auto RangeCount(TT::Box const query_box)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
     size_t count = 0;
     auto it = tree_->Begin(query_box.first);
     while (!it.IsEnd()) {
@@ -153,9 +153,9 @@ public:
 
   template<typename Range>
   auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
     size_t count = 0;
     auto it = tree_->Begin(query_box.first);
     while (!it.IsEnd()) {

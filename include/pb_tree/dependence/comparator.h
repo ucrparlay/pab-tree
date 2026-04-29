@@ -1,5 +1,5 @@
-#ifndef PMOS_DEPENDENCE_COMPARATOR_H_
-#define PMOS_DEPENDENCE_COMPARATOR_H_
+#ifndef PBTREE_DEPENDENCE_COMPARATOR_H_
+#define PBTREE_DEPENDENCE_COMPARATOR_H_
 
 #include <algorithm>
 #include <cfloat>
@@ -8,7 +8,7 @@
 #include <iostream>
 #include <limits>
 
-namespace pmos {
+namespace pb_tree {
 //*----------- double precision comparision ----------------
 //* God made the integers, all else is the work of man.
 //* -- Leopold Kronecker
@@ -110,6 +110,6 @@ private:
   static constexpr T eps = std::numeric_limits<T>::epsilon();
 };
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_COMPARATOR_H_
+#endif // PBTREE_DEPENDENCE_COMPARATOR_H_

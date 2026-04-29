@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
-#define PMOS_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#define PBTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
 
 #include <parlay/range.h>
 #include <parlay/slice.h>
@@ -7,7 +7,7 @@
 
 #include "../../b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 void
 BTree<TT>::DeleteTree()
@@ -44,6 +44,6 @@ BTree<TT>::DeleteTreeRec(Node* T)
     FreeNode<Interior>(T);
   }
 }
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#endif // PBTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_

@@ -7,7 +7,7 @@
 #include "StructOfArrays/multipointer.hpp"
 #include "dependence/loggers.h"
 #include "parlay/primitives.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
 namespace SPMA {
 
@@ -91,7 +91,7 @@ public:
 
   auto Contain(K const k) const
   {
-    pmos::MembershipLogger logger;
+    pb_tree::MembershipLogger logger;
     auto res = this->pma_tree_->has(k);
     return std::make_pair(res, logger);
   }

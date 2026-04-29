@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
-#define PMOS_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
+#ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
+#define PBTREE_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
 
 #include "../../b_tree.h"
 #include "parlay/monoid.h"
@@ -8,7 +8,7 @@
 #include "parlay/slice.h"
 #include <tuple>
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 template<typename Range>
 void
@@ -155,6 +155,6 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
     T, contain_invalid_subtree, invalid_subtree_flag, reinsert_entries_num);
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
+#endif // PBTREE_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_

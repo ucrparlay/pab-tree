@@ -1,12 +1,12 @@
-#ifndef PMOS_B_TREE_IMPL_POINTS_OP_HPP_
-#define PMOS_B_TREE_IMPL_POINTS_OP_HPP_
+#ifndef PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
+#define PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
 
 #include <algorithm>
 #include <utility>
 
 #include "../b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 void
 BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
@@ -209,6 +209,6 @@ BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
   }
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_POINTS_OP_HPP_
+#endif // PBTREE_B_TREE_IMPL_POINTS_OP_HPP_

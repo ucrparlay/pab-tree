@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_LEAF_OP_HPP_
-#define PMOS_B_TREE_IMPL_LEAF_OP_HPP_
+#ifndef PBTREE_B_TREE_IMPL_LEAF_OP_HPP_
+#define PBTREE_B_TREE_IMPL_LEAF_OP_HPP_
 
 #include <algorithm>
 #include <cassert>
@@ -10,10 +10,10 @@
 #include <type_traits>
 #include <utility>
 
-#include "pmos/b_tree.h"
-#include "pmos/dependence/concepts.h"
+#include "pb_tree/b_tree.h"
+#include "pb_tree/dependence/concepts.h"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 template<typename Range, bool sorted>
 void
@@ -143,6 +143,6 @@ BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
   return delete_cnt;
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_LEAF_OP_HPP_
+#endif // PBTREE_B_TREE_IMPL_LEAF_OP_HPP_

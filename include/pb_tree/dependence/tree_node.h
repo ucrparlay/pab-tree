@@ -1,5 +1,5 @@
-#ifndef PMOS_DEPENDENCE_TREE_NODE_H_
-#define PMOS_DEPENDENCE_TREE_NODE_H_
+#ifndef PBTREE_DEPENDENCE_TREE_NODE_H_
+#define PBTREE_DEPENDENCE_TREE_NODE_H_
 
 #include <parlay/slice.h>
 
@@ -21,7 +21,7 @@
 #include "dependence/box_op.h"
 #include "parlay/utilities.h"
 
-namespace pmos {
+namespace pb_tree {
 
 struct AllocNormalLeafTag
 {};
@@ -56,7 +56,12 @@ struct LeafNode : TypeTrait::Node
 
   static constexpr typename TT::BufSizeT kBinarySearchBase =
     static_cast<typename TT::BufSizeT>(
-      std::hardware_constructive_interference_size / sizeof(E));
+#ifdef __cpp_lib_hardware_interference_size
+      std::hardware_constructive_interference_size / sizeof(E)
+#else
+      64 / sizeof(E)
+#endif
+    );
 
   // NOTE: default allocator
   LeafNode()
@@ -101,7 +106,7 @@ struct LeafNode : TypeTrait::Node
   auto BinarySearchKey(K const& k) const
   {
     assert(this->is_sorted);
-    return pmos::BinarySearch<kBinarySearchBase>(
+    return pb_tree::BinarySearch<kBinarySearchBase>(
       parlay::make_slice(this->elements.begin(),
                          this->elements.begin() + this->size),
       [k](E const e) { return Entry::GetKey(e) < k; });
@@ -111,7 +116,7 @@ struct LeafNode : TypeTrait::Node
   auto BinarySearchKeyExclusive(K const k) const
   {
     assert(this->is_sorted);
-    return pmos::BinarySearch<kBinarySearchBase>(
+    return pb_tree::BinarySearch<kBinarySearchBase>(
       parlay::make_slice(this->elements.begin(),
                          this->elements.begin() + this->size),
       [k](E const e) { return Entry::GetKey(e) <= k; });
@@ -270,7 +275,12 @@ struct MultiWayNode : TypeTrait::Node
 
   static constexpr BufSizeT kBinarySearchBase =
     static_cast<BufSizeT>(
-      std::hardware_constructive_interference_size / sizeof(typename TT::K));
+#ifdef __cpp_lib_hardware_interference_size
+      std::hardware_constructive_interference_size / sizeof(typename TT::K)
+#else
+      64 / sizeof(typename TT::K)
+#endif
+    );
 
   MultiWayNode(TT::NodeSeq const& _tree_nodes,
                TT::SplitSeq const& _split,
@@ -343,7 +353,7 @@ struct MultiWayNode : TypeTrait::Node
   {
     // return the first idx s.t. split[idx] > k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
-    return pmos::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
+    return pb_tree::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key <= k; });
     // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
     //   if (split[i] > k) {
@@ -357,7 +367,7 @@ struct MultiWayNode : TypeTrait::Node
   {
     // return the first idx s.t. split[idx] >= k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[1]
-    return pmos::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
+    return pb_tree::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
                                  [&](TT::K const key) { return key < k; });
     // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
     //   if (split[i] >= k) {
@@ -432,10 +442,10 @@ FreeNode(auto T)
 
 // Define some alias for concept check
 // template <typename T>
-// concept IsBinaryNode = CheckBinaryNode<T, pmos::BinaryNode>;
+// concept IsBinaryNode = CheckBinaryNode<T, pb_tree::BinaryNode>;
 
 // template <typename T>
-// concept IsMultiNode = CheckMultiNode<T, pmos::MultiNode>;
+// concept IsMultiNode = CheckMultiNode<T, pb_tree::MultiNode>;
 //
 // // TODO: may remove below from inner tree
 // template <typename T>
@@ -447,6 +457,6 @@ FreeNode(auto T)
 //                IsBox<typename T::second_type, Point>;
 // };
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_TREE_NODE_H_
+#endif // PBTREE_DEPENDENCE_TREE_NODE_H_

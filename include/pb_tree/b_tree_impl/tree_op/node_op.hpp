@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_
-#define PMOS_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_
+#ifndef PBTREE_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_
+#define PBTREE_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_
 
 #include <algorithm>
 #include <cassert>
@@ -13,9 +13,9 @@
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 template<typename OutputHandler>
 TT::SizeT
@@ -661,6 +661,6 @@ BTree<TT>::CopyTreeRecursive(Node* T)
   return AllocInteriorNode(parlay::make_slice(new_nodes), TI->GetSplitSlice());
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_
+#endif // PBTREE_B_TREE_IMPL_TREE_OP_NODE_OP_HPP_

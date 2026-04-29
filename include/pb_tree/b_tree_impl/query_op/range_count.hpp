@@ -1,11 +1,11 @@
-#ifndef PMOS_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
-#define PMOS_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
+#ifndef PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
+#define PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
 
 #include "dependence/binary_search.h"
 #include "parlay/slice.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 
 template<typename TT>
 auto
@@ -114,6 +114,6 @@ BTree<TT>::RangeCountRec(Node const* T,
   RangeCountLeaf(T, query_box, offset);
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
+#endif // PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_

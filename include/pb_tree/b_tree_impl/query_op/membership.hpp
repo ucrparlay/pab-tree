@@ -1,10 +1,10 @@
-#ifndef PMOS_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
-#define PMOS_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
+#ifndef PBTREE_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
+#define PBTREE_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
 
 #include "parlay/slice.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 
 template<typename TT>
 auto
@@ -48,6 +48,6 @@ BTree<TT>::ContainRec(Node const* T, K const& k) const
   return ContainRec(TI->tree_nodes[pos], k);
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
+#endif // PBTREE_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_

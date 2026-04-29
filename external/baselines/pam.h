@@ -228,7 +228,7 @@ public:
 
   auto Contain(K const k) const
   {
-    pmos::RangeQueryLogger logger;
+    pb_tree::RangeQueryLogger logger;
     auto res = this->pam_aug_map_.contains(k);
     return std::make_pair(res, logger);
   }
@@ -253,10 +253,10 @@ public:
   // }
 
   auto RangeCount(TT::Box const query_box)
-    -> std::pair<size_t, pmos::RangeReportLogger>
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
     // auto rt_size = this->RangeCountImpl(this->pam_aug_map_, query_box);
 
     auto rt_tree =
@@ -286,10 +286,10 @@ public:
 
   template<typename Range>
   auto RangeReport(TT::Box const query_box,
-                   Range&& out) -> std::pair<size_t, pmos::RangeReportLogger>
+                   Range&& out) -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
-    pmos::RangeReportLogger logger;
+    pb_tree::RangeReportLogger logger;
     auto rt_size = this->RangeReportImpl(this->pam_aug_map_, query_box, out);
     return { rt_size, logger };
   }

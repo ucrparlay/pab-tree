@@ -1,11 +1,11 @@
-# PMOS: A library for Parallel Multiway Ordered Sets
+# PB-Tree: A fast in memory parallel B+-tree.
 
 ## Requirements
 
 Necessary:
 
 - CMake >= 3.15
-- g++ or clang++ with C++20 features support (Tested with g++14 and clang-19) on Linux machines.
+- g++ with C++20 features support on Linux machines.
 - We use [ParlayLib](https://github.com/cmuparlay/parlaylib) to support fork-join parallelism and some parallel primitives. It is provided as a submodule in our repository.
 
 Optional:
@@ -20,7 +20,7 @@ Try:
 1. Clone the repository.
 
 ```{bash}
-git clone https://github.com/ucrparlay/ParallelMultiwayOrderedSet
+git clone https://github.com/ucrparlay/pb-tree
 cd ParallelMultiwayOrderedSet
 ```
 

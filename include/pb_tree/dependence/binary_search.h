@@ -1,9 +1,9 @@
-#ifndef PMOS_BINARY_SEARCH_H_
-#define PMOS_BINARY_SEARCH_H_
+#ifndef PBTREE_BINARY_SEARCH_H_
+#define PBTREE_BINARY_SEARCH_H_
 
 #include <cstddef>
 
-namespace pmos {
+namespace pb_tree {
 
 // Legacy linear-scan helpers (kept for callers outside the hot path).
 template<typename Seq, typename F>
@@ -75,6 +75,6 @@ BinarySearch(Seq const& I, const F& less)
   return lo + count;
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_BINARY_SEARCH_H_
+#endif // PBTREE_BINARY_SEARCH_H_

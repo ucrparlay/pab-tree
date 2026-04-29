@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
-#define PMOS_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
+#ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
+#define PBTREE_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
 
 #include <parlay/range.h>
 #include <parlay/slice.h>
@@ -12,7 +12,7 @@
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 template<typename Range>
 void
@@ -105,6 +105,6 @@ BTree<TT>::BuildRecursive(Range In)
   return this->root_;
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
+#endif // PBTREE_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_

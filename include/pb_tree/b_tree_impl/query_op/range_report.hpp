@@ -1,14 +1,14 @@
-#ifndef PMOS_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
-#define PMOS_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
+#ifndef PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
+#define PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
 
 #include <algorithm>
 
 #include "dependence/binary_search.h"
 #include "parlay/parallel.h"
 #include "parlay/slice.h"
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 
 template<typename TT>
 template<typename Range>
@@ -227,6 +227,6 @@ BTree<TT>::RangeReportRec(Node const* T,
     }
   }
 }
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
+#endif // PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_

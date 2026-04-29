@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
-#define PMOS_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
+#ifndef PBTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
+#define PBTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
 
 #include <algorithm>
 #include <cassert>
@@ -10,9 +10,9 @@
 #include <type_traits>
 #include <utility>
 
-#include "pmos/b_tree.h"
+#include "pb_tree/b_tree.h"
 
-namespace pmos {
+namespace pb_tree {
 
 template<typename TT>
 template<bool granularity>
@@ -70,6 +70,6 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
     ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBufUB);
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
+#endif // PBTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_

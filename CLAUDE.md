@@ -11,7 +11,7 @@
 
 ## What this project is
 
-A parallel, cache-oblivious B-tree (`pmos::BTree<TypeTrait>`) that supports parallel batch insert, batch delete, and range queries. It lives entirely in `include/pmos/`.
+A parallel, cache-oblivious B-tree (`pmos::BTree<TypeTrait>`) that supports parallel batch insert, batch delete, and range queries. It lives entirely in `include/pb_tree/`.
 
 ## Build
 
@@ -26,14 +26,14 @@ Build is CMake-based. The `build/` directory already exists; no need to re-run c
 
 | Path | Role |
 |------|------|
-| `include/pmos/b_tree.h` | `BTree<TT>` class declaration + all type aliases |
-| `include/pmos/dependence/type_trait.h` | `BTreeTypeTrait` template — defines all size constants |
-| `include/pmos/dependence/tree_node.h` | `LeafNode`, `MultiWayNode` (interior) structs; alloc/free helpers |
-| `include/pmos/b_tree_impl/tree_op/node_op.hpp` | `BalanceOverLeaves`, `GenerateLeafNodes`, `GenerateInteriorNodes`, `BatchInsertUpdateInterior`, etc. |
-| `include/pmos/b_tree_impl/tree_op/leaf_op.hpp` | `InsertPoints2Leaf`, `DeletePoints4Leaf`, `HandlingLeafSplitOverflow` |
-| `include/pmos/b_tree_impl/batch_op/b_batch_delete.hpp` | `BatchDelete`, `BatchDeleteRecursive`, `FetchInvalidSubtreeNodes` |
-| `include/pmos/b_tree_impl/batch_op/b_batch_insert.hpp` | `BatchInsert`, `BatchInsertRecursive` |
-| `include/pmos/b_tree_impl/batch_op/b_build_tree.hpp` | `Build`, `BuildRecursive` |
+| `include/pb_tree/b_tree.h` | `BTree<TT>` class declaration + all type aliases |
+| `include/pb_tree/dependence/type_trait.h` | `BTreeTypeTrait` template — defines all size constants |
+| `include/pb_tree/dependence/tree_node.h` | `LeafNode`, `MultiWayNode` (interior) structs; alloc/free helpers |
+| `include/pb_tree/b_tree_impl/tree_op/node_op.hpp` | `BalanceOverLeaves`, `GenerateLeafNodes`, `GenerateInteriorNodes`, `BatchInsertUpdateInterior`, etc. |
+| `include/pb_tree/b_tree_impl/tree_op/leaf_op.hpp` | `InsertPoints2Leaf`, `DeletePoints4Leaf`, `HandlingLeafSplitOverflow` |
+| `include/pb_tree/b_tree_impl/batch_op/b_batch_delete.hpp` | `BatchDelete`, `BatchDeleteRecursive`, `FetchInvalidSubtreeNodes` |
+| `include/pb_tree/b_tree_impl/batch_op/b_batch_insert.hpp` | `BatchInsert`, `BatchInsertRecursive` |
+| `include/pb_tree/b_tree_impl/batch_op/b_build_tree.hpp` | `Build`, `BuildRecursive` |
 | `tests/b_test.cpp` | Main benchmark/test driver |
 | `tests/unit_test.cpp` | Unit tests (uses GoogleTest) |
 | `tests/wrapper.h` | Concrete element/augmentation types for tests |
@@ -148,7 +148,7 @@ Uses `parlay::parallel_for` for tree-level operations. `BalanceOverLeaves` itsel
 
 ## Range report implementation notes
 
-- `RangeReport` lives in `include/pmos/b_tree_impl/query_op/range_report.hpp`.
+- `RangeReport` lives in `include/pb_tree/b_tree_impl/query_op/range_report.hpp`.
 - Boundary nodes (`l`, `r`) are still handled with recursive filtering against `[query_l, query_r)`.
 - Fully covered middle subtrees now use `RangeReportFlattenRec` (const traversal) rather than generic `FlattenRec`:
   - leaf case performs a single `std::copy_n` into output,

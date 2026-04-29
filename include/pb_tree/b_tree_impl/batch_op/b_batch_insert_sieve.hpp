@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_SIEVE_HPP_
-#define PMOS_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_SIEVE_HPP_
+#ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_SIEVE_HPP_
+#define PBTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_SIEVE_HPP_
 
 #include <algorithm>
 #include <numeric>
@@ -9,7 +9,7 @@
 #include "parlay/primitives.h"
 #include "parlay/slice.h"
 
-namespace pmos {
+namespace pb_tree {
 // NOTE: Start as sieve
 template<typename TT>
 template<typename Range>
@@ -298,6 +298,6 @@ BTree<TT>::BatchInsertSieveRecursive(Node* T,
 // }
 //
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_SIEVE_HPP_
+#endif // PBTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_SIEVE_HPP_

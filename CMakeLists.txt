@@ -110,7 +110,7 @@ enable_testing()
 
 # NOTE: PMOS
 add_library(PMOS INTERFACE)
-set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pmos" "${PMOS_SOURCE_DIR}/include/" "${PMOS_SOURCE_DIR}/external")
+set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pb_tree" "${PMOS_SOURCE_DIR}/include/" "${PMOS_SOURCE_DIR}/external")
 target_link_libraries(PMOS INTERFACE parlay)
 target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

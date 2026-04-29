@@ -934,12 +934,12 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
   using Wrapper = Wrapper<uint64_t, uint32_t>;
   using E = typename Wrapper::E;
   // using EleType = Element<uint32_t, uint32_t>;
-  using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+  using TT = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
                                   16,
                                   Wrapper::LeafAugEmpty,
                                   Wrapper::InteriorAugEmpty,
                                   8,
-                                  pmos::ProtoNode>;
+                                  pb_tree::ProtoNode>;
 
 #if defined(DYNAMIC_GRAPH)
   constexpr int kInputType = InputType::kDynamicGraphInput;
@@ -1052,12 +1052,12 @@ ApplyConcurrentIndex(Options const& opts)
   using Wrapper = Wrapper<uint32_t, uint32_t>;
   using E = typename Wrapper::E;
   // using EleType = Element<uint32_t, uint32_t>;
-  using TT = pmos::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+  using TT = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
                                   16,
                                   Wrapper::LeafAugEmpty,
                                   Wrapper::InteriorAugEmpty,
                                   8,
-                                  pmos::ProtoNode>;
+                                  pb_tree::ProtoNode>;
 
   using EntrySeq = TT::EntrySeq;
 

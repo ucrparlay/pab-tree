@@ -1,5 +1,5 @@
-#ifndef PMOS_B_TREE_IMPL_VALIDATION_HPP_
-#define PMOS_B_TREE_IMPL_VALIDATION_HPP_
+#ifndef PBTREE_B_TREE_IMPL_VALIDATION_HPP_
+#define PBTREE_B_TREE_IMPL_VALIDATION_HPP_
 
 #include <parlay/parallel.h>
 
@@ -9,7 +9,7 @@
 #include "b_tree.h"
 #include "parlay/primitives.h"
 
-namespace pmos {
+namespace pb_tree {
 template<typename TT>
 template<bool kCheckSize>
 TT::Box
@@ -25,7 +25,7 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
            parlay::is_sorted(TL->GetEle(), [&](auto const& e1, auto const& e2) {
              return Entry::GetKey(e1) < Entry::GetKey(e2);
            }));
-    return pmos::GetBox<TT>(TL->GetEle());
+    return pb_tree::GetBox<TT>(TL->GetEle());
   }
 
   auto const* TI = static_cast<Interior const*>(T);
@@ -63,7 +63,7 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
     }
   });
 
-  return pmos::GetBox<TT>(box_seq);
+  return pb_tree::GetBox<TT>(box_seq);
 }
 
 template<typename TT>
@@ -236,6 +236,6 @@ BTree<TT>::CheckTreeAugAfterDelete(Node* T)
            NodeIsValid(T) ? sum_reinsert_size : TI->size };
 }
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_B_TREE_IMPL_VALIDATION_HPP_
+#endif // PBTREE_B_TREE_IMPL_VALIDATION_HPP_

@@ -1,5 +1,5 @@
-#ifndef PMOS_DEPENDENCE_TYPE_TRAIT_H_
-#define PMOS_DEPENDENCE_TYPE_TRAIT_H_
+#ifndef PBTREE_DEPENDENCE_TYPE_TRAIT_H_
+#define PBTREE_DEPENDENCE_TYPE_TRAIT_H_
 
 #include <cstdint>
 #include <type_traits>
@@ -9,7 +9,7 @@
 #include "parlay/sequence.h"
 #include "parlay/slice.h"
 
-namespace pmos {
+namespace pb_tree {
 
 template<class EleType>
 struct EleWrapper : EleType
@@ -138,6 +138,6 @@ public:
   using BallSeq = parlay::sequence<SizeT>;
 };
 
-} // namespace pmos
+} // namespace pb_tree
 
-#endif // PMOS_DEPENDENCE_TYPE_TRAIT_H_
+#endif // PBTREE_DEPENDENCE_TYPE_TRAIT_H_
