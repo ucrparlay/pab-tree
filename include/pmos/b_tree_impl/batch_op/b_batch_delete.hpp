@@ -43,6 +43,7 @@ BTree<TT>::BatchDelete_(Range In)
   if (invalid_flag) {
     assert(this->root_->size == 0);
     this->DeleteTree();
+    this->root_ = nullptr;
     return;
   }
 
