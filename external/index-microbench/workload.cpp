@@ -582,7 +582,7 @@ ConDelete(auto num_thread, auto idx, const auto& wp)
   StartThreads(idx, num_thread, func, false);
   t.stop();
   if constexpr (kPrint) {
-    std::cout << t.total_time() << " ";
+    std::cout << t.total_time() << " " << std::flush;
   }
 }
 
@@ -1209,6 +1209,55 @@ ApplyConcurrentIndex(Options const& opts)
     range_count(wp);
   }
 
+  // NOTE: batch update by size
+  if (opts.tag & (1 << 3)) {
+    if (index_type == TYPE_MASSTREE) { // reset the status
+      ConDelete<0>(num_thread, primal_idx, wp);
+      delete primal_idx;
+    } else {
+      delete primal_idx;
+    }
+
+    parlay::sequence<double> const ratio_seq = { 0.0001, 0.0002, 0.0005, 0.001,
+                                                 0.002,  0.005,  0.01,   0.02,
+                                                 0.05,   0.1,    0.2,    0.5,
+                                                 1.0 };
+    for (auto ratio : ratio_seq) {
+      auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+      // std::cout << base_path << " " << batch_path << std::endl;
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+      // BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
+                                         // if rebuild the whole index
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConInsert<1>(num_thread, idx, wi);
+        ConDelete<0>(num_thread, idx, parlay::append(wi, wp));
+        delete idx;
+      } else if (index_type == TYPE_BWTREE) {
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConInsert<1>(num_thread, idx, wi);
+        delete idx;
+      }
+    }
+
+    for (auto ratio : ratio_seq) {
+      auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+      // std::cout << base_path << " " << batch_path << std::endl;
+      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+      if (index_type == TYPE_MASSTREE) {
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConDelete<1>(num_thread, idx, wi);
+        ConDelete<0>(num_thread, idx, wp);
+        delete idx;
+      } else if (index_type == TYPE_BWTREE) {
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConDelete<1>(num_thread, idx, wi);
+        delete idx;
+      }
+    }
+  }
   std::cout << "\n" << std::flush;
 }
 
