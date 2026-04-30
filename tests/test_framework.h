@@ -42,7 +42,7 @@ static constexpr size_t kMemberQueryOsmSize = 100'000'000;
 static constexpr int kOsmWindowLen = 5;
 // NOTE: Dynamic Graph
 constexpr uint64_t kDynamicGraphRangeNum = 1e7;
-constexpr uint64_t kDynamicGraphMaxSingleRange = 220;
+constexpr uint64_t kDynamicGraphMaxSingleRange = 1506;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
@@ -494,15 +494,19 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
     loop_late,
     [&]() {},
     [&]() {
-      parlay::parallel_for(0, query_num, [&](size_t i) {
-        // for (int i = 0; i < query_num; i++) {
-        auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
+      parlay::parallel_for(
+        0,
+        query_num,
+        [&](size_t i) {
+          // for (int i = 0; i < query_num; i++) {
+          auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
 
-        res[i] = contain;
-        // vis_leaf[i] = logger.vis_leaf_num;
-        // vis_inter[i] = logger.vis_interior_num;
-        // }
-      });
+          res[i] = contain;
+          // vis_leaf[i] = logger.vis_leaf_num;
+          // vis_inter[i] = logger.vis_interior_num;
+          // }
+        },
+        1);
     },
     [&]() {});
 

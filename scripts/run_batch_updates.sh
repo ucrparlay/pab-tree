@@ -17,9 +17,10 @@ round=4
 log_path="logs/batch_updates"
 mkdir -p "${log_path}"
 
-data_prefix="/data/zmen002/kv_pair/batch_updates/"
+data_prefix="/data/zmen002/kv_pair/batch_updates"
 batch_op_seq=("ins")
-dis_seq=("uni" "exp")
+# dis_seq=("uni" "exp")
+dis_seq=("exp")
 batch_ratio=0.01
 
 function run_test() {
@@ -52,7 +53,7 @@ function run_test() {
 }
 
 function run_cmake() {
-	/usr/bin/drop_caches
+	# /usr/bin/drop_caches
 	local leaf_idx="$1"
 	local solver="$2"
 
@@ -61,24 +62,24 @@ function run_cmake() {
 	cd ../build || exit
 	rm -rf *
 	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DOSM=OFF -DDYNAMIC_GRAPH=OFF -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
-	make "${solver}"
+	make "${solver}" -j
 	cd "${cur_path}" || exit
 }
 
 # Masstree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-tree=5
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=5
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # BwTree
-tree=6
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=6
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
-# # PMA
+# PMA
 tree=3
 solver="pma"
 run_cmake 0 "${solver}"
