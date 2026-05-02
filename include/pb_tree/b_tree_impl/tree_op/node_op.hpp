@@ -275,9 +275,9 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
     auto size = T->size;
     assert(T != nullptr);
-    FlattenRec<decltype(reinsert_entries), true, kSortReinsertEntries>(
+    FlattenRec<decltype(reinsert_entries), false, kSortReinsertEntries>(
       T, reinsert_entries);
-    DeleteTreeRec(T);
+    DeleteTreeRec<false>(T);
     return;
   }
 

@@ -47,131 +47,44 @@
 --   Found jemalloc, version 5.2.1_0
 Generating .clangd configuration...
 Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (1.3s)
+-- Configuring done (1.2s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[ 50%] Building CXX object CMakeFiles/pma.dir/tests/pma.cpp.o
-[100%] Linking CXX executable pma
-[100%] Built target pma
->>>logs/batch_updates/3/exp/64.log
-Tree: PMA; Buf: 1; InputFile: 1.base.in; Dis: exp; 
-11.6888 0.0035095 0.0076685 0.0142922 0.0154408 0.0331798 0.0447435 0.0719453 0.954527 1.1366 1.28969 1.83341 3.56448 6.61669 0.00313375 0.0043115 0.00716975 0.0109397 0.015039 0.0234262 0.032839 0.0499578 0.0861463 0.175984 0.553583 1.42722 2.20021 
--- The CXX compiler identification is GNU 15.1.1
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/g++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- PARLAY VERSION 2.3.3
--- ---------------------------- General configuration -----------------------------
--- CMake Generator:                Unix Makefiles
--- Compiler:                       GNU 15.1.1
--- Build type:                     Release
--- CMAKE_CXX_FLAGS:                
--- CMAKE_CXX_FLAGS_DEBUG:          -g
--- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
--- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
--- CMAKE_EXE_LINKER_FLAGS          
--- CMAKE_INSTALL_PREFIX:           /usr/local
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
--- -------------------------------- Library options ------------------------------
--- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
--- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
--- ------------------------------- Static Analysis --------------------------------
--- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
--- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
--- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
--- ---------------------------------- Unit Tests ----------------------------------
--- testing: Disabled (enable with -DPARLAY_TEST=On)
--- ---------------------------------- Benchmarks ----------------------------------
--- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
--- ----------------------------------- Examples -----------------------------------
--- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
--- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
--- The C compiler identification is GNU 15.1.1
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
--- Checking for module 'jemalloc'
---   Found jemalloc, version 5.2.1_0
-Generating .clangd configuration...
-Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (0.7s)
--- Generating done (0.0s)
--- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[ 50%] Building CXX object CMakeFiles/cpam.dir/tests/cpam.cpp.o
-[100%] Linking CXX executable cpam
-[100%] Built target cpam
->>>logs/batch_updates/2/exp/64.log
-Tree: PAM; Buf: 1; InputFile: 1.base.in; Dis: exp; 
-2.13087 0.0020535 0.00333575 0.010181 0.0124545 0.0233665 0.0378435 0.060817 0.0922393 0.167845 0.30102 0.573369 1.20849 2.461 0.00225725 0.00434225 0.0074625 0.0158597 0.02293 0.0436495 0.0709495 0.111965 0.218382 0.364956 0.649141 1.38696 2.11932 
--- The CXX compiler identification is GNU 15.1.1
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/g++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- PARLAY VERSION 2.3.3
--- ---------------------------- General configuration -----------------------------
--- CMake Generator:                Unix Makefiles
--- Compiler:                       GNU 15.1.1
--- Build type:                     Release
--- CMAKE_CXX_FLAGS:                
--- CMAKE_CXX_FLAGS_DEBUG:          -g
--- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
--- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
--- CMAKE_EXE_LINKER_FLAGS          
--- CMAKE_INSTALL_PREFIX:           /usr/local
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
--- -------------------------------- Library options ------------------------------
--- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
--- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
--- ------------------------------- Static Analysis --------------------------------
--- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
--- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
--- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
--- ---------------------------------- Unit Tests ----------------------------------
--- testing: Disabled (enable with -DPARLAY_TEST=On)
--- ---------------------------------- Benchmarks ----------------------------------
--- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
--- ----------------------------------- Examples -----------------------------------
--- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
--- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
--- The C compiler identification is GNU 15.1.1
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
--- Checking for module 'jemalloc'
---   Found jemalloc, version 5.2.1_0
-Generating .clangd configuration...
-Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (0.7s)
--- Generating done (0.0s)
--- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[ 50%] Building CXX object CMakeFiles/cpam.dir/tests/cpam.cpp.o
-[100%] Linking CXX executable cpam
-[100%] Built target cpam
->>>logs/batch_updates/1/exp/.log
-Tree: CPAM; Buf: 64; InputFile: 1.base.in; Dis: exp; 
-1.86727 0.00453 0.00727525 0.0159012 0.0168695 0.023093 0.0334722 0.0486712 0.0671848 0.121849 0.204491 0.40532 0.854289 1.83993 0.00480325 0.0080025 0.0133307 0.0197673 0.023894 0.0320335 0.0415118 0.0571087 0.101363 0.162225 0.283705 0.648359 1.83868 
+[  3%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/workload.cpp.o
+[  7%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/BwTree/bwtree.cpp.o
+[ 10%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/garbagecoll.cpp.o
+[ 14%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/ARTOLC/Tree.cpp.o
+[ 17%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/btree-rtm/btree.c.o
+[ 28%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/background.cpp.o
+[ 28%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/intset.cpp.o
+[ 28%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/nohotspot_ops.cpp.o
+[ 32%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/ptst.cpp.o
+[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/skiplist.cpp.o
+[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/mtIndexAPI.cc.o
+[ 42%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/kvthread.cc.o
+[ 46%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/json.cc.o
+[ 50%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/str.cc.o
+[ 57%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/string.cc.o
+[ 57%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/misc.cc.o
+[ 64%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/kvio.cc.o
+[ 64%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/straccum.cc.o
+[ 75%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/kvrandom.cc.o
+[ 75%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/value_array.cc.o
+[ 75%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/value_string.cc.o
+[ 82%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/value_versioned_array.cc.o
+[ 82%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/string_slice.cc.o
+[ 85%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/perfstat.cc.o
+[ 92%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/file.cc.o
+[ 92%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/compiler.cc.o
+[ 96%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/clp.c.o
+[100%] Linking CXX executable index_microbench_workload
+[100%] Built target index_microbench_workload
+>>>logs/batch_updates/6/uni/64.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.in; Dis: uni; 
+83.3441 0.022389 0.041541 0.085821 0.177794 0.348219 0.649162 1.19093 2.08139 4.73202 9.04737 17.8532 44.6792 90.1954 0.023035 0.041138 0.093127 0.172019 0.347851 0.595434 1.11833 1.9356 4.50997 8.58296 16.5507 40.6657 86.3709 
+>>>logs/batch_updates/6/exp/64.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.in; Dis: exp; 
+83.5647 0.020563 0.043144 0.088291 0.163449 0.32024 0.562131 1.04475 1.84434 4.107 7.98083 15.8778 41.2768 84.4126 0.021005 0.039997 0.08647 0.161806 0.322466 0.562872 1.005 1.67062 3.9323 7.63599 15.6478 41.5597 41.4446 
 -- The CXX compiler identification is GNU 15.1.1
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
@@ -227,6 +140,9 @@ Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not 
 [ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
 [100%] Linking CXX executable b_test
 [100%] Built target b_test
+>>>logs/batch_updates/0/uni/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: uni; 
+1.25547 0.0047195 0.004627 0.00551675 0.00725175 0.009814 0.0165288 0.0257763 0.0377653 0.0731482 0.125904 0.244464 0.599979 1.27602 0.00408275 0.0058285 0.008084 0.0125943 0.0179985 0.035816 0.058669 0.0869812 0.13474 0.183852 0.291149 0.63974 1.4677 
 >>>logs/batch_updates/0/exp/64.log
 Tree: BTree; Buf: 64; InputFile: 1.base.in; Dis: exp; 
-1.26084 0.001486 0.00184175 0.00379225 0.0040185 0.00591525 0.0110653 0.0172458 0.0327228 0.0634663 0.125002 0.251526 0.63031 1.29837 0.00186825 0.002667 0.00471125 0.0076075 0.0114153 0.0197355 0.0279865 0.039443 0.0866727 0.200854 0.488939 0.941809 38.1057 
+1.25666 0.00146725 0.00188125 0.0058705 0.0040365 0.0061535 0.0099985 0.0177755 0.027196 0.0628408 0.125774 0.253088 0.633834 1.30189 0.001856 0.00265875 0.00467025 0.00909325 0.011077 0.0192483 0.0267442 0.0392935 0.0819958 0.203197 0.491043 0.93248 36.7054 
