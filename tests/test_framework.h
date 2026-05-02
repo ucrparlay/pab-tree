@@ -937,6 +937,8 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   auto pts = W.cut(2, W.size());
   assert(pts.size() % dim == 0);
   size_t n = pts.size() / dim;
+  assert(n == N);
+  wp.clear();
   wp.resize(N);
   parlay::parallel_for(0, n, [&](size_t i) -> void {
     if constexpr (kInputType == InputType::kDynamicGraphInput) {
@@ -954,6 +956,10 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
       wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
     }
+    // if (wp[i].key == 0 && wp[i].val == 0) {
+    //   std::cout << "zero key val: " << i << " " << pts[i * dim] << " "
+    //             << pts[(i * dim) + 1] << std::endl;
+    // }
   });
   return std::make_pair(N, dim);
 }
@@ -1125,6 +1131,7 @@ static auto constexpr DefaultTestFunc =
         0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
         0.02,   0.05,   0.1,    0.2,   0.5,   1.0
       };
+      // parlay::sequence<double> const ratio_seq = { 1.0 };
       for (auto ratio : ratio_seq) {
         auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
         // std::cout << base_path << " " << batch_path << std::endl;

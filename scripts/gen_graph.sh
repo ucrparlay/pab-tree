@@ -20,7 +20,7 @@ batch_ratio_seq=(1)
 # dis_seq=(0 1 2 3)
 dis_seq=(1)
 # batch_op=(0 1)
-batch_op=(0)
+batch_op=(1)
 val_n=1
 
 logger_path="log.in"

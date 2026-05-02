@@ -35,15 +35,19 @@ BTree<TT>::BatchDelete_(Range In)
   }
   static_assert(
     std::same_as<typename decltype(In)::value_type, typename TT::K>);
+  // parlay::internal::timer t;
   auto sorted_seq = parlay::sort(In);
+  // t.next("sort ");
 
   auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
     BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
+  // t.next("remove points ");
 
   if (invalid_flag) {
     assert(this->root_->size == 0);
     this->DeleteTreeRec<false>(this->root_);
     this->root_ = nullptr;
+    // t.next("delete tree ");
     return;
   }
 
