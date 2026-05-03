@@ -1071,7 +1071,10 @@ static auto constexpr DefaultTestFunc =
     }
 
     // PARA: lambda for membership
-    auto membership_query = [&](auto const& query_ele) {};
+    auto membership_query = [&](auto const& query_ele) {
+      auto res = parlay::sequence<bool>(query_ele.size(), true);
+      Membership<TT>(tree, query_ele, opts.rounds, res);
+    };
 
     // PARA: lambda for range query
     auto range_query = [&](auto const& base_points) {
@@ -1096,10 +1099,22 @@ static auto constexpr DefaultTestFunc =
     // NOTE: membership
     if (opts.query_type & (1 << 0)) {
       auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
-      auto query_ele =
-        wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
-      auto res = parlay::sequence<bool>(query_ele.size(), true);
-      Membership<TT>(tree, query_ele, opts.rounds, res);
+      typename TT::EntrySeq query_ele;
+      if (wi.size() == 0) {
+        query_ele = wi.subseq(0, batch_size);
+        membership_query(query_ele);
+      } else {
+        query_ele = wp.subseq(0, batch_size);
+        membership_query(query_ele);
+
+        query_ele = wi.subseq(0, batch_size);
+        membership_query(query_ele);
+
+        query_ele = parlay::append(wp.subseq(0, batch_size / 2),
+                                   wi.subseq(0, batch_size - (batch_size / 2)));
+        query_ele = parlay::random_shuffle(query_ele);
+        membership_query(query_ele);
+      }
     }
 
     // NOTE: range query
