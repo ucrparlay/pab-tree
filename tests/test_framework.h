@@ -849,6 +849,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
         range_query_time[i] = 0.0;
       }
     }
+
     // running the osm
     parlay::internal::timer t;
     pkd.DeleteTree();
@@ -859,6 +860,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
       t.stop();
       insert_time[batch_id] += t.total_time();
       current_tree_size += insert_batch_seq[batch_id].size();
+
 #ifdef DEBUG
       std::cerr << " insert batch: " << batch_id << std::flush;
       pkd.Validate();
@@ -869,6 +871,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
       t.stop();
       delete_time[batch_id] += t.total_time();
       current_tree_size -= delete_batch_seq[batch_id].size();
+
 #ifdef DEBUG
       std::cerr << " delete batch: " << batch_id << std::flush;
       pkd.Validate();
@@ -885,15 +888,25 @@ TestDynamicGraph(const auto& insert_batch_seq,
       t.stop();
       member_query_time[batch_id] += t.total_time();
 
+      // NOTE: range report query
+      parlay::sequence<uint> size_seq(box_seq.size(), 0);
       t.reset(), t.start();
       parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
         auto [size, logger] = pkd.RangeReport(
           box_seq[j],
           range_report_output.cut(kDynamicGraphMaxSingleRange * j,
                                   kDynamicGraphMaxSingleRange * (j + 1)));
+        size_seq[j] = size;
       });
       t.stop();
       range_query_time[batch_id] += t.total_time();
+      std::cout << "Non empty range query num: "
+                << parlay::reduce(
+                     parlay::delayed_tabulate(
+                       box_seq.size(),
+                       [&](size_t j) -> size_t { return size_seq[j] > 0; }),
+                     parlay::addm<size_t>())
+                << std::endl;
 
       // std::cout << std::endl;
     }
