@@ -1,4 +1,4 @@
-# PB-Tree: A fast in memory parallel B+-tree.
+# PB-Tree: A fast in-memory parallel B+-tree.
 
 ## Requirements
 
