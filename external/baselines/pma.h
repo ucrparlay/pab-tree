@@ -126,8 +126,8 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(TT::Box const query_box,
-                   Range&& out) -> std::pair<size_t, pb_tree::RangeReportLogger>
+  auto RangeReport(TT::Box const query_box, Range&& out)
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pb_tree::RangeReportLogger logger;
@@ -147,6 +147,29 @@ public:
     auto rt_size =
       this->pma_tree_->map_range(f, query_box.first, query_box.second);
     return { rt_size, logger };
+  }
+
+  template<typename Range>
+  void GetEntries(Range& out)
+  {
+    auto n_leaves = this->pma_tree_->total_leaves();
+    parlay::sequence<uint64_t> counts(n_leaves);
+    parlay::parallel_for(0, n_leaves, [&](uint64_t i) {
+      counts[i] = this->pma_tree_->get_leaf(i).element_count();
+    });
+    auto [offsets, total] = parlay::scan(counts);
+    parlay::parallel_for(0, n_leaves, [&](uint64_t i) {
+      uint64_t pos = offsets[i];
+      this->pma_tree_->get_leaf(i).template map<true>([&](auto ele) {
+        if constexpr (std::is_same_v<decltype(ele), typename TT::K>) {
+          out[pos++] = ele;
+        } else {
+          out[pos].key = std::get<0>(ele);
+          out[pos].val = std::get<1>(ele);
+          pos++;
+        }
+      });
+    });
   }
 
   void DeleteTree()
