@@ -1159,15 +1159,32 @@ ApplyConcurrentIndex(Options const& opts)
     }
   }
 
+  // PARA: lambda for membership
+  auto membership_query = [&](auto const& input_query_ele) {
+    auto query_ele =
+      parlay::map(input_query_ele, [&](auto const& e) { return e.GetKey(); });
+    ConMembership(num_thread, primal_idx, query_ele);
+  };
+
   // NOTE: Membership query
   if (opts.query_type & (1 << 0)) {
     auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
-    // auto query_ele =
-    //   wi.size() ? wi.subseq(0, batch_size) : wp.subseq(0, batch_size);
-    auto query_ele = parlay::tabulate(batch_size, [&](size_t i) {
-      return wi.size() ? wi[i].GetKey() : wp[i].GetKey();
-    });
-    ConMembership(num_thread, primal_idx, query_ele);
+    typename TT::EntrySeq query_ele;
+    if (wi.size() == 0) {
+      query_ele = wi.subseq(0, batch_size);
+      membership_query(query_ele);
+    } else {
+      query_ele = wp.subseq(0, batch_size);
+      membership_query(query_ele);
+
+      query_ele = wi.subseq(0, batch_size);
+      membership_query(query_ele);
+
+      query_ele = parlay::append(wp.subseq(0, batch_size / 2),
+                                 wi.subseq(0, batch_size - (batch_size / 2)));
+      query_ele = parlay::random_shuffle(query_ele);
+      membership_query(query_ele);
+    }
   }
 
   // PARA: lambda for range query
