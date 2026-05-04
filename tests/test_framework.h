@@ -43,6 +43,7 @@ static constexpr int kOsmWindowLen = 5;
 // NOTE: Dynamic Graph
 constexpr uint64_t kDynamicGraphRangeNum = 1e7;
 constexpr uint64_t kDynamicGraphMaxSingleRange = 1506;
+constexpr uint64_t kDynamicFlattenSize = 5e8;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 // static constexpr int kRangeQueryNum = 500;
@@ -803,7 +804,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
                  const int rounds,
                  auto& membership_res,
                  auto& box_seq,
-                 auto& range_report_output)
+                 auto& range_report_output,
+                 auto& flatten_seq)
 {
   pkd.DeleteTree();
   auto time_period_num = insert_batch_seq.size();
@@ -908,6 +910,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
                      parlay::addm<size_t>())
                 << std::endl;
 
+      // NOTE: flatten
+      pkd.GetEntries(flatten_seq);
       // std::cout << std::endl;
     }
   }
@@ -1267,7 +1271,11 @@ static auto constexpr TestTemporalGraph =
       auto range_report_output =
         typename TT::EntrySeq(box_seq.size() * kDynamicGraphMaxSingleRange);
 
+      // membership query result
       auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+
+      // flatten
+      auto flatten_seq = TT::EntrySeq::uninitialized(kDynamicFlattenSize);
       TestDynamicGraph<TT, Tree>(insert_batch_seq,
                                  delete_batch_seq,
                                  tree,

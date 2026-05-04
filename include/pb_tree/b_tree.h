@@ -424,6 +424,9 @@ public:
   template<typename Range, bool granularity = true, bool sorted = false>
   static void FlattenRec(Node* T, Range Out);
 
+  template<typename Range>
+  void GetEntries(Range Out);
+
   template<typename Range, bool sorted = false>
   static void ExtractPointsInLeaf(Node* T, Range Out);
 
@@ -569,6 +572,7 @@ private:
 #include "b_tree_impl/tree_op/flatten.hpp"
 #include "b_tree_impl/tree_op/leaf_op.hpp"
 #include "b_tree_impl/tree_op/node_op.hpp"
+#include "b_tree_impl/utility.hpp"
 #include "b_tree_impl/validation.hpp"
 
 #endif // PBTREE_B_TREE_H_

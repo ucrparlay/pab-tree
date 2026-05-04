@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "b_tree.h"
+#include "pb_tree/b_tree.h"
 #include <pam.h>
 // #include "geobase.h"
 // #include "hilbert.h"
@@ -285,13 +285,21 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(TT::Box const query_box,
-                   Range&& out) -> std::pair<size_t, pb_tree::RangeReportLogger>
+  auto RangeReport(TT::Box const query_box, Range&& out)
+    -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // the bounding box should be [a, b)
     pb_tree::RangeReportLogger logger;
     auto rt_size = this->RangeReportImpl(this->pam_aug_map_, query_box, out);
     return { rt_size, logger };
+  }
+
+  template<typename Range>
+  void GetEntries(Range& out)
+  {
+    zmap::foreach_index(this->pam_aug_map_, [&](auto const& e, size_t i) {
+      out[i] = { std::get<0>(e), std::get<1>(e) };
+    });
   }
 
   void DeleteTree()

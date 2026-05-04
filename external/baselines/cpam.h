@@ -255,6 +255,14 @@ public:
     return { rt_size, logger };
   }
 
+  template<typename Range>
+  void GetEntries(Range& out)
+  {
+    zmap::foreach_index(this->cpam_aug_map_, [&](auto const& e, size_t i) {
+      out[i] = { std::get<0>(e), std::get<1>(e) };
+    });
+  }
+
   void DeleteTree()
   {
     cpam_aug_map_.clear();
