@@ -908,7 +908,8 @@ ConcurrentIdxDynamicGraph(auto num_thread,
   std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
             << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
             << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::endl;
+            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::setw(14)
+            << "flatten_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
     //   batch_id >= sliding_window_len
@@ -921,7 +922,8 @@ ConcurrentIdxDynamicGraph(auto num_thread,
               << std::setprecision(6) << insert_time[batch_id] << std::setw(14)
               << delete_time[batch_id] << std::setw(14)
               << member_query_time[batch_id] << std::setw(14)
-              << range_query_time[batch_id] << std::endl;
+              << range_query_time[batch_id] << std::setw(14) << "-"
+              << std::endl;
   }
 }
 

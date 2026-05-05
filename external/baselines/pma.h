@@ -158,8 +158,7 @@ public:
     parlay::sequence<uint64_t> counts(n_leaves);
     parlay::parallel_for(0, n_leaves, [&](uint64_t i) {
       uint64_t cnt = 0;
-      this->pma_tree_->get_leaf(i).template map<true>(
-        [&cnt](auto) { cnt++; });
+      this->pma_tree_->get_leaf(i).template map<true>([&cnt](auto) { cnt++; });
       counts[i] = cnt;
     });
     auto [offsets, total] = parlay::scan(counts);
