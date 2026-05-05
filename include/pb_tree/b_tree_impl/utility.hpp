@@ -18,7 +18,9 @@ template<typename Range>
 void
 BTree<TT>::GetEntries(Range Out)
 {
-  this->FlattenRec<Range>(this->root_, Out);
+  this->FlattenRec(
+    this->root_,
+    parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));
 }
 
 } // namespace pb_tree

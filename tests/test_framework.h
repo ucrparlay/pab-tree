@@ -803,7 +803,6 @@ TestDynamicGraph(const auto& insert_batch_seq,
                  Tree& pkd,
                  const int rounds,
                  auto& membership_res,
-                 auto& box_seq,
                  auto& range_report_output,
                  auto& flatten_seq)
 {
@@ -836,6 +835,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
   parlay::sequence<double> delete_time(time_period_num, 0.0);
   parlay::sequence<double> member_query_time(time_period_num, 0.0);
   parlay::sequence<double> range_query_time(time_period_num, 0.0);
+  parlay::sequence<double> flatten_time(time_period_num, 0.0);
   parlay::sequence<size_t> tree_size(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
@@ -891,7 +891,14 @@ TestDynamicGraph(const auto& insert_batch_seq,
       member_query_time[batch_id] += t.total_time();
 
       // NOTE: range report query
-      parlay::sequence<uint> size_seq(box_seq.size(), 0);
+      auto random_wi = parlay::random_shuffle(insert_batch_seq[batch_id]);
+      auto box_seq = parlay::tabulate(kDynamicGraphRangeNum, [&](size_t i) {
+        auto e = random_wi[i];
+        uint64_t key = TT::Entry::GetKey(e);
+        uint64_t u = key >> 32;
+        return std::make_pair(u << 32, (u + 1) << 32);
+      });
+      parlay::sequence<size_t> size_seq(box_seq.size(), 0);
       t.reset(), t.start();
       parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
         auto [size, logger] = pkd.RangeReport(
@@ -902,16 +909,19 @@ TestDynamicGraph(const auto& insert_batch_seq,
       });
       t.stop();
       range_query_time[batch_id] += t.total_time();
-      std::cout << "Non empty range query num: "
-                << parlay::reduce(
-                     parlay::delayed_tabulate(
-                       box_seq.size(),
-                       [&](size_t j) -> size_t { return size_seq[j] > 0; }),
-                     parlay::addm<size_t>())
-                << std::endl;
+      // std::cout << "Non empty range query num: "
+      //           << parlay::reduce(
+      //                parlay::delayed_tabulate(
+      //                  box_seq.size(),
+      //                  [&](size_t j) -> size_t { return size_seq[j] > 0; }),
+      //                parlay::addm<size_t>())
+      //           << std::endl;
 
       // NOTE: flatten
+      t.reset(), t.start();
       pkd.GetEntries(flatten_seq);
+      t.stop();
+      flatten_time[batch_id] += t.total_time();
       // std::cout << std::endl;
     }
   }
@@ -919,7 +929,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
   std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
             << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
             << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::endl;
+            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::setw(14)
+            << "flatten_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
     //   batch_id >= sliding_window_len
@@ -933,6 +944,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
               << std::setw(14) << delete_time[batch_id] / (rounds - 1)
               << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
               << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
+              << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
               << std::endl;
   }
 }
@@ -1261,15 +1273,8 @@ static auto constexpr TestTemporalGraph =
       }
 
       // generate box
-      auto random_wi = parlay::random_shuffle(insert_batch_seq[0]);
-      auto box_seq = parlay::tabulate(kDynamicGraphRangeNum, [&](size_t i) {
-        auto e = random_wi[i];
-        uint64_t key = TT::Entry::GetKey(e);
-        uint64_t u = key >> 32;
-        return std::make_pair(u << 32, (u + 1) << 32);
-      });
-      auto range_report_output =
-        typename TT::EntrySeq(box_seq.size() * kDynamicGraphMaxSingleRange);
+      auto range_report_output = typename TT::EntrySeq(
+        kDynamicGraphRangeNum * kDynamicGraphMaxSingleRange);
 
       // membership query result
       auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
@@ -1281,8 +1286,8 @@ static auto constexpr TestTemporalGraph =
                                  tree,
                                  opts.rounds,
                                  membership_res,
-                                 box_seq,
-                                 range_report_output);
+                                 range_report_output,
+                                 flatten_seq);
     }
   };
 
