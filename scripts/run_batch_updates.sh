@@ -19,8 +19,8 @@ mkdir -p "${log_path}"
 
 data_prefix="/data/zmen002/kv_pair/batch_updates"
 batch_op_seq=("ins")
-dis_seq=("uni" "exp")
-# dis_seq=("exp")
+# dis_seq=("uni" "exp")
+dis_seq=("exp")
 batch_ratio=0.01
 
 function run_test() {
@@ -67,11 +67,11 @@ function run_cmake() {
 }
 
 # Masstree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-tree=5
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=5
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # BwTree
 export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
@@ -80,28 +80,28 @@ solver="index_microbench_workload"
 run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
 
-# PMA
-tree=3
-solver="pma"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
-
-# PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
-
-# CPAM
-tree=1
-solver="cpam"
-run_cmake 4 "${solver}"
-run_test 4 "${solver}" "${tree}"
-
-# ours
-solver="b_test"
-tree=0
-for idx in "${!leaf_wrap_seq[@]}"; do
-	run_cmake "${idx}" "${solver}"
-	run_test "${idx}" "${solver}" "${tree}"
-done
+# # PMA
+# tree=3
+# solver="pma"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
+#
+# # PAM
+# tree=2
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
+#
+# # CPAM
+# tree=1
+# solver="cpam"
+# run_cmake 4 "${solver}"
+# run_test 4 "${solver}" "${tree}"
+#
+# # ours
+# solver="b_test"
+# tree=0
+# for idx in "${!leaf_wrap_seq[@]}"; do
+# 	run_cmake "${idx}" "${solver}"
+# 	run_test "${idx}" "${solver}" "${tree}"
+# done
