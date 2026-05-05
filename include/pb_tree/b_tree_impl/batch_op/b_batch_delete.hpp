@@ -51,6 +51,9 @@ BTree<TT>::BatchDelete_(Range In)
     return;
   }
 
+  // this->sys_reinsert_size = 0;
+  // this->sys_balance_leaf_size = 0;
+
   if (invalid_subtree_num) {
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
 
@@ -63,6 +66,9 @@ BTree<TT>::BatchDelete_(Range In)
     FetchInvalidSubtreeNodes(
       this->root_, parlay::make_slice(reinsert_entries), true);
   }
+
+  // std::cout << this->sys_reinsert_size << " ";
+  // std::cout << this->sys_balance_leaf_size << std::endl;
 }
 
 // Returns (invalid_flag, needs_fetch, reinsert_entry_num).

@@ -411,6 +411,8 @@ template<typename TT>
 void
 BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
 {
+  // this->sys_balance_leaf_size += reinsert_size;
+
   auto TI = static_cast<Interior*>(T);
 
   // ── Phase 1: Group assignment ──────────────────────────────────────────────
@@ -639,6 +641,8 @@ template<typename TT>
 void
 BTree<TT>::ReInsertTreeAfterDelete(Node* T, EntrySlice reinsert_entries)
 {
+  // this->sys_reinsert_size += reinsert_entries.size();
+
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());
   SizeT new_node_n = BatchInsertRecursive(
