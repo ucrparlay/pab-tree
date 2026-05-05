@@ -23,8 +23,8 @@ store_path = "data/" + log_folder_name + "/" + input_type + ".csv"
 
 START_YEAR = 2014
 # Column indices within each data row: insert_n=0, delete_n=1, tree_n=2, insert_t=3, delete_t=4, query_t=5
-OPERATIONS = ["insert_t(s)", "delete_t(s)", "find_t(s)", "range_t(s)"]
-OP_COL_IDX = [3, 4, 5, 6]
+OPERATIONS = ["insert_t(s)", "delete_t(s)", "find_t(s)", "range_t(s)", "flatten_t(s)"]
+OP_COL_IDX = [3, 4, 5, 6, 7]
 
 BENCH_ORDER = ["temp"]
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
