@@ -512,7 +512,10 @@ static constexpr std::array<meta_data_t, 256> get_metadata_table() {
 
 } // namespace PMA_precalculate
 
+namespace PMA { template <typename> class PmaWrapper; }
+
 template <typename traits> class CPMA {
+  template <typename> friend class PMA::PmaWrapper;
 public:
   using leaf = typename traits::leaf;
   using key_type = typename traits::key_type;

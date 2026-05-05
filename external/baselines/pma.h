@@ -53,7 +53,7 @@ public:
     -> InputDeleteRangeT
   {
     return parlay::map(input_seq,
-                       [&](auto e) -> K { return Entry::GetKey(e); });
+                       [&](auto e) -> K { return Entry::GetKey(e) + 1; });
   }
 
   template<class PT>
@@ -153,9 +153,14 @@ public:
   void GetEntries(Range& out)
   {
     auto n_leaves = this->pma_tree_->total_leaves();
+    // Count exact per-leaf element counts using the same iteration logic as
+    // the write pass, so prefix-sum offsets match what is actually written.
     parlay::sequence<uint64_t> counts(n_leaves);
     parlay::parallel_for(0, n_leaves, [&](uint64_t i) {
-      counts[i] = this->pma_tree_->get_leaf(i).element_count();
+      uint64_t cnt = 0;
+      this->pma_tree_->get_leaf(i).template map<true>(
+        [&cnt](auto) { cnt++; });
+      counts[i] = cnt;
     });
     auto [offsets, total] = parlay::scan(counts);
     parlay::parallel_for(0, n_leaves, [&](uint64_t i) {
