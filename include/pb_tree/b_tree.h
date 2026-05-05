@@ -425,7 +425,7 @@ public:
   static void FlattenRec(Node* T, Range Out);
 
   template<typename Range>
-  void GetEntries(Range Out);
+  void GetEntries(Range& Out);
 
   template<typename Range, bool sorted = false>
   static void ExtractPointsInLeaf(Node* T, Range Out);
