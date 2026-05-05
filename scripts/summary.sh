@@ -61,7 +61,7 @@ function run_cmake() {
 	cd ../build || exit
 	rm -rf *
 	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DOSM=OFF -DDYNAMIC_GRAPH=OFF -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
-	make "${solver}"
+	make "${solver}" -j
 	cd "${cur_path}" || exit
 }
 
@@ -80,27 +80,27 @@ run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
 
 # # PMA
-tree=3
-solver="pma"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
-
-# PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
-
-# CPAM
-tree=1
-solver="cpam"
-run_cmake 4 "${solver}"
-run_test 4 "${solver}" "${tree}"
-
-# ours
-solver="b_test"
-tree=0
-for idx in "${!leaf_wrap_seq[@]}"; do
-	run_cmake "${idx}" "${solver}"
-	run_test "${idx}" "${solver}" "${tree}"
-done
+# tree=3
+# solver="pma"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
+#
+# # PAM
+# tree=2
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
+#
+# # CPAM
+# tree=1
+# solver="cpam"
+# run_cmake 4 "${solver}"
+# run_test 4 "${solver}" "${tree}"
+#
+# # ours
+# solver="b_test"
+# tree=0
+# for idx in "${!leaf_wrap_seq[@]}"; do
+# 	run_cmake "${idx}" "${solver}"
+# 	run_test "${idx}" "${solver}" "${tree}"
+# done
