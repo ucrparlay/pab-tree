@@ -888,7 +888,6 @@ TestDynamicGraph(const auto& insert_batch_seq,
         membership_res[j] = contain;
       });
       t.stop();
-      member_query_time[batch_id] += t.total_time();
 
       // NOTE: range report query
       auto random_wi = parlay::random_shuffle(insert_batch_seq[batch_id]);
@@ -922,6 +921,22 @@ TestDynamicGraph(const auto& insert_batch_seq,
       pkd.GetEntries(flatten_seq);
       t.stop();
       flatten_time[batch_id] += t.total_time();
+
+      Tree new_pkd;
+      auto const new_wp =
+        Tree::ParseInput(flatten_seq.subseq(0, pkd.GetSize()));
+      new_pkd.Build(new_wp);
+
+      t.reset(), t.start();
+      parlay::parallel_for(0, member_query_n, [&](size_t j) {
+        auto [contain, logger] = new_pkd.Contain(query_points[j]);
+        membership_res[j] = contain;
+      });
+      t.stop();
+      member_query_time[batch_id] += t.total_time();
+
+      new_pkd.DeleteTree();
+
       // std::cout << std::endl;
     }
   }
@@ -942,9 +957,9 @@ TestDynamicGraph(const auto& insert_batch_seq,
               << tree_size[batch_id] << std::setw(14) << std::fixed
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
               << std::setw(14) << delete_time[batch_id] / (rounds - 1)
+              << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
               << std::setw(14)
-              << member_query_time[batch_id] / (rounds - 1)
-              // << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
+              << range_query_time[batch_id] / (rounds - 1)
               // << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
               << std::endl;
   }
