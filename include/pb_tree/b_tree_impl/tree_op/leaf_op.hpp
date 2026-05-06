@@ -49,11 +49,10 @@ BTree<TT>::InsertPoints2Leaf(Node* T, Range In)
   }
   // PERF: BufSizeT should be enough since total size fits within
   std::ranges::copy_n(In.begin(), In.size(), TL->GetEleEndIter());
-  // for (BufSizeT i = 0; i < In.size(); i++) {
-  //   TL->elements[TL->size + i] = In[i];
-  // }
   TL->size += In.size();
-  TL->is_sorted = false;
+  // TL->is_sorted = false;
+  std::sort(TL->elements.begin(), TL->elements.begin() + TL->size);
+  TL->is_sorted = true;
 
   // TL->UpdateAug(TL->elements.cut(0, TL->size));
   TL->UpdateAug(
@@ -135,7 +134,9 @@ BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
          std::cmp_equal(std::distance(TL->elements.begin(), end),
                         TL->size - In.size()));
   TL->size = std::distance(TL->elements.begin(), end);
-  TL->is_sorted = false;
+  // TL->is_sorted = false;
+  std::sort(TL->elements.begin(), TL->elements.begin() + TL->size);
+  TL->is_sorted = true;
   assert(TL->size >= 0);
   // TL->UpdateAug(TL->elements.cut(0, TL->size));
   TL->UpdateAug(

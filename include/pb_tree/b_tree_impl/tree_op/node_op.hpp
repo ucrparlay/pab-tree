@@ -507,7 +507,13 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
       }
       dest->size = static_cast<SizeT>(dst - dest->GetEleBeginIter());
       // TODO: try sort it as well
-      dest->is_sorted = false;
+      // dest->is_sorted = false;
+      std::sort(dest->GetEleBeginIter(),
+                dest->GetEleEndIter(),
+                [](auto const& a, auto const& b) {
+                  return Entry::GetKey(a) < Entry::GetKey(b);
+                });
+      dest->is_sorted = true;
       TI->tree_nodes[tree_idx++] = dest;
       if (!is_rightmost) {
         TI->split[split_idx++] = TI->split[j - 1];

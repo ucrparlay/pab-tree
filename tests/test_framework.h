@@ -942,9 +942,10 @@ TestDynamicGraph(const auto& insert_batch_seq,
               << tree_size[batch_id] << std::setw(14) << std::fixed
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
               << std::setw(14) << delete_time[batch_id] / (rounds - 1)
-              << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
-              << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
-              << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
+              << std::setw(14)
+              << member_query_time[batch_id] / (rounds - 1)
+              // << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
+              // << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
               << std::endl;
   }
 }
