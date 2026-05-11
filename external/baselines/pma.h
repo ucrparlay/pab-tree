@@ -61,8 +61,10 @@ public:
   {
     assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
     size_t n = P.first.size();
-    PmaPointer it(P.first.begin(), P.second.begin());
-    pma_tree_->insert_batch(it, n, false);
+    auto range = parlay::tabulate(n, [&](size_t i) {
+      return std::make_tuple(P.first[i], P.second[i]);
+    });
+    pma_tree_ = std::make_shared<PMA>(range);
   }
 
   template<typename PT>

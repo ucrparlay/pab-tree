@@ -2397,14 +2397,13 @@ template <typename traits> CPMA<traits>::CPMA(auto &range) {
       });
 
     } else {
-      auto element_pairs = parlay::delayed_map(range, [](auto elem) {
-        return std::make_pair(std::get<0>(elem), leftshift_tuple(elem));
-      });
-      auto elements = parlay::reduce_by_key(element_pairs, value_update());
-      parlay::sort_inplace(elements);
+      auto elements = parlay::unique(
+          range, [](const auto &a, const auto &b) {
+            return std::get<0>(a) == std::get<0>(b);
+          });
       soa_num_elements = elements.size();
       size_t start_idx = 0;
-      if (std::get<0>(elements[0]) == 0) {
+      if (!elements.empty() && std::get<0>(elements[0]) == 0) {
         has_0 = true;
         zero_element = elements[0];
         start_idx = 1;
@@ -2414,8 +2413,7 @@ template <typename traits> CPMA<traits>::CPMA(auto &range) {
       leaf_init = malloc(SOA_type::get_size_static(soa_num_elements));
       ParallelTools::parallel_for(start_idx, elements.size(), [&](size_t i) {
         SOA_type::get_static(leaf_init, soa_num_elements, i - start_idx) =
-            std::tuple_cat(std::make_tuple(elements[i].first),
-                           elements[i].second);
+            elements[i];
       });
     }
     auto leaf_soa = SOA_type(leaf_init, soa_num_elements);
