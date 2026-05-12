@@ -50,35 +50,9 @@ Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not 
 -- Configuring done (1.2s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[  3%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/workload.cpp.o
-[  7%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/BwTree/bwtree.cpp.o
-[ 10%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/garbagecoll.cpp.o
-[ 25%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/btree-rtm/btree.c.o
-[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/ptst.cpp.o
-[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/ARTOLC/Tree.cpp.o
-[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/skiplist.cpp.o
-[ 25%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/intset.cpp.o
-[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/nohotspot_ops.cpp.o
-[ 39%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/nohotspot-skiplist/background.cpp.o
-[ 46%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/str.cc.o
-[ 46%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/kvthread.cc.o
-[ 46%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/mtIndexAPI.cc.o
-[ 50%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/json.cc.o
-[ 53%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/misc.cc.o
-[ 57%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/string.cc.o
-[ 64%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/kvio.cc.o
-[ 64%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/straccum.cc.o
-[ 67%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/kvrandom.cc.o
-[ 71%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/value_string.cc.o
-[ 75%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/value_array.cc.o
-[ 85%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/value_versioned_array.cc.o
-[ 85%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/perfstat.cc.o
-[ 85%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/string_slice.cc.o
-[ 96%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/clp.c.o
-[ 96%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/file.cc.o
-[ 96%] Building CXX object CMakeFiles/index_microbench_workload.dir/external/index-microbench/masstree/compiler.cc.o
-[100%] Linking CXX executable index_microbench_workload
-[100%] Built target index_microbench_workload
->>>logs/batch_updates/6/exp/64.log
-Tree: BwTree; Buf: 1; InputFile: 1.base.in; Dis: exp; 
-83.8786 0.022131 0.043034 0.087933 0.167264 0.316197 0.578171 1.05212 1.84024 4.18992 7.90539 15.8512 41.3074 84.6012 0.02306 0.04074 0.087059 0.162947 0.31821 0.566551 0.981382 1.73265 3.8414 7.54477 15.4195 41.3678 86.3969 
+[ 50%] Building CXX object CMakeFiles/pma.dir/tests/pma.cpp.o
+[100%] Linking CXX executable pma
+[100%] Built target pma
+>>>logs/batch_updates/3/exp/64.log
+Tree: PMA; Buf: 1; InputFile: 1.base.in; Dis: exp; 
+3.37459 0.00476075 0.009609 0.0128535 0.019726 0.0380177 0.748533 0.825276 0.899314 1.08413 1.24504 1.83674 3.55567 6.36294 0.003323 0.004361 0.006917 0.0105165 0.0142072 0.0227262 0.0309097 0.0480755 0.0842647 0.164428 0.429785 1.15279 1.43377 
