@@ -13,6 +13,7 @@
 #include "pb_tree/b_tree.h"
 
 namespace pb_tree {
+
 template<typename TT>
 template<typename Range>
 void

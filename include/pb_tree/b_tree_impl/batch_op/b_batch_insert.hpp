@@ -5,6 +5,7 @@
 #include <numeric>
 
 #include "../../b_tree.h"
+#include "dependence/type_trait.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "parlay/slice.h"
@@ -23,17 +24,35 @@ BTree<TT>::BatchInsert(Range&& In)
 
   auto A = parlay::make_slice(std::forward<Range>(In));
 
-#ifndef SIEVE
-  BatchInsert_(A);
-#else
-  BatchInsertSieve(A);
-#endif // !SIEVE
+  constexpr auto leaf_entries_pattern = TT::LeafEntriesPattern::kHybrid;
+  constexpr bool sorted_input = false;
+  BatchInsert_(A, leaf_entries_pattern, sorted_input);
 }
 
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::BatchInsert_(Range In, bool sorted)
+BTree<TT>::BatchInsert(Range&& In,
+                       const TT::PatternType leaf_entries_pattern,
+                       const bool sorted_input)
+{
+  static_assert(parlay::is_random_access_range_v<Range>);
+  static_assert(
+    parlay::is_less_than_comparable_v<parlay::range_reference_type_t<Range>>);
+  static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
+                                        parlay::range_reference_type_t<Range>>);
+
+  auto A = parlay::make_slice(std::forward<Range>(In));
+
+  BatchInsert_(A, leaf_entries_pattern, sorted_input);
+}
+
+template<typename TT>
+template<typename Range>
+void
+BTree<TT>::BatchInsert_(Range In,
+                        const TT::PatternType leaf_entries_pattern,
+                        const bool sorted_input)
 {
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
@@ -46,18 +65,19 @@ BTree<TT>::BatchInsert_(Range In, bool sorted)
 
   parlay::slice<const E*, const E*> sorted_slice{ In.begin(), In.end() };
   typename TT::EntrySeq sorted_seq;
-  if (!sorted) {
+  if (!sorted_input) {
     sorted_seq = parlay::sort(In);
     sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
   }
 
+  // NOTE: begin insert
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());
   SizeT new_node_n = BatchInsertRecursive(
     this->root_, sorted_slice, parlay::make_slice(node_split_seq));
 
 #ifdef DEBUG
-  assert(!sorted || new_node_n == 0);
+  assert(!sorted_input || new_node_n == 0);
 #endif // DEBUG
 
   if (new_node_n > 0) {
@@ -76,7 +96,8 @@ template<typename Range>
 TT::SizeT
 BTree<TT>::BatchInsertRecursive(Node* T,
                                 Range In,
-                                NodeSplitPairSlice node_split_slice)
+                                NodeSplitPairSlice node_split_slice,
+                                const TT::PatternType leaf_entries_pattern)
 {
   assert(2 * In.size() == node_split_slice.size());
 
@@ -88,7 +109,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   if (T->is_leaf) {
     Leaf* TL = static_cast<Leaf*>(T);
     if (TL->size + n <= TT::kBufUB) {
-      [[maybe_unused]] Node* updated_node = InsertPoints2Leaf(T, In);
+      Node* updated_node = InsertPoints2Leaf(T, In, leaf_entries_pattern);
       assert(updated_node == T);
       return 0;
     }
@@ -149,8 +170,9 @@ BTree<TT>::BatchInsertRecursive(Node* T,
     // In.size() > 2048 ? 1 : cnt);
     1);
 
-  // count only over touched children: start from GetNodeN() (each contributes 1)
-  // and add the excess for children that split (return value is 0 or >=2, never 1).
+  // count only over touched children: start from GetNodeN() (each contributes
+  // 1) and add the excess for children that split (return value is 0 or >=2,
+  // never 1).
   SizeT new_node_n = TI->GetNodeN();
   for (BufSizeT i = 0; i < cnt; i++) {
     SizeT split_n = new_split_node_n_arr[nodes_map[i]];

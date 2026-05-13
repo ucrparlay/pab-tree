@@ -10,7 +10,6 @@
 #include "parlay/slice.h"
 
 namespace pb_tree {
-
 template<class EleType>
 struct EleWrapper : EleType
 {
@@ -73,6 +72,15 @@ public:
   using NodeSeq = parlay::sequence<Node*>;
   using NodeSlice = parlay::slice<Node**, Node**>;
   using ConstNodeSlice = parlay::slice<Node* const*, Node* const*>;
+
+  using PatternType = std::uint8_t;
+
+  enum LeafEntriesPattern : PatternType
+  {
+    kSorted = 0,
+    kUnsorted = 1,
+    kHybrid = 2,
+  };
 };
 
 template<typename EleType,
@@ -106,12 +114,13 @@ public:
 
   using HeightT = uint_fast8_t;
   using SizeT = uint_fast32_t;
-  using BufSizeT = int;
-  // std::conditional_t<(kBufferSize * kBufUBFac > 65535U),
-  //                    uint_fast32_t,
-  //                    std::conditional_t<(kBufferSize * kBufUBFac > 255U),
-  //                                       uint_fast16_t,
-  //                                       uint_fast8_t>>;
+  // using BufSizeT = int;
+  using BufSizeT =
+    std::conditional_t<(kBufferSize * kBufUBFac > 65535U),
+                       uint_fast32_t,
+                       std::conditional_t<(kBufferSize * kBufUBFac > 255U),
+                                          uint_fast16_t,
+                                          uint_fast8_t>>;
   static constexpr BufSizeT kBuf = kBufferSize;
   static constexpr BufSizeT kBufLB = kBufferSize;
   static constexpr BufSizeT kBufMD = kBufMDFac * kBufferSize;
@@ -125,9 +134,9 @@ public:
 
   // NOTE: block param in point sieving
   static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
-  // using BucketType =
-  //   std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
-  using BucketType = BufSizeT; // WARN: Assume sieve one node at a time
+  using BucketType =
+    std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
+  // using BucketType = BufSizeT; // WARN: Assume sieve one node at a time
   // static constexpr BucketType const kPivotNum = (1 << kSkeletonHeight) - 1;
   // static constexpr BucketType const kBucketNum = 1 << kSkeletonHeight;
   static constexpr uint_fast8_t const kLog2Base = 10;

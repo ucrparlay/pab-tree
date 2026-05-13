@@ -36,7 +36,9 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
 template<typename TT>
 template<typename Range>
 TT::Node*
-BTree<TT>::InsertPoints2Leaf(Node* T, Range In)
+BTree<TT>::InsertPoints2Leaf(Node* T,
+                             Range In,
+                             TT::PatternType leaf_entries_pattern)
 {
   Leaf* TL = static_cast<Leaf*>(T);
 
@@ -49,13 +51,15 @@ BTree<TT>::InsertPoints2Leaf(Node* T, Range In)
   }
   // PERF: BufSizeT should be enough since total size fits within
   std::ranges::copy_n(In.begin(), In.size(), TL->GetEleEndIter());
-  // for (BufSizeT i = 0; i < In.size(); i++) {
-  //   TL->elements[TL->size + i] = In[i];
-  // }
   TL->size += In.size();
-  TL->is_sorted = false;
 
-  // TL->UpdateAug(TL->elements.cut(0, TL->size));
+  if (leaf_entries_pattern == TT::LeafEntriesPattern::kSorted) {
+    std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
+    TL->is_sorted = true;
+  } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kUnsorted) {
+    TL->is_sorted = false;
+  }
+
   TL->UpdateAug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
   return T;

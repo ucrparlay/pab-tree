@@ -271,7 +271,14 @@ public:
   void BatchInsert(Range&& In);
 
   template<typename Range>
-  void BatchInsert_(Range In, bool sorted = false);
+  void BatchInsert(Range&& In,
+                   const TT::PatternType leaf_entries_pattern,
+                   const bool sorted_input);
+
+  template<typename Range>
+  void BatchInsert_(Range In,
+                    const TT::PatternType leaf_entries_pattern,
+                    const bool sorted_input);
 
   template<typename Range>
   void BatchInsertSieve(Range In);
@@ -279,7 +286,8 @@ public:
   template<typename Range>
   SizeT BatchInsertRecursive(Node* T,
                              Range In,
-                             NodeSplitPairSlice node_split_slice);
+                             NodeSplitPairSlice node_split_slice,
+                             const TT::PatternType leaf_entries_pattern);
 
   template<typename Range>
   SizeT BatchInsertSieveRecursive(Node* T,
@@ -359,7 +367,9 @@ public:
                                      OutputHandler&& output_handler);
   // NOTE: batch insert
   template<typename Range>
-  static Node* InsertPoints2Leaf(Node* T, Range In);
+  static Node* InsertPoints2Leaf(Node* T,
+                                 Range In,
+                                 const TT::PatternType leaf_entries_pattern);
 
   static void PartitionBinarySearchRec(auto split_seq_s,
                                        // parlay::sequence<int>& split_pos_seq,
