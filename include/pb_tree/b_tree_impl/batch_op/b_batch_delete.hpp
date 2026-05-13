@@ -22,30 +22,61 @@ BTree<TT>::BatchDelete(Range&& In)
 
   auto A = parlay::make_slice(std::forward<Range>(In));
 
-  BatchDelete_(A);
+  constexpr auto leaf_entries_pattern = TT::LeafEntriesPattern::kHybrid;
+  constexpr bool sorted_input = false;
+  BatchDelete_(A, leaf_entries_pattern, sorted_input);
 }
 
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::BatchDelete_(Range In)
+BTree<TT>::BatchDelete(Range&& In,
+                       const TT::PatternType leaf_entries_pattern,
+                       const bool sorted_input)
+{
+  static_assert(parlay::is_random_access_range_v<Range>);
+  static_assert(
+    parlay::is_less_than_comparable_v<parlay::range_reference_type_t<Range>>);
+  static_assert(std::is_constructible_v<parlay::range_value_type_t<Range>,
+                                        parlay::range_reference_type_t<Range>>);
+
+  auto A = parlay::make_slice(std::forward<Range>(In));
+
+  BatchDelete_(A, leaf_entries_pattern, sorted_input);
+}
+
+template<typename TT>
+template<typename Range>
+void
+BTree<TT>::BatchDelete_(Range In,
+                        const TT::PatternType leaf_entries_pattern,
+                        const bool sorted_input)
 {
   if (this->root_ == nullptr) {
     return;
   }
+
   static_assert(
     std::same_as<typename decltype(In)::value_type, typename TT::K>);
+
   // parlay::internal::timer t;
-  auto sorted_seq = parlay::sort(In);
-  // t.next("sort ");
+
+  parlay::slice<const K*, const K*> sorted_slice{ In.begin(), In.end() };
+  typename TT::KeySeq sorted_seq;
+  if (!sorted_input) {
+    sorted_seq = parlay::sort(In);
+    sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
+  }
 
   auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
-    BatchDeleteRecursive(this->root_, parlay::make_slice(sorted_seq));
+    BatchDeleteRecursive(
+      this->root_, parlay::make_slice(sorted_seq), leaf_entries_pattern);
   // t.next("remove points ");
 
   if (invalid_flag) {
     assert(this->root_->size == 0);
-    this->DeleteTreeRec<false>(this->root_);
+    constexpr bool kEnableGranularity = false;
+    this->DeleteTreeRec<kEnableGranularity>(this->root_);
     this->root_ = nullptr;
     // t.next("delete tree ");
     return;
@@ -62,9 +93,11 @@ BTree<TT>::BatchDelete_(Range In)
     puts(">>> pass tree aug after delete");
 #endif // DEBUG
 
-    // TODO: we can check the tag in leaf to avoid additional sort
-    FetchInvalidSubtreeNodes(
-      this->root_, parlay::make_slice(reinsert_entries), true);
+    bool has_tomb = true;
+    FetchInvalidSubtreeNodes(this->root_,
+                             parlay::make_slice(reinsert_entries),
+                             has_tomb,
+                             leaf_entries_pattern);
   }
 
   // std::cout << this->sys_reinsert_size << " ";
@@ -76,7 +109,9 @@ BTree<TT>::BatchDelete_(Range In)
 // node).
 template<typename TT>
 std::tuple<bool, bool, typename TT::SizeT>
-BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
+BTree<TT>::BatchDeleteRecursive(Node* T,
+                                TT::KeySlice In,
+                                const TT::PatternType leaf_entries_pattern)
 {
 
   if (In.size() == 0) {
@@ -90,8 +125,11 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
   }
 
   if (T->is_leaf) {
-    [[maybe_unused]] auto delete_cnt = DeletePoints4Leaf(T, In);
-    assert(delete_cnt == In.size());
+    auto old_size = T->size;
+    auto new_node = DeletePoints4Leaf(T, In, leaf_entries_pattern);
+    assert(new_node == T);
+    assert(new_node->size + In.size() == old_size);
+    // assert(delete_cnt == In.size());
     // return std::make_tuple(T->size < TT::kBufLB,
     //                        T->size < TT::kBufLB ? 1 : 0,
     //                        T->size < TT::kBufLB ? T->size : 0);
@@ -157,7 +195,8 @@ BTree<TT>::BatchDeleteRecursive(Node* T, TT::KeySlice In)
                contain_invalid_subtree[nodes_map[i]],
                reinsert_entries_num[nodes_map[i]]) =
         BatchDeleteRecursive(TI->tree_nodes[nodes_map[i]],
-                             In.cut(touched_l[i], touched_r[i]));
+                             In.cut(touched_l[i], touched_r[i]),
+                             leaf_entries_pattern);
     },
     1);
 

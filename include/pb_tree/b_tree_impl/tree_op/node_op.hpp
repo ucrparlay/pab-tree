@@ -264,7 +264,8 @@ template<typename TT>
 void
 BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                     EntrySlice reinsert_entries,
-                                    const bool has_tomb)
+                                    const bool has_tomb,
+                                    const TT::PatternType leaf_entries_pattern)
 {
   constexpr bool kSortReinsertEntries = true;
   assert(reinsert_entries.size() == GetNodeReinsertSize(T));
@@ -297,16 +298,16 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     return;
   }
 
-  if (SelfBalanceNode(T, has_tomb)) { // so far a good tree
+  if (SelfBalanceNode(T, has_tomb)) { // reach a node can be self balanced
     assert(NodeIsValid(T));
-    if (GetNodeReinsertSize(T) == 0) {
+    if (GetNodeReinsertSize(T) == 0) { // just contain empty trees
       assert(NodeContainInvalidSubtree(T));
       PruneOutEmptyTree(T);
       TI->ResetDeletionFlag();
       return;
     }
 
-    BalanceOverLeaves(T, TI->reinsert_size);
+    BalanceOverLeaves(T, TI->reinsert_size, leaf_entries_pattern);
     TI->ResetDeletionFlag();
     return;
   }
@@ -383,7 +384,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                                     i == invalid_idx - 1
                                                       ? reinsert_entries.size()
                                                       : reinsert_sum[i + 1]),
-                               next_tomb);
+                               next_tomb,
+                               leaf_entries_pattern);
     },
     1);
 
@@ -400,7 +402,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       return Entry::GetKey(a) < Entry::GetKey(b) &&
              Entry::GetKey(a) != Entry::GetKey(b);
     }));
-    ReInsertTreeAfterDelete(T, reinsert_entries);
+    ReInsertTreeAfterDelete(T, reinsert_entries, leaf_entries_pattern);
   }
 
   assert((this->Validate<true, false>(T)));
@@ -409,7 +411,9 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 
 template<typename TT>
 void
-BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
+BTree<TT>::BalanceOverLeaves(Node* T,
+                             const SizeT reinsert_size,
+                             const TT::PatternType leaf_entries_pattern)
 {
   // this->sys_balance_leaf_size += reinsert_size;
 
@@ -483,7 +487,8 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
            box.second < TI->split[split_idx - 1];
   };
 
-  // Case A: group is a single valid node — slide its pointer/split into place.
+  // NOTE: Case A: group is a single valid node — slide its pointer/split into
+  // place.
   auto handle_single = [&](BufSizeT i, BufSizeT g, bool is_rightmost) {
     assert(NodeIsValid(TI->tree_nodes[i]));
     TI->tree_nodes[tree_idx++] = TI->tree_nodes[i];
@@ -493,7 +498,8 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
     assert(quick_check(g));
   };
 
-  // Case B: group total fits in one leaf — merge all into the rightmost leaf.
+  // NOTE: Case B: group total fits in one leaf — merge all into the rightmost
+  // leaf.
   auto handle_merge =
     [&](BufSizeT i, BufSizeT j, BufSizeT g, bool is_rightmost) {
       auto* dest = static_cast<Leaf*>(TI->tree_nodes[j - 1]);
@@ -507,16 +513,20 @@ BTree<TT>::BalanceOverLeaves(Node* T, const SizeT reinsert_size)
       }
       dest->size = static_cast<SizeT>(dst - dest->GetEleBeginIter());
       // TODO: try sort it as well
-      dest->is_sorted = false;
-      TI->tree_nodes[tree_idx++] = dest;
+      // dest->is_sorted = false;
+      auto updated_dest = PostProcessLeafChange(
+        dest,
+        parlay::make_slice(dest->GetEleBeginIter(), dest->GetEleEndIter()),
+        leaf_entries_pattern);
+      TI->tree_nodes[tree_idx++] = updated_dest;
       if (!is_rightmost) {
         TI->split[split_idx++] = TI->split[j - 1];
       }
       assert(quick_check(g));
     };
 
-  // Case C: group must be redistributed — gather all entries, sort, scatter
-  // into evenly-sized buckets while reusing existing leaf node objects.
+  // NOTE: Case C: group must be redistributed — gather all entries, sort,
+  // scatter into evenly-sized buckets while reusing existing leaf node objects.
   auto handle_distribute = [&](BufSizeT i, BufSizeT j, bool is_rightmost) {
     if (entry_buf.empty()) [[unlikely]] {
       entry_buf = TT::EntrySeq::uninitialized(reinsert_size + TT::kBufUB);
@@ -639,14 +649,18 @@ BTree<TT>::PruneOutEmptyTree(Node* T)
 
 template<typename TT>
 void
-BTree<TT>::ReInsertTreeAfterDelete(Node* T, EntrySlice reinsert_entries)
+BTree<TT>::ReInsertTreeAfterDelete(Node* T,
+                                   EntrySlice reinsert_entries,
+                                   TT::PatternType leaf_entries_pattern)
 {
   // this->sys_reinsert_size += reinsert_entries.size();
 
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());
-  SizeT new_node_n = BatchInsertRecursive(
-    T, reinsert_entries, parlay::make_slice(node_split_seq));
+  SizeT new_node_n = BatchInsertRecursive(T,
+                                          reinsert_entries,
+                                          parlay::make_slice(node_split_seq),
+                                          leaf_entries_pattern);
   assert(new_node_n == 0);
 }
 

@@ -15,6 +15,36 @@
 
 namespace pb_tree {
 template<typename TT>
+template<typename Range>
+TT::Node*
+BTree<TT>::PostProcessLeafChange(Node* T,
+                                 Range In,
+                                 const TT::PatternType leaf_entries_pattern)
+{
+  // WARN: does not know whether the T->elements are sorted or not,
+  // so might mark it as unsorted if the leaf entries pattern is unsort/hybrid,
+  // even if the entries are actually sorted.
+  assert(T->is_leaf);
+  auto TL = static_cast<Leaf*>(T);
+  if (leaf_entries_pattern == TT::LeafEntriesPattern::kSorted) {
+    std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
+    TL->is_sorted = true;
+  } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kUnsorted) {
+    TL->is_sorted = false;
+  } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kHybrid) {
+    if (PseudoRandomGenPattern(T, In)) {
+      std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
+      TL->is_sorted = true;
+    } else {
+      TL->is_sorted = false;
+    }
+  } else {
+    assert(false && "Invalid leaf entries pattern");
+  }
+  return T;
+}
+
+template<typename TT>
 template<typename Range, bool sorted>
 void
 BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
@@ -28,9 +58,6 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
   }
   assert(Out.size() >= TL->size);
   std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, Out.begin());
-  // for (BufSizeT i = 0; i < TL->size; i++) {
-  //   Out[i] = TL->elements[i];
-  // }
 }
 
 template<typename TT>
@@ -52,17 +79,10 @@ BTree<TT>::InsertPoints2Leaf(Node* T,
   // PERF: BufSizeT should be enough since total size fits within
   std::ranges::copy_n(In.begin(), In.size(), TL->GetEleEndIter());
   TL->size += In.size();
-
-  if (leaf_entries_pattern == TT::LeafEntriesPattern::kSorted) {
-    std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
-    TL->is_sorted = true;
-  } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kUnsorted) {
-    TL->is_sorted = false;
-  }
-
   TL->UpdateAug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
-  return T;
+
+  return PostProcessLeafChange(T, In, leaf_entries_pattern);
 }
 
 template<typename TT>
@@ -106,8 +126,10 @@ BTree<TT>::HandlingLeafSplitOverflow(Node* T,
 }
 
 template<typename TT>
-TT::SizeT
-BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
+TT::Node*
+BTree<TT>::DeletePoints4Leaf(Node* T,
+                             TT::KeySlice In,
+                             const TT::PatternType leaf_entries_pattern)
 {
   auto TL = static_cast<Leaf*>(T);
 
@@ -139,12 +161,12 @@ BTree<TT>::DeletePoints4Leaf(Node* T, TT::KeySlice In)
          std::cmp_equal(std::distance(TL->elements.begin(), end),
                         TL->size - In.size()));
   TL->size = std::distance(TL->elements.begin(), end);
-  TL->is_sorted = false;
+
   assert(TL->size >= 0);
-  // TL->UpdateAug(TL->elements.cut(0, TL->size));
   TL->UpdateAug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
-  return delete_cnt;
+
+  return PostProcessLeafChange(T, In, leaf_entries_pattern);
 }
 
 } // namespace pb_tree

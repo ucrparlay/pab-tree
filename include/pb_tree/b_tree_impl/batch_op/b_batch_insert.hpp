@@ -73,8 +73,10 @@ BTree<TT>::BatchInsert_(Range In,
   // NOTE: begin insert
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());
-  SizeT new_node_n = BatchInsertRecursive(
-    this->root_, sorted_slice, parlay::make_slice(node_split_seq));
+  SizeT new_node_n = BatchInsertRecursive(this->root_,
+                                          sorted_slice,
+                                          parlay::make_slice(node_split_seq),
+                                          leaf_entries_pattern);
 
 #ifdef DEBUG
   assert(!sorted_input || new_node_n == 0);
@@ -165,7 +167,8 @@ BTree<TT>::BatchInsertRecursive(Node* T,
       new_split_node_n_arr[nodes_map[i]] =
         BatchInsertRecursive(TI->tree_nodes[nodes_map[i]],
                              In.cut(l, r),
-                             node_split_slice.cut(2 * l, 2 * r));
+                             node_split_slice.cut(2 * l, 2 * r),
+                             leaf_entries_pattern);
     },
     // In.size() > 2048 ? 1 : cnt);
     1);

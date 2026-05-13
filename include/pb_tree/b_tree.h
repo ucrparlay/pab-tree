@@ -299,12 +299,22 @@ public:
   void BatchDelete(Range&& In);
 
   template<typename Range>
-  void BatchDelete_(Range In);
+  void BatchDelete(Range&& In,
+                   const TT::PatternType leaf_entries_pattern,
+                   const bool sorted_input);
+
+  template<typename Range>
+  void BatchDelete_(Range In,
+                    const TT::PatternType leaf_entries_pattern,
+                    const bool sorted_input);
 
   // Returns (invalid_flag, needs_fetch, reinsert_entry_num).
   // needs_fetch: any subtree needs FetchInvalidSubtreeNodes (not stored in
   // node).
-  std::tuple<bool, bool, SizeT> BatchDeleteRecursive(Node* T, TT::KeySlice In);
+  std::tuple<bool, bool, SizeT> BatchDeleteRecursive(
+    Node* T,
+    TT::KeySlice In,
+    const TT::PatternType leaf_entries_pattern);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
@@ -312,7 +322,8 @@ public:
   // Return the total number entries in the tree that needs to rebuild
   void FetchInvalidSubtreeNodes(Node* T,
                                 EntrySlice reinsert_entries,
-                                bool has_tomb
+                                bool has_tomb,
+                                const TT::PatternType leaf_entries_pattern
 
   );
 
@@ -323,11 +334,15 @@ public:
 
   std::pair<Node*, Node*> InsertToLeafNoOverflow(Node* T, EntrySlice In);
 
-  void ReInsertTreeAfterDelete(Node* T, EntrySlice reinsert_entries);
+  void ReInsertTreeAfterDelete(Node* T,
+                               EntrySlice reinsert_entries,
+                               const TT::PatternType leaf_entries_pattern);
 
   void PruneOutEmptyTree(Node* T);
 
-  void BalanceOverLeaves(Node* T, const SizeT reinsert_size);
+  void BalanceOverLeaves(Node* T,
+                         const SizeT reinsert_size,
+                         const TT::PatternType leaf_entries_pattern);
 
   static Node* BatchInsertUpdateInterior(Node* T,
                                          NodeSplitPairSlice node_split_slice,
@@ -365,6 +380,20 @@ public:
   static SizeT GenerateInteriorNodes(TT::NodeSlice node_in,
                                      TT::SplitSlice key_in,
                                      OutputHandler&& output_handler);
+
+  template<typename InputNode, typename Range>
+  static bool PseudoRandomGenPattern(InputNode const* T, Range const In)
+  {
+    // TODO: implement a better function
+    return (T->size ^ In.size()) & 1;
+  }
+
+  template<typename Range>
+  static TT::Node* PostProcessLeafChange(
+    Node* T,
+    Range Out,
+    const TT::PatternType leaf_entries_pattern);
+
   // NOTE: batch insert
   template<typename Range>
   static Node* InsertPoints2Leaf(Node* T,
@@ -390,7 +419,10 @@ public:
     SizeT new_node_n,
     SizeBufUBArr const& return_node_n_arr);
 
-  static TT::SizeT DeletePoints4Leaf(Node* T, TT::KeySlice In);
+  static TT::Node* DeletePoints4Leaf(
+    Node* T,
+    TT::KeySlice In,
+    const TT::PatternType leaf_entries_pattern);
 
   // template <typename Leaf, typename RT>
   // static RT DiffPoints4Leaf(Node* T, Slice In);
