@@ -512,8 +512,6 @@ BTree<TT>::BalanceOverLeaves(Node* T,
         FreeNode<Leaf>(leaf);
       }
       dest->size = static_cast<SizeT>(dst - dest->GetEleBeginIter());
-      // TODO: try sort it as well
-      // dest->is_sorted = false;
       auto updated_dest = PostProcessLeafChange(
         dest,
         parlay::make_slice(dest->GetEleBeginIter(), dest->GetEleEndIter()),

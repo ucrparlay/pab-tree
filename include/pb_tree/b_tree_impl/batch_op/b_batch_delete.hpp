@@ -93,7 +93,7 @@ BTree<TT>::BatchDelete_(Range In,
     puts(">>> pass tree aug after delete");
 #endif // DEBUG
 
-    bool has_tomb = true;
+    const bool has_tomb = true;
     FetchInvalidSubtreeNodes(this->root_,
                              parlay::make_slice(reinsert_entries),
                              has_tomb,
