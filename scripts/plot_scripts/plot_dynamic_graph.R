@@ -28,39 +28,74 @@ read_csv_op <- function(op) {
 plot_op <- function(t, title, size_label, time_label, show_legend,
                     titleSize, axisSize, legendSize,
                     show_left_title = TRUE, show_right_title = TRUE,
-                    right_scale_divisor = 1) {
-  solvers <- setdiff(colnames(t), c("year", "size"))
+                    right_scale_divisor = 1,
+                    extra_bars = NULL,
+                    bar_scale = 1e6) {
+  all_bar_cols <- c("size", if (!is.null(extra_bars)) extra_bars else character(0))
+  solvers <- setdiff(colnames(t), c("year", all_bar_cols))
   solvers <- intersect(TREE_ORDER, solvers)  # keep defined order
 
   t$year <- as.integer(t$year)
-  t$size <- as.numeric(t$size) / 1e6
+  for (col in all_bar_cols) t[[col]] <- as.numeric(t[[col]]) / bar_scale
 
-  tb <- t %>% select(year, size)
+  tb_size <- t %>% select(year, size)
+  year_breaks <- seq(min(tb_size$year), max(tb_size$year), by = 2)
 
   tc <- t %>%
     select(year, all_of(solvers)) %>%
     pivot_longer(!year, names_to = "solver", values_to = "time",
                  values_transform = list(time = as.numeric)) %>%
     mutate(solver = factor(solver, levels = solvers)) %>%
-    arrange(solver == "BTree")
+    arrange(solver == "BTree") %>%
+    mutate(solver = recode(solver, "BTree" = "PBTree (Ours)"))
 
-  # scale right axis to align with left log axis
+  # scale right axis to align with left log axis (based on main size column)
   rightScaleValue <- 10^(
-    mean(log10(range(tb$size, na.rm = TRUE))) -
+    mean(log10(range(tb_size$size, na.rm = TRUE))) -
     mean(log10(range(tc$time, na.rm = TRUE)))
   ) / right_scale_divisor
   tc$time_scaled <- tc$time * rightScaleValue
 
   shapeLevel <- c(1, 0, 2, 5, 7, 14)[seq_along(solvers)]
 
-  plt <- ggplot(tb, aes(x = year)) +
-    geom_bar(
+  bar_fill_values <- c(size          = "#fbf8cc",
+                       extra_total        = "#a8d8ea")
+  bar_fill_labels <- c(size          = "Batch / Tree size",
+                       extra_total        = "Reinsert + Leaf balance size")
+
+  if (is.null(extra_bars)) {
+    tb <- tb_size
+    bar_geom <- geom_bar(
       aes(y = size, fill = "size"),
-      stat = "identity",
-      color = "black",
-      width = 0.5
-    ) +
-    scale_fill_manual("", values = "#fbf8cc", label = "Batch / Tree size") +
+      stat = "identity", color = "black", width = 0.5
+    )
+    fill_scale <- scale_fill_manual(
+      "", values = bar_fill_values["size"], labels = bar_fill_labels["size"]
+    )
+  } else {
+    tb <- t %>%
+      select(year, size, all_of(extra_bars)) %>%
+      mutate(extra_total = rowSums(across(all_of(extra_bars)), na.rm = TRUE),
+             extra_total = ifelse(extra_total <= 0, NA_real_, extra_total)) %>%
+      select(year, size, extra_total) %>%
+      pivot_longer(!year, names_to = "bar_type", values_to = "bar_value") %>%
+      mutate(bar_type = factor(bar_type, levels = c("size", "extra_total")))
+
+    bar_geom <- geom_bar(
+      aes(y = bar_value, fill = bar_type, group = bar_type),
+      stat = "identity", color = "black", width = 0.35,
+      position = position_dodge(width = 0.6)
+    )
+    fill_scale <- scale_fill_manual(
+      "",
+      values = bar_fill_values[c("size", "extra_total")],
+      labels = bar_fill_labels[c("size", "extra_total")]
+    )
+  }
+
+  plt <- ggplot(tb, aes(x = year)) +
+    bar_geom +
+    fill_scale +
     geom_line(
       data = tc,
       aes(y = time_scaled, color = solver, group = solver)
@@ -72,8 +107,8 @@ plot_op <- function(t, title, size_label, time_label, show_legend,
     ) +
     scale_shape_manual(values = shapeLevel) +
     scale_x_continuous(
-      breaks = seq(min(tb$year), max(tb$year), by = 2),
-      labels = seq(min(tb$year), max(tb$year), by = 2) - 2000
+      breaks = year_breaks,
+      labels = year_breaks - 2000
     ) +
     scale_y_log10(
       name = if (show_left_title) size_label else NULL,
@@ -108,9 +143,9 @@ plot_op <- function(t, title, size_label, time_label, show_legend,
       panel.grid.minor    = element_blank()
     ) +
     guides(
-      fill  = guide_legend(order = 1, nrow = 1),
-      color = guide_legend(order = 2, nrow = 1),
-      shape = guide_legend(order = 2, nrow = 1,
+      fill  = guide_legend(order = 1, nrow = 1, keywidth = unit(0.8, "lines"), keyheight = unit(1.0, "lines")),
+      color = guide_legend(order = 2, nrow = 1, keyheight = unit(1.0, "lines")),
+      shape = guide_legend(order = 2, nrow = 1, keyheight = unit(1.0, "lines"),
                            override.aes = list(size = 3, stroke = 1))
     ) +
     scale_color_locuszoom()
@@ -128,17 +163,21 @@ tDelete  <- read_csv_op("delete")
 tRange   <- read_csv_op("range")
 tFlatten <- read_csv_op("flatten")
 
-g1 <- plot_op(tInsert,  "(a) Batch Insert", expression(underline("Batch size (×1M)")), expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE)
-g2 <- plot_op(tDelete,  "(b) Batch Delete", expression(underline("Batch size (×1M)")), expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE)
+g1 <- plot_op(tInsert,  "(a) Batch Insert", expression(underline("Batch size (×1K)")), expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE, bar_scale = 1e3, right_scale_divisor = 100)
+
+g2 <- plot_op(tDelete,  "(b) Batch Delete", expression(underline("Batch size (×1K)")), expression(underline("Time (sec.)")), TRUE,  titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE,  bar_scale = 1e3, right_scale_divisor = 100)
+
 g3 <- plot_op(tRange,   "(c) Neighbor Query",  expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE, right_scale_divisor = 10)
-g4 <- plot_op(tFlatten, "(d) Flatten",      expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), TRUE,  titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE,  right_scale_divisor = 10)
+
+g4 <- plot_op(tFlatten, "(d) Flatten",      expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE,  right_scale_divisor = 10)
 
 g <- ggpubr::ggarrange(
   plotlist = list(g1, g2, g3, g4),
   nrow = 2,
   ncol = 2,
   common.legend = TRUE,
-  legend = "top"
+  legend = "top",
+  legend.grob = ggpubr::get_legend(g2)
 ) + theme(plot.margin = grid::unit(c(0, 0, 0, 0), "mm"))
 
 g <- annotate_figure(g,
