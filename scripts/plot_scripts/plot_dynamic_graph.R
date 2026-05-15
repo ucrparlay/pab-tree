@@ -26,7 +26,8 @@ read_csv_op <- function(op) {
 # time_label: right y-axis label
 # show_legend: whether to show the legend
 plot_op <- function(t, title, size_label, time_label, show_legend,
-                    titleSize, axisSize, legendSize) {
+                    titleSize, axisSize, legendSize,
+                    show_left_title = TRUE, show_right_title = TRUE) {
   solvers <- setdiff(colnames(t), c("year", "size"))
   solvers <- intersect(TREE_ORDER, solvers)  # keep defined order
 
@@ -73,13 +74,13 @@ plot_op <- function(t, title, size_label, time_label, show_legend,
       labels = seq(min(tb$year), max(tb$year), by = 2) - 2000
     ) +
     scale_y_log10(
-      name = size_label,
+      name = if (show_left_title) size_label else NULL,
       breaks = scales::trans_breaks("log10", function(x) 10^x, n = 3),
       labels = scales::trans_format("log10", scales::math_format(10^.x)),
       expand = expansion(mult = c(0, .1)),
       sec.axis = sec_axis(
         ~ . / rightScaleValue,
-        name = time_label,
+        name = if (show_right_title) time_label else NULL,
         breaks = scales::trans_breaks("log10", function(x) 10^x, n = 3),
         labels = scales::trans_format("log10", scales::math_format(10^.x))
       )
@@ -125,10 +126,10 @@ tDelete  <- read_csv_op("delete")
 tRange   <- read_csv_op("range")
 tFlatten <- read_csv_op("flatten")
 
-g1 <- plot_op(tInsert,  "(a) Batch Insert", TeX("Batch size ($\\times 1M$)"), "Time (sec.)", FALSE, titleSize, axisSize, legendSize)
-g2 <- plot_op(tDelete,  "(b) Batch Delete", TeX("Batch size ($\\times 1M$)"), "Time (sec.)", FALSE, titleSize, axisSize, legendSize)
-g3 <- plot_op(tRange,   "(c) Range Query",  TeX("Tree size ($\\times 1M$)"),  "Time (sec.)", FALSE, titleSize, axisSize, legendSize)
-g4 <- plot_op(tFlatten, "(d) Flatten",      TeX("Tree size ($\\times 1M$)"),  "Time (sec.)", TRUE,  titleSize, axisSize, legendSize)
+g1 <- plot_op(tInsert,  "(a) Batch Insert", TeX("Batch size ($\\times 1M$)"), "Time (sec.)", FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE)
+g2 <- plot_op(tDelete,  "(b) Batch Delete", TeX("Batch size ($\\times 1M$)"), "Time (sec.)", FALSE, titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE)
+g3 <- plot_op(tRange,   "(c) Neighbor Query",  TeX("Tree size ($\\times 1M$)"),  "Time (sec.)", FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE)
+g4 <- plot_op(tFlatten, "(d) Flatten",      TeX("Tree size ($\\times 1M$)"),  "Time (sec.)", TRUE,  titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE)
 
 g <- ggpubr::ggarrange(
   plotlist = list(g1, g2, g3, g4),
