@@ -40,7 +40,8 @@ plot_op <- function(t, title, size_label, time_label, show_legend,
     select(year, all_of(solvers)) %>%
     pivot_longer(!year, names_to = "solver", values_to = "time",
                  values_transform = list(time = as.numeric)) %>%
-    mutate(solver = factor(solver, levels = solvers))
+    mutate(solver = factor(solver, levels = solvers)) %>%
+    arrange(solver == "BTree")
 
   # scale right axis to align with left log axis
   rightScaleValue <- 10^(
