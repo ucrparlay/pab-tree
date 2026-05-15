@@ -26,6 +26,9 @@ START_YEAR = 2014
 OP_COL_IDX = 4  # delete_t column index within each data row
 SIZE_COL_IDX = 1  # delete_n column index within each data row
 
+REINSERT_SIZE = [2353013, 213106, 119789, 456378, 46732, 12671, 97684, 9788, 25879, 9496]
+LEAF_BALANCE_SIZE = [1044678, 1018914, 808104, 549132, 513460, 493318, 487719, 482626, 383692, 270354]
+
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
 
 
@@ -84,8 +87,10 @@ for tree, buf_value, data_rows in blocks:
 store_path.parent.mkdir(parents=True, exist_ok=True)
 with open(store_path, "w", newline="") as f:
     writer = csv.writer(f)
-    writer.writerow(["year", "size"] + solver_labels)
+    writer.writerow(["year", "size"] + solver_labels + ["reinsert_size", "leaf_balance_size"])
     for j in range(max_years):
-        writer.writerow([START_YEAR + j, size_by_year[j]] + [values_by_solver[label][j] for label in solver_labels])
+        rs = REINSERT_SIZE[j] if j < len(REINSERT_SIZE) else ""
+        lbs = LEAF_BALANCE_SIZE[j] if j < len(LEAF_BALANCE_SIZE) else ""
+        writer.writerow([START_YEAR + j, size_by_year[j]] + [values_by_solver[label][j] for label in solver_labels] + [rs, lbs])
 
 print(f"Written {max_years} rows to {store_path}")

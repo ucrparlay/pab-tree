@@ -27,7 +27,8 @@ read_csv_op <- function(op) {
 # show_legend: whether to show the legend
 plot_op <- function(t, title, size_label, time_label, show_legend,
                     titleSize, axisSize, legendSize,
-                    show_left_title = TRUE, show_right_title = TRUE) {
+                    show_left_title = TRUE, show_right_title = TRUE,
+                    right_scale_divisor = 1) {
   solvers <- setdiff(colnames(t), c("year", "size"))
   solvers <- intersect(TREE_ORDER, solvers)  # keep defined order
 
@@ -47,7 +48,7 @@ plot_op <- function(t, title, size_label, time_label, show_legend,
   rightScaleValue <- 10^(
     mean(log10(range(tb$size, na.rm = TRUE))) -
     mean(log10(range(tc$time, na.rm = TRUE)))
-  )
+  ) / right_scale_divisor
   tc$time_scaled <- tc$time * rightScaleValue
 
   shapeLevel <- c(1, 0, 2, 5, 7, 14)[seq_along(solvers)]
@@ -129,8 +130,8 @@ tFlatten <- read_csv_op("flatten")
 
 g1 <- plot_op(tInsert,  "(a) Batch Insert", expression(underline("Batch size (×1M)")), expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE)
 g2 <- plot_op(tDelete,  "(b) Batch Delete", expression(underline("Batch size (×1M)")), expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE)
-g3 <- plot_op(tRange,   "(c) Neighbor Query",  expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE)
-g4 <- plot_op(tFlatten, "(d) Flatten",      expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), TRUE,  titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE)
+g3 <- plot_op(tRange,   "(c) Neighbor Query",  expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), FALSE, titleSize, axisSize, legendSize, show_left_title = TRUE,  show_right_title = FALSE, right_scale_divisor = 10)
+g4 <- plot_op(tFlatten, "(d) Flatten",      expression(underline("Tree size (×1M)")),  expression(underline("Time (sec.)")), TRUE,  titleSize, axisSize, legendSize, show_left_title = FALSE, show_right_title = TRUE,  right_scale_divisor = 10)
 
 g <- ggpubr::ggarrange(
   plotlist = list(g1, g2, g3, g4),
