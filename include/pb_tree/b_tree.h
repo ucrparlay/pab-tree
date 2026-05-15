@@ -600,9 +600,9 @@ private:
   int vis_leaf_num = 0;
   int vis_inter_num = 0;
 
-  std::atomic<size_t> max_reinsert_batch_size = 0;
   std::atomic<size_t> sys_reinsert_size = 0;
   std::atomic<size_t> sys_balance_leaf_size = 0;
+  std::atomic<size_t> sys_split_leaf_size = 0;
 };
 
 } // namespace pb_tree

@@ -415,7 +415,7 @@ BTree<TT>::BalanceOverLeaves(Node* T,
                              const SizeT reinsert_size,
                              const TT::PatternType leaf_entries_pattern)
 {
-  // this->sys_balance_leaf_size += reinsert_size;
+  this->sys_balance_leaf_size += reinsert_size;
 
   auto TI = static_cast<Interior*>(T);
 
@@ -651,7 +651,7 @@ BTree<TT>::ReInsertTreeAfterDelete(Node* T,
                                    EntrySlice reinsert_entries,
                                    TT::PatternType leaf_entries_pattern)
 {
-  // this->sys_reinsert_size += reinsert_entries.size();
+  this->sys_reinsert_size += reinsert_entries.size();
 
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());

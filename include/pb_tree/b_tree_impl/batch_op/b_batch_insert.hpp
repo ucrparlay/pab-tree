@@ -70,6 +70,8 @@ BTree<TT>::BatchInsert_(Range In,
     sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
   }
 
+  this->sys_split_leaf_size = 0;
+
   // NOTE: begin insert
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());
@@ -91,6 +93,8 @@ BTree<TT>::BatchInsert_(Range In,
     this->root_ = AssembleInteriorLevels(parlay::make_slice(updated_node_seq),
                                          parlay::make_slice(updated_split_seq));
   }
+
+  std::cout << "split_leaf_size: " << this->sys_split_leaf_size << std::endl;
 }
 
 template<typename TT>
@@ -115,6 +119,9 @@ BTree<TT>::BatchInsertRecursive(Node* T,
       assert(updated_node == T);
       return 0;
     }
+
+    this->sys_split_leaf_size += T->size;
+
     return HandlingLeafSplitOverflow(T, In, node_split_slice);
   }
 

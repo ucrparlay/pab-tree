@@ -59,8 +59,6 @@ BTree<TT>::BatchDelete_(Range In,
   static_assert(
     std::same_as<typename decltype(In)::value_type, typename TT::K>);
 
-  // parlay::internal::timer t;
-
   parlay::slice<const K*, const K*> sorted_slice{ In.begin(), In.end() };
   typename TT::KeySeq sorted_seq;
   if (!sorted_input) {
@@ -82,8 +80,8 @@ BTree<TT>::BatchDelete_(Range In,
     return;
   }
 
-  // this->sys_reinsert_size = 0;
-  // this->sys_balance_leaf_size = 0;
+  this->sys_reinsert_size = 0;
+  this->sys_balance_leaf_size = 0;
 
   if (invalid_subtree_num) {
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
@@ -100,8 +98,9 @@ BTree<TT>::BatchDelete_(Range In,
                              leaf_entries_pattern);
   }
 
-  // std::cout << this->sys_reinsert_size << " ";
-  // std::cout << this->sys_balance_leaf_size << std::endl;
+  std::cout << "batch delete: ";
+  std::cout << this->sys_reinsert_size << " ";
+  std::cout << this->sys_balance_leaf_size << std::endl;
 }
 
 // Returns (invalid_flag, needs_fetch, reinsert_entry_num).
