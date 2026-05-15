@@ -26,6 +26,8 @@ START_YEAR = 2014
 INSERT_COL_IDX = 3  # insert_t column index within each data row
 INSERT_N_COL_IDX = 0  # insert_n column index within each data row
 
+SPLIT_LEAF_SIZE = [0, 4071037, 4388892, 4927428, 6450654, 8835425, 10843226, 10519810, 12251530, 13036310]
+
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
 
 
@@ -100,10 +102,11 @@ for tree, buf_value, data_rows in blocks:
 store_path.parent.mkdir(parents=True, exist_ok=True)
 with open(store_path, "w", newline="") as f:
     writer = csv.writer(f)
-    writer.writerow(["year", "size"] + solver_labels)
+    writer.writerow(["year", "size"] + solver_labels + ["split_leaf_size"])
     for j in range(max_years):
         year = START_YEAR + j
-        row = [year, size_by_year[j]] + [insert_by_solver[label][j] for label in solver_labels]
+        sls = SPLIT_LEAF_SIZE[j] if j < len(SPLIT_LEAF_SIZE) else ""
+        row = [year, size_by_year[j]] + [insert_by_solver[label][j] for label in solver_labels] + [sls]
         writer.writerow(row)
 
 print(f"Written {max_years} rows to {store_path}")
