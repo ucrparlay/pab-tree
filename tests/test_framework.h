@@ -837,6 +837,9 @@ TestDynamicGraph(const auto& insert_batch_seq,
   parlay::sequence<double> range_query_time(time_period_num, 0.0);
   parlay::sequence<double> flatten_time(time_period_num, 0.0);
   parlay::sequence<size_t> tree_size(time_period_num, 0);
+  parlay::sequence<size_t> sys_split_leaf_size(time_period_num, 0);
+  parlay::sequence<size_t> sys_reinsert_size(time_period_num, 0);
+  parlay::sequence<size_t> sys_leaf_balance(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
     auto const& insert_entry = wi;
@@ -861,6 +864,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
       pkd.BatchInsert(insert_entry[batch_id]);
       t.stop();
       insert_time[batch_id] += t.total_time();
+      sys_split_leaf_size[batch_id] = pkd.sys_split_leaf_size;
       current_tree_size += insert_batch_seq[batch_id].size();
 
 #ifdef DEBUG
@@ -872,6 +876,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
       pkd.BatchDelete(delete_entry[batch_id]);
       t.stop();
       delete_time[batch_id] += t.total_time();
+      sys_reinsert_size[batch_id] = pkd.sys_reinsert_size;
+      sys_leaf_balance[batch_id] = pkd.sys_balance_leaf_size;
       current_tree_size -= delete_batch_seq[batch_id].size();
 
 #ifdef DEBUG
@@ -926,11 +932,13 @@ TestDynamicGraph(const auto& insert_batch_seq,
     }
   }
 
-  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
-            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
-            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::setw(14)
-            << "flatten_t(s)" << std::endl;
+  std::cout
+    << std::right << std::setw(12) << "insert_n" << std::setw(12) << "delete_n"
+    << std::setw(12) << "tree_n" << std::setw(14) << "insert_t(s)"
+    << std::setw(14) << "delete_t(s)" << std::setw(14) << "find_t(s)"
+    << std::setw(14) << "range_t(s)" << std::setw(14) << "flatten_t(s)"
+    << " insert_split_size delete_reinsert_size delete_balance_leaf_size"
+    << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
     //   batch_id >= sliding_window_len
@@ -945,7 +953,10 @@ TestDynamicGraph(const auto& insert_batch_seq,
               << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
               << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
               << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
-              << std::endl;
+              << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
+              << std::setw(14) << sys_split_leaf_size[batch_id] << std::setw(14)
+              << sys_reinsert_size[batch_id] << std::setw(14)
+              << sys_leaf_balance[batch_id] << std::endl;
   }
 }
 
