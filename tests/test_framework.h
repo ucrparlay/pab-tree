@@ -689,19 +689,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   for (int i = 0; i < time_period_num; i++) {
     wi[i] = Tree::ParseInput(node_by_time[i]);
     wd[i] = Tree::ParseDeleteInput(node_by_time[i]);
-    // std::cout << i << " "
-    //           << *parlay::max_element(node_by_time[i],
-    //                                   [&](auto a, auto b) {
-    //                                     return TT::Entry::GetKey(a) <
-    //                                            TT::Entry::GetKey(b);
-    //                                   })
-    //           << *parlay::min_element(node_by_time[i],
-    //                                   [&](auto a, auto b) {
-    //                                     return TT::Entry::GetKey(a) <
-    //                                            TT::Entry::GetKey(b);
-    //                                   })
-    //           << std::endl;
-
     if (node_by_time[i].size() < step) {
       std::cout << "not enough points in time period " << i
                 << " for member query, need " << step << std::endl;
@@ -717,6 +704,9 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<double> delete_time(time_period_num, 0.0);
   parlay::sequence<double> query_time(time_period_num, 0.0);
   parlay::sequence<size_t> tree_size(time_period_num, 0);
+  parlay::sequence<size_t> sys_split_leaf_size(time_period_num, 0);
+  parlay::sequence<size_t> sys_reinsert_size(time_period_num, 0);
+  parlay::sequence<size_t> sys_leaf_balance(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
     auto const& insert_entry = wi;
@@ -740,6 +730,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       t.stop();
       insert_time[batch_id] += t.total_time();
       current_tree_size += node_by_time[batch_id].size();
+      sys_split_leaf_size[batch_id] = pkd.sys_split_leaf_size;
+
 #ifdef DEBUG
       std::cerr << " insert batch: " << batch_id << std::flush;
       pkd.Validate();
@@ -752,6 +744,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         pkd.BatchDelete(delete_entry[batch_id - sliding_window_len]);
         t.stop();
         delete_time[batch_id] += t.total_time();
+        sys_reinsert_size[batch_id] = pkd.sys_reinsert_size;
+        sys_leaf_balance[batch_id] = pkd.sys_balance_leaf_size;
         current_tree_size -= node_by_time[batch_id - sliding_window_len].size();
 #ifdef DEBUG
         // std::cerr << " delete batch: " << batch_id - sliding_window_len
@@ -759,7 +753,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         pkd.Validate();
 #endif // DEBUG
       } else {
-        // std::cout << "-1 " << std::flush;
+        sys_reinsert_size[batch_id] = 0;
+        sys_leaf_balance[batch_id] = 0;
         delete_time[batch_id] = 0.0;
       }
       tree_size[batch_id] = current_tree_size;
@@ -780,7 +775,9 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
             << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
             << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "query_t(s)" << std::endl;
+            << "query_t(s)" << std::setw(14) << "insert_split_size"
+            << std::setw(14) << "delete_reinsert_size" << std::setw(14)
+            << "delete_balance_leaf_size" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     size_t const delete_n =
       batch_id >= sliding_window_len
@@ -792,7 +789,9 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
               << std::setw(14) << delete_time[batch_id] / (rounds - 1)
               << std::setw(14) << query_time[batch_id] / (rounds - 1)
-              << std::endl;
+              << std::setw(14) << sys_split_leaf_size[batch_id] << std::setw(14)
+              << sys_reinsert_size[batch_id] << std::setw(14)
+              << sys_leaf_balance[batch_id] << std::endl;
   }
 }
 
@@ -915,13 +914,6 @@ TestDynamicGraph(const auto& insert_batch_seq,
       });
       t.stop();
       range_query_time[batch_id] += t.total_time();
-      // std::cout << "Non empty range query num: "
-      //           << parlay::reduce(
-      //                parlay::delayed_tabulate(
-      //                  box_seq.size(),
-      //                  [&](size_t j) -> size_t { return size_seq[j] > 0; }),
-      //                parlay::addm<size_t>())
-      //           << std::endl;
 
       // NOTE: flatten
       t.reset(), t.start();
@@ -932,13 +924,13 @@ TestDynamicGraph(const auto& insert_batch_seq,
     }
   }
 
-  std::cout
-    << std::right << std::setw(12) << "insert_n" << std::setw(12) << "delete_n"
-    << std::setw(12) << "tree_n" << std::setw(14) << "insert_t(s)"
-    << std::setw(14) << "delete_t(s)" << std::setw(14) << "find_t(s)"
-    << std::setw(14) << "range_t(s)" << std::setw(14) << "flatten_t(s)"
-    << " insert_split_size delete_reinsert_size delete_balance_leaf_size"
-    << std::endl;
+  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
+            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
+            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
+            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::setw(14)
+            << "flatten_t(s)" << std::setw(14) << "insert_split_size"
+            << std::setw(14) << "delete_reinsert_size" << std::setw(14)
+            << "delete_balance_leaf_size" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
     //   batch_id >= sliding_window_len
