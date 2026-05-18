@@ -40,13 +40,15 @@ static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
 static constexpr size_t kMemberQueryOsmSize = 100'000'000;
 static constexpr int kOsmWindowLen = 5;
+static constexpr int kOSMRecType = 1;
+static constexpr int kOSMRangeQueryNum = 500'000;
+
 // NOTE: Dynamic Graph
 constexpr uint64_t kDynamicGraphRangeNum = 1e7;
 constexpr uint64_t kDynamicGraphMaxSingleRange = 1506;
 constexpr uint64_t kDynamicFlattenSize = 5e8;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
-// static constexpr int kRangeQueryNum = 500;
 static constexpr int kRangeQueryType = 3;
 static constexpr int kSingleQueryLogRepeatNum = 100;
 
@@ -661,7 +663,6 @@ RangeQuerySerialWithLog(Tree& pkd,
   return;
 }
 
-// TODO: cpam change to slow insert
 template<typename TT, typename Tree>
 void
 InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
@@ -669,7 +670,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
                 const int rounds,
                 const int sliding_window_len,
                 const size_t member_query_n,
-                auto& res)
+                auto& member_res,
+                auto& range_res)
 {
   pkd.DeleteTree();
   const int time_period_num = node_by_time.size();
@@ -689,18 +691,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   for (int i = 0; i < time_period_num; i++) {
     wi[i] = Tree::ParseInput(node_by_time[i]);
     wd[i] = Tree::ParseDeleteInput(node_by_time[i]);
-    // std::cout << i << " "
-    //           << *parlay::max_element(node_by_time[i],
-    //                                   [&](auto a, auto b) {
-    //                                     return TT::Entry::GetKey(a) <
-    //                                            TT::Entry::GetKey(b);
-    //                                   })
-    //           << *parlay::min_element(node_by_time[i],
-    //                                   [&](auto a, auto b) {
-    //                                     return TT::Entry::GetKey(a) <
-    //                                            TT::Entry::GetKey(b);
-    //                                   })
-    //           << std::endl;
 
     if (node_by_time[i].size() < step) {
       std::cout << "not enough points in time period " << i
@@ -711,11 +701,21 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
     });
   }
-  // return;
+
+  // generate the range query box
+  auto box_seq_by_year =
+    parlay::tabulate(node_by_time.size(), [&](size_t batch_id) {
+      bool constexpr kSavePoint = false;
+      bool constexpr kFixSize = false;
+      // return query box seq and max size
+      return GenRectangles<TT, kSavePoint, kFixSize>(
+        kOSMRangeQueryNum, kOSMRecType, node_by_time[batch_id]);
+    });
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
-  parlay::sequence<double> query_time(time_period_num, 0.0);
+  parlay::sequence<double> member_query_time(time_period_num, 0.0);
+  parlay::sequence<double> range_query_time(time_period_num, 0.0);
   parlay::sequence<size_t> tree_size(time_period_num, 0);
 
   for (int r = 0; r < rounds; r++) {
@@ -727,14 +727,14 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       for (int i = 0; i < time_period_num; i++) {
         insert_time[i] = 0.0;
         delete_time[i] = 0.0;
-        query_time[i] = 0.0;
+        member_query_time[i] = 0.0;
       }
     }
-    // running the osm
+
+    // NOTE: running the osm
     parlay::internal::timer t;
     pkd.DeleteTree();
     for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
-      // std::cout << node_by_time[i].size() << " ";
       t.reset(), t.start();
       pkd.BatchInsert(insert_entry[batch_id]);
       t.stop();
@@ -746,8 +746,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 #endif // DEBUG
 
       if (batch_id >= sliding_window_len) {
-        // puts("begin delete");
-        // std::cout << delete_entry[i - cur_batch_id].size() << " ";
         t.reset(), t.start();
         pkd.BatchDelete(delete_entry[batch_id - sliding_window_len]);
         t.stop();
@@ -759,7 +757,6 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         pkd.Validate();
 #endif // DEBUG
       } else {
-        // std::cout << "-1 " << std::flush;
         delete_time[batch_id] = 0.0;
       }
       tree_size[batch_id] = current_tree_size;
@@ -768,19 +765,37 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
         auto [contain, logger] = pkd.Contain(query_points[j]);
-        res[j] = contain;
+        member_res[j] = contain;
       });
       t.stop();
-      query_time[batch_id] += t.total_time();
+      member_query_time[batch_id] += t.total_time();
 
-      // std::cout << std::endl;
+      // NOTE: range query
+      auto query_box_seq = box_seq_by_year[batch_id].first;
+      auto [offset, tot_size] =
+        parlay::scan(parlay::tabulate(kOSMRangeQueryNum,
+                                      [&](size_t i) -> size_t {
+                                        return query_box_seq[i].second;
+                                      }),
+                     parlay::addm<size_t>());
+      offset.push_back(tot_size);
+      range_res.resize(tot_size);
+
+      t.reset(), t.start();
+      parlay::parallel_for(0, kOSMRangeQueryNum, [&](size_t i) {
+        auto [size, logger] = pkd.RangeReport(
+          query_box_seq[i].first, range_res.cut(offset[i], offset[i + 1]));
+      });
+      t.stop();
+      range_query_time[batch_id] += t.total_time();
     }
   }
 
   std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
             << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
             << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "query_t(s)" << std::endl;
+            << "member_query_t(s)" << std::setw(14) << "range_query_t(s)"
+            << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     size_t const delete_n =
       batch_id >= sliding_window_len
@@ -791,7 +806,8 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
               << tree_size[batch_id] << std::setw(14) << std::fixed
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
               << std::setw(14) << delete_time[batch_id] / (rounds - 1)
-              << std::setw(14) << query_time[batch_id] / (rounds - 1)
+              << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
+              << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
               << std::endl;
   }
 }
@@ -1107,9 +1123,12 @@ static auto constexpr DefaultTestFunc =
 
     // PARA: lambda for range query
     auto range_query = [&](auto const& base_points) {
+      bool constexpr kSavePoint = false;
+      bool constexpr kFixSize = false;
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
-          kRangeQueryNum, rec_type, base_points);
+        auto [query_box_seq, max_size] =
+          GenRectangles<TT, kSavePoint, kFixSize>(
+            kRangeQueryNum, rec_type, base_points);
         typename TT::EntrySeq Out;
         RangeQueryFix<TT>(
           tree, opts.rounds, Out, kRangeQueryNum, query_box_seq);
@@ -1118,9 +1137,12 @@ static auto constexpr DefaultTestFunc =
 
     // PARA: lambda for range count
     auto range_count = [&](auto const& base_points) {
+      bool constexpr kSavePoint = false;
+      bool constexpr kFixSize = false;
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
-          kRangeQueryNum, rec_type, base_points);
+        auto [query_box_seq, max_size] =
+          GenRectangles<TT, kSavePoint, kFixSize>(
+            kRangeQueryNum, rec_type, base_points);
         RangeCountFix<TT>(tree, opts.rounds, kRangeQueryNum, query_box_seq);
       }
     };
@@ -1230,19 +1252,24 @@ static auto constexpr TestTemporalGraph =
         });
       const std::vector<int> files = { 2015, 2016, 2017, 2018, 2019,
                                        2020, 2021, 2022, 2023, 2024 };
-      auto node_by_year = parlay::tabulate(files.size(), [&](size_t i) {
+      const auto year_num = files.size();
+      auto node_by_year = parlay::tabulate(year_num, [&](size_t i) {
         return parlay::filter(osm_records, [&](auto const& record) {
           return TT::Entry::GetVal(record) == files[i];
         });
       });
 
-      auto res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      // membership
+      auto member_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      auto range_res = typename TT::EntrySeq();
+
       InsertOsmByTime<TT>(node_by_year,
                           tree,
                           opts.rounds,
                           kOsmWindowLen,
                           kMemberQueryOsmSize,
-                          res);
+                          member_res,
+                          range_res);
     }
 
     if (opts.tag & (1 << 4)) { // NOTE: temporal graph
