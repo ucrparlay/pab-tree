@@ -50,7 +50,7 @@ constexpr uint64_t kDynamicFlattenSize = 5e8;
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 static constexpr int kRangeQueryType = 3;
-static constexpr int kSingleQueryLogRepeatNum = 100;
+static constexpr int kRangeQueryWithLogNum = 100;
 
 // NOTE: rectangle numbers for inba ratio
 static constexpr int rangeQueryNumInbaRatio = 50000;
@@ -622,25 +622,20 @@ RangeQueryFix(Tree& pkd,
   return;
 }
 
-template<typename Point, typename Tree>
+template<typename TT, typename Tree>
 void
 RangeQuerySerialWithLog(Tree& pkd,
-                        Typename* kdknn,
                         int const& rounds,
-                        parlay::sequence<Point>& Out,
-                        int rec_type,
-                        int rec_num,
-                        int DIM,
-                        auto const& query_box_seq,
-                        auto max_size)
+                        auto& Out,
+                        const int rec_num,
+                        const int rec_type,
+                        auto const& query_box_seq)
 {
   auto [offset, tot_size] = parlay::scan(
     parlay::delayed_tabulate(
       rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
     parlay::addm<size_t>());
   offset.push_back(tot_size);
-  // using ref_t = std::reference_wrapper<point>;
-  // parlay::sequence<ref_t> out_ref( Out.size(), std::ref( Out[0] ) );
   Out.resize(tot_size);
 
   for (int i = 0; i < rec_num; i++) {
@@ -649,13 +644,6 @@ RangeQuerySerialWithLog(Tree& pkd,
     auto [size, logger] =
       pkd.RangeQuery(query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
     t.stop();
-    // double ave_query = time_loop(
-    //     rounds, -1.0, [&]() {},
-    //     [&]() {
-    //       auto [size, logger] = pkd.RangeQuery(
-    //           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
-    //     },
-    //     [&]() {});
     std::cout << rec_type << " " << query_box_seq[i].second << " "
               << std::scientific << t.total_time() << std::endl;
   }
@@ -1178,18 +1166,36 @@ static auto constexpr DefaultTestFunc =
       range_count(wp);
     }
 
-    // NOTE: incremental build
-    if (opts.tag & (1 << 2)) {
-      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-      for (auto ratio : ratio_seq) {
-        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
-        // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-        BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
-        range_query(wp);
+    // NOTE: range query with log
+    if (opts.query_type & (1 << 3)) {
+      bool constexpr kSavePoint = false;
+      bool constexpr kFixSize = false;
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] =
+          GenRectangles<TT, kSavePoint, kFixSize>(
+            kRangeQueryWithLogNum, rec_type, wp);
+        typename TT::EntrySeq Out;
+        RangeQuerySerialWithLog<TT>(tree,
+                                    opts.rounds,
+                                    Out,
+                                    kRangeQueryWithLogNum,
+                                    rec_type,
+                                    query_box_seq);
       }
     }
+
+    // // NOTE: incremental build
+    // if (opts.tag & (1 << 2)) {
+    //   parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1
+    //   }; for (auto ratio : ratio_seq) {
+    //     auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+    //     // std::cout << base_path << " " << batch_path << std::endl;
+    //     auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+    //     auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+    //     BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
+    //     range_query(wp);
+    //   }
+    // }
 
     // NOTE: batch update by size
     if (opts.tag & (1 << 3)) {

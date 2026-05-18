@@ -713,6 +713,34 @@ ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
   return t.total_time();
 }
 
+void
+ConRangeQuerySerialWithLog(auto idx,
+                           int const rec_type,
+                           int rec_num,
+                           auto const& query_box_seq)
+{
+  threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+
+  for (int i = 0; i < rec_num; i++) {
+    auto box = query_box_seq[i].first;
+    int range_size = query_box_seq[i].second;
+
+    parlay::internal::timer t;
+    t.reset(), t.start();
+    idx->scan(box.first, range_size, ti);
+    t.stop();
+
+    std::cout << rec_type << " " << range_size << " " << std::scientific
+              << t.total_time() << std::endl;
+
+    if ((i + 1) % 4096 == 0) {
+      ti->rcu_quiesce();
+    }
+  }
+
+  ti->rcu_quiesce();
+}
+
 template<int kPrint = 1>
 double
 ConRangeQuery(auto num_thread,
@@ -1249,6 +1277,19 @@ ApplyConcurrentIndex(Options const& opts)
   // NOTE: range count
   if (opts.query_type & (1 << 2)) {
     range_count(wp);
+  }
+
+  // NOTE: range query with log
+  if (opts.query_type & (1 << 3)) {
+    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      if (index_type == TYPE_MASSTREE && rec_type == kRangeQueryType - 1) {
+        continue;
+      }
+      auto [query_box_seq, max_size] =
+        GenRectangles<TT, false, false>(kRangeQueryWithLogNum, rec_type, wp);
+      ConRangeQuerySerialWithLog(
+        primal_idx, rec_type, kRangeQueryWithLogNum, query_box_seq);
+    }
   }
 
   // NOTE: batch update by size
