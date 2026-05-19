@@ -98,9 +98,9 @@ BTree<TT>::BatchDelete_(Range In,
                              leaf_entries_pattern);
   }
 
-  std::cout << "batch delete: ";
-  std::cout << this->sys_reinsert_size << " ";
-  std::cout << this->sys_balance_leaf_size << std::endl;
+  // std::cout << "batch delete: ";
+  // std::cout << this->sys_reinsert_size << " ";
+  // std::cout << this->sys_balance_leaf_size << std::endl;
 }
 
 // Returns (invalid_flag, needs_fetch, reinsert_entry_num).

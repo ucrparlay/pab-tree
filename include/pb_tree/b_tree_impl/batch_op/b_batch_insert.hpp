@@ -94,7 +94,7 @@ BTree<TT>::BatchInsert_(Range In,
                                          parlay::make_slice(updated_split_seq));
   }
 
-  std::cout << "split_leaf_size: " << this->sys_split_leaf_size << std::endl;
+  // std::cout << "split_leaf_size: " << this->sys_split_leaf_size << std::endl;
 }
 
 template<typename TT>

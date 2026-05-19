@@ -772,25 +772,24 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     }
   }
 
-  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
-            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
-            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "query_t(s)" << std::setw(14) << "insert_split_size"
-            << std::setw(14) << "delete_reinsert_size" << std::setw(14)
+  std::cout << std::right << " " << "insert_n" << " "
+            << "delete_n" << " " << "tree_n" << " "
+            << "insert_t(s)" << " " << "delete_t(s)" << " "
+            << "query_t(s)" << " " << "insert_split_size"
+            << " " << "delete_reinsert_size" << " "
             << "delete_balance_leaf_size" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     size_t const delete_n =
       batch_id >= sliding_window_len
         ? node_by_time[batch_id - sliding_window_len].size()
         : 0;
-    std::cout << std::right << std::setw(12) << node_by_time[batch_id].size()
-              << std::setw(12) << delete_n << std::setw(12)
-              << tree_size[batch_id] << std::setw(14) << std::fixed
+    std::cout << std::right << " " << node_by_time[batch_id].size() << " "
+              << delete_n << " " << tree_size[batch_id] << " " << std::fixed
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
-              << std::setw(14) << delete_time[batch_id] / (rounds - 1)
-              << std::setw(14) << query_time[batch_id] / (rounds - 1)
-              << std::setw(14) << sys_split_leaf_size[batch_id] << std::setw(14)
-              << sys_reinsert_size[batch_id] << std::setw(14)
+              << " " << delete_time[batch_id] / (rounds - 1) << " "
+              << query_time[batch_id] / (rounds - 1) << " "
+              << sys_split_leaf_size[batch_id] << " "
+              << sys_reinsert_size[batch_id] << " "
               << sys_leaf_balance[batch_id] << std::endl;
   }
 }
@@ -924,30 +923,28 @@ TestDynamicGraph(const auto& insert_batch_seq,
     }
   }
 
-  std::cout << std::right << std::setw(12) << "insert_n" << std::setw(12)
-            << "delete_n" << std::setw(12) << "tree_n" << std::setw(14)
-            << "insert_t(s)" << std::setw(14) << "delete_t(s)" << std::setw(14)
-            << "find_t(s)" << std::setw(14) << "range_t(s)" << std::setw(14)
-            << "flatten_t(s)" << std::setw(14) << "insert_split_size"
-            << std::setw(14) << "delete_reinsert_size" << std::setw(14)
-            << "delete_balance_leaf_size" << std::endl;
+  std::cout << std::right << " " << "insert_n" << " "
+            << "delete_n" << " " << "tree_n" << " "
+            << "insert_t(s)" << " " << "delete_t(s)" << " "
+            << "find_t(s)" << " " << "range_t(s)" << " "
+            << "flatten_t(s)" << " " << "insert_split"
+            << " " << "delete_reinsert" << " "
+            << "delete_balance" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
     //   batch_id >= sliding_window_len
     //     ? node_by_time[batch_id - sliding_window_len].size()
     //     : 0;
-    std::cout << std::right << std::setw(12)
-              << insert_batch_seq[batch_id].size() << std::setw(12)
-              << delete_batch_seq[batch_id].size() << std::setw(12)
-              << tree_size[batch_id] << std::setw(14) << std::fixed
-              << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
-              << std::setw(14) << delete_time[batch_id] / (rounds - 1)
-              << std::setw(14) << member_query_time[batch_id] / (rounds - 1)
-              << std::setw(14) << range_query_time[batch_id] / (rounds - 1)
-              << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
-              << std::setw(14) << flatten_time[batch_id] / (rounds - 1)
-              << std::setw(14) << sys_split_leaf_size[batch_id] << std::setw(14)
-              << sys_reinsert_size[batch_id] << std::setw(14)
+    std::cout << std::right << " " << insert_batch_seq[batch_id].size() << " "
+              << delete_batch_seq[batch_id].size() << " " << tree_size[batch_id]
+              << " " << std::fixed << std::setprecision(6)
+              << insert_time[batch_id] / (rounds - 1) << " "
+              << delete_time[batch_id] / (rounds - 1) << " "
+              << member_query_time[batch_id] / (rounds - 1) << " "
+              << range_query_time[batch_id] / (rounds - 1) << " "
+              << flatten_time[batch_id] / (rounds - 1) << " "
+              << sys_split_leaf_size[batch_id] << " "
+              << sys_reinsert_size[batch_id] << " "
               << sys_leaf_balance[batch_id] << std::endl;
   }
 }
