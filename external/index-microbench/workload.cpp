@@ -818,13 +818,23 @@ ConcurrentIdxOSM(auto num_thread,
   }
 
   // generate the range query box
+  parlay::sequence<std::pair<int, int>> batch_in_tree;
+  for (int i = 0; i < time_period_num; i++) {
+    if (i < sliding_window_len) {
+      batch_in_tree.emplace_back(0, i + 1);
+    } else {
+      batch_in_tree.emplace_back(i - sliding_window_len, i + 1);
+    }
+  }
   auto box_seq_by_year =
-    parlay::tabulate(node_by_time.size(), [&](size_t batch_id) {
+    parlay::tabulate(time_period_num, [&](size_t batch_id) {
       bool constexpr kSavePoint = false;
       bool constexpr kFixSize = false;
+      auto wp = parlay::flatten(node_by_time.cut(
+        batch_in_tree[batch_id].first, batch_in_tree[batch_id].second));
       // return query box seq and max size
       return GenRectangles<TT, kSavePoint, kFixSize>(
-        kOSMRangeQueryNum, kOSMRecType, node_by_time[batch_id]);
+        kOSMRangeQueryNum, kOSMRecType, wp);
     });
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
