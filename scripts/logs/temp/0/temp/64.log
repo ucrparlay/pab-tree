@@ -1,4 +1,4 @@
-Tree: BTree; Buf: 64; InputFile: ; Dis: uni;
+Tree: BTree; Buf: 64; InputFile: ; Dis: temp;
     insert_n    delete_n      tree_n   insert_t(s)   delete_t(s)     find_t(s)    range_t(s)  flatten_t(s)
     82422166    18665467    63756699      0.130085      0.038918      0.098071      0.119249      0.038627
     76192693    24894940   115054452      0.257473      0.051144      0.155444      0.130742      0.057621
