@@ -10,7 +10,7 @@
 run_transfer.sh
 transfer.sh
 .clangd
-.claude/settings.local.json
+.claude
 venv
 __pycache__
 
