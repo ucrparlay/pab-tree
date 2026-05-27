@@ -15,11 +15,12 @@
 
 namespace pb_tree {
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
 TT::Node*
 BTree<TT>::PostProcessLeafChange(Node* T,
                                  Range In,
-                                 const TT::PatternType leaf_entries_pattern)
+                                 const TT::PatternType leaf_entries_pattern,
+                                 LeafSortPred const& leaf_sort_pred)
 {
   // WARN: does not know whether the T->elements are sorted or not,
   // so might mark it as unsorted if the leaf entries pattern is unsort/hybrid,
@@ -32,7 +33,7 @@ BTree<TT>::PostProcessLeafChange(Node* T,
   } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kUnsorted) {
     TL->is_sorted = false;
   } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kHybrid) {
-    if (PseudoRandomGenPattern(T, In)) {
+    if (leaf_sort_pred(T, In)) {
       std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
       TL->is_sorted = true;
     } else {
@@ -61,11 +62,12 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
 }
 
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
 TT::Node*
 BTree<TT>::InsertPoints2Leaf(Node* T,
                              Range In,
-                             TT::PatternType leaf_entries_pattern)
+                             TT::PatternType leaf_entries_pattern,
+                             LeafSortPred const& leaf_sort_pred)
 {
   Leaf* TL = static_cast<Leaf*>(T);
 
@@ -82,7 +84,7 @@ BTree<TT>::InsertPoints2Leaf(Node* T,
   TL->UpdateAug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
 
-  return PostProcessLeafChange(T, In, leaf_entries_pattern);
+  return PostProcessLeafChange(T, In, leaf_entries_pattern, leaf_sort_pred);
 }
 
 template<typename TT>
@@ -126,10 +128,12 @@ BTree<TT>::HandlingLeafSplitOverflow(Node* T,
 }
 
 template<typename TT>
+template<typename LeafSortPred>
 TT::Node*
 BTree<TT>::DeletePoints4Leaf(Node* T,
                              TT::KeySlice In,
-                             const TT::PatternType leaf_entries_pattern)
+                             const TT::PatternType leaf_entries_pattern,
+                             LeafSortPred const& leaf_sort_pred)
 {
   auto TL = static_cast<Leaf*>(T);
 
@@ -166,7 +170,7 @@ BTree<TT>::DeletePoints4Leaf(Node* T,
   TL->UpdateAug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
 
-  return PostProcessLeafChange(T, In, leaf_entries_pattern);
+  return PostProcessLeafChange(T, In, leaf_entries_pattern, leaf_sort_pred);
 }
 
 } // namespace pb_tree

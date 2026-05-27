@@ -24,15 +24,16 @@ BTree<TT>::BatchDelete(Range&& In)
 
   constexpr auto leaf_entries_pattern = TT::LeafEntriesPattern::kHybrid;
   constexpr bool sorted_input = false;
-  BatchDelete_(A, leaf_entries_pattern, sorted_input);
+  BatchDelete_(A, leaf_entries_pattern, sorted_input, DefaultHybridPred{});
 }
 
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
 void
 BTree<TT>::BatchDelete(Range&& In,
                        const TT::PatternType leaf_entries_pattern,
-                       const bool sorted_input)
+                       const bool sorted_input,
+                       LeafSortPred const& leaf_sort_pred)
 {
   static_assert(parlay::is_random_access_range_v<Range>);
   static_assert(
@@ -42,15 +43,17 @@ BTree<TT>::BatchDelete(Range&& In,
 
   auto A = parlay::make_slice(std::forward<Range>(In));
 
-  BatchDelete_(A, leaf_entries_pattern, sorted_input);
+  BatchDelete_(A, leaf_entries_pattern, sorted_input, leaf_sort_pred);
 }
 
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
+  requires std::predicate<LeafSortPred, typename BTree<TT>::Node*, Range>
 void
 BTree<TT>::BatchDelete_(Range In,
                         const TT::PatternType leaf_entries_pattern,
-                        const bool sorted_input)
+                        const bool sorted_input,
+                        LeafSortPred const& leaf_sort_pred)
 {
   if (this->root_ == nullptr) {
     return;
@@ -70,7 +73,7 @@ BTree<TT>::BatchDelete_(Range In,
 
   auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
     BatchDeleteRecursive(
-      this->root_, parlay::make_slice(sorted_seq), leaf_entries_pattern);
+      this->root_, parlay::make_slice(sorted_seq), leaf_entries_pattern, leaf_sort_pred);
   // t.next("remove points ");
 
   if (invalid_flag) {
@@ -97,7 +100,8 @@ BTree<TT>::BatchDelete_(Range In,
     FetchInvalidSubtreeNodes(this->root_,
                              parlay::make_slice(reinsert_entries),
                              has_tomb,
-                             leaf_entries_pattern);
+                             leaf_entries_pattern,
+                             leaf_sort_pred);
   }
 
   // std::cout << this->sys_reinsert_size << " ";
@@ -108,10 +112,12 @@ BTree<TT>::BatchDelete_(Range In,
 // needs_fetch: any descendant needs FetchInvalidSubtreeNodes (not stored in
 // node).
 template<typename TT>
+template<typename LeafSortPred>
 std::tuple<bool, bool, typename TT::SizeT>
 BTree<TT>::BatchDeleteRecursive(Node* T,
                                 TT::KeySlice In,
-                                const TT::PatternType leaf_entries_pattern)
+                                const TT::PatternType leaf_entries_pattern,
+                                LeafSortPred const& leaf_sort_pred)
 {
 
   if (In.size() == 0) {
@@ -126,7 +132,7 @@ BTree<TT>::BatchDeleteRecursive(Node* T,
 
   if (T->is_leaf) {
     auto old_size = T->size;
-    auto new_node = DeletePoints4Leaf(T, In, leaf_entries_pattern);
+    auto new_node = DeletePoints4Leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
     assert(new_node == T);
     assert(new_node->size + In.size() == old_size);
     // assert(delete_cnt == In.size());
@@ -196,7 +202,8 @@ BTree<TT>::BatchDeleteRecursive(Node* T,
                reinsert_entries_num[nodes_map[i]]) =
         BatchDeleteRecursive(TI->tree_nodes[nodes_map[i]],
                              In.cut(touched_l[i], touched_r[i]),
-                             leaf_entries_pattern);
+                             leaf_entries_pattern,
+                             leaf_sort_pred);
     },
     1);
 

@@ -1,6 +1,7 @@
 #ifndef PBTREE_B_TREE_H_
 #define PBTREE_B_TREE_H_
 
+#include <concepts>
 #include <cstdint>
 
 #include "dependence/box_op.h"
@@ -267,27 +268,46 @@ public:
 
   Node* AssembleInteriorLevels(TT::NodeSlice nodes, TT::SplitSlice keys);
 
+  struct DefaultHybridPred
+  {
+    template<typename InputNode, typename Range>
+    bool operator()(InputNode const* T, Range In) const noexcept
+    {
+      // Knuth multiplicative hash over (node_size + batch_size); XOR in low
+      // address bits from begin/end to break correlation across call sites.
+      auto const v =
+        (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
+        (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
+        (reinterpret_cast<uintptr_t>(In.end()) >> 3);
+      return v & 1;
+    }
+  };
+
   template<typename Range>
   void BatchInsert(Range&& In);
 
-  template<typename Range>
+  template<typename Range, typename LeafSortPred = DefaultHybridPred>
   void BatchInsert(Range&& In,
                    const TT::PatternType leaf_entries_pattern,
-                   const bool sorted_input);
+                   const bool sorted_input,
+                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
 
-  template<typename Range>
+  template<typename Range, typename LeafSortPred>
+    requires std::predicate<LeafSortPred, Node*, Range>
   void BatchInsert_(Range In,
                     const TT::PatternType leaf_entries_pattern,
-                    const bool sorted_input);
+                    const bool sorted_input,
+                    LeafSortPred const& leaf_sort_pred);
 
   template<typename Range>
   void BatchInsertSieve(Range In);
 
-  template<typename Range>
+  template<typename Range, typename LeafSortPred>
   SizeT BatchInsertRecursive(Node* T,
                              Range In,
                              NodeSplitPairSlice node_split_slice,
-                             const TT::PatternType leaf_entries_pattern);
+                             const TT::PatternType leaf_entries_pattern,
+                             LeafSortPred const& leaf_sort_pred);
 
   template<typename Range>
   SizeT BatchInsertSieveRecursive(Node* T,
@@ -298,34 +318,39 @@ public:
   template<typename Range>
   void BatchDelete(Range&& In);
 
-  template<typename Range>
+  template<typename Range, typename LeafSortPred = DefaultHybridPred>
   void BatchDelete(Range&& In,
                    const TT::PatternType leaf_entries_pattern,
-                   const bool sorted_input);
+                   const bool sorted_input,
+                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
 
-  template<typename Range>
+  template<typename Range, typename LeafSortPred>
+    requires std::predicate<LeafSortPred, Node*, Range>
   void BatchDelete_(Range In,
                     const TT::PatternType leaf_entries_pattern,
-                    const bool sorted_input);
+                    const bool sorted_input,
+                    LeafSortPred const& leaf_sort_pred);
 
   // Returns (invalid_flag, needs_fetch, reinsert_entry_num).
   // needs_fetch: any subtree needs FetchInvalidSubtreeNodes (not stored in
   // node).
+  template<typename LeafSortPred>
   std::tuple<bool, bool, SizeT> BatchDeleteRecursive(
     Node* T,
     TT::KeySlice In,
-    const TT::PatternType leaf_entries_pattern);
+    const TT::PatternType leaf_entries_pattern,
+    LeafSortPred const& leaf_sort_pred);
 
   // Remove the invalid subtree and put it in flatten_node_slice
   // Needs to compact the tree_nodes if find a invalid subtree and update the
   // interior node size and valid flag after the compaction
   // Return the total number entries in the tree that needs to rebuild
+  template<typename LeafSortPred>
   void FetchInvalidSubtreeNodes(Node* T,
                                 EntrySlice reinsert_entries,
                                 bool has_tomb,
-                                const TT::PatternType leaf_entries_pattern
-
-  );
+                                const TT::PatternType leaf_entries_pattern,
+                                LeafSortPred const& leaf_sort_pred);
 
   std::pair<Node*, Node*> SplitLeaf(const Entry* a,
                                     TT::BufSizeT n,
@@ -334,15 +359,19 @@ public:
 
   std::pair<Node*, Node*> InsertToLeafNoOverflow(Node* T, EntrySlice In);
 
+  template<typename LeafSortPred>
   void ReInsertTreeAfterDelete(Node* T,
                                EntrySlice reinsert_entries,
-                               const TT::PatternType leaf_entries_pattern);
+                               const TT::PatternType leaf_entries_pattern,
+                               LeafSortPred const& leaf_sort_pred);
 
   void PruneOutEmptyTree(Node* T);
 
+  template<typename LeafSortPred>
   void BalanceOverLeaves(Node* T,
                          const SizeT reinsert_size,
-                         const TT::PatternType leaf_entries_pattern);
+                         const TT::PatternType leaf_entries_pattern,
+                         LeafSortPred const& leaf_sort_pred);
 
   static Node* BatchInsertUpdateInterior(Node* T,
                                          NodeSplitPairSlice node_split_slice,
@@ -392,17 +421,19 @@ public:
     return v & 1;
   }
 
-  template<typename Range>
+  template<typename Range, typename LeafSortPred>
   static TT::Node* PostProcessLeafChange(
     Node* T,
     Range In,
-    const TT::PatternType leaf_entries_pattern);
+    const TT::PatternType leaf_entries_pattern,
+    LeafSortPred const& leaf_sort_pred);
 
   // NOTE: batch insert
-  template<typename Range>
+  template<typename Range, typename LeafSortPred>
   static Node* InsertPoints2Leaf(Node* T,
                                  Range In,
-                                 const TT::PatternType leaf_entries_pattern);
+                                 const TT::PatternType leaf_entries_pattern,
+                                 LeafSortPred const& leaf_sort_pred);
 
   static void PartitionBinarySearchRec(auto split_seq_s,
                                        // parlay::sequence<int>& split_pos_seq,
@@ -423,10 +454,11 @@ public:
     SizeT new_node_n,
     SizeBufUBArr const& return_node_n_arr);
 
-  static TT::Node* DeletePoints4Leaf(
-    Node* T,
-    TT::KeySlice In,
-    const TT::PatternType leaf_entries_pattern);
+  template<typename LeafSortPred>
+  static TT::Node* DeletePoints4Leaf(Node* T,
+                                     TT::KeySlice In,
+                                     const TT::PatternType leaf_entries_pattern,
+                                     LeafSortPred const& leaf_sort_pred);
 
   // template <typename Leaf, typename RT>
   // static RT DiffPoints4Leaf(Node* T, Slice In);

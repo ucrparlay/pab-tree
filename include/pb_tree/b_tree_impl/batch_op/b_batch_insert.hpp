@@ -26,15 +26,16 @@ BTree<TT>::BatchInsert(Range&& In)
 
   constexpr auto leaf_entries_pattern = TT::LeafEntriesPattern::kHybrid;
   constexpr bool sorted_input = false;
-  BatchInsert_(A, leaf_entries_pattern, sorted_input);
+  BatchInsert_(A, leaf_entries_pattern, sorted_input, DefaultHybridPred{});
 }
 
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
 void
 BTree<TT>::BatchInsert(Range&& In,
                        const TT::PatternType leaf_entries_pattern,
-                       const bool sorted_input)
+                       const bool sorted_input,
+                       LeafSortPred const& leaf_sort_pred)
 {
   static_assert(parlay::is_random_access_range_v<Range>);
   static_assert(
@@ -44,15 +45,17 @@ BTree<TT>::BatchInsert(Range&& In,
 
   auto A = parlay::make_slice(std::forward<Range>(In));
 
-  BatchInsert_(A, leaf_entries_pattern, sorted_input);
+  BatchInsert_(A, leaf_entries_pattern, sorted_input, leaf_sort_pred);
 }
 
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
+  requires std::predicate<LeafSortPred, typename BTree<TT>::Node*, Range>
 void
 BTree<TT>::BatchInsert_(Range In,
                         const TT::PatternType leaf_entries_pattern,
-                        const bool sorted_input)
+                        const bool sorted_input,
+                        LeafSortPred const& leaf_sort_pred)
 {
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
@@ -76,7 +79,8 @@ BTree<TT>::BatchInsert_(Range In,
   SizeT new_node_n = BatchInsertRecursive(this->root_,
                                           sorted_slice,
                                           parlay::make_slice(node_split_seq),
-                                          leaf_entries_pattern);
+                                          leaf_entries_pattern,
+                                          leaf_sort_pred);
 
 #ifdef DEBUG
   assert(!sorted_input || new_node_n == 0);
@@ -94,12 +98,13 @@ BTree<TT>::BatchInsert_(Range In,
 }
 
 template<typename TT>
-template<typename Range>
+template<typename Range, typename LeafSortPred>
 TT::SizeT
 BTree<TT>::BatchInsertRecursive(Node* T,
                                 Range In,
                                 NodeSplitPairSlice node_split_slice,
-                                const TT::PatternType leaf_entries_pattern)
+                                const TT::PatternType leaf_entries_pattern,
+                                LeafSortPred const& leaf_sort_pred)
 {
   assert(2 * In.size() == node_split_slice.size());
 
@@ -111,7 +116,8 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   if (T->is_leaf) {
     Leaf* TL = static_cast<Leaf*>(T);
     if (TL->size + n <= TT::kBufUB) {
-      Node* updated_node = InsertPoints2Leaf(T, In, leaf_entries_pattern);
+      Node* updated_node =
+        InsertPoints2Leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
       assert(updated_node == T);
       return 0;
     }
@@ -168,7 +174,8 @@ BTree<TT>::BatchInsertRecursive(Node* T,
         BatchInsertRecursive(TI->tree_nodes[nodes_map[i]],
                              In.cut(l, r),
                              node_split_slice.cut(2 * l, 2 * r),
-                             leaf_entries_pattern);
+                             leaf_entries_pattern,
+                             leaf_sort_pred);
     },
     // In.size() > 2048 ? 1 : cnt);
     1);

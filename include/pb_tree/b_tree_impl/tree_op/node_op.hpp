@@ -261,11 +261,13 @@ BTree<TT>::BatchDeleteUpdateInteriorSize(
 }
 
 template<typename TT>
+template<typename LeafSortPred>
 void
 BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                     EntrySlice reinsert_entries,
                                     const bool has_tomb,
-                                    const TT::PatternType leaf_entries_pattern)
+                                    const TT::PatternType leaf_entries_pattern,
+                                    LeafSortPred const& leaf_sort_pred)
 {
   constexpr bool kSortReinsertEntries = true;
   assert(reinsert_entries.size() == GetNodeReinsertSize(T));
@@ -307,7 +309,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       return;
     }
 
-    BalanceOverLeaves(T, TI->reinsert_size, leaf_entries_pattern);
+    BalanceOverLeaves(T, TI->reinsert_size, leaf_entries_pattern, leaf_sort_pred);
     TI->ResetDeletionFlag();
     return;
   }
@@ -385,7 +387,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
                                                       ? reinsert_entries.size()
                                                       : reinsert_sum[i + 1]),
                                next_tomb,
-                               leaf_entries_pattern);
+                               leaf_entries_pattern,
+                               leaf_sort_pred);
     },
     1);
 
@@ -402,7 +405,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       return Entry::GetKey(a) < Entry::GetKey(b) &&
              Entry::GetKey(a) != Entry::GetKey(b);
     }));
-    ReInsertTreeAfterDelete(T, reinsert_entries, leaf_entries_pattern);
+    ReInsertTreeAfterDelete(T, reinsert_entries, leaf_entries_pattern, leaf_sort_pred);
   }
 
   assert((this->Validate<true, false>(T)));
@@ -410,10 +413,12 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
 }
 
 template<typename TT>
+template<typename LeafSortPred>
 void
 BTree<TT>::BalanceOverLeaves(Node* T,
                              const SizeT reinsert_size,
-                             const TT::PatternType leaf_entries_pattern)
+                             const TT::PatternType leaf_entries_pattern,
+                             LeafSortPred const& leaf_sort_pred)
 {
   // this->sys_balance_leaf_size += reinsert_size;
 
@@ -515,7 +520,8 @@ BTree<TT>::BalanceOverLeaves(Node* T,
       auto updated_dest = PostProcessLeafChange(
         dest,
         parlay::make_slice(dest->GetEleBeginIter(), dest->GetEleEndIter()),
-        leaf_entries_pattern);
+        leaf_entries_pattern,
+        leaf_sort_pred);
       TI->tree_nodes[tree_idx++] = updated_dest;
       if (!is_rightmost) {
         TI->split[split_idx++] = TI->split[j - 1];
@@ -646,10 +652,12 @@ BTree<TT>::PruneOutEmptyTree(Node* T)
 }
 
 template<typename TT>
+template<typename LeafSortPred>
 void
 BTree<TT>::ReInsertTreeAfterDelete(Node* T,
                                    EntrySlice reinsert_entries,
-                                   TT::PatternType leaf_entries_pattern)
+                                   TT::PatternType leaf_entries_pattern,
+                                   LeafSortPred const& leaf_sort_pred)
 {
   // this->sys_reinsert_size += reinsert_entries.size();
 
@@ -658,7 +666,8 @@ BTree<TT>::ReInsertTreeAfterDelete(Node* T,
   SizeT new_node_n = BatchInsertRecursive(T,
                                           reinsert_entries,
                                           parlay::make_slice(node_split_seq),
-                                          leaf_entries_pattern);
+                                          leaf_entries_pattern,
+                                          leaf_sort_pred);
   assert(new_node_n == 0);
 }
 

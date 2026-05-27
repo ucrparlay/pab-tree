@@ -307,6 +307,83 @@ Aggregates per-child validity info into the current interior node. Updates `TI->
 
 See `BalanceOverLeaves` section above — these are shared between delete and the general rebalancing path.
 
+## Leaf sort policy (`PostProcessLeafChange` / `PseudoRandomGenPattern`)
+
+### What it does
+
+After any leaf mutation (insert, delete, balance-merge), `PostProcessLeafChange` is the single authority for setting `is_sorted`. It branches on `PatternType` (`b_tree_impl/tree_op/leaf_op.hpp`):
+
+| Pattern | Action |
+|---|---|
+| `kSorted` | Always `std::sort` the leaf; `is_sorted = true` |
+| `kUnsorted` | Skip sort; `is_sorted = false` |
+| `kHybrid` | Call `pred(T, In.size())` — sort if returns `true`, mark unsorted if `false` |
+
+### Call sites (all three delegate here)
+
+- `InsertPoints2Leaf` — after appending batch entries to the leaf end
+- `DeletePoints4Leaf` — after swap-to-end removal (leaf order scrambled)
+- `BalanceOverLeaves` case B merge — after compacting invalid leaves into the pivot
+
+### User-supplied hybrid predicate
+
+The `kHybrid` decision function is a **template parameter `LeafSortPred`** threaded through the entire call stack — zero runtime overhead, fully inlinable. The predicate signature is:
+
+```cpp
+bool leaf_sort_pred(Node const* T, size_t batch_size);
+```
+
+Users pass a lambda (or any callable) at `BatchInsert` / `BatchDelete` call sites:
+
+```cpp
+tree.BatchInsert(data, kHybrid, /*sorted=*/false,
+    [](auto const* T, size_t n) { return T->size + n > threshold; });
+```
+
+### Default: `DefaultHybridPred`
+
+Defined as a nested struct in `BTree<TT>` (declared before `BatchInsert` in `b_tree.h` so it can serve as a default template argument). Computes a Knuth multiplicative hash of `(T->size + batch_sz)` and returns the low bit — effectively a ~50/50 coin flip with no global state:
+
+```cpp
+struct DefaultHybridPred {
+    template<typename N>
+    bool operator()(N const* T, size_t batch_sz) const noexcept {
+        return (static_cast<size_t>(T->size) + batch_sz) * 2654435761ULL & 1;
+    }
+};
+```
+
+The no-pattern `BatchInsert(Range&&)` / `BatchDelete(Range&&)` overloads hardcode `kHybrid` and pass `DefaultHybridPred{}`.
+
+### Threading chain
+
+```
+BatchInsert(In, pattern, sorted, pred)
+  └─ BatchInsert_(In, pattern, sorted, pred)
+       └─ BatchInsertRecursive(T, In, node_split_slice, pattern, pred)
+            └─ InsertPoints2Leaf(T, In, pattern, pred)
+                 └─ PostProcessLeafChange(T, In, pattern, pred)
+
+BatchDelete(In, pattern, sorted, pred)
+  └─ BatchDelete_(In, pattern, sorted, pred)
+       ├─ BatchDeleteRecursive(T, In, pattern, pred)
+       │    └─ DeletePoints4Leaf(T, In, pattern, pred)
+       │         └─ PostProcessLeafChange(T, In, pattern, pred)
+       └─ FetchInvalidSubtreeNodes(root, entries, tomb, pattern, pred)
+            ├─ BalanceOverLeaves(TI, reinsert_size, pattern, pred)   [case B merge]
+            │    └─ PostProcessLeafChange(dest, slice, pattern, pred)
+            └─ ReInsertTreeAfterDelete(T, entries, pattern, pred)
+                 └─ BatchInsertRecursive(…, pattern, pred)
+```
+
+### `PseudoRandomGenPattern` (kept but no longer on the hot path)
+
+The original coin-flip helper (`b_tree.h:396`) that additionally XORs in address bits from `In.begin()`/`In.end()` to break per-call-site correlation. Still exists but is not called internally; the default is now `DefaultHybridPred`.
+
+### Important: `DefaultHybridPred` must be declared before `BatchInsert` in the class body
+
+C++ requires default template arguments to reference names already declared at that point. `DefaultHybridPred` is placed immediately before the `BatchInsert` declarations in `b_tree.h`.
+
 ## Concrete element type in tests
 
 Default: `Wrapper<uint32_t, uint32_t>::Element` → key=uint32_t (4B), val=uint32_t (4B) → E is 8 bytes.
