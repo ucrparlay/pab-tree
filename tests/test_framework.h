@@ -641,8 +641,8 @@ RangeQuerySerialWithLog(Tree& pkd,
   for (int i = 0; i < rec_num; i++) {
     parlay::internal::timer t;
     t.reset(), t.start();
-    auto [size, logger] =
-      pkd.RangeQuery(query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
+    auto [size, logger] = pkd.RangeReport(query_box_seq[i].first,
+                                          Out.cut(offset[i], offset[i + 1]));
     t.stop();
     std::cout << rec_type << " " << query_box_seq[i].second << " "
               << std::scientific << t.total_time() << std::endl;
