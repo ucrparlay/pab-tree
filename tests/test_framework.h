@@ -283,6 +283,115 @@ BatchInsertByStep(Tree& pkd,
   incre_build();
 }
 
+struct PBTreeLeafSortPred
+{
+  PBTreeLeafSortPred() = default;
+
+  PBTreeLeafSortPred(int ratio)
+    : _randomness(ratio)
+  {
+  }
+
+  template<typename InputNode, typename Range>
+  bool operator()(InputNode const* T, Range In) const noexcept
+  {
+    auto const v = (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
+                   (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
+                   (reinterpret_cast<uintptr_t>(In.end()) >> 3);
+
+    // - _randomness = 0: 0–99 ≥ 0 → always true → always sort
+    // - _randomness = 100: 0–99 ≥ 100 → always false → never sort
+    return (v % 100) >= this->_randomness;
+  }
+
+  size_t _randomness = 50;
+};
+
+template<typename TypeTrait, typename Tree>
+  requires(!pb_tree::IsPBTree<Tree>)
+void
+TestLeafRandom(Tree&, typename TypeTrait::EntrySeq const&, int const, int const)
+{
+}
+
+template<typename TypeTrait, typename Tree>
+  requires pb_tree::IsPBTree<Tree>
+void
+TestLeafRandom(Tree& pkd,
+               typename TypeTrait::EntrySeq const& WP,
+               int const rounds,
+               int const ratio)
+{
+  using TT = TypeTrait;
+  auto const wp = Tree::ParseInput(WP);
+  double loop_late = rounds > 1 ? 0.01 : -100;
+
+  auto const random_in = parlay::random_shuffle(WP);
+  auto const time_period_num = 10;
+  auto const step = wp.size() / time_period_num;
+  auto const insert_batch_seq =
+    parlay::tabulate(time_period_num, [&](size_t i) {
+      return Tree::ParseInput(
+        random_in.subseq(i * step, std::min((i + 1) * step, wp.size())));
+    });
+  auto const delete_batch_seq =
+    parlay::tabulate(time_period_num, [&](size_t i) {
+      return Tree::ParseDeleteInput(
+        random_in.subseq(i * step, std::min((i + 1) * step, wp.size())));
+    });
+
+  auto const query_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
+  auto query_ele = wp.subseq(0, query_size);
+  auto member_res = parlay::sequence<bool>(query_ele.size(), true);
+
+  constexpr auto leaf_entries_pattern = TypeTrait::LeafEntriesPattern::kHybrid;
+  constexpr bool sorted_input = false;
+  parlay::internal::timer t;
+
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  double member_query_time = 0.0;
+
+  for (int r = 0; r < rounds; r++) {
+    pkd.DeleteTree();
+    pkd.Build(wp);
+
+    for (int i = 0; i < 10; i++) {
+      t.reset(), t.start();
+      pkd.BatchDelete(delete_batch_seq[i],
+                      leaf_entries_pattern,
+                      sorted_input,
+                      PBTreeLeafSortPred(ratio));
+      t.stop();
+      insert_time[i] += t.total_time();
+
+      t.reset(), t.start();
+      pkd.BatchInsert(insert_batch_seq[i],
+                      leaf_entries_pattern,
+                      sorted_input,
+                      PBTreeLeafSortPred(ratio));
+      t.stop();
+      delete_time[i] += t.total_time();
+    }
+
+    // membership
+    t.reset(), t.start();
+    parlay::parallel_for(0, query_size, [&](size_t j) {
+      auto [contain, logger] = pkd.Contain(Tree::Entry::GetKey(query_ele[j]));
+      member_res[j] = contain;
+    });
+    t.stop();
+    member_query_time += t.total_time();
+  }
+
+  auto insert_ave = parlay::reduce(insert_time) / (rounds * time_period_num);
+  auto delete_ave = parlay::reduce(delete_time) / (rounds * time_period_num);
+  auto member_query_ave = member_query_time / rounds;
+
+  std::cout << insert_ave << " " << delete_ave << " " << member_query_ave
+            << std::endl;
+}
+
 template<typename TypeTrait,
          typename Tree,
          bool kTestTime = true,
@@ -1225,6 +1334,15 @@ static auto constexpr DefaultTestFunc =
         BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
       }
     }
+
+    if (opts.tag & (1 << 4)) {
+      const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30, 40, 50,
+                                                     60, 70, 80, 90, 100 };
+      for (auto ratio : sort_ratio_seq) {
+        TestLeafRandom<TT>(tree, wp, opts.rounds, ratio);
+      }
+    }
+
     std::cout << "\n" << std::flush;
 
     tree.DeleteTree();

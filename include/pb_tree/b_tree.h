@@ -617,6 +617,10 @@ public:
     return TT::kBuf;
   }
 
+  void PBTreeTag()
+  {
+  }
+
 private:
   Node* root_ = nullptr;
   parlay::internal::timer insert_leaf_timer;

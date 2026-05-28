@@ -95,8 +95,7 @@ InvokeWithOptionalArg(Func&& func, Arg&& arg)
 
 // NOTE: define the what is a binary node
 template<typename T,
-         template<typename, typename, typename>
-         typename BinaryNodeT>
+         template<typename, typename, typename> typename BinaryNodeT>
 concept CheckBinaryNode =
   std::is_base_of_v<BinaryNodeT<typename T::PT, typename T::ST, typename T::AT>,
                     T>;
@@ -107,8 +106,7 @@ concept CheckMultiNode = std::is_base_of_v<MultiNodeT<typename T::TT>, T>;
 
 // NOTE: define the what is a dynamic node
 template<typename T,
-         template<typename, typename, typename>
-         typename DynamicNodeT>
+         template<typename, typename, typename> typename DynamicNodeT>
 concept CheckDynamicNode = std::
   is_base_of_v<DynamicNodeT<typename T::PT, typename T::ST, typename T::AT>, T>;
 
@@ -124,73 +122,16 @@ concept HasBox = requires(T t) {
   { t.box };
 };
 
-// NOTE: tag a orth tree
+// NOTE: tag a pb tree
 template<typename T>
-concept IsOrthTree = requires(T t) {
-  { t.OrthTreeTag() } -> std::same_as<void>;
-};
-
-// NOTE: tag a kd tree
-template<typename T>
-concept IsKdTree = requires(T t) {
-  { t.KdTreeTag() } -> std::same_as<void>;
-};
-
-// NOTE: tag a rtree
-template<typename T>
-concept IsRTree = requires(T t) {
-  { t.RTreeTag() } -> std::same_as<void>;
-};
-
-// NOTE: tag a rtree
-template<typename T>
-concept IsCoverTree = requires(T t) {
-  { t.CoverTreeTag() } -> std::same_as<void>;
-};
-
-template<typename T>
-concept IsPTree = requires(T t) {
-  { t.PTreeTag() } -> std::same_as<void>;
+concept IsPBTree = requires(T t) {
+  { t.PBTreeTag() } -> std::same_as<void>;
 };
 
 template<typename T>
 concept SupportsForceParallel = requires(T t) {
   { t.ForceParallel() } -> std::same_as<bool>;
 };
-
-template<typename T>
-concept IsMaxStretchDim = requires(T t) {
-  { t.MaxStretchTag() } -> std::same_as<void>;
-};
-
-template<typename T>
-concept IsRotateDimSplit = requires(T t) {
-  { t.RotateDimTag() } -> std::same_as<void>;
-};
-
-template<typename T>
-concept IsObjectMedianSplit = requires(T t) {
-  { t.ObjectMedianTag() } -> std::same_as<void>;
-};
-
-template<typename T>
-concept IsSpatialMedianSplit = requires(T t) {
-  { t.SpatialMedianTag() } -> std::same_as<void>;
-};
-
-template<typename T>
-concept IsHilbertCode = requires(T t) {
-  { t.HilbertTag() } -> std::same_as<void>;
-};
-
-template<typename T>
-concept IsMortonCode = requires(T t) {
-  { t.MortonTag() } -> std::same_as<void>;
-};
-struct FullCoveredTag
-{};
-struct PartialCoverTag
-{};
 
 } // namespace pb_tree
 
