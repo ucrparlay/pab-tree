@@ -39,7 +39,7 @@ using namespace pb_tree;
 static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
 static constexpr size_t kMemberQueryOsmSize = 100'000'000;
-static constexpr int kOsmWindowLen = 5;
+static constexpr int kOsmWindowLen = 3;
 // NOTE: Dynamic Graph
 constexpr uint64_t kDynamicGraphRangeNum = 1e7;
 constexpr uint64_t kDynamicGraphMaxSingleRange = 1506;
