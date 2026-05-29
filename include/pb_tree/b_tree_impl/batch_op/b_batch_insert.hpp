@@ -54,6 +54,8 @@ BTree<TT>::BatchInsert_(Range In,
                         const TT::PatternType leaf_entries_pattern,
                         const bool sorted_input)
 {
+  this->sys_split_leaf_size = 0;
+
   if (this->root_ == nullptr) { // TODO: may check using explicity tag
     return Build_(In);
   }
@@ -69,8 +71,6 @@ BTree<TT>::BatchInsert_(Range In,
     sorted_seq = parlay::sort(In);
     sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
   }
-
-  this->sys_split_leaf_size = 0;
 
   // NOTE: begin insert
   NodeSplitPairSeq node_split_seq =

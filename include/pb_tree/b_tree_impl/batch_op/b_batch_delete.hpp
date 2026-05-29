@@ -52,6 +52,9 @@ BTree<TT>::BatchDelete_(Range In,
                         const TT::PatternType leaf_entries_pattern,
                         const bool sorted_input)
 {
+  this->sys_reinsert_size = 0;
+  this->sys_balance_leaf_size = 0;
+
   if (this->root_ == nullptr) {
     return;
   }
@@ -79,9 +82,6 @@ BTree<TT>::BatchDelete_(Range In,
     // t.next("delete tree ");
     return;
   }
-
-  this->sys_reinsert_size = 0;
-  this->sys_balance_leaf_size = 0;
 
   if (invalid_subtree_num) {
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
