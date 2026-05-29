@@ -39,7 +39,7 @@ using namespace pb_tree;
 static constexpr double kMemberQueryRatio = 0.01;
 // NOTE: OSM
 static constexpr size_t kMemberQueryOsmSize = 100'000'000;
-static constexpr int kOsmWindowLen = 5;
+static constexpr int kOsmWindowLen = 3;
 static constexpr int kOSMRecType = 1;
 static constexpr int kOSMRangeQueryNum = 500'000;
 

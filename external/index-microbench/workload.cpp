@@ -867,17 +867,17 @@ ConcurrentIdxOSM(auto num_thread,
 
     // NOTE: test membership query
     t.reset(), t.start();
-    double time = ConMembership(num_thread, primal_idx, query_points);
+    double time = ConMembership<0>(num_thread, primal_idx, query_points);
     t.stop();
     member_query_time[batch_id] += time;
 
     // NOTE: test range query
     t.reset(), t.start();
-    time = ConRangeQuery(num_thread,
-                         primal_idx,
-                         index_type,
-                         kOSMRangeQueryNum,
-                         box_seq_by_year[batch_id].first);
+    time = ConRangeQuery<0>(num_thread,
+                            primal_idx,
+                            index_type,
+                            kOSMRangeQueryNum,
+                            box_seq_by_year[batch_id].first);
     t.stop();
     range_query_time[batch_id] += time;
   }
