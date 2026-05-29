@@ -324,10 +324,11 @@ TestLeafRandom(Tree& pkd,
 {
   using TT = TypeTrait;
   auto const wp = Tree::ParseInput(WP);
-  double loop_late = rounds > 1 ? 0.01 : -100;
 
   auto const random_in = parlay::random_shuffle(WP);
-  auto const time_period_num = 10;
+
+  auto const time_period_num = 100;
+
   auto const step = wp.size() / time_period_num;
   auto const insert_batch_seq =
     parlay::tabulate(time_period_num, [&](size_t i) {
@@ -356,14 +357,14 @@ TestLeafRandom(Tree& pkd,
     pkd.DeleteTree();
     pkd.Build(wp);
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < time_period_num; i++) {
       t.reset(), t.start();
       pkd.BatchDelete(delete_batch_seq[i],
                       leaf_entries_pattern,
                       sorted_input,
                       PBTreeLeafSortPred(ratio));
       t.stop();
-      insert_time[i] += t.total_time();
+      delete_time[i] += t.total_time();
 
       t.reset(), t.start();
       pkd.BatchInsert(insert_batch_seq[i],
@@ -371,7 +372,7 @@ TestLeafRandom(Tree& pkd,
                       sorted_input,
                       PBTreeLeafSortPred(ratio));
       t.stop();
-      delete_time[i] += t.total_time();
+      insert_time[i] += t.total_time();
     }
 
     // membership
@@ -388,8 +389,8 @@ TestLeafRandom(Tree& pkd,
   auto delete_ave = parlay::reduce(delete_time) / (rounds * time_period_num);
   auto member_query_ave = member_query_time / rounds;
 
-  std::cout << insert_ave << " " << delete_ave << " " << member_query_ave
-            << std::endl;
+  std::cout << ratio << " " << insert_ave << " " << delete_ave << " "
+            << member_query_ave << std::endl;
 }
 
 template<typename TypeTrait,
@@ -1335,9 +1336,12 @@ static auto constexpr DefaultTestFunc =
       }
     }
 
+    // NOTE: test randomness
     if (opts.tag & (1 << 4)) {
       const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30, 40, 50,
                                                      60, 70, 80, 90, 100 };
+      puts("");
+
       for (auto ratio : sort_ratio_seq) {
         TestLeafRandom<TT>(tree, wp, opts.rounds, ratio);
       }
