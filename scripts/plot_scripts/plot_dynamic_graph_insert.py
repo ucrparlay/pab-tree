@@ -19,14 +19,32 @@ subprocess.run(
     cwd=Path(__file__).parent.parent,
 )
 
-input_path = Path(__file__).parent.parent / "logs" / log_folder_name / f"{input_type}.log"
-store_path = Path(__file__).parent.parent / "data" / log_folder_name / f"{input_type}_insert_by_year.csv"
+input_path = (
+    Path(__file__).parent.parent / "logs" / log_folder_name / f"{input_type}.log"
+)
+store_path = (
+    Path(__file__).parent.parent
+    / "data"
+    / log_folder_name
+    / f"{input_type}_insert_by_year.csv"
+)
 
 START_YEAR = 2014
 INSERT_COL_IDX = 3  # insert_t column index within each data row
 INSERT_N_COL_IDX = 0  # insert_n column index within each data row
 
-SPLIT_LEAF_SIZE = [10953165, 3158992, 2984343, 3294757, 4575881, 6665722, 8885239, 8594522, 10195787, 10953165]
+SPLIT_LEAF_SIZE = [
+    0,
+    3158992,
+    2984343,
+    3294757,
+    4575881,
+    6665722,
+    8885239,
+    8594522,
+    10195787,
+    10953165,
+]
 
 
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
@@ -95,9 +113,13 @@ size_by_year = [""] * max_years
 for tree, buf_value, data_rows in blocks:
     label = solver_label(tree, buf_value)
     for j, row in enumerate(data_rows):
-        insert_by_solver[label][j] = row[INSERT_COL_IDX] if INSERT_COL_IDX < len(row) else ""
+        insert_by_solver[label][j] = (
+            row[INSERT_COL_IDX] if INSERT_COL_IDX < len(row) else ""
+        )
         if not size_by_year[j]:
-            size_by_year[j] = row[INSERT_N_COL_IDX] if INSERT_N_COL_IDX < len(row) else ""
+            size_by_year[j] = (
+                row[INSERT_N_COL_IDX] if INSERT_N_COL_IDX < len(row) else ""
+            )
 
 # Write CSV: one row per year, columns = [year, size, solver1, solver2, ...]
 store_path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,7 +129,11 @@ with open(store_path, "w", newline="") as f:
     for j in range(max_years):
         year = START_YEAR + j
         sls = SPLIT_LEAF_SIZE[j] if j < len(SPLIT_LEAF_SIZE) else ""
-        row = [year, size_by_year[j]] + [insert_by_solver[label][j] for label in solver_labels] + [sls]
+        row = (
+            [year, size_by_year[j]]
+            + [insert_by_solver[label][j] for label in solver_labels]
+            + [sls]
+        )
         writer.writerow(row)
 
 print(f"Written {max_years} rows to {store_path}")

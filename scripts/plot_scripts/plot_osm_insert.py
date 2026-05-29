@@ -21,18 +21,33 @@ subprocess.run(
     cwd=Path(__file__).parent.parent,
 )
 
-input_path = Path(__file__).parent.parent / "logs" / \
-    log_folder_name / f"{input_type}.log"
-store_path = Path(__file__).parent.parent / "data" / \
-    log_folder_name / f"{input_type}_insert_by_year.csv"
+input_path = (
+    Path(__file__).parent.parent / "logs" / log_folder_name / f"{input_type}.log"
+)
+store_path = (
+    Path(__file__).parent.parent
+    / "data"
+    / log_folder_name
+    / f"{input_type}_insert_by_year.csv"
+)
 
 START_YEAR = 2014
 INSERT_N_COL_IDX = 0
 TREE_N_COL_IDX = 2
 INSERT_T_COL_IDX = 3
 
-SPLIT_LEAF_SIZE = [46974578, 8037248, 16419615, 30690764,
-                   35035783, 57638478, 59269438, 45107069, 42780428, 44941418]
+SPLIT_LEAF_SIZE = [
+    0,
+    8037248,
+    16419615,
+    30690764,
+    35035783,
+    57638478,
+    59269438,
+    45107069,
+    42780428,
+    44941418,
+]
 
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
 
@@ -93,8 +108,10 @@ tree_n_by_step = [""] * max_steps
 
 for tree, buf_value, data_rows in blocks:
     for j, row in enumerate(data_rows):
+
         def get(idx, r=row):
             return r[idx] if idx < len(r) else ""
+
         insert_t_by_solver[tree][j] = get(INSERT_T_COL_IDX)
         if not insert_n_by_step[j]:
             insert_n_by_step[j] = get(INSERT_N_COL_IDX)
@@ -104,8 +121,9 @@ for tree, buf_value, data_rows in blocks:
 store_path.parent.mkdir(parents=True, exist_ok=True)
 with open(store_path, "w", newline="") as f:
     writer = csv.writer(f)
-    writer.writerow(["year", "insert_n", "tree_n"] +
-                    solver_labels + ["split_leaf_size"])
+    writer.writerow(
+        ["year", "insert_n", "tree_n"] + solver_labels + ["split_leaf_size"]
+    )
     for j in range(max_steps):
         sls = SPLIT_LEAF_SIZE[j] if j < len(SPLIT_LEAF_SIZE) else ""
         writer.writerow(
