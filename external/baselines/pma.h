@@ -32,6 +32,8 @@ public:
 
   // using PmaLeaf = uncompressed_leaf<K>;
   using PmaLeaf = uncompressed_leaf<K, V>;
+  // TODO: try
+  // https://github.com/wheatman/Packed-Memory-Array/blob/69edd1831174682a1f702375542a8244e8faeccc/include/PMA/CPMA.hpp#L80
   using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
   using PmaPointer = PmaLeaf::element_ptr_type;
   // static_assert(!PmaLeaf::binary);
@@ -61,9 +63,8 @@ public:
   {
     assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
     size_t n = P.first.size();
-    auto range = parlay::tabulate(n, [&](size_t i) {
-      return std::make_tuple(P.first[i], P.second[i]);
-    });
+    auto range = parlay::tabulate(
+      n, [&](size_t i) { return std::make_tuple(P.first[i], P.second[i]); });
     pma_tree_ = std::make_shared<PMA>(range);
   }
 
