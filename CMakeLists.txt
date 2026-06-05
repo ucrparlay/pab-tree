@@ -149,6 +149,11 @@ target_link_libraries(cpam PUBLIC TEST_FRAME)
 target_link_libraries(cpam PUBLIC CPAM)
 target_include_directories(cpam PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_DIR})
 
+# NOTE: StdSet
+add_executable(stdset ${PROJECT_SOURCE_DIR}/tests/stdset.cpp)
+target_link_libraries(stdset PUBLIC TEST_FRAME)
+target_include_directories(stdset PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
 # NOTE: PMA
 if(NOT APPLE)
 	add_executable(pma ${PROJECT_SOURCE_DIR}/tests/pma.cpp)
@@ -172,6 +177,7 @@ if(JEMA)
 	# target_link_libraries(myapp PRIVATE PkgConfig::JEMALLOC)
 	target_link_libraries(b_test PUBLIC PkgConfig::JEMALLOC)
 	target_link_libraries(cpam PUBLIC PkgConfig::JEMALLOC)
+	target_link_libraries(stdset PUBLIC PkgConfig::JEMALLOC)
 	# target_link_libraries(masstree PUBLIC PkgConfig::JEMALLOC)
 	# target_link_libraries(b_test PUBLIC libjemalloc.so)
 	# target_link_libraries(cpam PUBLIC libjemalloc.so)
