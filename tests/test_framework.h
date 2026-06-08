@@ -1213,7 +1213,7 @@ static auto constexpr DefaultTestFunc =
 
     if (opts.query_type != 0 && opts.tag != 0) {
       auto [base_path, batch_path] =
-        opts.ParseInsertBatchPath(kMemberQueryRatio);
+        opts.ParseInsertBatchPath(opts.batch_ratio);
       auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
       BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
     }

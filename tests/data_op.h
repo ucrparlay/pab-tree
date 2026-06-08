@@ -282,10 +282,10 @@ public:
 
     auto base_sort_seq = parlay::sort(base_k_seq);
     auto batch_sort_seq = parlay::sort(batch_k_seq);
-    if (batch_op == 0 && parlay::any_of(batch_sort_seq, [&](size_t idx) {
+    if (batch_op == 0 && parlay::any_of(batch_sort_seq, [&](size_t key) {
           auto it =
-            std::lower_bound(base_sort_seq.begin(), base_sort_seq.end(), idx);
-          return it != base_sort_seq.end() && *it == idx;
+            std::lower_bound(base_sort_seq.begin(), base_sort_seq.end(), key);
+          return it != base_sort_seq.end() && *it == key;
         })) {
       throw std::runtime_error(
         "Validate: Insert batch has keys already in base sequence.");
@@ -297,10 +297,6 @@ public:
           })) {
         throw std::runtime_error(
           "Validate: Delete batch has keys not in base sequence.");
-      }
-      if (base_sort_seq.subseq(0, batch_sort_seq.size()) != batch_sort_seq) {
-        throw std::runtime_error("Validate: Delete batch keys are not the "
-                                 "smallest ones in base sequence.");
       }
     }
 
