@@ -391,6 +391,129 @@ TestLeafRandom(Tree& pkd,
             << member_query_ave << " " << sorted_leaf_ratio_ave << std::endl;
 }
 
+template<typename TypeTrait, typename Tree>
+  requires(!pb_tree::IsPBTree<Tree>)
+void
+TestLeafRandomDynamicGraph(Tree&,
+                           auto const&,
+                           auto const&,
+                           auto&,
+                           int const,
+                           int const,
+                           int const)
+{
+}
+
+template<typename TypeTrait, typename Tree>
+  requires pb_tree::IsPBTree<Tree>
+void
+TestLeafRandomDynamicGraph(Tree& pkd,
+                           auto const& insert_batch_seq,
+                           auto const& delete_batch_seq,
+                           auto& membership_res,
+                           int const time_period_num,
+                           int const rounds,
+                           int const ratio)
+{
+  using TT = TypeTrait;
+  pkd.DeleteTree();
+  parlay::sequence<typename Tree::InputRangeT> wi(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> wd(time_period_num);
+  parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
+    time_period_num);
+  const size_t member_query_n = membership_res.size();
+  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto step = member_query_n / time_period_num;
+
+  for (int i = 0; i < time_period_num; i++) {
+    wi[i] = Tree::ParseInput(insert_batch_seq[i]);
+    wd[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
+    assert(insert_batch_seq[i].size() >= step);
+    parlay::parallel_for(0, step, [&](size_t j) {
+      query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
+    });
+  }
+
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  parlay::sequence<double> member_query_time(time_period_num, 0.0);
+
+  // geometric mean over a per-batch timing sequence: exp(mean(log(t_i))).
+  auto geo_mean = [](parlay::sequence<double> const& v) -> double {
+    if (v.empty()) {
+      return 0.0;
+    }
+    double const log_sum = parlay::reduce(parlay::delayed_map(
+      v, [](double x) { return std::log(std::max(x, 1e-300)); }));
+    return std::exp(log_sum / static_cast<double>(v.size()));
+  };
+
+  // accumulate the per-round geo means; averaged over rounds at the end.
+  double insert_geo_sum = 0.0;
+  double delete_geo_sum = 0.0;
+  double member_query_geo_sum = 0.0;
+  double sorted_leaf_ratio_ave = 0.0;
+
+  for (int r = 0; r < rounds; r++) {
+    auto const& insert_entry = wi;
+    auto const& delete_entry = wd;
+
+    // running the osm
+    constexpr auto leaf_entries_pattern = TT::LeafEntriesPattern::kHybrid;
+    constexpr bool sorted_input = false;
+    parlay::internal::timer t;
+    pkd.DeleteTree();
+    for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+      t.reset(), t.start();
+      pkd.BatchInsert(insert_entry[batch_id],
+                      leaf_entries_pattern,
+                      sorted_input,
+                      PBTreeLeafSortPred(ratio));
+      t.stop();
+      insert_time[batch_id] = t.total_time();
+
+      t.reset(), t.start();
+      pkd.BatchDelete(delete_entry[batch_id],
+                      leaf_entries_pattern,
+                      sorted_input,
+                      PBTreeLeafSortPred(ratio));
+      t.stop();
+      delete_time[batch_id] = t.total_time();
+
+      // NOTE: test membership query
+      t.reset(), t.start();
+      parlay::parallel_for(0, member_query_n, [&](size_t j) {
+        auto [contain, logger] = pkd.Contain(query_points[j]);
+        membership_res[j] = contain;
+      });
+      t.stop();
+      member_query_time[batch_id] = t.total_time();
+    }
+
+    // NOTE: end of round — geo mean across batches for each metric.
+    // Omit the first (warmup) round when more than one round is requested.
+    if (rounds == 1 || r >= 1) {
+      insert_geo_sum += geo_mean(insert_time);
+      delete_geo_sum += geo_mean(delete_time);
+      member_query_geo_sum += geo_mean(member_query_time);
+      // sorted-leaf ratio (measured after all updates, before membership)
+      sorted_leaf_ratio_ave += pkd.SortedLeafRatio();
+    }
+  }
+
+  // average of the per-round geo means
+  double const denom = rounds > 1 ? (rounds - 1) : 1;
+  double const insert_geo_ave = insert_geo_sum / denom;
+  double const delete_geo_ave = delete_geo_sum / denom;
+  double const member_query_geo_ave = member_query_geo_sum / denom;
+  sorted_leaf_ratio_ave /= denom;
+
+  std::cout << ratio << " " << insert_geo_ave << " " << delete_geo_ave << " "
+            << member_query_geo_ave << " " << sorted_leaf_ratio_ave
+            << std::endl;
+}
+
 template<typename TypeTrait,
          typename Tree,
          bool kTestTime = true,
@@ -1465,6 +1588,49 @@ static auto constexpr TestTemporalGraph =
                                  membership_res,
                                  range_report_output,
                                  flatten_seq);
+    }
+
+    if (opts.tag & (1 << 5)) { // NOTE: temporal graph randomness
+      // string dynamic_graph_path =
+      //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
+      string dynamic_graph_path = opts.input_file_path;
+
+      constexpr int kDynamicGraphBatchNum = 10;
+      std::array<std::string, kDynamicGraphBatchNum> insert_files;
+      std::array<std::string, kDynamicGraphBatchNum> delete_files;
+      for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+        insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
+        delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
+      }
+      parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
+      parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
+      size_t total_entries = 0;
+      for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+        auto [n1, dim1] = ReadEntries<typename TT::E, kInputType>(
+          insert_files[i].c_str(), insert_batch_seq[i], total_entries);
+        total_entries += n1;
+
+        auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
+          delete_files[i].c_str(), delete_batch_seq[i], total_entries);
+        total_entries += n2;
+      }
+
+      // membership query result
+      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      auto const time_period_num = insert_batch_seq.size();
+
+      const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30, 40, 50,
+                                                     60, 70, 80, 90, 100 };
+      puts("");
+      for (auto ratio : sort_ratio_seq) {
+        TestLeafRandomDynamicGraph<TT, Tree>(tree,
+                                             insert_batch_seq,
+                                             delete_batch_seq,
+                                             membership_res,
+                                             time_period_num,
+                                             opts.rounds,
+                                             ratio);
+      }
     }
   };
 
