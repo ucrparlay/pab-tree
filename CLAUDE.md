@@ -389,3 +389,36 @@ C++ requires default template arguments to reference names already declared at t
 Default: `Wrapper<uint32_t, uint32_t>::Element` → key=uint32_t (4B), val=uint32_t (4B) → E is 8 bytes.
 OSM variant: key=uint64_t.
 Dynamic graph: key=tuple<uint32_t,uint32_t,uint32_t>.
+
+## Baselines (`external/baselines/*.h` + `tests/<name>.cpp`)
+
+Single-threaded / external reference implementations that conform to the same
+test-framework interface as `BTree<TT>` (methods: `Build`, `BatchInsert`,
+`BatchDelete`, `Contain`, `RangeCount`, `RangeReport`, `GetEntries`,
+`DeleteTree`, `GetSize`, plus `ParseInput`/`ParseDeleteInput`/`KeyProbe` adapters
+and the `Leaf`/`Interior` aliases). Each has a thin `tests/<name>.cpp` driver
+(mirror of `tests/stdset.cpp`) and its own executable target in CMake.
+
+| Baseline | Wrapper header | Backing store | Notes |
+|---|---|---|---|
+| StdSet | `stdset.h` | `std::set<E, KeyLess>` | serial loops; ordered by key only |
+| TlxBTree | `tlxbtree.h` | `tlx::btree_set<E, KeyLess>` | serial loops; in-memory B+ tree |
+
+- **TLX** is a git **submodule** at `external/tlx` (header-only btree). Added with
+  `git submodule add -f` because `.gitignore` ignores all extensionless paths
+  (`*` on line 2). Include dir `${PROJECT_SOURCE_DIR}/external/tlx` is added only
+  to the `tlxbtree` target; header is `<tlx/container/btree_set.hpp>`.
+- `tlxbtree.h` differs from `stdset.h` only in: include, `SetType`, and
+  `Contain` uses `set_.exists(k)` (tlx) vs `set_.find(k) != end()` (std::set).
+- **Build caveat**: baselines have **no `Validate()` method**, so they only
+  compile on the `DefaultTestFunc` path. Under `-DOSM`/`-DDYNAMIC_GRAPH` the
+  driver selects `TestTemporalGraph`, which calls `pkd.Validate()` →
+  compile error. Build baselines with `OSM=OFF DYNAMIC_GRAPH=OFF` (the default).
+- **Membership-query segfault fix** (`DefaultTestFunc`, `test_framework.h`): the
+  `query_type & (1<<0)` (membership) branch sliced the membership probe set from
+  `wi` (the insert/delete batch) in its `wi.size()==0` case. With `-t 0` (no
+  insert/delete batch) `wi` is empty, so `wi.subseq(0, batch_size)` with
+  `batch_size = wp.size()*kMemberQueryRatio (0.01) > 0` did an out-of-bounds copy
+  → SIGSEGV inside parlay's parallel `sequence` construction (crash is in the
+  framework, *before* any `Contain` call — affected every baseline equally, not
+  TLX-specific). Fixed to slice `wp` (the keys actually built into the tree).

@@ -39,7 +39,9 @@ main(int argc, char* argv[])
   Options opts(params);
 
   auto test_func =
-    []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {};
+    []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {
+
+    };
 
 #if defined(DYNAMIC_GRAPH) || defined(OSM)
   ApplyStdSet(opts, TestTemporalGraph);

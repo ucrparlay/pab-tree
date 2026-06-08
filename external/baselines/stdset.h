@@ -99,7 +99,7 @@ public:
     return std::make_pair(res, logger);
   }
 
-  auto RangeCount(typename TT::Box const query_box)
+  auto RangeCount(typename TT::Box const query_box) const
     -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // half-open range [first, second)
@@ -111,7 +111,7 @@ public:
   }
 
   template<typename Range>
-  auto RangeReport(typename TT::Box const query_box, Range&& out)
+  auto RangeReport(typename TT::Box const query_box, Range&& out) const
     -> std::pair<size_t, pb_tree::RangeReportLogger>
   {
     // half-open range [first, second)

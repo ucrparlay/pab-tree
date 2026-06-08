@@ -1255,7 +1255,7 @@ static auto constexpr DefaultTestFunc =
       auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
       typename TT::EntrySeq query_ele;
       if (wi.size() == 0) {
-        query_ele = wi.subseq(0, batch_size);
+        query_ele = wp.subseq(0, batch_size);
         membership_query(query_ele);
       } else {
         query_ele = wp.subseq(0, batch_size);
