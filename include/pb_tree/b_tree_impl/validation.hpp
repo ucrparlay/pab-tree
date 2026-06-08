@@ -191,6 +191,49 @@ BTree<TT>::Validate(Node const* T)
 }
 
 template<typename TT>
+std::pair<typename TT::SizeT, typename TT::SizeT>
+BTree<TT>::CountSortedLeaves(Node const* T)
+{
+  if (T->is_leaf) {
+    Leaf const* TL = static_cast<Leaf const*>(T);
+    return { TL->is_sorted ? SizeT(1) : SizeT(0), SizeT(1) };
+  }
+
+  auto const* TI = static_cast<Interior const*>(T);
+  auto const node_n = TI->GetNodeN();
+  parlay::sequence<std::pair<SizeT, SizeT>> counts(node_n);
+  parlay::parallel_for(0, node_n, [&](size_t i) {
+    counts[i] = CountSortedLeaves(TI->tree_nodes[i]);
+  });
+
+  return parlay::reduce(
+    counts,
+    parlay::binary_op(
+      [](std::pair<SizeT, SizeT> a, std::pair<SizeT, SizeT> b) {
+        return std::pair<SizeT, SizeT>{ a.first + b.first,
+                                        a.second + b.second };
+      },
+      std::pair<SizeT, SizeT>{ 0, 0 }));
+}
+
+template<typename TT>
+double
+BTree<TT>::SortedLeafRatio(Node const* T)
+{
+  if (T == nullptr) {
+    T = this->root_;
+  }
+  if (T == nullptr) {
+    return 0.0;
+  }
+
+  auto const [sorted_n, total_n] = CountSortedLeaves(T);
+  return total_n == 0 ? 0.0
+                      : static_cast<double>(sorted_n) /
+                          static_cast<double>(total_n);
+}
+
+template<typename TT>
 std::tuple<bool, bool, typename TT::SizeT>
 BTree<TT>::CheckTreeAugAfterDelete(Node* T)
 {

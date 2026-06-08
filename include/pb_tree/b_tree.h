@@ -536,6 +536,13 @@ public:
   template<bool kCheckSize = true, bool kVerbose = true>
   bool Validate(Node const* T = nullptr);
 
+  // Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at T.
+  static std::pair<SizeT, SizeT> CountSortedLeaves(Node const* T);
+
+  // Ratio of sorted leaves to total leaves in the subtree rooted at T
+  // (defaults to the whole tree). Returns 0.0 for an empty tree.
+  double SortedLeafRatio(Node const* T = nullptr);
+
   std::tuple<bool, bool, typename TT::SizeT> CheckTreeAugAfterDelete(Node* T);
 
   auto Contain(K const& k) const -> std::pair<bool, MembershipLogger>;
