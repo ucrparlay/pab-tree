@@ -310,7 +310,13 @@ struct PBTreeLeafSortPred
 template<typename TypeTrait, typename Tree>
   requires(!pb_tree::IsPBTree<Tree>)
 void
-TestLeafRandom(Tree&, typename TypeTrait::EntrySeq const&, int const, int const)
+TestLeafRandom(Tree&,
+               auto const&,
+               auto const&,
+               auto const&,
+               int const,
+               int const,
+               int const)
 {
 }
 
