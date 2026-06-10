@@ -57,6 +57,8 @@ main(int argc, char* argv[])
   dis_type = P.getOptionIntValue("-dis", 0);
   // PARA: 0: insert, 1: delete
   batch_op = P.getOptionIntValue("-batch_op", 0);
+  // PARA: 0: text .in, 1: binary .bin
+  int const binary = P.getOptionIntValue("-binary", 0);
   // PARA: uni: none
   // PARA: exp: 10
   // PARA: norm: 0.5, 0.2
@@ -117,8 +119,13 @@ main(int argc, char* argv[])
         : Generator<E, NormalGenerator<>, NormalGenerator<>>::GenBatch(
             batch_op, base_n, batch_n, base_param_seq, batch_param_seq);
     std::cout << "Writing... " << std::endl;
-    PrintToFile(new_path + ".base.in", base_seq);
-    PrintToFile(new_path + ".batch.in", batch_seq);
+    if (binary) {
+      PrintToBinaryFile(new_path + ".base.bin", base_seq);
+      PrintToBinaryFile(new_path + ".batch.bin", batch_seq);
+    } else {
+      PrintToFile(new_path + ".base.in", base_seq);
+      PrintToFile(new_path + ".batch.in", batch_seq);
+    }
   };
 
   for (int i = 0; i < file_n; i++) {

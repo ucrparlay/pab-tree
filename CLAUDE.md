@@ -411,11 +411,70 @@ is a dense permutation of `0..base_n-1` and the batch keys ⊆ base; for insert
 workloads base and batch keys are disjoint, jointly covering
 `0..base_n+batch_n-1`.
 
-### Binary `.bin` format (`data_to_binary` target, `tests/data_to_binary.cpp`)
+### Binary `.bin` format
 
-Converts `.in` → `.bin`: a flat little-endian `uint64_t` stream —
-`[N, dim, key, val, key, val, ...]` (row-major entries). Default output path
-replaces `.in` with `.bin`. Usage: `data_to_binary -p <file.in> [-o <file.bin>]`.
+A flat little-endian `uint64_t` stream — `[N, dim, key, val, key, val, ...]`
+(row-major entries). Two ways to produce it:
+
+- `data_to_binary -p <file.in> [-o <file.bin>]` — converts an existing text
+  file (default output replaces `.in` with `.bin`).
+- `data_generator ... -binary 1` — generates directly to `.base.bin`/
+  `.batch.bin` via `PrintToBinaryFile` (`data_op.h`) instead of text.
+- `temporal_graph_info <graph> <out_dir> [binary=0]` — `binary=1` writes
+  `<i>_insert.bin`/`<i>_delete.bin` (`[N, 2, src, dest, ...]`) instead of `.in`.
+- `filter_csv_year <in.csv> <out>` — if `<out>` ends with `.bin`, writes
+  binary (`[N, 2, code, time, ...]`) instead of text.
+
+### Generator gotcha
+
+`data_generator` **segfaults** if `-base_param`/`-batch_param` are omitted
+(`std::string(nullptr)` from `getOptionValue`) — pass dummies (e.g. `1`) even
+for uniform, which ignores them.
+
+## `ReadEntries` (`test_framework.h`) — the dataset loader
+
+```cpp
+template<typename E, int kInputType = 0>
+auto ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+  -> std::pair<size_t, int>;  // returns (N, dim)
+```
+
+`ReadEntries` is a **dispatch layer**: path ends in `.bin` →
+`ReadEntriesBinary`; anything else → `ReadEntriesText`. No filesystem probing —
+the given path is the file that gets read. To use binary data, pass a `.bin`
+path explicitly (note: `ParseInsertBatchPath`/`ParseDeleteBatchPath` construct
+`.in` paths, so derived batch files always load as text).
+
+### `ReadEntriesText` (the original text parser)
+
+- Reads whole file via `benchIO::readStringFromFile`, tokenizes in parallel via
+  `stringToWords`, parses `N`/`dim` from the first two tokens, then a
+  `parallel_for` fills `wp[i]` via `E::ReadKey`/`E::ReadVal` (`std::stoul`).
+- **Overwrites** `wp` (`clear()` + `resize(N)`), never appends.
+- Only ever reads 2 columns (`pts[i*dim]`, `pts[i*dim+1]`) regardless of dim.
+- `kInputType` (enum `InputType` in `wrapper.h`): `kNormalInput`/`kOsmInput`
+  read key+val from the two columns; `kDynamicGraphInput` packs two uint32
+  columns into a uint64 key `(u<<32)|v` and sets `val = i + offset`.
+- `offset` is only used by `kDynamicGraphInput`: callers thread a running
+  `total_entries` across multiple files so vals stay globally unique.
+- Call sites: `DefaultTestFunc` (base file from `-p`, then per-ratio
+  base/batch pairs via `opts.ParseInsertBatchPath`/`ParseDeleteBatchPath`),
+  `TestTemporalGraph` (OSM single file; dynamic graph 10×`{i}_insert.in`/
+  `{i}_delete.in` pairs), `unit_test.cpp`.
+- `ReadPointsSerial` (serial fallback) is used only under `-DMEMCHECK`.
+
+### `ReadEntriesBinary`
+
+Same interface/semantics, reads the `.bin` format (`[N, dim, key, val, ...]`
+uint64 stream) with two `fs.read` calls. Assigns `wp[i].key`/`wp[i].val`
+directly (no string parse); `kDynamicGraphInput` packs `(u<<32)|v` and uses
+`offset` like the text reader. Aborts on missing/truncated file.
+
+### Known issue (pre-existing, 2026-06)
+
+`stdset`/baseline targets currently fail to compile due to a `TestLeafRandom<TT>`
+call signature mismatch in `TestLeafRandomness` — unrelated to the reader work
+(verified by stashing). `b_test` builds fine.
 
 ## Baselines (`external/baselines/*.h` + `tests/<name>.cpp`)
 

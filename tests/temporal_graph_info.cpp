@@ -21,14 +21,17 @@ struct EdgeRecord
 int
 main(int argc, char** argv)
 {
-  if (argc != 3) {
+  if (argc < 3 || argc > 4) {
     std::cerr << "Usage: " << argv[0]
-              << " <temporal_graph_binary_file> <output_folder>\n";
+              << " <temporal_graph_binary_file> <output_folder> [binary=0]\n"
+              << "  binary=1 writes <i>_insert.bin/<i>_delete.bin "
+                 "(uint64 stream [N, 2, src, dest, ...]) instead of text .in\n";
     return EXIT_FAILURE;
   }
 
   const std::string filename = argv[1];
   const std::filesystem::path output_dir = argv[2];
+  const bool binary = argc == 4 && std::atoi(argv[3]) != 0;
   IO::InputGraph graph(filename);
   graph.print_summary();
 
@@ -133,6 +136,23 @@ main(int argc, char** argv)
 
   auto write_edges = [&](const parlay::sequence<EdgeRecord>& edges,
                          const std::filesystem::path& out_path) -> bool {
+    if (binary) {
+      std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
+      if (!out) {
+        std::cerr << "Failed to open output file: " << out_path << "\n";
+        return false;
+      }
+      parlay::sequence<uint64_t> data(2 + (edges.size() * 2));
+      data[0] = edges.size();
+      data[1] = 2;
+      parlay::parallel_for(0, edges.size(), [&](size_t i) {
+        data[2 + (i * 2)] = edges[i].src;
+        data[2 + (i * 2) + 1] = edges[i].dest;
+      });
+      out.write(reinterpret_cast<char const*>(data.data()),
+                static_cast<std::streamsize>(data.size() * sizeof(uint64_t)));
+      return true;
+    }
     std::ofstream out(out_path);
     if (!out) {
       std::cerr << "Failed to open output file: " << out_path << "\n";
@@ -151,9 +171,11 @@ main(int argc, char** argv)
             << " timestamp-ordered batches\n";
   for (size_t batch = 0; batch < edge_batches.size(); ++batch) {
     const auto insert_path =
-      output_dir / (std::to_string(batch) + "_insert.in");
+      output_dir /
+      (std::to_string(batch) + (binary ? "_insert.bin" : "_insert.in"));
     const auto delete_path =
-      output_dir / (std::to_string(batch) + "_delete.in");
+      output_dir /
+      (std::to_string(batch) + (binary ? "_delete.bin" : "_delete.in"));
     if (!write_edges(edge_batches[batch].first, insert_path) ||
         !write_edges(edge_batches[batch].second, delete_path)) {
       return EXIT_FAILURE;

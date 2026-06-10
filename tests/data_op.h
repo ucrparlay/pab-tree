@@ -81,6 +81,37 @@ PrintToFile(std::string const& path, auto const& wp)
   return;
 }
 
+// NOTE: binary counterpart of PrintToFile. Writes the ".bin" format read by
+// ReadEntriesBinary: a little-endian uint64_t stream [N, dim, key, val, ...]
+// (row-major entries).
+void
+PrintToBinaryFile(std::string const& path, auto const& wp)
+{
+  using E = typename std::remove_reference_t<decltype(wp)>::value_type;
+
+  uint64_t const gen_num = wp.size();
+  uint64_t constexpr gen_dim = 1 + std::tuple_size_v<typename E::V>;
+  static_assert(std::tuple_size_v<typename E::V> == 1,
+                "PrintToBinaryFile: only key + 1 value column is supported.");
+
+  parlay::sequence<uint64_t> data(2 + (gen_num * gen_dim));
+  data[0] = gen_num;
+  data[1] = gen_dim;
+  parlay::parallel_for(0, gen_num, [&](size_t i) {
+    data[2 + (i * gen_dim)] = wp[i].key;
+    data[2 + (i * gen_dim) + 1] = std::get<0>(wp[i].val);
+  });
+
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
+  if (!out.is_open()) {
+    throw std::runtime_error("Unable to open output file: " + path);
+  }
+  out.write(reinterpret_cast<char const*>(data.data()),
+            static_cast<std::streamsize>(data.size() * sizeof(uint64_t)));
+  out.close();
+  return;
+}
+
 template<typename Seq>
 auto
 bucketize(Seq const& data, size_t const numBuckets = 10)

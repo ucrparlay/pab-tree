@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <iomanip>
 #include <ios>
 #include <iostream>
@@ -1197,7 +1198,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
 
 template<typename E, int kInputType = 0>
 auto
-ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+ReadEntriesText(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   -> std::pair<size_t, int>
 {
   using K = E::K;
@@ -1237,6 +1238,67 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
     // }
   });
   return std::make_pair(N, dim);
+}
+
+// NOTE: binary counterpart of ReadEntries. Reads the ".bin" format produced
+// by data_to_binary: a little-endian uint64_t stream [N, dim, key, val, ...]
+// (row-major entries). Same interface and semantics as ReadEntries
+// (overwrites wp, returns (N, dim)).
+template<typename E, int kInputType = 0>
+auto
+ReadEntriesBinary(char const* iFile,
+                  parlay::sequence<E>& wp,
+                  size_t offset = 0) -> std::pair<size_t, int>
+{
+  std::ifstream fs(iFile, std::ios::binary);
+  if (!fs.is_open()) {
+    std::cout << "Unable to open file: " << iFile << std::endl;
+    abort();
+  }
+
+  uint64_t header[2];
+  fs.read(reinterpret_cast<char*>(header), sizeof(header));
+  size_t N = header[0];
+  int dim = static_cast<int>(header[1]);
+  assert(fs.good() && N > 0 && dim >= 1);
+
+  auto data = parlay::sequence<uint64_t>::uninitialized(N * dim);
+  fs.read(reinterpret_cast<char*>(data.data()),
+          static_cast<std::streamsize>(N * dim * sizeof(uint64_t)));
+  if (fs.gcount() !=
+      static_cast<std::streamsize>(N * dim * sizeof(uint64_t))) {
+    std::cout << "Truncated binary file: " << iFile << std::endl;
+    abort();
+  }
+
+  wp.clear();
+  wp.resize(N);
+  parlay::parallel_for(0, N, [&](size_t i) -> void {
+    if constexpr (kInputType == InputType::kDynamicGraphInput) {
+      uint64_t u = data[i * dim];
+      uint64_t v = data[(i * dim) + 1];
+      wp[i].key = (u << 32) | v;
+      wp[i].val = i + offset;
+    } else {
+      wp[i].key = data[i * dim];
+      wp[i].val = data[(i * dim) + 1];
+    }
+  });
+  return std::make_pair(N, dim);
+}
+
+// NOTE: dispatch layer — decides the reader from the file path:
+// ".bin" suffix -> ReadEntriesBinary, anything else -> ReadEntriesText.
+template<typename E, int kInputType = 0>
+auto
+ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+  -> std::pair<size_t, int>
+{
+  std::string_view const path(iFile);
+  if (path.ends_with(".bin")) {
+    return ReadEntriesBinary<E, kInputType>(iFile, wp, offset);
+  }
+  return ReadEntriesText<E, kInputType>(iFile, wp, offset);
 }
 
 template<typename E>

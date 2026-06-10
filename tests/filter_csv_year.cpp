@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../external/fast-cpp-csv-parser/csv.h"
@@ -44,7 +45,9 @@ main(int argc, char** argv)
          "[year_column=ts]\n"
       << "Example:\n  " << argv[0]
       << " /data/zmen002/geometry/osm_by_year/africa-latest.osm.pbf.csv "
-         "/tmp/africa-2014-2024.csv\n";
+         "/tmp/africa-2014-2024.csv\n"
+      << "If <output_csv> ends with \".bin\", the output is written in "
+         "binary form (uint64 stream [N, 2, code, time, ...]).\n";
     return EXIT_FAILURE;
   }
 
@@ -103,16 +106,33 @@ main(int argc, char** argv)
   std::cout << "Finished removing duplicates. Unique rows: "
             << record_seq.size() << "\n";
 
-  // NOTE: write to file
-  auto header = toString(record_seq.size()) + " " + toString(2);
-  auto record_str = parlay::tabulate(record_seq.size(), [&](size_t i) {
-    std::string str;
-    str += toString(record_seq[i].code) + " ";
-    str += toString(record_seq[i].time);
-    parlay::sequence<char> cstr(str.begin(), str.end());
-    return cstr;
-  });
-  writeSeqToFile(header, record_str, output_path.c_str());
+  // NOTE: write to file; ".bin" output suffix selects the binary form
+  if (std::string_view(output_path).ends_with(".bin")) {
+    parlay::sequence<uint64_t> data(2 + (record_seq.size() * 2));
+    data[0] = record_seq.size();
+    data[1] = 2;
+    parlay::parallel_for(0, record_seq.size(), [&](size_t i) {
+      data[2 + (i * 2)] = record_seq[i].code;
+      data[2 + (i * 2) + 1] = record_seq[i].time;
+    });
+    std::ofstream out(output_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      std::cerr << "Failed to open output file: " << output_path << "\n";
+      return EXIT_FAILURE;
+    }
+    out.write(reinterpret_cast<char const*>(data.data()),
+              static_cast<std::streamsize>(data.size() * sizeof(uint64_t)));
+  } else {
+    auto header = toString(record_seq.size()) + " " + toString(2);
+    auto record_str = parlay::tabulate(record_seq.size(), [&](size_t i) {
+      std::string str;
+      str += toString(record_seq[i].code) + " ";
+      str += toString(record_seq[i].time);
+      parlay::sequence<char> cstr(str.begin(), str.end());
+      return cstr;
+    });
+    writeSeqToFile(header, record_str, output_path.c_str());
+  }
 
   std::cout << "Input: " << input_path << "\n"
             << "Output: " << output_path << "\n"
