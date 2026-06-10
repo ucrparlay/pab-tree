@@ -10,6 +10,7 @@
 #include <string>
 #include <utility>
 
+#include "binary_io.h"
 #include "common/geometryIO.h"
 #include "common/parse_command_line.h"
 #include "common/time_loop.h"
@@ -1240,36 +1241,19 @@ ReadEntriesText(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   return std::make_pair(N, dim);
 }
 
-// NOTE: binary counterpart of ReadEntries. Reads the ".bin" format produced
-// by data_to_binary: a little-endian uint64_t stream [N, dim, key, val, ...]
-// (row-major entries). Same interface and semantics as ReadEntries
-// (overwrites wp, returns (N, dim)).
+// NOTE: binary counterpart of ReadEntries. Reads the ".bin" format described
+// in binary_io.h (header [N, dim, width], 32- or 64-bit values widened
+// transparently). Same interface and semantics as ReadEntries (overwrites wp,
+// returns (N, dim)).
 template<typename E, int kInputType = 0>
 auto
 ReadEntriesBinary(char const* iFile,
                   parlay::sequence<E>& wp,
                   size_t offset = 0) -> std::pair<size_t, int>
 {
-  std::ifstream fs(iFile, std::ios::binary);
-  if (!fs.is_open()) {
-    std::cout << "Unable to open file: " << iFile << std::endl;
-    abort();
-  }
-
-  uint64_t header[2];
-  fs.read(reinterpret_cast<char*>(header), sizeof(header));
-  size_t N = header[0];
-  int dim = static_cast<int>(header[1]);
-  assert(fs.good() && N > 0 && dim >= 1);
-
-  auto data = parlay::sequence<uint64_t>::uninitialized(N * dim);
-  fs.read(reinterpret_cast<char*>(data.data()),
-          static_cast<std::streamsize>(N * dim * sizeof(uint64_t)));
-  if (fs.gcount() !=
-      static_cast<std::streamsize>(N * dim * sizeof(uint64_t))) {
-    std::cout << "Truncated binary file: " << iFile << std::endl;
-    abort();
-  }
+  auto const [N, raw_dim, data] = ReadBinaryEntries(iFile);
+  int dim = static_cast<int>(raw_dim);
+  assert(N > 0 && dim >= 1);
 
   wp.clear();
   wp.resize(N);
@@ -1295,10 +1279,25 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   -> std::pair<size_t, int>
 {
   std::string_view const path(iFile);
-  if (path.ends_with(".bin")) {
-    return ReadEntriesBinary<E, kInputType>(iFile, wp, offset);
+  auto const res = path.ends_with(".bin")
+                     ? ReadEntriesBinary<E, kInputType>(iFile, wp, offset)
+                     : ReadEntriesText<E, kInputType>(iFile, wp, offset);
+
+  // NOTE: manual sanity check of the read
+  size_t const head = std::min<size_t>(wp.size(), 5);
+  size_t const tail = std::min<size_t>(wp.size() - head, 5);
+  std::cout << "Read " << wp.size() << " entries from " << iFile
+            << "; first " << head << ":";
+  for (size_t i = 0; i < head; i++) {
+    std::cout << " (" << wp[i] << ")";
   }
-  return ReadEntriesText<E, kInputType>(iFile, wp, offset);
+  std::cout << "; last " << tail << ":";
+  for (size_t i = wp.size() - tail; i < wp.size(); i++) {
+    std::cout << " (" << wp[i] << ")";
+  }
+  std::cout << std::endl;
+
+  return res;
 }
 
 template<typename E>

@@ -411,13 +411,20 @@ is a dense permutation of `0..base_n-1` and the batch keys ⊆ base; for insert
 workloads base and batch keys are disjoint, jointly covering
 `0..base_n+batch_n-1`.
 
-### Binary `.bin` format
+### Binary `.bin` format (`tests/binary_io.h` — single source of truth)
 
-A flat little-endian `uint64_t` stream — `[N, dim, key, val, key, val, ...]`
-(row-major entries). Two ways to produce it:
+Little-endian: `uint64_t header[3] = {N, dim, width}` followed by `N*dim`
+values of `width` bytes each, row-major (`key, val, ...`). `width` is 4 when
+every value fits in uint32 (writers narrow automatically via
+`WriteBinaryEntries`), else 8. `ReadBinaryEntries` widens back to uint64
+transparently. All writers/readers go through these two helpers — **older
+2-word-header `.bin` files are incompatible; regenerate them**. Producers:
 
 - `data_to_binary -p <file.in> [-o <file.bin>]` — converts an existing text
   file (default output replaces `.in` with `.bin`).
+- `scripts/convert_to_binary.sh <dir> [-f] [-d]` — recursively converts every
+  `.in` under `<dir>`; skips up-to-date `.bin` twins unless `-f`; `-d` deletes
+  each `.in` after its successful conversion (skipped files are kept).
 - `data_generator ... -binary 1` — generates directly to `.base.bin`/
   `.batch.bin` via `PrintToBinaryFile` (`data_op.h`) instead of text.
 - `temporal_graph_info <graph> <out_dir> [binary=0]` — `binary=1` writes
@@ -465,10 +472,11 @@ path explicitly (note: `ParseInsertBatchPath`/`ParseDeleteBatchPath` construct
 
 ### `ReadEntriesBinary`
 
-Same interface/semantics, reads the `.bin` format (`[N, dim, key, val, ...]`
-uint64 stream) with two `fs.read` calls. Assigns `wp[i].key`/`wp[i].val`
-directly (no string parse); `kDynamicGraphInput` packs `(u<<32)|v` and uses
-`offset` like the text reader. Aborts on missing/truncated file.
+Same interface/semantics, reads the `.bin` format via `ReadBinaryEntries`
+(`binary_io.h`; handles 32/64-bit payload widths transparently). Assigns
+`wp[i].key`/`wp[i].val` directly (no string parse); `kDynamicGraphInput`
+packs `(u<<32)|v` and uses `offset` like the text reader. Aborts on
+missing/truncated file or bad header.
 
 ### Known issue (pre-existing, 2026-06)
 

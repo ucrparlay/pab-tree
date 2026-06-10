@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../external/fast-cpp-csv-parser/csv.h"
+#include "binary_io.h"
 #include "data_op.h"
 #include "libmorton/morton.h"
 #include "libmorton/morton3D.h"
@@ -108,20 +109,12 @@ main(int argc, char** argv)
 
   // NOTE: write to file; ".bin" output suffix selects the binary form
   if (std::string_view(output_path).ends_with(".bin")) {
-    parlay::sequence<uint64_t> data(2 + (record_seq.size() * 2));
-    data[0] = record_seq.size();
-    data[1] = 2;
+    parlay::sequence<uint64_t> payload(record_seq.size() * 2);
     parlay::parallel_for(0, record_seq.size(), [&](size_t i) {
-      data[2 + (i * 2)] = record_seq[i].code;
-      data[2 + (i * 2) + 1] = record_seq[i].time;
+      payload[i * 2] = record_seq[i].code;
+      payload[(i * 2) + 1] = record_seq[i].time;
     });
-    std::ofstream out(output_path, std::ios::binary | std::ios::trunc);
-    if (!out) {
-      std::cerr << "Failed to open output file: " << output_path << "\n";
-      return EXIT_FAILURE;
-    }
-    out.write(reinterpret_cast<char const*>(data.data()),
-              static_cast<std::streamsize>(data.size() * sizeof(uint64_t)));
+    WriteBinaryEntries(output_path, record_seq.size(), 2, payload);
   } else {
     auto header = toString(record_seq.size()) + " " + toString(2);
     auto record_str = parlay::tabulate(record_seq.size(), [&](size_t i) {

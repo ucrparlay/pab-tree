@@ -6,6 +6,7 @@
 #include <string>
 #include <tuple>
 
+#include "binary_io.h"
 #include "common/temporal_graph_io.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
@@ -137,20 +138,12 @@ main(int argc, char** argv)
   auto write_edges = [&](const parlay::sequence<EdgeRecord>& edges,
                          const std::filesystem::path& out_path) -> bool {
     if (binary) {
-      std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
-      if (!out) {
-        std::cerr << "Failed to open output file: " << out_path << "\n";
-        return false;
-      }
-      parlay::sequence<uint64_t> data(2 + (edges.size() * 2));
-      data[0] = edges.size();
-      data[1] = 2;
+      parlay::sequence<uint64_t> payload(edges.size() * 2);
       parlay::parallel_for(0, edges.size(), [&](size_t i) {
-        data[2 + (i * 2)] = edges[i].src;
-        data[2 + (i * 2) + 1] = edges[i].dest;
+        payload[i * 2] = edges[i].src;
+        payload[(i * 2) + 1] = edges[i].dest;
       });
-      out.write(reinterpret_cast<char const*>(data.data()),
-                static_cast<std::streamsize>(data.size() * sizeof(uint64_t)));
+      WriteBinaryEntries(out_path.string(), edges.size(), 2, payload);
       return true;
     }
     std::ofstream out(out_path);
