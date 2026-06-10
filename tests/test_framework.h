@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 #include <iomanip>
 #include <ios>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "binary_io.h"
@@ -1247,9 +1247,8 @@ ReadEntriesText(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
 // returns (N, dim)).
 template<typename E, int kInputType = 0>
 auto
-ReadEntriesBinary(char const* iFile,
-                  parlay::sequence<E>& wp,
-                  size_t offset = 0) -> std::pair<size_t, int>
+ReadEntriesBinary(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+  -> std::pair<size_t, int>
 {
   auto const [N, raw_dim, data] = ReadBinaryEntries(iFile);
   int dim = static_cast<int>(raw_dim);
@@ -1286,8 +1285,8 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   // NOTE: manual sanity check of the read
   size_t const head = std::min<size_t>(wp.size(), 5);
   size_t const tail = std::min<size_t>(wp.size() - head, 5);
-  std::cout << "Read " << wp.size() << " entries from " << iFile
-            << "; first " << head << ":";
+  std::cout << "Read " << wp.size() << " entries from " << iFile << "; first "
+            << head << ":";
   for (size_t i = 0; i < head; i++) {
     std::cout << " (" << wp[i] << ")";
   }
@@ -1621,8 +1620,10 @@ static auto constexpr TestTemporalGraph =
       std::array<std::string, kDynamicGraphBatchNum> insert_files;
       std::array<std::string, kDynamicGraphBatchNum> delete_files;
       for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-        insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
-        delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
+        insert_files[i] =
+          dynamic_graph_path + std::to_string(i) + "_insert.bin";
+        delete_files[i] =
+          dynamic_graph_path + std::to_string(i) + "_delete.bin";
       }
       parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
       parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
@@ -1666,8 +1667,10 @@ static auto constexpr TestTemporalGraph =
       std::array<std::string, kDynamicGraphBatchNum> insert_files;
       std::array<std::string, kDynamicGraphBatchNum> delete_files;
       for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-        insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
-        delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
+        insert_files[i] =
+          dynamic_graph_path + std::to_string(i) + "_insert.bin";
+        delete_files[i] =
+          dynamic_graph_path + std::to_string(i) + "_delete.bin";
       }
       parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
       parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);

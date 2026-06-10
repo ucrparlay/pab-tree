@@ -62,7 +62,7 @@ ReadBinaryEntries(char const* path)
 {
   std::ifstream fs(path, std::ios::binary);
   if (!fs.is_open()) {
-    std::cout << "Unable to open file: " << path << std::endl;
+    std::cerr << "Unable to open file: " << path << std::endl;
     abort();
   }
 
@@ -72,7 +72,7 @@ ReadBinaryEntries(char const* path)
   uint64_t const dim = header[1];
   uint64_t const width = header[2];
   if (!fs.good() || (width != sizeof(uint32_t) && width != sizeof(uint64_t))) {
-    std::cout << "Bad binary header in " << path << " (width = " << width
+    std::cerr << "Bad binary header in " << path << " (width = " << width
               << "); regenerate the .bin file." << std::endl;
     abort();
   }
@@ -90,7 +90,7 @@ ReadBinaryEntries(char const* path)
     });
   }
   if (fs.gcount() != payload_bytes) {
-    std::cout << "Truncated binary file: " << path << std::endl;
+    std::cerr << "Truncated binary file: " << path << std::endl;
     abort();
   }
   return { n, dim, std::move(data) };

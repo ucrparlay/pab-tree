@@ -448,9 +448,15 @@ auto ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
 
 `ReadEntries` is a **dispatch layer**: path ends in `.bin` →
 `ReadEntriesBinary`; anything else → `ReadEntriesText`. No filesystem probing —
-the given path is the file that gets read. To use binary data, pass a `.bin`
-path explicitly (note: `ParseInsertBatchPath`/`ParseDeleteBatchPath` construct
-`.in` paths, so derived batch files always load as text).
+the given path is the file that gets read. `ParseInsertBatchPath`/
+`ParseDeleteBatchPath` (`options.h`) derive base/batch paths that **inherit the
+input file's extension** (`InputExtension()`), so a `.bin` input (`-p`) makes
+all derived batch files load as binary too. `ExtractPrefixes` strips `.bin`,
+`.in`, then `.base`.
+
+**Debugging note**: `unit_test` redirects stdout during `RunTest`, so an
+`abort()` from a missing data file used to die silently (no gtest summary).
+`binary_io.h` errors go to **stderr** for this reason.
 
 ### `ReadEntriesText` (the original text parser)
 

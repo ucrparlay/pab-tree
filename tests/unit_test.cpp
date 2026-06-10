@@ -57,11 +57,11 @@ CheckOrthogonal(Options const& opts, RunFunc test_func)
 #endif // LEAF1
 
   using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                         kBuf,
-                                         Wrapper::LeafAugEmpty,
-                                         Wrapper::InteriorAugEmpty,
-                                         8,
-                                         pb_tree::ProtoNode>;
+                                            kBuf,
+                                            Wrapper::LeafAugEmpty,
+                                            Wrapper::InteriorAugEmpty,
+                                            8,
+                                            pb_tree::ProtoNode>;
   if (opts.tree_type == 0) {
     Run<BTreeWrapper<TypeTrait>>(opts, test_func);
   }
@@ -205,7 +205,7 @@ protected:
     for (auto const& entry : fs::directory_iterator(files_path)) {
       if (entry.is_regular_file()) {
         std::string filename = entry.path().filename().string();
-        if (filename.find(".base.in") != std::string::npos) {
+        if (filename.find(".base.bin") != std::string::npos) {
           base_files.push_back(entry.path().string());
         }
       }
@@ -237,7 +237,7 @@ protected:
                                       distribution.c_str() };
 
     // Print the command being executed
-    std::cout << "Running: b_ccp";
+    std::cout << "Running: unit_test";
     for (size_t i = 1; i < argv.size(); i++) {
       std::cout << " " << argv[i];
     }
@@ -390,7 +390,7 @@ std::string ParTreeCorrectTest::file_filter = "";
 bool ParTreeCorrectTest::redirect_output = true;
 
 // ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M
-// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --file_filter=1.base.in
+// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --file_filter=1.base.bin
 // ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --no_redirect
 int
 main(int argc, char** argv)

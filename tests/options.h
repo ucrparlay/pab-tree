@@ -62,10 +62,18 @@ struct Options
         s.erase(s.size() - suf.size());
       }
     };
+    strip_suffix(filename, ".bin");
     strip_suffix(filename, ".in");
     strip_suffix(filename, ".base");
 
     return { dirPrefix, filename };
+  }
+
+  // NOTE: derived base/batch paths inherit the input file's extension, so a
+  // ".bin" input selects ".bin" batch files (read via ReadEntriesBinary)
+  [[nodiscard]] auto InputExtension() const -> std::string
+  {
+    return input_file_path.ends_with(".bin") ? ".bin" : ".in";
   }
 
   [[nodiscard]] auto ParseInsertBatchPath(double batch_ratio) const
@@ -78,7 +86,7 @@ struct Options
     std::string base_path =
       dir_prefix + "ins/" +
       std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" + file_prefix +
-      ".base.in";
+      ".base" + InputExtension();
 
     std::string batch_path = base_path;
     batch_path.replace(batch_path.find(".base."), 6, ".batch.");
@@ -93,7 +101,7 @@ struct Options
     std::string base_path =
       dir_prefix + "del/" +
       std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" + file_prefix +
-      ".base.in";
+      ".base" + InputExtension();
 
     std::string batch_path = base_path;
     batch_path.replace(batch_path.find(".base."), 6, ".batch.");
