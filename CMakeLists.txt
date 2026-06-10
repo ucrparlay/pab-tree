@@ -193,6 +193,11 @@ add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
 target_link_libraries(data_generator PUBLIC TEST_FRAME)
 target_include_directories(data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
+# convert text .in datasets to binary .bin
+add_executable(data_to_binary ${PROJECT_SOURCE_DIR}/tests/data_to_binary.cpp)
+target_link_libraries(data_to_binary PUBLIC TEST_FRAME)
+target_include_directories(data_to_binary PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
 # to generate temporal graph
 add_executable(temporal_graph_info ${PROJECT_SOURCE_DIR}/tests/temporal_graph_info.cpp)
 target_link_libraries(temporal_graph_info PUBLIC TEST_FRAME)
