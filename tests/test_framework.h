@@ -49,6 +49,9 @@ static constexpr int kOSMRangeQueryNum = 500'000;
 constexpr uint64_t kDynamicGraphRangeNum = 1e7;
 constexpr uint64_t kDynamicGraphMaxSingleRange = 1506;
 constexpr uint64_t kDynamicFlattenSize = 5e8;
+
+// constexpr uint64_t kDynamicGraphSignalRangeNum = 1e6;
+
 // NOTE: rectangle numbers
 static constexpr int kRangeQueryNum = 50'000;
 static constexpr int kRangeQueryType = 3;
@@ -1028,10 +1031,20 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     }
   }
 
-  std::cout << std::right << " " << "insert_n" << " "
-            << "delete_n" << " " << "tree_n" << " "
-            << "insert_t(s)" << " " << "delete_t(s)" << " "
-            << "member_query_t(s)" << " " << "range_query_t(s)" << std::endl;
+  std::cout << std::right << " "
+            << "insert_n"
+            << " "
+            << "delete_n"
+            << " "
+            << "tree_n"
+            << " "
+            << "insert_t(s)"
+            << " "
+            << "delete_t(s)"
+            << " "
+            << "member_query_t(s)"
+            << " "
+            << "range_query_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     size_t const delete_n =
       batch_id >= sliding_window_len
@@ -1087,6 +1100,14 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
     query_points[i] = TT::Entry::GetKey(
       node_by_time[time_period_num - 1][i % member_query_step]);
   }
+
+  auto const range_query_num = vertex_occurrence.size();
+  auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
+    uint64_t u = vertex_occurrence[i].first;
+    return std::make_pair(static_cast<uint64_t>(u << 32),
+                          static_cast<uint64_t>((u + 1) << 32));
+  });
+  parlay::sequence<size_t> size_seq(box_seq.size(), 0);
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
@@ -1145,17 +1166,12 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         membership_res[j] = contain;
       });
       t.stop();
+      std::cout << "batch_id: " << batch_id
+                << " membership query time: " << t.total_time() << std::endl;
       member_query_time[batch_id] += t.total_time();
 
       // NOTE: range query — probe the top-occurrence (highest out-degree)
       // source vertices selected from the sorted edge list.
-      auto const range_query_num = vertex_occurrence.size();
-      auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
-        uint64_t u = vertex_occurrence[i].first;
-        return std::make_pair(static_cast<uint64_t>(u << 32),
-                              static_cast<uint64_t>((u + 1) << 32));
-      });
-      parlay::sequence<size_t> size_seq(box_seq.size(), 0);
 
       t.reset(), t.start();
       parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
@@ -1166,20 +1182,36 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         size_seq[j] = size;
       });
       t.stop();
+      std::cout << "batch_id: " << batch_id
+                << " range query time: " << t.total_time() << std::endl;
       range_query_time[batch_id] += t.total_time();
 
       // NOTE: flatten
       t.reset(), t.start();
       pkd.GetEntries(flatten_seq);
       t.stop();
+      std::cout << "batch_id: " << batch_id
+                << " flatten time: " << t.total_time() << std::endl;
       flatten_time[batch_id] += t.total_time();
     }
   }
 
-  std::cout << std::right << " " << "insert_n" << " "
-            << "delete_n" << " " << "tree_n" << " "
-            << "insert_t(s)" << " " << "delete_t(s)" << " "
-            << "member_query_t(s)" << " " << "range_query_t(s)" << std::endl;
+  std::cout << std::right << " "
+            << "insert_n"
+            << " "
+            << "delete_n"
+            << " "
+            << "tree_n"
+            << " "
+            << "insert_t(s)"
+            << " "
+            << "delete_t(s)"
+            << " "
+            << "member_query_t(s)"
+            << " "
+            << "range_query_t(s)"
+            << " "
+            << "flatten_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     size_t const delete_n =
       batch_id >= sliding_window_len
@@ -1190,7 +1222,8 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
               << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
               << " " << delete_time[batch_id] / (rounds - 1) << " "
               << member_query_time[batch_id] / (rounds - 1) << " "
-              << range_query_time[batch_id] / (rounds - 1) << std::endl;
+              << range_query_time[batch_id] / (rounds - 1) << " "
+              << flatten_time[batch_id] / (rounds - 1) << std::endl;
   }
 }
 
@@ -1324,10 +1357,21 @@ TestDynamicGraph(const auto& insert_batch_seq,
     }
   }
 
-  std::cout << std::right << " " << "insert_n" << " "
-            << "delete_n" << " " << "tree_n" << " "
-            << "insert_t(s)" << " " << "delete_t(s)" << " "
-            << "find_t(s)" << " " << "range_t(s)" << " "
+  std::cout << std::right << " "
+            << "insert_n"
+            << " "
+            << "delete_n"
+            << " "
+            << "tree_n"
+            << " "
+            << "insert_t(s)"
+            << " "
+            << "delete_t(s)"
+            << " "
+            << "find_t(s)"
+            << " "
+            << "range_t(s)"
+            << " "
             << "flatten_t(s)" << std::endl;
   for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
     // size_t const delete_n =
@@ -1440,19 +1484,26 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
                      : ReadEntriesText<E, kInputType>(iFile, wp, offset);
 
   // NOTE: manual sanity check of the read
-  size_t const head = std::min<size_t>(wp.size(), 5);
-  size_t const tail = std::min<size_t>(wp.size() - head, 5);
-  std::cout << "Read " << wp.size() << " entries from " << iFile << "; first "
-            << head << ":";
-  for (size_t i = 0; i < head; i++) {
-    std::cout << " (" << wp[i] << ")";
+  // size_t const head = std::min<size_t>(wp.size(), 5);
+  // size_t const tail = std::min<size_t>(wp.size() - head, 5);
+  // std::cout << "Read " << wp.size() << " entries from " << iFile << "; first
+  // "
+  //           << head << ":";
+  // for (size_t i = 0; i < head; i++) {
+  //   std::cout << " (" << wp[i] << ")";
+  // }
+  // std::cout << "; last " << tail << ":";
+  // for (size_t i = wp.size() - tail; i < wp.size(); i++) {
+  //   std::cout << " (" << wp[i] << ")";
+  // }
+  // std::cout << std::endl;
+  auto dedup = parlay::remove_duplicates_ordered(
+    wp, [&](auto const& a, auto const& b) { return a.key < b.key; });
+  if (dedup.size() != wp.size()) {
+    std::cout << "Warning: input contains " << (wp.size() - dedup.size())
+              << " duplicate keys; only the first occurrence is kept."
+              << std::endl;
   }
-  std::cout << "; last " << tail << ":";
-  for (size_t i = wp.size() - tail; i < wp.size(); i++) {
-    std::cout << " (" << wp[i] << ")";
-  }
-  std::cout << std::endl;
-
   return res;
 }
 
@@ -1862,7 +1913,7 @@ static auto constexpr TestTemporalGraph =
     }
 
     // NOTE: temporal graph signal sliding window
-    if (opts.tag & (1 << 3)) {
+    if (opts.tag & (1 << 6)) {
       string osm_path = opts.input_file_path;
       EntrySeq osm_records;
       auto [input_num, input_dim] =
@@ -1896,10 +1947,12 @@ static auto constexpr TestTemporalGraph =
       parlay::sort_inplace(vertex_occurrence, [](auto const& a, auto const& b) {
         return a.second > b.second;
       });
+      std::cout << vertex_occurrence.size() << " unique vertices in total"
+                << std::endl;
+      vertex_occurrence = vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
       // WARN: may don't have enough vertices for range query
       auto [offset, tot_range_size] = parlay::scan(
-        parlay::map(vertex_occurrence.cut(0, kDynamicGraphRangeNum),
-                    [](auto const& p) { return p.second; }),
+        parlay::map(vertex_occurrence, [](auto const& p) { return p.second; }),
         parlay::addm<size_t>());
       offset.push_back(tot_range_size);
 
