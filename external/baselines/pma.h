@@ -71,6 +71,10 @@ public:
   template<typename PT>
   void map_insert(PT P)
   {
+    if (this->pma_tree_ == nullptr || this->pma_tree_->size() == 0) {
+      map_init(P);
+      return;
+    }
     assert(parlay::all_of(P.first, [](auto x) { return x != 0; }));
     size_t n = P.first.size();
     // parlay::sort_inplace(parlay::make_slice(P.first));
@@ -188,7 +192,7 @@ public:
 
   auto GetSize() const
   {
-    return this->pma_tree_.size();
+    return this->pma_tree_->size();
   }
 
   constexpr static int GetLeafSize()
