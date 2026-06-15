@@ -1083,11 +1083,11 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   auto member_query_step = member_query_n / time_period_num;
 
   for (int i = 0; i < time_period_num; i++) {
-    // parse input
+    // NOTE: parse input
     wi[i] = Tree::ParseInput(node_by_time[i]);
     wd[i] = Tree::ParseDeleteInput(node_by_time[i]);
 
-    // generate the query points
+    // NOTE: generate the query points
     parlay::parallel_for(0, member_query_step, [&](size_t j) {
       query_points[(i * member_query_step) + j] =
         TT::Entry::GetKey(node_by_time[i][j]);
@@ -1101,6 +1101,7 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       node_by_time[time_period_num - 1][i % member_query_step]);
   }
 
+  // NOTE: generate the range query box
   auto const range_query_num = vertex_occurrence.size();
   auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
     uint64_t u = vertex_occurrence[i].first;
@@ -1172,7 +1173,6 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 
       // NOTE: range query — probe the top-occurrence (highest out-degree)
       // source vertices selected from the sorted edge list.
-
       t.reset(), t.start();
       parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
         auto [size, logger] =
@@ -1235,7 +1235,9 @@ TestDynamicGraph(const auto& insert_batch_seq,
                  const int rounds,
                  auto& membership_res,
                  auto& range_report_output,
-                 auto& flatten_seq)
+                 auto& flatten_seq,
+                 auto const& vertex_occurrence,
+                 auto const& range_query_offset)
 {
   pkd.DeleteTree();
   auto time_period_num = insert_batch_seq.size();
@@ -1261,6 +1263,15 @@ TestDynamicGraph(const auto& insert_batch_seq,
       query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
     });
   }
+
+  // NOTE: generate the range query box
+  auto const range_query_num = vertex_occurrence.size();
+  auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
+    uint64_t u = vertex_occurrence[i].first;
+    return std::make_pair(static_cast<uint64_t>(u << 32),
+                          static_cast<uint64_t>((u + 1) << 32));
+  });
+  parlay::sequence<size_t> size_seq(box_seq.size(), 0);
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
@@ -1322,20 +1333,12 @@ TestDynamicGraph(const auto& insert_batch_seq,
       member_query_time[batch_id] += t.total_time();
 
       // NOTE: range report query
-      auto random_wi = parlay::random_shuffle(insert_batch_seq[batch_id]);
-      auto box_seq = parlay::tabulate(kDynamicGraphRangeNum, [&](size_t i) {
-        auto e = random_wi[i];
-        uint64_t key = TT::Entry::GetKey(e);
-        uint64_t u = key >> 32;
-        return std::make_pair(u << 32, (u + 1) << 32);
-      });
-      parlay::sequence<size_t> size_seq(box_seq.size(), 0);
       t.reset(), t.start();
       parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
-        auto [size, logger] = pkd.RangeReport(
-          box_seq[j],
-          range_report_output.cut(kDynamicGraphMaxSingleRange * j,
-                                  kDynamicGraphMaxSingleRange * (j + 1)));
+        auto [size, logger] =
+          pkd.RangeReport(box_seq[j],
+                          range_report_output.cut(range_query_offset[j],
+                                                  range_query_offset[j + 1]));
         size_seq[j] = size;
       });
       t.stop();
@@ -1850,21 +1853,45 @@ static auto constexpr TestTemporalGraph =
       }
 
       // generate box
-      auto range_report_output = typename TT::EntrySeq(
-        kDynamicGraphRangeNum * kDynamicGraphMaxSingleRange);
+      // NOTE: count how often each source vertex occurs (its out-degree) and
+      // build a (vertex, occurrence) sequence, highest occurrence first. The
+      // top vertices are later used as the keys for the range queries.
+      auto osm_records = parlay::flatten(insert_batch_seq);
+      auto edge_list = parlay::tabulate(osm_records.size(), [&](size_t i) {
+        auto key = TT::Entry::GetKey(osm_records[i]);
+        uint64_t u = key >> 32;
+        uint64_t v = key & 0xffffffff;
+        return std::make_pair(u, v);
+      });
+      auto vertex_occurrence = parlay::histogram_by_key(
+        parlay::map(edge_list, [](auto const& e) { return e.first; }));
+      parlay::sort_inplace(vertex_occurrence, [](auto const& a, auto const& b) {
+        return a.second > b.second;
+      });
+      vertex_occurrence = vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
+      // WARN: may don't have enough vertices for range query
+      auto [offset, tot_range_size] = parlay::scan(
+        parlay::map(vertex_occurrence, [](auto const& p) { return p.second; }),
+        parlay::addm<size_t>());
+      offset.push_back(tot_range_size);
 
-      // membership query result
+      auto range_report_output = typename TT::EntrySeq(tot_range_size);
+
+      // NOTE: membership query result
       auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
 
-      // flatten
+      // NOTE: flatten
       auto flatten_seq = TT::EntrySeq::uninitialized(kDynamicFlattenSize);
+
       TestDynamicGraph<TT, Tree>(insert_batch_seq,
                                  delete_batch_seq,
                                  tree,
                                  opts.rounds,
                                  membership_res,
                                  range_report_output,
-                                 flatten_seq);
+                                 flatten_seq,
+                                 vertex_occurrence,
+                                 offset);
     }
 
     if (opts.tag & (1 << 5)) { // NOTE: temporal graph randomness
@@ -1947,8 +1974,6 @@ static auto constexpr TestTemporalGraph =
       parlay::sort_inplace(vertex_occurrence, [](auto const& a, auto const& b) {
         return a.second > b.second;
       });
-      std::cout << vertex_occurrence.size() << " unique vertices in total"
-                << std::endl;
       vertex_occurrence = vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
       // WARN: may don't have enough vertices for range query
       auto [offset, tot_range_size] = parlay::scan(
