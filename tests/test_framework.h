@@ -1167,8 +1167,8 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         membership_res[j] = contain;
       });
       t.stop();
-      std::cout << "batch_id: " << batch_id
-                << " membership query time: " << t.total_time() << std::endl;
+      // std::cout << "batch_id: " << batch_id
+      //           << " membership query time: " << t.total_time() << std::endl;
       member_query_time[batch_id] += t.total_time();
 
       // NOTE: range query — probe the top-occurrence (highest out-degree)
@@ -1182,16 +1182,16 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         size_seq[j] = size;
       });
       t.stop();
-      std::cout << "batch_id: " << batch_id
-                << " range query time: " << t.total_time() << std::endl;
+      // std::cout << "batch_id: " << batch_id
+      //           << " range query time: " << t.total_time() << std::endl;
       range_query_time[batch_id] += t.total_time();
 
       // NOTE: flatten
       t.reset(), t.start();
       pkd.GetEntries(flatten_seq);
       t.stop();
-      std::cout << "batch_id: " << batch_id
-                << " flatten time: " << t.total_time() << std::endl;
+      // std::cout << "batch_id: " << batch_id
+      //           << " flatten time: " << t.total_time() << std::endl;
       flatten_time[batch_id] += t.total_time();
     }
   }
