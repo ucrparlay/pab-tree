@@ -13,13 +13,13 @@ summary=0
 query_type=$((2#00))
 round=4
 
-log_path="logs/temp"
+log_path="logs/temp_osm"
 mkdir -p "${log_path}"
 
-data_path="/data/zmen002/geometry/osm_temporal_graph/planet/"
+data_path="/data/zmen002/geometry/temporal_graph/osm/planet/"
 
 batch_op_seq=("ins")
-dis_seq=("temp")
+dis_seq=("temp_osm")
 batch_ratio=0.01
 
 function run_test() {
@@ -80,22 +80,22 @@ solver="pma"
 run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
 
-# # PAM
-# tree=2
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
-#
-# # CPAM
-# tree=1
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
-#
-# # ours
-# solver="b_test"
-# tree=0
-# for idx in "${!leaf_wrap_seq[@]}"; do
-# 	run_cmake "${idx}" "${solver}"
-# 	run_test "${idx}" "${solver}" "${tree}"
-# done
+# PAM
+tree=2
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+# CPAM
+tree=1
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+# ours
+solver="b_test"
+tree=0
+for idx in "${!leaf_wrap_seq[@]}"; do
+	run_cmake "${idx}" "${solver}"
+	run_test "${idx}" "${solver}" "${tree}"
+done
