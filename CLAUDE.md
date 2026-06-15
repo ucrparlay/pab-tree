@@ -427,7 +427,7 @@ transparently. All writers/readers go through these two helpers — **older
   each `.in` after its successful conversion (skipped files are kept).
 - `data_generator ... -binary 1` — generates directly to `.base.bin`/
   `.batch.bin` via `PrintToBinaryFile` (`data_op.h`) instead of text.
-- `temporal_graph_info <graph> <out_dir> [binary=0]` — `binary=1` writes
+- `temporal_graph_osm <graph> <out_dir> [binary=0]` — `binary=1` writes
   `<i>_insert.bin`/`<i>_delete.bin` (`[N, 2, src, dest, ...]`) instead of `.in`.
 - `filter_csv_year <in.csv> <out>` — if `<out>` ends with `.bin`, writes
   binary (`[N, 2, code, time, ...]`) instead of text.

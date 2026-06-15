@@ -198,10 +198,15 @@ add_executable(data_to_binary ${PROJECT_SOURCE_DIR}/tests/data_to_binary.cpp)
 target_link_libraries(data_to_binary PUBLIC TEST_FRAME)
 target_include_directories(data_to_binary PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
-# to generate temporal graph
-add_executable(temporal_graph_info ${PROJECT_SOURCE_DIR}/tests/temporal_graph_info.cpp)
-target_link_libraries(temporal_graph_info PUBLIC TEST_FRAME)
-target_include_directories(temporal_graph_info PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+# to generate temporal graph osm 
+add_executable(temporal_graph_osm ${PROJECT_SOURCE_DIR}/tests/temporal_graph_osm.cpp)
+target_link_libraries(temporal_graph_osm PUBLIC TEST_FRAME)
+target_include_directories(temporal_graph_osm PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
+# to generate temporal graph signal
+add_executable(temporal_graph_signal ${PROJECT_SOURCE_DIR}/tests/temporal_graph_signal.cpp)
+target_link_libraries(temporal_graph_signal PUBLIC TEST_FRAME)
+target_include_directories(temporal_graph_signal PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
 # to generate osm
 add_subdirectory(external/libmorton)

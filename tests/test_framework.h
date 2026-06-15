@@ -1611,7 +1611,7 @@ static auto constexpr TestTemporalGraph =
                           range_res);
     }
 
-    if (opts.tag & (1 << 4)) { // NOTE: temporal graph
+    if (opts.tag & (1 << 4)) { // NOTE: temporal graph osm
       // string dynamic_graph_path =
       //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
       string dynamic_graph_path = opts.input_file_path;
