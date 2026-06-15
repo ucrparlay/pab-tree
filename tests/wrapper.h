@@ -22,7 +22,7 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In){};
+    LeafAugEmpty(Slice In) {};
 
     template<typename Slice>
     void UpdateAug(Slice In)

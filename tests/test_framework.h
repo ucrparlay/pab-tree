@@ -1048,6 +1048,154 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 
 template<typename TT, typename Tree>
 void
+TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
+                   Tree& pkd,
+                   const int rounds,
+                   const int sliding_window_len,
+                   const size_t member_query_n,
+                   auto& membership_res,
+                   auto& range_report_res,
+                   auto& flatten_seq,
+                   auto const& vertex_occurrence,
+                   auto const& range_query_offset)
+{
+  pkd.DeleteTree();
+  const int time_period_num = node_by_time.size();
+  parlay::sequence<typename Tree::InputRangeT> wi(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> wd(time_period_num);
+  parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
+  parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
+    time_period_num);
+  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto member_query_step = member_query_n / time_period_num;
+
+  for (int i = 0; i < time_period_num; i++) {
+    // parse input
+    wi[i] = Tree::ParseInput(node_by_time[i]);
+    wd[i] = Tree::ParseDeleteInput(node_by_time[i]);
+
+    // generate the query points
+    parlay::parallel_for(0, member_query_step, [&](size_t j) {
+      query_points[(i * member_query_step) + j] =
+        TT::Entry::GetKey(node_by_time[i][j]);
+    });
+  }
+
+  // add the remaining empty membership query points
+  for (size_t i = member_query_step * time_period_num; i < member_query_n;
+       i++) {
+    query_points[i] = TT::Entry::GetKey(
+      node_by_time[time_period_num - 1][i % member_query_step]);
+  }
+
+  parlay::sequence<double> insert_time(time_period_num, 0.0);
+  parlay::sequence<double> delete_time(time_period_num, 0.0);
+  parlay::sequence<double> member_query_time(time_period_num, 0.0);
+  parlay::sequence<double> range_query_time(time_period_num, 0.0);
+  parlay::sequence<double> flatten_time(time_period_num, 0.0);
+  parlay::sequence<size_t> tree_size(time_period_num, 0);
+
+  for (int r = 0; r < rounds; r++) {
+    auto const& insert_entry = wi;
+    auto const& delete_entry = wd;
+
+    size_t current_tree_size = 0;
+    if (r == 1) { // omit the first rounds
+      for (int i = 0; i < time_period_num; i++) {
+        insert_time[i] = 0.0;
+        delete_time[i] = 0.0;
+        member_query_time[i] = 0.0;
+      }
+    }
+
+    // NOTE: running the osm
+    parlay::internal::timer t;
+    pkd.DeleteTree();
+    for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+      t.reset(), t.start();
+      pkd.BatchInsert(insert_entry[batch_id]);
+      t.stop();
+      insert_time[batch_id] += t.total_time();
+      current_tree_size += node_by_time[batch_id].size();
+#ifdef DEBUG
+      std::cerr << " insert batch: " << batch_id << std::flush;
+      pkd.Validate();
+#endif // DEBUG
+
+      if (batch_id >= sliding_window_len) {
+        t.reset(), t.start();
+        pkd.BatchDelete(delete_entry[batch_id - sliding_window_len]);
+        t.stop();
+        delete_time[batch_id] += t.total_time();
+        current_tree_size -= node_by_time[batch_id - sliding_window_len].size();
+#ifdef DEBUG
+        // std::cerr << " delete batch: " << batch_id - sliding_window_len
+        //           << std::flush;
+        pkd.Validate();
+#endif // DEBUG
+      } else {
+        delete_time[batch_id] = 0.0;
+      }
+      tree_size[batch_id] = current_tree_size;
+
+      // NOTE: test membership query
+      t.reset(), t.start();
+      parlay::parallel_for(0, member_query_n, [&](size_t j) {
+        auto [contain, logger] = pkd.Contain(query_points[j]);
+        membership_res[j] = contain;
+      });
+      t.stop();
+      member_query_time[batch_id] += t.total_time();
+
+      // NOTE: range query — probe the top-occurrence (highest out-degree)
+      // source vertices selected from the sorted edge list.
+      auto const range_query_num = vertex_occurrence.size();
+      auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
+        uint64_t u = vertex_occurrence[i].first;
+        return std::make_pair(static_cast<uint64_t>(u << 32),
+                              static_cast<uint64_t>((u + 1) << 32));
+      });
+      parlay::sequence<size_t> size_seq(box_seq.size(), 0);
+
+      t.reset(), t.start();
+      parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
+        auto [size, logger] =
+          pkd.RangeReport(box_seq[j],
+                          range_report_res.cut(range_query_offset[j],
+                                               range_query_offset[j + 1]));
+        size_seq[j] = size;
+      });
+      t.stop();
+      range_query_time[batch_id] += t.total_time();
+
+      // NOTE: flatten
+      t.reset(), t.start();
+      pkd.GetEntries(flatten_seq);
+      t.stop();
+      flatten_time[batch_id] += t.total_time();
+    }
+  }
+
+  std::cout << std::right << " " << "insert_n" << " "
+            << "delete_n" << " " << "tree_n" << " "
+            << "insert_t(s)" << " " << "delete_t(s)" << " "
+            << "member_query_t(s)" << " " << "range_query_t(s)" << std::endl;
+  for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+    size_t const delete_n =
+      batch_id >= sliding_window_len
+        ? node_by_time[batch_id - sliding_window_len].size()
+        : 0;
+    std::cout << std::right << " " << node_by_time[batch_id].size() << " "
+              << delete_n << " " << tree_size[batch_id] << " " << std::fixed
+              << std::setprecision(6) << insert_time[batch_id] / (rounds - 1)
+              << " " << delete_time[batch_id] / (rounds - 1) << " "
+              << member_query_time[batch_id] / (rounds - 1) << " "
+              << range_query_time[batch_id] / (rounds - 1) << std::endl;
+  }
+}
+
+template<typename TT, typename Tree>
+void
 TestDynamicGraph(const auto& insert_batch_seq,
                  const auto& delete_batch_seq,
                  Tree& pkd,
@@ -1223,12 +1371,14 @@ ReadEntriesText(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
       uint64_t v = std::stoull(pts[(i * dim) + 1]);
       uint64_t k = (u << 32) | v;
       wp[i].ReadKey(std::to_string(k));
-      wp[i].ReadVal(std::to_string(i + offset));
+      if (dim == 2) {
+        wp[i].ReadVal(std::to_string(i + offset));
+      } else if (dim == 3) {
+        wp[i].ReadVal(pts[(i * dim) + 2]);
+      }
     } else if constexpr (kInputType == InputType::kOsmInput) {
       wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
-      // wp[i].ReadKey(pts[i * dim], offset + i);
-      // wp[i].ReadVal(pts[(i * dim) + 1]);
     } else {
       wp[i].ReadKey(pts[i * dim]);
       wp[i].ReadVal(pts[(i * dim) + 1]);
@@ -1261,7 +1411,14 @@ ReadEntriesBinary(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
       uint64_t u = data[i * dim];
       uint64_t v = data[(i * dim) + 1];
       wp[i].key = (u << 32) | v;
-      wp[i].val = i + offset;
+      if (raw_dim == 2) {
+        wp[i].val = i + offset;
+      } else if (raw_dim == 3) {
+        wp[i].val = data[(i * dim) + 2];
+      }
+    } else if constexpr (kInputType == InputType::kOsmInput) {
+      wp[i].ReadKey(data[i * dim]);
+      wp[i].ReadVal(data[(i * dim) + 1]);
     } else {
       wp[i].key = data[i * dim];
       wp[i].val = data[(i * dim) + 1];
@@ -1575,7 +1732,7 @@ static auto constexpr TestTemporalGraph =
 #elif defined(OSM)
     constexpr int kInputType = InputType::kOsmInput;
 #else
-    constexpr int kInputType = InputType::kNormalInput;
+    constexpr int kInputType = InputType::kNormal;
 #endif
 
     // NOTE: real world sliding window
@@ -1611,7 +1768,8 @@ static auto constexpr TestTemporalGraph =
                           range_res);
     }
 
-    if (opts.tag & (1 << 4)) { // NOTE: temporal graph osm
+    // NOTE: temporal graph osm
+    if (opts.tag & (1 << 4)) {
       // string dynamic_graph_path =
       //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
       string dynamic_graph_path = opts.input_file_path;
@@ -1701,6 +1859,77 @@ static auto constexpr TestTemporalGraph =
                                              opts.rounds,
                                              ratio);
       }
+    }
+
+    // NOTE: temporal graph signal sliding window
+    if (opts.tag & (1 << 3)) {
+      string osm_path = opts.input_file_path;
+      EntrySeq osm_records;
+      auto [input_num, input_dim] =
+        ReadEntries<typename TT::E, kInputType>(osm_path.c_str(), osm_records);
+
+      parlay::stable_sort_inplace(
+        osm_records, [&](auto const& a, auto const& b) {
+          return TT::Entry::GetVal(a) < TT::Entry::GetVal(b);
+        });
+      auto max_timestamp = osm_records.back().val;
+      auto timestamp_seq =
+        parlay::tabulate(max_timestamp, [&](size_t i) { return i; });
+      const auto year_num = timestamp_seq.size();
+      auto node_by_year = parlay::tabulate(year_num, [&](size_t i) {
+        return parlay::filter(osm_records, [&](auto const& record) {
+          return TT::Entry::GetVal(record) == timestamp_seq[i];
+        });
+      });
+
+      // NOTE: count how often each source vertex occurs (its out-degree) and
+      // build a (vertex, occurrence) sequence, highest occurrence first. The
+      // top vertices are later used as the keys for the range queries.
+      auto edge_list = parlay::tabulate(osm_records.size(), [&](size_t i) {
+        auto key = TT::Entry::GetKey(osm_records[i]);
+        uint64_t u = key >> 32;
+        uint64_t v = key & 0xffffffff;
+        return std::make_pair(u, v);
+      });
+      auto vertex_occurrence = parlay::histogram_by_key(
+        parlay::map(edge_list, [](auto const& e) { return e.first; }));
+      parlay::sort_inplace(vertex_occurrence, [](auto const& a, auto const& b) {
+        return a.second > b.second;
+      });
+      // WARN: may don't have enough vertices for range query
+      auto [offset, tot_range_size] = parlay::scan(
+        parlay::map(vertex_occurrence.cut(0, kDynamicGraphRangeNum),
+                    [](auto const& p) { return p.second; }),
+        parlay::addm<size_t>());
+      offset.push_back(tot_range_size);
+
+      auto range_report_output = typename TT::EntrySeq(tot_range_size);
+
+      // membership query result
+      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+
+      // flatten
+      size_t tree_size = 0;
+      size_t max_tree_size = 0;
+      for (int batch_id = 0; batch_id < node_by_year.size(); batch_id++) {
+        tree_size += node_by_year[batch_id].size();
+        if (batch_id >= kOsmWindowLen) {
+          tree_size -= node_by_year[batch_id - kOsmWindowLen].size();
+        }
+        max_tree_size = std::max(max_tree_size, tree_size);
+      }
+      auto flatten_seq = TT::EntrySeq::uninitialized(max_tree_size);
+
+      TestTemporalSignal<TT>(node_by_year,
+                             tree,
+                             opts.rounds,
+                             kOsmWindowLen,
+                             kMemberQueryOsmSize,
+                             membership_res,
+                             range_report_output,
+                             flatten_seq,
+                             vertex_occurrence,
+                             offset);
     }
   };
 

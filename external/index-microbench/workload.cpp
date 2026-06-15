@@ -1007,7 +1007,7 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
 #if defined(DYNAMIC_GRAPH)
   constexpr int kInputType = InputType::kDynamicGraphInput;
 #elif defined(OSM)
-  constexpr int kInputType = InputType::kOsmInput;
+  constexpr int kInputType = InputType::kOSM;
 #else
   constexpr int kInputType = InputType::kNormalInput;
 #endif
