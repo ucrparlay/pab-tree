@@ -6,11 +6,11 @@
 #include <iostream>
 #include <string>
 
+#include "binary_io.h"
 #include "common/temporal_graph_io.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
 #include "parlay/random.h"
-#include "binary_io.h"
 
 // A signal graph stores only edge *appearances* (src, dest, timestamp); it
 // carries no INSERT/DELETE update_info. This driver:
@@ -31,17 +31,24 @@ struct EdgeRecord
 int
 main(int argc, char** argv)
 {
-  if (argc < 3 || argc > 4) {
+  // temporal_graph_signal <signal_graph_binary_file> <output_folder> [binary=0]
+  // [equal_timestamp=0]
+
+  if (argc < 3 || argc > 5) {
     std::cerr << "Usage: " << argv[0]
-              << " <signal_graph_binary_file> <output_folder> [binary=0]\n"
-              << "  binary=1 writes <i>.bin (uint64 stream [N, 2, src, dest, "
-                 "...]) instead of text <i>.in\n";
+              << " <signal_graph_binary_file> <output_folder> [binary=0] "
+                 "[equal_timestamp=0]\n"
+              << "  binary=1 writes <i>.bin (uint64 stream [N, 3, src, dest, "
+                 "timestamp, ...]) instead of text <i>.in\n"
+              << "  equal_timestamp=1 divides the edges into 10 equal batches "
+                 "labeled 1..10 instead of ranking distinct timestamps\n";
     return EXIT_FAILURE;
   }
 
   const std::string filename = argv[1];
   const std::filesystem::path output_dir = argv[2];
-  const bool binary = argc == 4 && std::atoi(argv[3]) != 0;
+  const bool binary = argc >= 4 && std::atoi(argv[3]) != 0;
+  const bool equal_timestamp = argc == 5 && std::atoi(argv[4]) != 0;
   IO::InputGraph graph(filename);
   graph.print_summary();
 
@@ -63,19 +70,33 @@ main(int argc, char** argv)
   };
   parlay::sort_inplace(edges, ts_cmp);
 
-  // 2. Count distinct timestamps and re-label them 1..K by ascending rank:
-  // edges is timestamp-sorted, so each distinct value starts a new group. An
-  // inclusive scan of the group-start flags gives each edge the 1-based rank
-  // of its timestamp, which becomes its new timestamp.
-  auto ts_new_flags = parlay::tabulate(edges.size(), [&](size_t i) -> size_t {
-    return (i == 0 || edges[i].timestamp != edges[i - 1].timestamp) ? 1 : 0;
-  });
-  auto ts_ranks = parlay::scan_inclusive(ts_new_flags);
-  const size_t num_distinct_ts = edges.empty() ? 0 : ts_ranks.back();
-  std::cout << "Distinct timestamps: " << num_distinct_ts << "\n";
-  parlay::parallel_for(0, edges.size(), [&](size_t i) {
-    edges[i].timestamp = static_cast<double>(ts_ranks[i]);
-  });
+  // 2. Re-label timestamps. Two modes:
+  if (equal_timestamp) {
+    // Equal-timestamp mode: edges is timestamp-sorted, so split it into 10
+    // equal contiguous batches by position and label each batch 1..10. Edge i
+    // falls in batch (i * 10) / n (0-based), labeled (i * 10) / n + 1.
+    constexpr size_t kNumBatches = 10;
+    const size_t n = edges.size();
+    parlay::parallel_for(0, n, [&](size_t i) {
+      edges[i].timestamp = static_cast<double>((i * kNumBatches) / n + 1);
+    });
+    std::cout << "Equal-timestamp mode: divided " << n << " edges into "
+              << kNumBatches << " batches labeled 1.." << kNumBatches << "\n";
+  } else {
+    // Rank mode: count distinct timestamps and re-label them 1..K by ascending
+    // rank. edges is timestamp-sorted, so each distinct value starts a new
+    // group. An inclusive scan of the group-start flags gives each edge the
+    // 1-based rank of its timestamp, which becomes its new timestamp.
+    auto ts_new_flags = parlay::tabulate(edges.size(), [&](size_t i) -> size_t {
+      return (i == 0 || edges[i].timestamp != edges[i - 1].timestamp) ? 1 : 0;
+    });
+    auto ts_ranks = parlay::scan_inclusive(ts_new_flags);
+    const size_t num_distinct_ts = edges.empty() ? 0 : ts_ranks.back();
+    std::cout << "Distinct timestamps: " << num_distinct_ts << "\n";
+    parlay::parallel_for(0, edges.size(), [&](size_t i) {
+      edges[i].timestamp = static_cast<double>(ts_ranks[i]);
+    });
+  }
 
   for (int i = 0; i < 5 && i < edges.size(); i++) {
     std::cout << "Edge " << i << ": src " << edges[i].src << ", dest "
