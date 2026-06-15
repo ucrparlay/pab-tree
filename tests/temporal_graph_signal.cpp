@@ -10,7 +10,7 @@
 #include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
 #include "parlay/random.h"
-#include "temporal_graph_binary_io.h"
+#include "binary_io.h"
 
 // A signal graph stores only edge *appearances* (src, dest, timestamp); it
 // carries no INSERT/DELETE update_info. This driver:

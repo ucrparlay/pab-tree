@@ -9,7 +9,7 @@
 #include "common/temporal_graph_io.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
-#include "temporal_graph_binary_io.h"
+#include "binary_io.h"
 
 struct EdgeRecord
 {

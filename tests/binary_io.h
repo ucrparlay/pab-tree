@@ -45,12 +45,10 @@ WriteBinaryEntries(std::string const& path,
       return static_cast<uint32_t>(payload[i]);
     });
     out.write(reinterpret_cast<char const*>(narrowed.data()),
-              static_cast<std::streamsize>(narrowed.size() *
-                                           sizeof(uint32_t)));
+              static_cast<std::streamsize>(narrowed.size() * sizeof(uint32_t)));
   } else {
     out.write(reinterpret_cast<char const*>(payload.data()),
-              static_cast<std::streamsize>(payload.size() *
-                                           sizeof(uint64_t)));
+              static_cast<std::streamsize>(payload.size() * sizeof(uint64_t)));
   }
   out.close();
 }
