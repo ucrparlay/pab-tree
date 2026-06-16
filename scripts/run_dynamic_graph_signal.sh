@@ -8,17 +8,17 @@ declare -a leaf_wrap_seq=(64)
 
 Nodes=(1000000000)
 Dim=(1)
-tag=$((2#10000))
+tag=64
 summary=0
 query_type=$((2#00))
 
 log_path="logs/temp_signal"
 mkdir -p "${log_path}"
 
-data_prefix="/data/zmen002/geometry/temporal_graph/signal/"
+data_prefix="/data/zmen002/geometry/temporal_graph/signal"
 
 batch_op_seq=("ins")
-dis_seq=("redd" "ref")
+dis_seq=("redd" "ref" "sem")
 batch_ratio=0.01
 
 function run_test() {
@@ -92,7 +92,7 @@ run_test 0 "${solver}" "${tree}" "${round}"
 # CPAM
 tree=1
 solver="cpam"
-round=2
+round=4
 run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}" "${round}"
 

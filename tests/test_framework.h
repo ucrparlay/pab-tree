@@ -2052,8 +2052,8 @@ static auto constexpr TestTemporalGraph =
       parlay::sort_inplace(
         range_query_vertex_occurrence,
         [](auto const& a, auto const& b) { return a.second > b.second; });
-      range_query_vertex_occurrence =
-        range_query_vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
+      range_query_vertex_occurrence = range_query_vertex_occurrence.subseq(
+        0, std::min(edge_list.size(), kDynamicGraphRangeNum));
       // WARN: may don't have enough vertices for range query
       auto [range_query_offset, tot_range_size] =
         parlay::scan(parlay::map(range_query_vertex_occurrence,
