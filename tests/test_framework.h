@@ -2023,7 +2023,7 @@ static auto constexpr TestTemporalGraph =
       auto timestamp_seq =
         parlay::tabulate(max_timestamp, [&](size_t i) { return i; });
       const auto year_num = timestamp_seq.size();
-      auto node_by_year = parlay::tabulate(year_num - 1, [&](size_t i) {
+      auto node_by_year = parlay::tabulate(year_num, [&](size_t i) {
         return parlay::filter(osm_records, [&](auto const& record) {
           return TT::Entry::GetVal(record) == timestamp_seq[i + 1];
         });
