@@ -40,8 +40,9 @@ main(int argc, char** argv)
                  "[equal_timestamp=0]\n"
               << "  binary=1 writes <i>.bin (uint64 stream [N, 3, src, dest, "
                  "timestamp, ...]) instead of text <i>.in\n"
-              << "  equal_timestamp=1 divides the edges into 10 equal batches "
-                 "labeled 1..10 instead of ranking distinct timestamps\n";
+              << "  equal_timestamp=1 ranks distinct timestamps 1..K, then "
+                 "buckets the ranks into 10 equal-width batches by timestamp "
+                 "(labeled 1..10) instead of using the raw rank\n";
     return EXIT_FAILURE;
   }
 
@@ -70,29 +71,34 @@ main(int argc, char** argv)
   };
   parlay::sort_inplace(edges, ts_cmp);
 
-  // 2. Re-label timestamps. Two modes:
+  // 2. Re-label timestamps. Both modes start by ranking the distinct
+  // timestamps 1..K by ascending value: edges is timestamp-sorted, so each
+  // distinct value starts a new group, and an inclusive scan of the
+  // group-start flags gives each edge the 1-based rank of its timestamp.
+  auto ts_new_flags = parlay::tabulate(edges.size(), [&](size_t i) -> size_t {
+    return (i == 0 || edges[i].timestamp != edges[i - 1].timestamp) ? 1 : 0;
+  });
+  auto ts_ranks = parlay::scan_inclusive(ts_new_flags);
+  const size_t num_distinct_ts = edges.empty() ? 0 : ts_ranks.back();
+  std::cout << "Distinct timestamps: " << num_distinct_ts << "\n";
+
   if (equal_timestamp) {
-    // Equal-timestamp mode: edges is timestamp-sorted, so split it into 10
-    // equal contiguous batches by position and label each batch 1..10. Edge i
-    // falls in batch (i * 10) / n (0-based), labeled (i * 10) / n + 1.
+    // Equal-timestamp mode: after ranking timestamps 1..K, bucket the ranks
+    // into 10 equal-width batches by timestamp, labeled 1..10. An edge whose
+    // timestamp rank is r (1-based) falls in batch ((r - 1) * 10) / K + 1, so
+    // ranks 1..K/10 land in batch 1, K/10+1..2K/10 in batch 2, and so on.
     constexpr size_t kNumBatches = 10;
-    const size_t n = edges.size();
-    parlay::parallel_for(0, n, [&](size_t i) {
-      edges[i].timestamp = static_cast<double>((i * kNumBatches) / n + 1);
+    const size_t k = num_distinct_ts;
+    parlay::parallel_for(0, edges.size(), [&](size_t i) {
+      const size_t rank = ts_ranks[i];
+      edges[i].timestamp =
+        static_cast<double>(k == 0 ? 0 : ((rank - 1) * kNumBatches) / k + 1);
     });
-    std::cout << "Equal-timestamp mode: divided " << n << " edges into "
-              << kNumBatches << " batches labeled 1.." << kNumBatches << "\n";
+    std::cout << "Equal-timestamp mode: bucketed " << k
+              << " distinct timestamps into " << kNumBatches
+              << " batches labeled 1.." << kNumBatches << " by timestamp\n";
   } else {
-    // Rank mode: count distinct timestamps and re-label them 1..K by ascending
-    // rank. edges is timestamp-sorted, so each distinct value starts a new
-    // group. An inclusive scan of the group-start flags gives each edge the
-    // 1-based rank of its timestamp, which becomes its new timestamp.
-    auto ts_new_flags = parlay::tabulate(edges.size(), [&](size_t i) -> size_t {
-      return (i == 0 || edges[i].timestamp != edges[i - 1].timestamp) ? 1 : 0;
-    });
-    auto ts_ranks = parlay::scan_inclusive(ts_new_flags);
-    const size_t num_distinct_ts = edges.empty() ? 0 : ts_ranks.back();
-    std::cout << "Distinct timestamps: " << num_distinct_ts << "\n";
+    // Rank mode: the timestamp rank itself becomes the new timestamp.
     parlay::parallel_for(0, edges.size(), [&](size_t i) {
       edges[i].timestamp = static_cast<double>(ts_ranks[i]);
     });
