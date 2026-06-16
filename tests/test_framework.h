@@ -1069,7 +1069,8 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
                    auto& membership_res,
                    auto& range_report_res,
                    auto& flatten_seq,
-                   auto const& vertex_occurrence,
+                   auto const& membership_query_keys,
+                   auto const& range_query_vertex_occurrence,
                    auto const& range_query_offset)
 {
   pkd.DeleteTree();
@@ -1079,36 +1080,24 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<typename Tree::InputRangeT> insert_entry(time_period_num);
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
-  auto query_points = TT::KeySeq::uninitialized(member_query_n);
-  auto member_query_step = member_query_n / time_period_num;
 
   for (int i = 0; i < time_period_num; i++) {
     // NOTE: parse input
     wi[i] = Tree::ParseInput(node_by_time[i]);
     wd[i] = Tree::ParseDeleteInput(node_by_time[i]);
-
-    // NOTE: generate the query points
-    parlay::parallel_for(0, member_query_step, [&](size_t j) {
-      query_points[(i * member_query_step) + j] =
-        TT::Entry::GetKey(node_by_time[i][j]);
-    });
-  }
-
-  // add the remaining empty membership query points
-  for (size_t i = member_query_step * time_period_num; i < member_query_n;
-       i++) {
-    query_points[i] = TT::Entry::GetKey(
-      node_by_time[time_period_num - 1][i % member_query_step]);
   }
 
   // NOTE: generate the range query box
-  auto const range_query_num = vertex_occurrence.size();
-  auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
-    uint64_t u = vertex_occurrence[i].first;
+  auto const range_query_num = range_query_vertex_occurrence.size();
+  auto range_query_box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
+    uint64_t u = range_query_vertex_occurrence[i].first;
     return std::make_pair(static_cast<uint64_t>(u << 32),
                           static_cast<uint64_t>((u + 1) << 32));
   });
-  parlay::sequence<size_t> size_seq(box_seq.size(), 0);
+  parlay::sequence<size_t> range_query_output_size(range_query_box_seq.size(),
+                                                   0);
+
+  // std::cout << "begin insert osm by time" << std::endl;
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
@@ -1163,7 +1152,7 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       // NOTE: test membership query
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(query_points[j]);
+        auto [contain, logger] = pkd.Contain(membership_query_keys[j]);
         membership_res[j] = contain;
       });
       t.stop();
@@ -1174,12 +1163,12 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       // NOTE: range query — probe the top-occurrence (highest out-degree)
       // source vertices selected from the sorted edge list.
       t.reset(), t.start();
-      parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
+      parlay::parallel_for(0, range_query_box_seq.size(), [&](size_t j) {
         auto [size, logger] =
-          pkd.RangeReport(box_seq[j],
+          pkd.RangeReport(range_query_box_seq[j],
                           range_report_res.cut(range_query_offset[j],
                                                range_query_offset[j + 1]));
-        size_seq[j] = size;
+        range_query_output_size[j] = size;
       });
       t.stop();
       // std::cout << "batch_id: " << batch_id
@@ -1786,7 +1775,7 @@ static auto constexpr TestTemporalGraph =
 #elif defined(OSM)
     constexpr int kInputType = InputType::kOsmInput;
 #else
-    constexpr int kInputType = InputType::kNormal;
+    constexpr int kInputType = InputType::kNormalInput;
 #endif
 
     // NOTE: real world sliding window
@@ -1863,17 +1852,19 @@ static auto constexpr TestTemporalGraph =
         uint64_t v = key & 0xffffffff;
         return std::make_pair(u, v);
       });
-      auto vertex_occurrence = parlay::histogram_by_key(
+      auto range_query_vertex_occurrence = parlay::histogram_by_key(
         parlay::map(edge_list, [](auto const& e) { return e.first; }));
-      parlay::sort_inplace(vertex_occurrence, [](auto const& a, auto const& b) {
-        return a.second > b.second;
-      });
-      vertex_occurrence = vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
+      parlay::sort_inplace(
+        range_query_vertex_occurrence,
+        [](auto const& a, auto const& b) { return a.second > b.second; });
+      range_query_vertex_occurrence =
+        range_query_vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
       // WARN: may don't have enough vertices for range query
-      auto [offset, tot_range_size] = parlay::scan(
-        parlay::map(vertex_occurrence, [](auto const& p) { return p.second; }),
-        parlay::addm<size_t>());
-      offset.push_back(tot_range_size);
+      auto [range_query_offset, tot_range_size] =
+        parlay::scan(parlay::map(range_query_vertex_occurrence,
+                                 [](auto const& p) { return p.second; }),
+                     parlay::addm<size_t>());
+      range_query_offset.push_back(tot_range_size);
 
       auto range_report_output = typename TT::EntrySeq(tot_range_size);
 
@@ -1890,8 +1881,8 @@ static auto constexpr TestTemporalGraph =
                                  membership_res,
                                  range_report_output,
                                  flatten_seq,
-                                 vertex_occurrence,
-                                 offset);
+                                 range_query_vertex_occurrence,
+                                 range_query_offset);
     }
 
     if (opts.tag & (1 << 5)) { // NOTE: temporal graph randomness
@@ -1954,12 +1945,21 @@ static auto constexpr TestTemporalGraph =
       auto timestamp_seq =
         parlay::tabulate(max_timestamp, [&](size_t i) { return i; });
       const auto year_num = timestamp_seq.size();
-      auto node_by_year = parlay::tabulate(year_num, [&](size_t i) {
+      auto node_by_year = parlay::tabulate(year_num - 1, [&](size_t i) {
         return parlay::filter(osm_records, [&](auto const& record) {
-          return TT::Entry::GetVal(record) == timestamp_seq[i];
+          return TT::Entry::GetVal(record) == timestamp_seq[i + 1];
         });
       });
 
+      // NOTE: membership query stuff
+      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      auto random_osm_records = parlay::random_shuffle(osm_records);
+      auto membership_query_points =
+        parlay::tabulate(kMemberQueryOsmSize, [&](size_t i) {
+          return TT::Entry::GetKey(random_osm_records[i]);
+        });
+
+      // NOTE: range query stuff
       // NOTE: count how often each source vertex occurs (its out-degree) and
       // build a (vertex, occurrence) sequence, highest occurrence first. The
       // top vertices are later used as the keys for the range queries.
@@ -1969,24 +1969,23 @@ static auto constexpr TestTemporalGraph =
         uint64_t v = key & 0xffffffff;
         return std::make_pair(u, v);
       });
-      auto vertex_occurrence = parlay::histogram_by_key(
+      auto range_query_vertex_occurrence = parlay::histogram_by_key(
         parlay::map(edge_list, [](auto const& e) { return e.first; }));
-      parlay::sort_inplace(vertex_occurrence, [](auto const& a, auto const& b) {
-        return a.second > b.second;
-      });
-      vertex_occurrence = vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
+      parlay::sort_inplace(
+        range_query_vertex_occurrence,
+        [](auto const& a, auto const& b) { return a.second > b.second; });
+      range_query_vertex_occurrence =
+        range_query_vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
       // WARN: may don't have enough vertices for range query
-      auto [offset, tot_range_size] = parlay::scan(
-        parlay::map(vertex_occurrence, [](auto const& p) { return p.second; }),
-        parlay::addm<size_t>());
-      offset.push_back(tot_range_size);
+      auto [range_query_offset, tot_range_size] =
+        parlay::scan(parlay::map(range_query_vertex_occurrence,
+                                 [](auto const& p) { return p.second; }),
+                     parlay::addm<size_t>());
+      range_query_offset.push_back(tot_range_size);
 
       auto range_report_output = typename TT::EntrySeq(tot_range_size);
 
-      // membership query result
-      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
-
-      // flatten
+      // NOTE: flatten stuff
       size_t tree_size = 0;
       size_t max_tree_size = 0;
       for (int batch_id = 0; batch_id < node_by_year.size(); batch_id++) {
@@ -1998,6 +1997,7 @@ static auto constexpr TestTemporalGraph =
       }
       auto flatten_seq = TT::EntrySeq::uninitialized(max_tree_size);
 
+      // NOTE: main function call
       TestTemporalSignal<TT>(node_by_year,
                              tree,
                              opts.rounds,
@@ -2006,8 +2006,9 @@ static auto constexpr TestTemporalGraph =
                              membership_res,
                              range_report_output,
                              flatten_seq,
-                             vertex_occurrence,
-                             offset);
+                             membership_query_points,
+                             range_query_vertex_occurrence,
+                             range_query_offset);
     }
   };
 
