@@ -59,6 +59,10 @@ BTree<TT>::BatchDelete_(Range In,
     return;
   }
 
+  if (In.size() == 0) {
+    return;
+  }
+
   static_assert(
     std::same_as<typename decltype(In)::value_type, typename TT::K>);
 
@@ -72,11 +76,16 @@ BTree<TT>::BatchDelete_(Range In,
   }
 
   auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
-    BatchDeleteRecursive(
-      this->root_, parlay::make_slice(sorted_seq), leaf_entries_pattern, leaf_sort_pred);
+    BatchDeleteRecursive(this->root_,
+                         parlay::make_slice(sorted_seq),
+                         leaf_entries_pattern,
+                         leaf_sort_pred);
   // t.next("remove points ");
 
-  if (invalid_flag) {
+  if (invalid_flag) { // NOTE: root is invalid
+    if (this->root_->is_leaf) {
+      return;
+    }
     assert(this->root_->size == 0);
     constexpr bool kEnableGranularity = false;
     this->DeleteTreeRec<kEnableGranularity>(this->root_);
@@ -89,6 +98,14 @@ BTree<TT>::BatchDelete_(Range In,
   // this->sys_balance_leaf_size = 0;
 
   if (invalid_subtree_num) {
+    if (this->root_->size < TT::kBufUB &&
+        !this->root_->is_leaf) { // fits in one leaf directly use leaf
+      auto tree_entries = TT::EntrySeq::uninitialized(this->root_->size);
+      FlattenRec(this->root_, parlay::make_slice(tree_entries));
+      this->DeleteTreeRec<true>(this->root_);
+      Build_(parlay::make_slice(tree_entries));
+      return;
+    }
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
 
 #ifdef DEBUG
@@ -132,7 +149,8 @@ BTree<TT>::BatchDeleteRecursive(Node* T,
 
   if (T->is_leaf) {
     auto old_size = T->size;
-    auto new_node = DeletePoints4Leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
+    auto new_node =
+      DeletePoints4Leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
     assert(new_node == T);
     assert(new_node->size + In.size() == old_size);
     // assert(delete_cnt == In.size());

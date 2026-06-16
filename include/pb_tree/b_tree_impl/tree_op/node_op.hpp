@@ -309,7 +309,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       return;
     }
 
-    BalanceOverLeaves(T, TI->reinsert_size, leaf_entries_pattern, leaf_sort_pred);
+    BalanceOverLeaves(
+      T, TI->reinsert_size, leaf_entries_pattern, leaf_sort_pred);
     TI->ResetDeletionFlag();
     return;
   }
@@ -405,7 +406,8 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
       return Entry::GetKey(a) < Entry::GetKey(b) &&
              Entry::GetKey(a) != Entry::GetKey(b);
     }));
-    ReInsertTreeAfterDelete(T, reinsert_entries, leaf_entries_pattern, leaf_sort_pred);
+    ReInsertTreeAfterDelete(
+      T, reinsert_entries, leaf_entries_pattern, leaf_sort_pred);
   }
 
   assert((this->Validate<true, false>(T)));
@@ -483,6 +485,9 @@ BTree<TT>::BalanceOverLeaves(Node* T,
   auto quick_check = [&](BufSizeT g) -> bool {
     const auto box = GetNodeBoxRec(TI->tree_nodes[tree_idx - 1]);
     if (tree_idx == 1) {
+      if (split_idx == 0) { // one tree node for the entire array
+        return true;
+      }
       return box.second < TI->split[split_idx - 1];
     }
     if (g == rightmost_pivot_idx) {
