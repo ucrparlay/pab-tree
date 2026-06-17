@@ -51,7 +51,7 @@ def parse_log(path):
             i += 2  # skip Tree: line and the column-header line
             data_rows = []
             geomean_row = None
-            arimean_row = None
+            sum_t_row = None
             while i < len(lines):
                 row_tokens = lines[i].split()
                 if not row_tokens:
@@ -65,14 +65,14 @@ def parse_log(path):
                     i += 1
                     continue
                 if row_tokens[0] == "#":
-                    # arithmetic mean of each attribute (leading "#")
-                    arimean_row = row_tokens
+                    # sum of each attribute across all batches (leading "#")
+                    sum_t_row = row_tokens
                     i += 1
                     continue
                 data_rows.append(row_tokens)
                 i += 1
             blocks.append(
-                (benchmark, tree, buf_value, data_rows, geomean_row, arimean_row)
+                (benchmark, tree, buf_value, data_rows, geomean_row, sum_t_row)
             )
         else:
             i += 1
@@ -81,29 +81,29 @@ def parse_log(path):
 
 def build_rows(blocks):
     """Pivot blocks into one CSV row per (solver, operation).
-    Columns: benchmark, tree, buf_value, operation, geomean, arimean,
+    Columns: benchmark, tree, buf_value, operation, geomean, sum_t,
     <year0>, <year1>, ...
     """
     rows = []
-    for benchmark, tree, buf_value, data_rows, geomean_row, arimean_row in blocks:
+    for benchmark, tree, buf_value, data_rows, geomean_row, sum_t_row in blocks:
         if tree in EXCLUDE_TREES:
             continue
         for op_name, col_idx in zip(OPERATIONS, OP_COL_IDX):
             values = [row[col_idx] if col_idx < len(row) else "" for row in data_rows]
-            # geomean/arimean lines have a leading ">"/"#", so columns shift by 1
+            # geomean/sum_t lines have a leading ">"/"#", so columns shift by 1
             mean_idx = col_idx + 1
             geomean = (
                 geomean_row[mean_idx]
                 if geomean_row is not None and mean_idx < len(geomean_row)
                 else ""
             )
-            arimean = (
-                arimean_row[mean_idx]
-                if arimean_row is not None and mean_idx < len(arimean_row)
+            sum_t = (
+                sum_t_row[mean_idx]
+                if sum_t_row is not None and mean_idx < len(sum_t_row)
                 else ""
             )
             rows.append(
-                [benchmark, tree, buf_value, op_name, geomean, arimean] + values
+                [benchmark, tree, buf_value, op_name, geomean, sum_t] + values
             )
     return rows
 
@@ -127,7 +127,7 @@ def write_csv(rows, path):
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["benchmark", "tree", "buf_value", "operation", "geomean", "arimean"]
+            ["benchmark", "tree", "buf_value", "operation", "geomean", "sum_t"]
             + year_header
         )
         writer.writerows(rows)
