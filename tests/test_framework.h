@@ -1075,6 +1075,21 @@ GeometricMean(Range const& v)
   return std::exp(log_sum / static_cast<double>(nz.size()));
 }
 
+// NOTE: arithmetic mean of a numeric range. Entries equal to 0 are omitted
+// (mirrors GeometricMean) so the two means describe the same set of batches.
+template<typename Range>
+double
+ArithmeticMean(Range const& v)
+{
+  auto const nz = parlay::filter(v, [](auto x) { return x != 0; });
+  if (nz.size() == 0) {
+    return 0.0;
+  }
+  double const sum = parlay::reduce(
+    parlay::delayed_map(nz, [](auto x) { return static_cast<double>(x); }));
+  return sum / static_cast<double>(nz.size());
+}
+
 template<typename TT, typename Tree>
 void
 TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
@@ -1259,6 +1274,38 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
                  return range_query_time[batch_id] / (rounds - 1);
                })
             << " " << geo_col([&](size_t batch_id) {
+                 return flatten_time[batch_id] / (rounds - 1);
+               })
+            << std::endl;
+
+  // NOTE: arithmetic mean of every attribute across all batches
+  auto const ari_col = [&](auto&& f) {
+    return ArithmeticMean(
+      parlay::tabulate(time_period_num, [&](size_t batch_id) {
+        return static_cast<double>(f(batch_id));
+      }));
+  };
+  std::cout << std::right << "# " << ari_col([&](size_t batch_id) {
+    return node_by_time[batch_id].size();
+  }) << " " << ari_col([&](size_t batch_id) {
+    return batch_id >= sliding_window_len
+             ? node_by_time[batch_id - sliding_window_len].size()
+             : size_t{ 0 };
+  }) << " " << ari_col([&](size_t batch_id) { return tree_size[batch_id]; })
+            << " " << std::fixed << std::setprecision(6)
+            << ari_col([&](size_t batch_id) {
+                 return insert_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
+                 return delete_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
+                 return member_query_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
+                 return range_query_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
                  return flatten_time[batch_id] / (rounds - 1);
                })
             << std::endl;
@@ -1454,6 +1501,36 @@ TestDynamicGraph(const auto& insert_batch_seq,
                  return range_query_time[batch_id] / (rounds - 1);
                })
             << " " << geo_col([&](size_t batch_id) {
+                 return flatten_time[batch_id] / (rounds - 1);
+               })
+            << std::endl;
+
+  // NOTE: arithmetic mean of every attribute across all batches
+  auto const ari_col = [&](auto&& f) {
+    return ArithmeticMean(
+      parlay::tabulate(time_period_num, [&](size_t batch_id) {
+        return static_cast<double>(f(batch_id));
+      }));
+  };
+  std::cout << std::right << "# " << ari_col([&](size_t batch_id) {
+    return insert_batch_seq[batch_id].size();
+  }) << " " << ari_col([&](size_t batch_id) {
+    return delete_batch_seq[batch_id].size();
+  }) << " " << ari_col([&](size_t batch_id) { return tree_size[batch_id]; })
+            << " " << std::fixed << std::setprecision(6)
+            << ari_col([&](size_t batch_id) {
+                 return insert_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
+                 return delete_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
+                 return member_query_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
+                 return range_query_time[batch_id] / (rounds - 1);
+               })
+            << " " << ari_col([&](size_t batch_id) {
                  return flatten_time[batch_id] / (rounds - 1);
                })
             << std::endl;
