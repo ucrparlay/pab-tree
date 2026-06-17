@@ -71,6 +71,21 @@ main(int argc, char** argv)
   };
   parlay::sort_inplace(edges, ts_cmp);
 
+  // NOTE: print several edges with their raw timestamps (before relabeling) so
+  // the original timestamp format/scale can be inspected.
+  std::cout << "Edges before timestamp relabeling (raw timestamps):\n";
+  std::cout << std::setprecision(17);
+  for (int i = 0; i < 5 && i < edges.size(); i++) {
+    std::cout << "Edge " << i << ": src " << edges[i].src << ", dest "
+              << edges[i].dest << ", timestamp ";
+    if (ts_integral)
+      std::cout << static_cast<uint64_t>(edges[i].timestamp) << "\n";
+    else
+      std::cout << edges[i].timestamp << "\n";
+  }
+
+  return 0;
+
   // 2. Re-label timestamps. Both modes start by ranking the distinct
   // timestamps 1..K by ascending value: edges is timestamp-sorted, so each
   // distinct value starts a new group, and an inclusive scan of the
