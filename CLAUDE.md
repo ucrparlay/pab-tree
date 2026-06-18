@@ -427,8 +427,16 @@ transparently. All writers/readers go through these two helpers — **older
   each `.in` after its successful conversion (skipped files are kept).
 - `data_generator ... -binary 1` — generates directly to `.base.bin`/
   `.batch.bin` via `PrintToBinaryFile` (`data_op.h`) instead of text.
-- `temporal_graph_osm <graph> <out_dir> [binary=0]` — `binary=1` writes
-  `<i>_insert.bin`/`<i>_delete.bin` (`[N, 2, src, dest, ...]`) instead of `.in`.
+- `temporal_graph_osm -p <graph> -o <out_dir> [-binary {0,1}]` — `-binary 1`
+  writes `<i>_insert.bin`/`<i>_delete.bin` (`[N, 2, src, dest, ...]`) instead of
+  `.in`. Uses the `commandLine` parser (`common/parse_command_line.h`): `-p`/`-o`
+  are required (empty → usage), `-h`/`-help` print usage.
+- `temporal_graph_signal -p <graph> -o <out_dir> [-binary {0,1}]
+  [-group_by_year {0,1}]` — converts a *signal* graph (edge appearances, no
+  insert/delete) into a single `0.in`/`0.bin` (`[N, 3, src, dest, timestamp,
+  ...]`). Timestamps are Unix epoch seconds; `-group_by_year 1` (default) labels
+  edges by calendar year `1..#batches`, `-group_by_year 0` renumbers distinct
+  timestamps `1..#timestamps`. Same `commandLine` interface as above.
 - `filter_csv_year <in.csv> <out>` — if `<out>` ends with `.bin`, writes
   binary (`[N, 2, code, time, ...]`) instead of text.
 
@@ -437,6 +445,47 @@ transparently. All writers/readers go through these two helpers — **older
 `data_generator` **segfaults** if `-base_param`/`-batch_param` are omitted
 (`std::string(nullptr)` from `getOptionValue`) — pass dummies (e.g. `1`) even
 for uniform, which ignores them.
+
+### `temporal_graph_signal` driver (`tests/temporal_graph_signal.cpp`)
+
+Converts a **signal graph** — a stream of edge *appearances* `(src, dest,
+timestamp)` with no INSERT/DELETE semantics — into one timestamp-labeled output
+file (`0.in`/`0.bin`; rows `src dest timestamp`, binary `[N, 3, src, dest,
+timestamp, ...]`). Pipeline:
+
+1. **Read & sort** edges by raw timestamp (Unix epoch seconds, read as
+   `double`).
+2. **Deduplicate** `(src, dest)` keeping the earliest (smallest raw-timestamp)
+   copy via `remove_duplicates_ordered` (input is timestamp-sorted, so the
+   stable sort by `(src, dest)` keeps the earliest copy of each group).
+3. **Re-label timestamps** on the deduplicated edges (the label becomes the
+   output timestamp). Dedup leaves the result sorted by `(src, dest)`, so it is
+   **re-sorted by raw timestamp first** to make group adjacency valid, then:
+   - `-group_by_year 1` (default): convert each epoch second to its UTC calendar
+     year via `gmtime_r` (`tm_year + 1900`), then label the distinct years
+     `1..#batches` by ascending year — one batch per year. Years with no edges
+     are skipped, so labels stay contiguous.
+   - `-group_by_year 0`: renumber the distinct raw timestamps `1..#timestamps`
+     by ascending value (each distinct timestamp = its own label). Ranks are
+     computed over the **deduplicated** set.
+   - Both share the same group-flag + `scan_inclusive` machinery; only the flag
+     predicate differs (year change vs raw-timestamp change). The result
+     `labels` sequence overwrites `deduped_edges[i].timestamp`.
+4. **Shuffle within equal labels**: global `random_shuffle` then `stable_sort`
+   on the label → uniform order within each label group, globally ordered across
+   groups.
+5. **Stats + write**: prints max vertex ids, max degree, average degree, and a
+   post-dedup per-batch summary (`Batch N: M edges`, listed only in year mode
+   since rank mode can have a huge number of labels; the aggregate distinct-label
+   count prints in both modes).
+
+Note the **dedup-before-relabel** order: relabeling operates on the final edge
+set, so rank-mode labels (and the printed distinct counts) reflect deduped data,
+not the raw stream.
+
+CLI (`commandLine`, `common/parse_command_line.h`): `-p` input (required), `-o`
+output dir (required), `-binary {0,1}`, `-group_by_year {0,1}`. Missing required
+arg or `-h`/`-help` → usage.
 
 ## `ReadEntries` (`test_framework.h`) — the dataset loader
 

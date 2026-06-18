@@ -6,10 +6,11 @@
 #include <string>
 #include <tuple>
 
+#include "binary_io.h"
+#include "common/parse_command_line.h"
 #include "common/temporal_graph_io.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
-#include "binary_io.h"
 
 struct EdgeRecord
 {
@@ -22,17 +23,18 @@ struct EdgeRecord
 int
 main(int argc, char** argv)
 {
-  if (argc < 3 || argc > 4) {
-    std::cerr << "Usage: " << argv[0]
-              << " <temporal_graph_binary_file> <output_folder> [binary=0]\n"
-              << "  binary=1 writes <i>_insert.bin/<i>_delete.bin "
-                 "(uint64 stream [N, 2, src, dest, ...]) instead of text .in\n";
-    return EXIT_FAILURE;
-  }
+  commandLine P(
+    argc,
+    argv,
+    "-p <temporal_graph_binary_file> -o <output_folder> [-binary {0,1}]\n"
+    "  -binary 1 writes <i>_insert.bin/<i>_delete.bin (uint64 stream [N, 2, "
+    "src, dest, ...]) instead of text .in");
 
-  const std::string filename = argv[1];
-  const std::filesystem::path output_dir = argv[2];
-  const bool binary = argc == 4 && std::atoi(argv[3]) != 0;
+  const std::string filename = P.getOptionValue("-p", "");
+  const std::filesystem::path output_dir = P.getOptionValue("-o", "");
+  if (filename.empty() || output_dir.empty())
+    P.badArgument();
+  const bool binary = P.getOptionIntValue("-binary", 0) != 0;
   IO::InputGraph graph(filename);
   graph.print_summary();
 

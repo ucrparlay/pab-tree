@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -7,6 +8,7 @@
 #include <string>
 
 #include "binary_io.h"
+#include "common/parse_command_line.h"
 #include "common/temporal_graph_io.h"
 #include "parlay/internal/group_by.h"
 #include "parlay/primitives.h"
@@ -15,9 +17,12 @@
 // A signal graph stores only edge *appearances* (src, dest, timestamp); it
 // carries no INSERT/DELETE update_info. This driver:
 //   1. reads and parses the edges,
-//   2. re-labels each distinct timestamp 1..K by ascending rank,
-//   3. removes duplicate edges (same (src, dest), keeping the earliest one),
-//   4. sorts by timestamp, randomly shuffling edges that share a timestamp,
+//   2. removes duplicate edges (same (src, dest), keeping the earliest one),
+//   3. re-labels timestamps: by default groups edges by calendar year (raw
+//      timestamps are Unix epoch seconds), labeling distinct years 1..#batches
+//      by ascending year; with group_by_year=0 it instead renumbers the
+//      distinct timestamps 1..#timestamps by ascending value,
+//   4. sorts by the new label, randomly shuffling edges that share a label,
 //   5. writes all edges to 0.in (text) or 0.bin (binary, [N, 3, src, dest,
 //      timestamp, ...]). Each output row is "src dest timestamp".
 
@@ -31,25 +36,22 @@ struct EdgeRecord
 int
 main(int argc, char** argv)
 {
-  // temporal_graph_signal <signal_graph_binary_file> <output_folder> [binary=0]
-  // [equal_timestamp=0]
+  commandLine P(
+    argc,
+    argv,
+    "-p <signal_graph_binary_file> -o <output_folder> [-binary {0,1}] "
+    "[-group_by_year {0,1}]\n"
+    "  -binary 1 writes 0.bin (uint64 stream [N, 3, src, dest, timestamp, "
+    "...]) instead of text 0.in\n"
+    "  -group_by_year 0 renumbers the distinct timestamps 1..#timestamps by "
+    "ascending value instead of grouping edges by calendar year (default 1)");
 
-  if (argc < 3 || argc > 5) {
-    std::cerr << "Usage: " << argv[0]
-              << " <signal_graph_binary_file> <output_folder> [binary=0] "
-                 "[equal_timestamp=0]\n"
-              << "  binary=1 writes <i>.bin (uint64 stream [N, 3, src, dest, "
-                 "timestamp, ...]) instead of text <i>.in\n"
-              << "  equal_timestamp=1 ranks distinct timestamps 1..K, then "
-                 "buckets the ranks into 10 equal-width batches by timestamp "
-                 "(labeled 1..10) instead of using the raw rank\n";
-    return EXIT_FAILURE;
-  }
-
-  const std::string filename = argv[1];
-  const std::filesystem::path output_dir = argv[2];
-  const bool binary = argc >= 4 && std::atoi(argv[3]) != 0;
-  const bool equal_timestamp = argc == 5 && std::atoi(argv[4]) != 0;
+  const std::string filename = P.getOptionValue("-p", "");
+  const std::filesystem::path output_dir = P.getOptionValue("-o", "");
+  if (filename.empty() || output_dir.empty())
+    P.badArgument();
+  const bool binary = P.getOptionIntValue("-binary", 0) != 0;
+  const bool group_by_year = P.getOptionIntValue("-group_by_year", 1) != 0;
   IO::InputGraph graph(filename);
   graph.print_summary();
 
@@ -84,47 +86,7 @@ main(int argc, char** argv)
       std::cout << edges[i].timestamp << "\n";
   }
 
-  return 0;
-
-  // 2. Re-label timestamps. Both modes start by ranking the distinct
-  // timestamps 1..K by ascending value: edges is timestamp-sorted, so each
-  // distinct value starts a new group, and an inclusive scan of the
-  // group-start flags gives each edge the 1-based rank of its timestamp.
-  auto ts_new_flags = parlay::tabulate(edges.size(), [&](size_t i) -> size_t {
-    return (i == 0 || edges[i].timestamp != edges[i - 1].timestamp) ? 1 : 0;
-  });
-  auto ts_ranks = parlay::scan_inclusive(ts_new_flags);
-  const size_t num_distinct_ts = edges.empty() ? 0 : ts_ranks.back();
-  std::cout << "Distinct timestamps: " << num_distinct_ts << "\n";
-
-  if (equal_timestamp) {
-    // Equal-timestamp mode: after ranking timestamps 1..K, bucket the ranks
-    // into 10 equal-width batches by timestamp, labeled 1..10. An edge whose
-    // timestamp rank is r (1-based) falls in batch ((r - 1) * 10) / K + 1, so
-    // ranks 1..K/10 land in batch 1, K/10+1..2K/10 in batch 2, and so on.
-    constexpr size_t kNumBatches = 10;
-    const size_t k = num_distinct_ts;
-    parlay::parallel_for(0, edges.size(), [&](size_t i) {
-      const size_t rank = ts_ranks[i];
-      edges[i].timestamp =
-        static_cast<double>(k == 0 ? 0 : ((rank - 1) * kNumBatches) / k + 1);
-    });
-    std::cout << "Equal-timestamp mode: bucketed " << k
-              << " distinct timestamps into " << kNumBatches
-              << " batches labeled 1.." << kNumBatches << " by timestamp\n";
-  } else {
-    // Rank mode: the timestamp rank itself becomes the new timestamp.
-    parlay::parallel_for(0, edges.size(), [&](size_t i) {
-      edges[i].timestamp = static_cast<double>(ts_ranks[i]);
-    });
-  }
-
-  for (int i = 0; i < 5 && i < edges.size(); i++) {
-    std::cout << "Edge " << i << ": src " << edges[i].src << ", dest "
-              << edges[i].dest << ", timestamp " << edges[i].timestamp << "\n";
-  }
-
-  // 3. Remove duplicate edges, keeping the earliest occurrence of each
+  // 2. Remove duplicate edges, keeping the earliest occurrence of each
   // (src, dest). remove_duplicates_ordered stable-sorts by the given (src,
   // dest) comparator, then keeps the first of each equal group. Since edges is
   // timestamp-sorted, the stable sort leaves the smallest-timestamp copy first
@@ -133,15 +95,56 @@ main(int argc, char** argv)
     edges, [](const EdgeRecord& a, const EdgeRecord& b) {
       return a.src < b.src || (a.src == b.src && a.dest < b.dest);
     });
+  const size_t deduped_total = deduped_edges.size();
 
-  // 4. Sort by timestamp, randomly shuffling edges that share a timestamp. A
-  // global random_shuffle followed by a stable sort on timestamp leaves a
-  // uniformly random order within each equal-timestamp group while keeping the
-  // timestamps globally ordered.
+  // 3. Re-label timestamps on the deduplicated edges. dedup left them sorted by
+  // (src, dest), so re-sort by raw timestamp first: then equal (or same-group)
+  // values are contiguous, and an inclusive scan of the group-start flags gives
+  // each edge the 1-based index of its group, which becomes its new timestamp.
+  parlay::sort_inplace(deduped_edges, ts_cmp);
+  parlay::sequence<size_t> labels;
+  if (group_by_year) {
+    // Group edges by calendar year: the raw timestamps are Unix epoch seconds,
+    // so convert each to its UTC calendar year and label the distinct years
+    // 1..#batches by ascending year, so every batch corresponds to one year.
+    auto edge_year = parlay::tabulate(deduped_total, [&](size_t i) -> int {
+      const std::time_t t =
+        static_cast<std::time_t>(deduped_edges[i].timestamp);
+      std::tm tm_buf;
+      gmtime_r(&t, &tm_buf);
+      return tm_buf.tm_year + 1900;
+    });
+    auto flags = parlay::tabulate(deduped_total, [&](size_t i) -> size_t {
+      return (i == 0 || edge_year[i] != edge_year[i - 1]) ? 1 : 0;
+    });
+    labels = parlay::scan_inclusive(flags);
+    if (deduped_total > 0)
+      std::cout << "Year batches: " << labels.back() << " (years "
+                << edge_year.front() << ".." << edge_year.back() << ")\n";
+  } else {
+    // Renumber the distinct timestamps 1..#timestamps by ascending value,
+    // using the rank itself as the new timestamp.
+    auto flags = parlay::tabulate(deduped_total, [&](size_t i) -> size_t {
+      return (i == 0 ||
+              deduped_edges[i].timestamp != deduped_edges[i - 1].timestamp)
+               ? 1
+               : 0;
+    });
+    labels = parlay::scan_inclusive(flags);
+    if (deduped_total > 0)
+      std::cout << "Distinct timestamps: " << labels.back() << "\n";
+  }
+  parlay::parallel_for(0, deduped_total, [&](size_t i) {
+    deduped_edges[i].timestamp = static_cast<double>(labels[i]);
+  });
+
+  // 4. Sort by the new label, randomly shuffling edges that share a label. A
+  // global random_shuffle followed by a stable sort on the label leaves a
+  // uniformly random order within each label group while keeping labels
+  // globally ordered.
   deduped_edges = parlay::random_shuffle(deduped_edges);
   parlay::stable_sort_inplace(deduped_edges, ts_cmp);
 
-  const size_t deduped_total = deduped_edges.size();
   std::cout << "Original edges: " << total_updates << "\n";
   std::cout << "Deduplicated to " << deduped_total << " unique edges\n";
   if (deduped_total > 0) {
@@ -164,6 +167,25 @@ main(int argc, char** argv)
     // divided by the number of distinct source vertices.
     std::cout << "Average degree: "
               << static_cast<double>(deduped_total) / kv_num.size() << "\n";
+
+    // Per-batch summary: count edges per label with histogram_by_key. The
+    // number of distinct labels is the histogram size; the per-batch breakdown
+    // (sorted by label) is only printed when grouping by year, since rank mode
+    // can have far too many distinct timestamps to list.
+    auto batch_hist =
+      parlay::histogram_by_key(parlay::map(deduped_edges, [](auto& e) {
+        return static_cast<uint64_t>(e.timestamp);
+      }));
+    if (group_by_year) {
+      parlay::sort_inplace(batch_hist, [](auto const& a, auto const& b) {
+        return a.first < b.first;
+      });
+      for (auto const& [batch, count] : batch_hist)
+        std::cout << "  Batch " << batch << ": " << count << " edges\n";
+    }
+    std::cout << (group_by_year ? "Distinct years (batches) after dedup: "
+                                : "Distinct timestamps after dedup: ")
+              << batch_hist.size() << "\n";
   }
 
   // 5. Write all edges to a single file. Each row is "src dest timestamp".
