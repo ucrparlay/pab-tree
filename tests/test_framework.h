@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <iomanip>
 #include <ios>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "binary_io.h"
 #include "common/geometryIO.h"
@@ -1919,6 +1921,21 @@ static auto constexpr DefaultTestFunc =
     return;
   };
 
+// NOTE: count how many sequentially-numbered batch file pairs
+// (<i>_insert.bin / <i>_delete.bin) live under `dir`. Starts at i = 0 and
+// stops at the first missing insert file, so the batches are expected to be
+// contiguous from 0.
+static int
+CountDynamicGraphBatches(std::string const& dir)
+{
+  int n = 0;
+  while (
+    std::filesystem::exists(dir + std::to_string(n) + "_insert.bin")) {
+    ++n;
+  }
+  return n;
+}
+
 static auto constexpr TestTemporalGraph =
   []<class TreeDesc, typename TypeTrait, typename Options>(Options opts) {
     using Tree = TreeDesc::TreeType;
@@ -1976,9 +1993,10 @@ static auto constexpr TestTemporalGraph =
       //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
       string dynamic_graph_path = opts.input_file_path;
 
-      constexpr int kDynamicGraphBatchNum = 10;
-      std::array<std::string, kDynamicGraphBatchNum> insert_files;
-      std::array<std::string, kDynamicGraphBatchNum> delete_files;
+      int const kDynamicGraphBatchNum =
+        CountDynamicGraphBatches(dynamic_graph_path);
+      std::vector<std::string> insert_files(kDynamicGraphBatchNum);
+      std::vector<std::string> delete_files(kDynamicGraphBatchNum);
       for (int i = 0; i < kDynamicGraphBatchNum; i++) {
         insert_files[i] =
           dynamic_graph_path + std::to_string(i) + "_insert.bin";
@@ -2049,9 +2067,10 @@ static auto constexpr TestTemporalGraph =
       //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
       string dynamic_graph_path = opts.input_file_path;
 
-      constexpr int kDynamicGraphBatchNum = 10;
-      std::array<std::string, kDynamicGraphBatchNum> insert_files;
-      std::array<std::string, kDynamicGraphBatchNum> delete_files;
+      int const kDynamicGraphBatchNum =
+        CountDynamicGraphBatches(dynamic_graph_path);
+      std::vector<std::string> insert_files(kDynamicGraphBatchNum);
+      std::vector<std::string> delete_files(kDynamicGraphBatchNum);
       for (int i = 0; i < kDynamicGraphBatchNum; i++) {
         insert_files[i] =
           dynamic_graph_path + std::to_string(i) + "_insert.bin";
