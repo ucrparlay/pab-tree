@@ -1131,7 +1131,7 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
   parlay::sequence<double> flatten_time(time_period_num, 0.0);
   parlay::sequence<size_t> tree_size(time_period_num, 0);
 
-  puts("");
+  // puts("");
   for (int r = 0; r < rounds; r++) {
     auto const& insert_entry = wi;
     auto const& delete_entry = wd;
@@ -1174,7 +1174,7 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
         delete_time[batch_id] = 0.0;
       }
       tree_size[batch_id] = current_tree_size;
-      std::cout << "tree size: " << current_tree_size << std::endl;
+      // std::cout << "tree size: " << current_tree_size << std::endl;
 
       // NOTE: test membership query
       t.reset(), t.start();
@@ -1190,26 +1190,26 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       // NOTE: range query — probe the top-occurrence (highest out-degree)
       // source vertices selected from the sorted edge list.
       t.reset(), t.start();
-      // parlay::parallel_for(0, range_query_box_seq.size(), [&](size_t j) {
-      //   auto [size, logger] =
-      //     pkd.RangeReport(range_query_box_seq[j],
-      //                     range_report_res.cut(range_query_offset[j],
-      //                                          range_query_offset[j + 1]));
-      //   range_query_output_size[j] = size;
-      // });
-      for (size_t j = 0; j < range_query_box_seq.size(); j++) {
+      parlay::parallel_for(0, range_query_box_seq.size(), [&](size_t j) {
         auto [size, logger] =
           pkd.RangeReport(range_query_box_seq[j],
                           range_report_res.cut(range_query_offset[j],
                                                range_query_offset[j + 1]));
         range_query_output_size[j] = size;
-        if (size != 0)
-          std::cout << size << std::endl;
-      }
+      });
+      // for (size_t j = 0; j < range_query_box_seq.size(); j++) {
+      //   auto [size, logger] =
+      //     pkd.RangeReport(range_query_box_seq[j],
+      //                     range_report_res.cut(range_query_offset[j],
+      //                                          range_query_offset[j + 1]));
+      //   range_query_output_size[j] = size;
+      //   if (size != 0)
+      //     std::cout << size << std::endl;
+      // }
       t.stop();
-      std::cout << "batch_id: " << batch_id
-                << " range query time: " << t.total_time() << std::endl;
-      exit(1);
+      // std::cout << "batch_id: " << batch_id
+      //           << " range query time: " << t.total_time() << std::endl;
+      // exit(1);
       range_query_time[batch_id] += t.total_time();
 
       // NOTE: flatten
@@ -1635,18 +1635,19 @@ ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
                      : ReadEntriesText<E, kInputType>(iFile, wp, offset);
 
   // NOTE: manual sanity check of the read
-  size_t const head = std::min<size_t>(wp.size(), 5);
-  size_t const tail = std::min<size_t>(wp.size() - head, 5);
-  std::cout << "Read " << wp.size() << " entries from " << iFile << "; first "
-            << head << ":";
-  for (size_t i = 0; i < head; i++) {
-    std::cout << " (" << wp[i] << ")";
-  }
-  std::cout << "; last " << tail << ":";
-  for (size_t i = wp.size() - tail; i < wp.size(); i++) {
-    std::cout << " (" << wp[i] << ")";
-  }
+  // size_t const head = std::min<size_t>(wp.size(), 5);
+  // size_t const tail = std::min<size_t>(wp.size() - head, 5);
+  // std::cout << "Read " << wp.size() << " entries from ";
+  // std::cout << iFile << "; first " << head << ":";
+  // for (size_t i = 0; i < head; i++) {
+  //   std::cout << " (" << wp[i] << ")";
+  // }
+  // std::cout << "; last " << tail << ":";
+  // for (size_t i = wp.size() - tail; i < wp.size(); i++) {
+  //   std::cout << " (" << wp[i] << ")";
+  // }
   // std::cout << std::endl;
+
   auto dedup = parlay::remove_duplicates_ordered(
     wp, [&](auto const& a, auto const& b) { return a.key < b.key; });
   if (dedup.size() != wp.size()) {
