@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "dependence/loggers.h"
 #include "pb_tree/b_tree.h"
 #include <cpam.h>
 // #include "geobase.h"
@@ -183,7 +184,7 @@ public:
 
   auto Contain(K const k) const
   {
-    pb_tree::RangeQueryLogger logger;
+    pb_tree::MembershipLogger logger;
     auto res = this->cpam_aug_map_.contains(k);
     return std::make_pair(res, logger);
   }
