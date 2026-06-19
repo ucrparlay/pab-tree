@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -26,15 +27,19 @@ main(int argc, char** argv)
   commandLine P(
     argc,
     argv,
-    "-p <temporal_graph_binary_file> -o <output_folder> [-binary {0,1}]\n"
+    "-p <temporal_graph_binary_file> -o <output_folder> [-binary {0,1}] "
+    "[-group_by_year {0,1}]\n"
     "  -binary 1 writes <i>_insert.bin/<i>_delete.bin (uint64 stream [N, 2, "
-    "src, dest, ...]) instead of text .in");
+    "src, dest, ...]) instead of text .in\n"
+    "  -group_by_year 1 makes one batch per calendar year (raw timestamps are "
+    "Unix epoch seconds) instead of 10 equal-size timestamp-ordered batches");
 
   const std::string filename = P.getOptionValue("-p", "");
   const std::filesystem::path output_dir = P.getOptionValue("-o", "");
   if (filename.empty() || output_dir.empty())
     P.badArgument();
   const bool binary = P.getOptionIntValue("-binary", 0) != 0;
+  const bool group_by_year = P.getOptionIntValue("-group_by_year", 0) != 0;
   IO::InputGraph graph(filename);
   graph.print_summary();
 
@@ -110,13 +115,10 @@ main(int argc, char** argv)
   std::cout << "Max degree: " << (*max_degree_vertex).second << std::endl;
 
   // generate batch
-  constexpr size_t kNumBatches = 10;
   using BatchSplit =
     std::pair<parlay::sequence<EdgeRecord>, parlay::sequence<EdgeRecord>>;
-  parlay::sequence<BatchSplit> edge_batches(kNumBatches);
-  for (size_t batch = 0; batch < kNumBatches; ++batch) {
-    const size_t begin = (deduped_total * batch) / kNumBatches;
-    const size_t end = (deduped_total * (batch + 1)) / kNumBatches;
+  // Slice deduped_edges[begin, end) and split it into its insert/delete edges.
+  auto make_batch = [&](size_t begin, size_t end) -> BatchSplit {
     auto batch_edges = parlay::tabulate(
       end - begin, [&](size_t j) { return deduped_edges[begin + j]; });
     auto insert_edges = parlay::filter(batch_edges, [](const EdgeRecord& edge) {
@@ -125,8 +127,49 @@ main(int argc, char** argv)
     auto delete_edges = parlay::filter(batch_edges, [](const EdgeRecord& edge) {
       return edge.update_info == IO::UpdateInfo::DELETE;
     });
-    edge_batches[batch] =
-      BatchSplit{ std::move(insert_edges), std::move(delete_edges) };
+    return BatchSplit{ std::move(insert_edges), std::move(delete_edges) };
+  };
+
+  parlay::sequence<BatchSplit> edge_batches;
+  // When grouping by year, batch_years[b] records the calendar year of batch b
+  // (for logging only; the year-relabeled timestamp is not written to output,
+  // which carries just src/dest).
+  parlay::sequence<int> batch_years;
+  if (group_by_year) {
+    // deduped_edges is timestamp-sorted, so edges of the same calendar year are
+    // contiguous. Convert each Unix-epoch-seconds timestamp to its UTC year,
+    // then make one batch per distinct year (ascending). The batch index keeps
+    // the existing 0-based file-naming style; batch_years maps it to the year.
+    auto edge_year = parlay::tabulate(deduped_total, [&](size_t i) -> int {
+      const std::time_t t =
+        static_cast<std::time_t>(deduped_edges[i].timestamp);
+      std::tm tm_buf;
+      gmtime_r(&t, &tm_buf);
+      return tm_buf.tm_year + 1900;
+    });
+    auto idx =
+      parlay::tabulate(deduped_total, [](size_t i) -> size_t { return i; });
+    auto starts = parlay::filter(idx, [&](size_t i) {
+      return i == 0 || edge_year[i] != edge_year[i - 1];
+    });
+    const size_t num_year_batches = starts.size();
+    edge_batches = parlay::sequence<BatchSplit>(num_year_batches);
+    batch_years = parlay::sequence<int>(num_year_batches);
+    for (size_t b = 0; b < num_year_batches; ++b) {
+      const size_t begin = starts[b];
+      const size_t end =
+        (b + 1 < num_year_batches) ? starts[b + 1] : deduped_total;
+      edge_batches[b] = make_batch(begin, end);
+      batch_years[b] = edge_year[begin];
+    }
+  } else {
+    constexpr size_t kNumBatches = 10;
+    edge_batches = parlay::sequence<BatchSplit>(kNumBatches);
+    for (size_t batch = 0; batch < kNumBatches; ++batch) {
+      const size_t begin = (deduped_total * batch) / kNumBatches;
+      const size_t end = (deduped_total * (batch + 1)) / kNumBatches;
+      edge_batches[batch] = make_batch(begin, end);
+    }
   }
 
   std::error_code ec;
@@ -162,8 +205,8 @@ main(int argc, char** argv)
 
   // return 0;
 
-  std::cout << "Created " << edge_batches.size()
-            << " timestamp-ordered batches\n";
+  std::cout << "Created " << edge_batches.size() << " "
+            << (group_by_year ? "per-year" : "timestamp-ordered") << " batches\n";
   for (size_t batch = 0; batch < edge_batches.size(); ++batch) {
     const auto insert_path =
       output_dir /
@@ -176,9 +219,11 @@ main(int argc, char** argv)
       return EXIT_FAILURE;
     }
 
-    std::cout << "Batch " << batch << ": " << edge_batches[batch].first.size()
-              << " inserts, " << edge_batches[batch].second.size()
-              << " deletes\n";
+    std::cout << "Batch " << batch;
+    if (group_by_year)
+      std::cout << " (year " << batch_years[batch] << ")";
+    std::cout << ": " << edge_batches[batch].first.size() << " inserts, "
+              << edge_batches[batch].second.size() << " deletes\n";
   }
 
   return EXIT_SUCCESS;
