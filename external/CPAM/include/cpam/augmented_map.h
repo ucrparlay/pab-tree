@@ -311,8 +311,8 @@ public:
                                    Out& out,
                                    Logger& logger)
   {
-    // Tree::range_report_filter2(m.root, f, cnt, out);
-    Tree::range_report_filter2(ptr(m.root, true), f, cnt, out, logger);
+    Tree::range_report_filter2(m.root, f, cnt, out, logger);
+    // Tree::range_report_filter2(ptr(m.root, true), f, cnt, out, logger);
   }
 
   template<typename F, typename Logger>

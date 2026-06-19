@@ -269,6 +269,79 @@ struct augmented_ops : Map
   }
 
   template<class F, typename Out, typename Logger>
+  static void range_report_filter2(node* b,
+                                   F const& f,
+                                   int64_t& cnt,
+                                   Out& out,
+                                   Logger& logger)
+  {
+
+    if (!b) {
+      return;
+    }
+
+    if (Map::is_compressed(b)) { // leaf node
+      logger.vis_leaf_num++;
+      // NOTE: binary search below
+      // auto c = Seq::cast_to_compressed(b);
+      // ET* ets = (ET*)(((uint8_t*)c) + sizeof(*c));
+      // size_t s = c->s;
+
+      // size_t lo, hi;
+      // {
+      //   size_t l = 0, r = s;
+      //   while (l < r) {
+      //     size_t m = l + ((r - l) >> 1);
+      //     if (f(Entry::get_key(ets[m])) < 0)
+      //       l = m + 1;
+      //     else
+      //       r = m;
+      //   }
+      //   lo = l;
+      // }
+      // {
+      //   size_t l = lo, r = s;
+      //   while (l < r) {
+      //     size_t m = l + ((r - l) >> 1);
+      //     if (f(Entry::get_key(ets[m])) <= 0)
+      //       l = m + 1;
+      //     else
+      //       r = m;
+      //   }
+      //   hi = l;
+      // }
+      // for (size_t i = lo; i < hi; i++) {
+      //   out[cnt++] = { Entry::get_key(ets[i]), Entry::get_val(ets[i]) };
+      // }
+
+      auto f_filter = [&](auto const& et) {
+        auto key = std::get<0>(et);
+        if (f(key) == 0) {
+          out[cnt++] = { std::get<0>(et), std::get<1>(et) };
+        }
+      };
+      Map::iterate_seq(b, f_filter);
+      return;
+    }
+
+    logger.vis_interior_num++;
+    auto rb = Map::cast_to_regular(b);
+    auto const& e = rb->entry.first; // entry is (ET, aug); ET = (key, val)
+    auto cur_key = Entry::get_key(e);
+    auto pos = f(cur_key);
+    if (pos == -1) {
+      range_report_filter2(rb->rc, f, cnt, out, logger);
+    } else if (pos == 1) {
+      range_report_filter2(rb->lc, f, cnt, out, logger);
+    } else {
+      out[cnt++] = { Entry::get_key(e), Entry::get_val(e) };
+      range_report_filter2(rb->lc, f, cnt, out, logger);
+      range_report_filter2(rb->rc, f, cnt, out, logger);
+    }
+    // GC::decrement(root);
+  }
+
+  template<class F, typename Out, typename Logger>
   static void range_report_filter2(ptr b,
                                    F const& f,
                                    int64_t& cnt,
