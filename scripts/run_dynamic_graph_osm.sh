@@ -16,7 +16,7 @@ round=4
 log_path="logs/temp_osm"
 mkdir -p "${log_path}"
 
-data_path="/data/zmen002/geometry/temporal_graph/osm/planet/"
+data_path="/data/zmen002/geometry/temporal_graph/osm/planet_year/"
 
 batch_op_seq=("ins")
 dis_seq=("temp_osm")

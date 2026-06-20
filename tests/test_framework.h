@@ -1327,7 +1327,8 @@ TestDynamicGraph(const auto& insert_batch_seq,
                  auto& membership_res,
                  auto& range_report_output,
                  auto& flatten_seq,
-                 auto const& vertex_occurrence,
+                 auto const& membership_query_keys,
+                 auto const& range_query_vertex_occurrence,
                  auto const& range_query_offset)
 {
   pkd.DeleteTree();
@@ -1338,27 +1339,16 @@ TestDynamicGraph(const auto& insert_batch_seq,
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
   const size_t member_query_n = membership_res.size();
-  auto query_points = TT::KeySeq::uninitialized(member_query_n);
-  auto step = member_query_n / time_period_num;
-  if (member_query_n % time_period_num != 0) {
-    std::cout << "the member query num should be divisible by time period num"
-              << std::endl;
-    return;
-  }
 
   for (int i = 0; i < time_period_num; i++) {
     wi[i] = Tree::ParseInput(insert_batch_seq[i]);
     wd[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
-    assert(insert_batch_seq[i].size() >= step);
-    parlay::parallel_for(0, step, [&](size_t j) {
-      query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
-    });
   }
 
   // NOTE: generate the range query box
-  auto const range_query_num = vertex_occurrence.size();
+  auto const range_query_num = range_query_vertex_occurrence.size();
   auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
-    uint64_t u = vertex_occurrence[i].first;
+    uint64_t u = range_query_vertex_occurrence[i].first;
     return std::make_pair(static_cast<uint64_t>(u << 32),
                           static_cast<uint64_t>((u + 1) << 32));
   });
@@ -1417,7 +1407,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
       // NOTE: test membership query
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(query_points[j]);
+        auto [contain, logger] = pkd.Contain(membership_query_keys[j]);
         membership_res[j] = contain;
       });
       t.stop();
@@ -1929,8 +1919,7 @@ static int
 CountDynamicGraphBatches(std::string const& dir)
 {
   int n = 0;
-  while (
-    std::filesystem::exists(dir + std::to_string(n) + "_insert.bin")) {
+  while (std::filesystem::exists(dir + std::to_string(n) + "_insert.bin")) {
     ++n;
   }
   return n;
@@ -2014,11 +2003,18 @@ static auto constexpr TestTemporalGraph =
         auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
           delete_files[i].c_str(), delete_batch_seq[i], total_entries);
         total_entries += n2;
-
-        // std::cout << n1 << " " << n2 << std::endl;
       }
 
-      // generate box
+      // NOTE: membership query result
+      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+      auto random_osm_records =
+        parlay::random_shuffle(parlay::flatten(insert_batch_seq));
+      auto membership_query_points =
+        parlay::tabulate(kMemberQueryOsmSize, [&](size_t i) {
+          return TT::Entry::GetKey(random_osm_records[i]);
+        });
+
+      // NOTE: generate box
       // NOTE: count how often each source vertex occurs (its out-degree) and
       // build a (vertex, occurrence) sequence, highest occurrence first. The
       // top vertices are later used as the keys for the range queries.
@@ -2045,9 +2041,6 @@ static auto constexpr TestTemporalGraph =
 
       auto range_report_output = typename TT::EntrySeq(tot_range_size);
 
-      // NOTE: membership query result
-      auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
-
       // NOTE: flatten
       auto flatten_seq = TT::EntrySeq::uninitialized(kDynamicFlattenSize);
 
@@ -2058,6 +2051,7 @@ static auto constexpr TestTemporalGraph =
                                  membership_res,
                                  range_report_output,
                                  flatten_seq,
+                                 membership_query_points,
                                  range_query_vertex_occurrence,
                                  range_query_offset);
     }
