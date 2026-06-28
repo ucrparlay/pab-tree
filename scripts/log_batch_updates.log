@@ -53,6 +53,180 @@ Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not 
 [ 50%] Building CXX object CMakeFiles/pma.dir/tests/pma.cpp.o
 [100%] Linking CXX executable pma
 [100%] Built target pma
->>>logs/batch_updates/3/exp/64.log
-Tree: PMA; Buf: 1; InputFile: 1.base.in; Dis: exp; 
-3.37459 0.00476075 0.009609 0.0128535 0.019726 0.0380177 0.748533 0.825276 0.899314 1.08413 1.24504 1.83674 3.55567 6.36294 0.003323 0.004361 0.006917 0.0105165 0.0142072 0.0227262 0.0309097 0.0480755 0.0842647 0.164428 0.429785 1.15279 1.43377 
+>>>logs/batch_updates/3/uni/64.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+3.32006 0.004592 0.00713975 0.0126622 0.0226597 0.0468485 0.0869247 0.128013 0.190318 0.373037 1.29812 4.39291 3.62821 6.52044 0.002787 0.00439525 0.0083165 0.0151312 0.026619 0.0516078 0.0727307 0.101193 0.146346 0.217375 0.340661 0.716935 1.45967 
+-- The CXX compiler identification is GNU 15.1.1
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE  
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+-- The C compiler identification is GNU 15.1.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
+-- Checking for module 'jemalloc'
+--   Found jemalloc, version 5.2.1_0
+Generating .clangd configuration...
+Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
+-- Configuring done (0.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/cpam.dir/tests/cpam.cpp.o
+[100%] Linking CXX executable cpam
+[100%] Built target cpam
+>>>logs/batch_updates/2/uni/64.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+2.23168 0.00240725 0.00411575 0.00888975 0.0162195 0.0291828 0.0592463 0.103166 0.175905 0.348048 0.547476 0.991585 1.92408 3.27362 0.00284025 0.0049655 0.0105508 0.0188852 0.0346045 0.0732755 0.127944 0.21785 0.438338 0.725522 1.15609 1.85707 2.54741 
+-- The CXX compiler identification is GNU 15.1.1
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE  
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+-- The C compiler identification is GNU 15.1.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
+-- Checking for module 'jemalloc'
+--   Found jemalloc, version 5.2.1_0
+Generating .clangd configuration...
+Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
+-- Configuring done (0.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/cpam.dir/tests/cpam.cpp.o
+[100%] Linking CXX executable cpam
+[100%] Built target cpam
+>>>logs/batch_updates/1/uni/64.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+1.74892 0.006276 0.0116778 0.0255478 0.0445545 0.070018 0.104135 0.120877 0.139415 0.199352 0.281151 0.489744 0.958675 2.16918 0.00641075 0.0118903 0.0270867 0.0464213 0.074418 0.110565 0.126157 0.136331 0.172985 0.225655 0.343907 0.715255 1.3015 
+-- The CXX compiler identification is GNU 15.1.1
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- PARLAY VERSION 2.3.3
+-- ---------------------------- General configuration -----------------------------
+-- CMake Generator:                Unix Makefiles
+-- Compiler:                       GNU 15.1.1
+-- Build type:                     Release
+-- CMAKE_CXX_FLAGS:                
+-- CMAKE_CXX_FLAGS_DEBUG:          -g
+-- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
+-- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
+-- CMAKE_EXE_LINKER_FLAGS          
+-- CMAKE_INSTALL_PREFIX:           /usr/local
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE  
+-- -------------------------------- Library options ------------------------------
+-- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
+-- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
+-- ------------------------------- Static Analysis --------------------------------
+-- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
+-- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
+-- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
+-- ---------------------------------- Unit Tests ----------------------------------
+-- testing: Disabled (enable with -DPARLAY_TEST=On)
+-- ---------------------------------- Benchmarks ----------------------------------
+-- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
+-- ----------------------------------- Examples -----------------------------------
+-- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
+-- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
+-- The C compiler identification is GNU 15.1.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
+-- Checking for module 'jemalloc'
+--   Found jemalloc, version 5.2.1_0
+Generating .clangd configuration...
+Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
+-- Configuring done (0.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
+[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
+[100%] Linking CXX executable b_test
+[100%] Built target b_test
+>>>logs/batch_updates/0/uni/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+1.22901 0.00482625 0.00673975 0.0143138 0.0184327 0.0313505 0.0557928 0.0759988 0.0928573 0.130329 0.184518 0.307237 0.652787 1.28889 0.00441375 0.006096 0.00961125 0.0145608 0.0250793 0.0504658 0.0810668 0.113425 0.164696 0.212753 0.343474 0.64176 1.46213 
