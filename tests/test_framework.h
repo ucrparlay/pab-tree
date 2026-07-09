@@ -436,41 +436,73 @@ TestLeafRandomDynamicGraph(Tree& pkd,
   parlay::sequence<typename Tree::InputDeleteRangeT> delete_entry(
     time_period_num);
   const size_t member_query_n = membership_res.size();
-  auto query_points = TT::KeySeq::uninitialized(member_query_n);
-  auto step = member_query_n / time_period_num;
+  auto random_osm_records =
+    parlay::random_shuffle(parlay::flatten(insert_batch_seq));
+  auto query_points = parlay::tabulate(member_query_n, [&](size_t i) {
+    return TT::Entry::GetKey(random_osm_records[i]);
+  });
+
+  // NOTE: generate box (same as TestDynamicGraph): count how often each
+  // source vertex occurs (its out-degree) and build a (vertex, occurrence)
+  // sequence, highest occurrence first. The top vertices are used as the
+  // keys for the range queries.
+  auto edge_list = parlay::tabulate(random_osm_records.size(), [&](size_t i) {
+    auto key = TT::Entry::GetKey(random_osm_records[i]);
+    uint64_t u = key >> 32;
+    uint64_t v = key & 0xffffffff;
+    return std::make_pair(u, v);
+  });
+  auto range_query_vertex_occurrence = parlay::histogram_by_key(
+    parlay::map(edge_list, [](auto const& e) { return e.first; }));
+  parlay::sort_inplace(
+    range_query_vertex_occurrence,
+    [](auto const& a, auto const& b) { return a.second > b.second; });
+  range_query_vertex_occurrence = range_query_vertex_occurrence.subseq(
+    0,
+    std::min(range_query_vertex_occurrence.size(),
+             static_cast<size_t>(kDynamicGraphRangeNum)));
+  auto [range_query_offset, tot_range_size] =
+    parlay::scan(parlay::map(range_query_vertex_occurrence,
+                             [](auto const& p) { return p.second; }),
+                 parlay::addm<size_t>());
+  range_query_offset.push_back(tot_range_size);
+  auto range_report_output = typename TT::EntrySeq(tot_range_size);
+
+  auto box_seq =
+    parlay::tabulate(range_query_vertex_occurrence.size(), [&](size_t i) {
+      uint64_t u = range_query_vertex_occurrence[i].first;
+      return std::make_pair(static_cast<uint64_t>(u << 32),
+                            static_cast<uint64_t>((u + 1) << 32));
+    });
+  parlay::sequence<size_t> size_seq(box_seq.size(), 0);
 
   for (int i = 0; i < time_period_num; i++) {
     wi[i] = Tree::ParseInput(insert_batch_seq[i]);
     wd[i] = Tree::ParseDeleteInput(delete_batch_seq[i]);
-    assert(insert_batch_seq[i].size() >= step);
-    parlay::parallel_for(0, step, [&](size_t j) {
-      query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
-    });
   }
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
   parlay::sequence<double> delete_time(time_period_num, 0.0);
   parlay::sequence<double> member_query_time(time_period_num, 0.0);
+  parlay::sequence<double> range_query_time(time_period_num, 0.0);
 
-  // geometric mean over a per-batch timing sequence: exp(mean(log(t_i))).
-  auto geo_mean = [](parlay::sequence<double> const& v) -> double {
-    if (v.empty()) {
-      return 0.0;
-    }
-    double const log_sum = parlay::reduce(parlay::delayed_map(
-      v, [](double x) { return std::log(std::max(x, 1e-300)); }));
-    return std::exp(log_sum / static_cast<double>(v.size()));
-  };
-
-  // accumulate the per-round geo means; averaged over rounds at the end.
-  double insert_geo_sum = 0.0;
-  double delete_geo_sum = 0.0;
-  double member_query_geo_sum = 0.0;
+  // accumulate the per-round total times; averaged over rounds at the end.
+  double insert_sum = 0.0;
+  double delete_sum = 0.0;
+  double member_query_sum = 0.0;
+  double range_query_sum = 0.0;
   double sorted_leaf_ratio_ave = 0.0;
 
   for (int r = 0; r < rounds; r++) {
     auto const& insert_entry = wi;
     auto const& delete_entry = wd;
+    if (rounds == 1) {
+      for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
+        insert_time[batch_id] = 0.0;
+        delete_time[batch_id] = 0.0;
+        member_query_time[batch_id] = 0.0;
+      }
+    }
 
     // running the osm
     constexpr auto leaf_entries_pattern = TT::LeafEntriesPattern::kHybrid;
@@ -504,27 +536,26 @@ TestLeafRandomDynamicGraph(Tree& pkd,
       member_query_time[batch_id] = t.total_time();
     }
 
-    // NOTE: end of round — geo mean across batches for each metric.
+    // NOTE: end of round — sum across batches for each metric.
     // Omit the first (warmup) round when more than one round is requested.
     if (rounds == 1 || r >= 1) {
-      insert_geo_sum += geo_mean(insert_time);
-      delete_geo_sum += geo_mean(delete_time);
-      member_query_geo_sum += geo_mean(member_query_time);
+      insert_sum += parlay::reduce(insert_time);
+      delete_sum += parlay::reduce(delete_time);
+      member_query_sum += parlay::reduce(member_query_time);
       // sorted-leaf ratio (measured after all updates, before membership)
       sorted_leaf_ratio_ave += pkd.SortedLeafRatio();
     }
   }
 
-  // average of the per-round geo means
+  // average of the per-round total times over counted rounds
   double const denom = rounds > 1 ? (rounds - 1) : 1;
-  double const insert_geo_ave = insert_geo_sum / denom;
-  double const delete_geo_ave = delete_geo_sum / denom;
-  double const member_query_geo_ave = member_query_geo_sum / denom;
+  double const insert_ave = insert_sum / denom;
+  double const delete_ave = delete_sum / denom;
+  double const member_query_ave = member_query_sum / denom;
   sorted_leaf_ratio_ave /= denom;
 
-  std::cout << ratio << " " << insert_geo_ave << " " << delete_geo_ave << " "
-            << member_query_geo_ave << " " << sorted_leaf_ratio_ave
-            << std::endl;
+  std::cout << ratio << " " << insert_ave << " " << delete_ave << " "
+            << member_query_ave << " " << sorted_leaf_ratio_ave << std::endl;
 }
 
 template<typename TypeTrait,
