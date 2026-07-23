@@ -47,278 +47,35 @@
 --   Found jemalloc, version 5.2.1_0
 Generating .clangd configuration...
 Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (1.1s)
+-- Configuring done (1.2s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
 [ 50%] Building CXX object CMakeFiles/pma.dir/tests/pma.cpp.o
-Linking CXX executable pma
-Built target pma
+[100%] Linking CXX executable pma
+[100%] Built target pma
 >>>logs/temp_osm/3/temp_osm/64.log
 Tree: PMA; Buf: 1; InputFile: ; Dis: temp_osm; 
  insert_n delete_n tree_n insert_t(s) delete_t(s) find_t(s) range_t(s) flatten_t(s)
- 3531 0 3531 0.000858 0.000001 0.054744 0.003377 0.000043
- 184675 0 188206 0.003851 0.000001 0.081101 0.003988 0.000209
- 30614547 687779 30114974 0.811758 0.006551 0.259117 0.041142 0.011208
- 19995315 5259738 44850551 0.587922 0.027079 0.313075 0.057630 0.018244
- 19841793 7886239 56806105 0.545419 0.038116 0.699233 0.136137 0.031596
- 21213139 8097806 69921438 0.571445 0.036645 0.755682 0.145308 0.035217
- 33208908 10134266 92996080 0.843703 0.042237 1.451560 0.256756 0.040969
- 39990761 13708942 119277899 0.992659 0.053660 1.477129 0.232160 0.046022
- 34803668 12484446 141597121 0.854295 0.044488 1.452078 0.197876 0.056536
- 32621464 12431057 161787528 0.816576 0.048078 1.258244 0.201198 0.066311
- 32488717 12641420 181634825 0.838290 0.050445 2.926928 0.394491 0.076939
- 32673426 12592524 201715727 0.897898 0.062793 2.486378 0.285948 0.095506
- 36157641 12997210 224876158 0.992333 0.068490 1.734343 0.292205 0.131079
- 47363312 17011226 255228244 1.299936 0.074723 4.423402 0.470002 0.130232
- 56872124 21218133 290882235 1.400932 0.088815 3.863715 0.312357 0.156806
- 72810996 26566503 337126728 1.776915 0.121389 3.398692 0.346229 0.186618
- 65364864 23896208 378595384 1.668382 0.111944 3.534515 0.354607 0.197162
- 47237189 19078553 406754020 1.501623 0.109062 6.884585 0.551475 0.239824
- 42341873 17219760 431876133 0.867458 0.117082 7.022702 0.553244 0.265457
- 42111351 16717554 457269930 1.472025 0.101127 7.260651 0.535313 0.264515
- 37420519 14927155 479763294 0.737060 0.092869 7.225308 0.534257 0.277694
-> 18466879.366672 11687783.698356 75488513.555271 0.530249 0.019896 1.498733 0.170955 0.044882
-# 745319813.000000 265556519.000000 4363266111.000000 19.481339 1.295594 58.563182 5.905701 2.328186
--- The CXX compiler identification is GNU 15.1.1
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/g++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- PARLAY VERSION 2.3.3
--- ---------------------------- General configuration -----------------------------
--- CMake Generator:                Unix Makefiles
--- Compiler:                       GNU 15.1.1
--- Build type:                     Release
--- CMAKE_CXX_FLAGS:                
--- CMAKE_CXX_FLAGS_DEBUG:          -g
--- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
--- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
--- CMAKE_EXE_LINKER_FLAGS          
--- CMAKE_INSTALL_PREFIX:           /usr/local
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
--- -------------------------------- Library options ------------------------------
--- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
--- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
--- ------------------------------- Static Analysis --------------------------------
--- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
--- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
--- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
--- ---------------------------------- Unit Tests ----------------------------------
--- testing: Disabled (enable with -DPARLAY_TEST=On)
--- ---------------------------------- Benchmarks ----------------------------------
--- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
--- ----------------------------------- Examples -----------------------------------
--- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
--- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
--- The C compiler identification is GNU 15.1.1
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
--- Checking for module 'jemalloc'
---   Found jemalloc, version 5.2.1_0
-Generating .clangd configuration...
-Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (0.8s)
--- Generating done (0.0s)
--- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[ 50%] Building CXX object CMakeFiles/cpam.dir/tests/cpam.cpp.o
-[100%] Linking CXX executable cpam
-[100%] Built target cpam
->>>logs/temp_osm/2/temp_osm/64.log
-Tree: PAM; Buf: 1; InputFile: ; Dis: temp_osm; 
- insert_n delete_n tree_n insert_t(s) delete_t(s) find_t(s) range_t(s) flatten_t(s)
- 3531 0 3531 0.000153 0.000003 0.009871 0.002579 0.000039
- 184675 0 188206 0.001415 0.000002 0.027234 0.005709 0.000242
- 30614547 687779 30114974 0.091869 0.006194 0.115838 0.023233 0.030233
- 19995315 5259738 44850551 0.067777 0.026997 0.178619 0.039258 0.048294
- 19841793 7886239 56806105 0.068367 0.040679 0.243864 0.053733 0.070884
- 21213139 8097806 69921438 0.085923 0.048003 0.298831 0.063240 0.082183
- 33208908 10134266 92996080 0.122915 0.059734 0.383581 0.074861 0.110581
- 39990761 13708942 119277899 0.169372 0.081793 0.474763 0.086965 0.143684
- 34803668 12484446 141597121 0.153596 0.078475 0.549133 0.095197 0.175406
- 32621464 12431057 161787528 0.150615 0.080742 0.607376 0.100077 0.201885
- 32488717 12641420 181634825 0.167214 0.084712 0.661223 0.104882 0.227698
- 32673426 12592524 201715727 0.159462 0.088674 0.715244 0.109261 0.255108
- 36157641 12997210 224876158 0.180041 0.090011 0.771236 0.112130 0.284323
- 47363312 17011226 255228244 0.218137 0.113094 0.839163 0.115590 0.322646
- 56872124 21218133 290882235 0.258437 0.138944 0.902382 0.119441 0.370030
- 72810996 26566503 337126728 0.332032 0.168631 0.974437 0.122372 0.429892
- 65364864 23896208 378595384 0.328209 0.164619 1.034053 0.125817 0.489002
- 47237189 19078553 406754020 0.256686 0.139938 1.078553 0.125868 0.525633
- 42341873 17219760 431876133 0.235023 0.132684 1.112258 0.127281 0.560191
- 42111351 16717554 457269930 0.226301 0.129013 1.142989 0.127209 0.597048
- 37420519 14927155 479763294 0.221367 0.122759 1.167376 0.129004 0.629149
-> 18466879.366672 11687783.698356 75488513.555271 0.094983 0.029180 0.417789 0.066710 0.103485
-# 745319813.000000 265556519.000000 4363266111.000000 3.494911 1.795702 13.288024 1.863708 5.554151
--- The CXX compiler identification is GNU 15.1.1
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/g++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- PARLAY VERSION 2.3.3
--- ---------------------------- General configuration -----------------------------
--- CMake Generator:                Unix Makefiles
--- Compiler:                       GNU 15.1.1
--- Build type:                     Release
--- CMAKE_CXX_FLAGS:                
--- CMAKE_CXX_FLAGS_DEBUG:          -g
--- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
--- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
--- CMAKE_EXE_LINKER_FLAGS          
--- CMAKE_INSTALL_PREFIX:           /usr/local
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
--- -------------------------------- Library options ------------------------------
--- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
--- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
--- ------------------------------- Static Analysis --------------------------------
--- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
--- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
--- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
--- ---------------------------------- Unit Tests ----------------------------------
--- testing: Disabled (enable with -DPARLAY_TEST=On)
--- ---------------------------------- Benchmarks ----------------------------------
--- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
--- ----------------------------------- Examples -----------------------------------
--- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
--- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
--- The C compiler identification is GNU 15.1.1
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
--- Checking for module 'jemalloc'
---   Found jemalloc, version 5.2.1_0
-Generating .clangd configuration...
-Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (0.8s)
--- Generating done (0.0s)
--- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[ 50%] Building CXX object CMakeFiles/cpam.dir/tests/cpam.cpp.o
-[100%] Linking CXX executable cpam
-[100%] Built target cpam
->>>logs/temp_osm/1/temp_osm/64.log
-Tree: CPAM; Buf: 64; InputFile: ; Dis: temp_osm; 
- insert_n delete_n tree_n insert_t(s) delete_t(s) find_t(s) range_t(s) flatten_t(s)
- 3531 0 3531 0.000134 0.000002 0.025510 0.016306 0.000022
- 184675 0 188206 0.001701 0.000001 0.040559 0.013847 0.000149
- 30614547 687779 30114974 0.071083 0.007271 0.117589 0.033063 0.010522
- 19995315 5259738 44850551 0.055411 0.019531 0.171432 0.055876 0.015547
- 19841793 7886239 56806105 0.052549 0.025646 0.219552 0.073369 0.020460
- 21213139 8097806 69921438 0.066738 0.030065 0.270354 0.088782 0.025783
- 33208908 10134266 92996080 0.096618 0.040770 0.343004 0.105200 0.033702
- 39990761 13708942 119277899 0.117914 0.049184 0.422627 0.121048 0.044092
- 34803668 12484446 141597121 0.125933 0.052503 0.488753 0.132034 0.052680
- 32621464 12431057 161787528 0.122551 0.058891 0.544059 0.142227 0.059809
- 32488717 12641420 181634825 0.120978 0.060893 0.593819 0.149022 0.066788
- 32673426 12592524 201715727 0.129329 0.064805 0.642629 0.155520 0.074625
- 36157641 12997210 224876158 0.152182 0.074205 0.696438 0.161412 0.085046
- 47363312 17011226 255228244 0.184862 0.088829 0.755057 0.165890 0.096926
- 56872124 21218133 290882235 0.226135 0.099779 0.815793 0.170898 0.111359
- 72810996 26566503 337126728 0.251080 0.123067 0.884162 0.176048 0.129575
- 65364864 23896208 378595384 0.270426 0.123444 0.938993 0.179634 0.146097
- 47237189 19078553 406754020 0.227513 0.123764 0.977065 0.181053 0.157084
- 42341873 17219760 431876133 0.236286 0.125390 1.011145 0.182138 0.166061
- 42111351 16717554 457269930 0.219498 0.129790 1.039727 0.182955 0.175263
- 37420519 14927155 479763294 0.235191 0.130633 1.059318 0.183310 0.182270
-> 18466879.366672 11687783.698356 75488513.555271 0.080461 0.021899 0.409110 0.104278 0.033353
-# 745319813.000000 265556519.000000 4363266111.000000 2.964111 1.428461 12.057586 2.669633 1.653858
--- The CXX compiler identification is GNU 15.1.1
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/g++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- PARLAY VERSION 2.3.3
--- ---------------------------- General configuration -----------------------------
--- CMake Generator:                Unix Makefiles
--- Compiler:                       GNU 15.1.1
--- Build type:                     Release
--- CMAKE_CXX_FLAGS:                
--- CMAKE_CXX_FLAGS_DEBUG:          -g
--- CMAKE_CXX_FLAGS_RELEASE:        -O3 -DNDEBUG
--- CMAKE_CXX_FLAGS_RELWITHDEBINFO: -O2 -g -DNDEBUG -fno-omit-frame-pointer
--- CMAKE_EXE_LINKER_FLAGS          
--- CMAKE_INSTALL_PREFIX:           /usr/local
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
--- -------------------------------- Library options ------------------------------
--- Using Parlay scheduler. Switch with -DPARLAY_{CILKPLUS,OPENCILK,OPENMP,TBB}=On
--- Elastic parallelism enabled. Disable with -DPARLAY_ELASTIC_PARALLELISM=Off
--- ------------------------------- Static Analysis --------------------------------
--- cppcheck:                     Disabled (enable with -DENABLE_CPPCHECK=On)
--- clang-tidy:                   Disabled (enable with -DENABLE_CLANG_TIDY=On)
--- include-what-you-use:         Disabled (enable with -DENABLE_IWYU=On)
--- ---------------------------------- Unit Tests ----------------------------------
--- testing: Disabled (enable with -DPARLAY_TEST=On)
--- ---------------------------------- Benchmarks ----------------------------------
--- benchmarks: Disabled (enable with -DPARLAY_BENCHMARK=On)
--- ----------------------------------- Examples -----------------------------------
--- examples: Disabled (enable with -DPARLAY_EXAMPLES=On)
--- example data: Off (add -DPARLAY_EXAMPLE_DATA=On to download)
--- The C compiler identification is GNU 15.1.1
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Found PkgConfig: /usr/bin/pkg-config (found version "1.4.2") 
--- Checking for module 'jemalloc'
---   Found jemalloc, version 5.2.1_0
-Generating .clangd configuration...
-Error: /home/zmen002/ParallelMultiwayOrderedSet/build/compile_commands.json not found. Run cmake first.
--- Configuring done (0.7s)
--- Generating done (0.0s)
--- Build files have been written to: /home/zmen002/ParallelMultiwayOrderedSet/build
-[ 50%] Building CXX object CMakeFiles/b_test.dir/tests/b_test.cpp.o
-[100%] Linking CXX executable b_test
-[100%] Built target b_test
->>>logs/temp_osm/0/temp_osm/64.log
-Tree: BTree; Buf: 64; InputFile: ; Dis: temp_osm; 
- insert_n delete_n tree_n insert_t(s) delete_t(s) find_t(s) range_t(s) flatten_t(s)
- 3531 0 3531 0.000141 0.000000 0.022230 0.003542 0.000021
- 184675 0 188206 0.001453 0.000000 0.030171 0.004732 0.000094
- 30614547 687779 30114974 0.103169 0.004047 0.088123 0.020080 0.010092
- 19995315 5259738 44850551 0.084307 0.014183 0.178405 0.045830 0.014442
- 19841793 7886239 56806105 0.054214 0.021090 0.256295 0.063048 0.018778
- 21213139 8097806 69921438 0.060160 0.024381 0.325431 0.075598 0.023862
- 33208908 10134266 92996080 0.088934 0.031022 0.420058 0.090195 0.030871
- 39990761 13708942 119277899 0.138609 0.038889 0.527708 0.104269 0.039867
- 34803668 12484446 141597121 0.117638 0.040135 0.619532 0.114534 0.047150
- 32621464 12431057 161787528 0.089568 0.043799 0.694615 0.121092 0.053796
- 32488717 12641420 181634825 0.123570 0.046041 0.762322 0.128924 0.059717
- 32673426 12592524 201715727 0.125268 0.048998 0.826658 0.133675 0.066835
- 36157641 12997210 224876158 0.131982 0.051671 0.899717 0.139616 0.074165
- 47363312 17011226 255228244 0.158663 0.060554 0.984030 0.146778 0.084726
- 56872124 21218133 290882235 0.193444 0.070621 1.072906 0.153106 0.096821
- 72810996 26566503 337126728 0.231958 0.084122 1.166640 0.159673 0.111957
- 65364864 23896208 378595384 0.213760 0.085182 1.243622 0.164806 0.127044
- 47237189 19078553 406754020 0.169408 0.079563 1.288398 0.166188 0.135415
- 42341873 17219760 431876133 0.156153 0.080527 1.321559 0.167903 0.145346
- 42111351 16717554 457269930 0.160587 0.082882 1.354972 0.169117 0.154625
- 37420519 14927155 479763294 0.136528 0.082282 1.381409 0.169819 0.162747
-> 18466879.366672 11687783.698356 75488513.555271 0.073024 0.042761 0.483159 0.080650 0.029403
-# 745319813.000000 265556519.000000 4363266111.000000 2.539511 0.989988 15.464802 2.342524 1.458372
+ 3531 0 3531 0.000946 0.000001 0.030075 0.002756 0.000048
+ 184675 0 188206 0.004303 0.000001 0.037016 0.003775 0.000192
+ 30614547 687779 30114974 0.828830 0.007412 0.059100 0.008731 0.014427
+ 19995315 5259738 44850551 0.601441 0.033099 0.071193 0.013787 0.018683
+ 19841793 7886239 56806105 0.560901 0.040963 0.089286 0.019026 0.036790
+ 21213139 8097806 69921438 0.576890 0.041145 0.101924 0.021856 0.034953
+ 33208908 10134266 92996080 0.820965 0.046037 0.123028 0.027141 0.038962
+ 39990761 13708942 119277899 1.006505 0.062836 0.148937 0.030343 0.048507
+ 34803668 12484446 141597121 0.866516 0.046610 0.170542 0.033241 0.062069
+ 32621464 12431057 161787528 0.813951 0.049830 0.188295 0.035399 0.069143
+ 32488717 12641420 181634825 0.843199 0.054383 0.200865 0.039412 0.084147
+ 32673426 12592524 201715727 0.878089 0.068614 0.224239 0.039521 0.096678
+ 36157641 12997210 224876158 1.032496 0.063635 0.248561 0.042320 0.137307
+ 47363312 17011226 255228244 1.288495 0.083319 0.270338 0.042178 0.141628
+ 56872124 21218133 290882235 1.465021 0.091839 0.291963 0.042913 0.158169
+ 72810996 26566503 337126728 1.807539 0.109454 0.331842 0.046009 0.199484
+ 65364864 23896208 378595384 1.729107 0.117971 0.353821 0.046736 0.205297
+ 47237189 19078553 406754020 1.400234 0.089713 0.373771 0.047195 0.208649
+ 42341873 17219760 431876133 1.474164 0.099966 0.391318 0.049496 0.248911
+ 42111351 16717554 457269930 0.823335 0.101962 0.406123 0.050781 0.265723
+ 37420519 14927155 479763294 1.360843 0.087344 0.411627 0.048674 0.268577
+> 18466879.366672 11687783.698356 75488513.555271 0.553230 0.020486 0.169334 0.026457 0.046361
+# 745319813.000000 265556519.000000 4363266111.000000 20.183770 1.296133 4.523864 0.691287 2.338342

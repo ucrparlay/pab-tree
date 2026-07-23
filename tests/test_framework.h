@@ -1634,10 +1634,10 @@ ReadEntriesBinary(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
       } else if (raw_dim == 3) {
         wp[i].val = data[(i * dim) + 2];
       }
-    } else if constexpr (kInputType == InputType::kOsmInput) {
-      wp[i].ReadKey(data[i * dim]);
-      wp[i].ReadVal(data[(i * dim) + 1]);
     } else {
+      // NOTE: both kOsmInput and kNormalInput store key/val directly — the
+      // binary payload is already numeric, so no string parse (ReadKey/ReadVal
+      // via std::stoul) is needed here (unlike the text reader).
       wp[i].key = data[i * dim];
       wp[i].val = data[(i * dim) + 1];
     }

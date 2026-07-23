@@ -34,7 +34,7 @@ public:
   using PmaLeaf = uncompressed_leaf<K, V>;
   // TODO: try
   // https://github.com/wheatman/Packed-Memory-Array/blob/69edd1831174682a1f702375542a8244e8faeccc/include/PMA/CPMA.hpp#L80
-  using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
+  using PmosPmaSettings = PMA_traits<PmaLeaf, Eytzinger, 0, false, false>;
   using PmaPointer = PmaLeaf::element_ptr_type;
   // static_assert(!PmaLeaf::binary);
   // static_assert(PmosPmaSettings::parallel);

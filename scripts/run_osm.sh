@@ -16,7 +16,7 @@ round=4
 log_path="logs/osm"
 mkdir -p "${log_path}"
 
-data_path="/data/zmen002/geometry/osm_by_year/asia_year_zcode.in"
+data_path="/data/zmen002/geometry/osm_by_year/asia_year_zcode.bin"
 
 batch_op_seq=("ins")
 dis_seq=("osm")
@@ -61,18 +61,18 @@ function run_cmake() {
 }
 
 # Masstree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-tree=5
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=5
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # BwTree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-tree=6
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=6
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # PMA
 tree=3
@@ -81,21 +81,21 @@ run_cmake 0 "${solver}"
 run_test 0 "${solver}" "${tree}"
 
 # PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=2
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # CPAM
-tree=1
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=1
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # ours
-solver="b_test"
-tree=0
-for idx in "${!leaf_wrap_seq[@]}"; do
-	run_cmake "${idx}" "${solver}"
-	run_test "${idx}" "${solver}" "${tree}"
-done
+# solver="b_test"
+# tree=0
+# for idx in "${!leaf_wrap_seq[@]}"; do
+# 	run_cmake "${idx}" "${solver}"
+# 	run_test "${idx}" "${solver}" "${tree}"
+# done
