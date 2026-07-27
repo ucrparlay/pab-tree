@@ -750,14 +750,16 @@ ConRangeQuery(auto num_thread,
               int rec_num,
               auto const& query_box_seq)
 {
-  auto [offset, tot_size] = parlay::scan(
-    parlay::tabulate(
-      rec_num, [&](size_t i) -> size_t { return query_box_seq[i].second; }),
-    parlay::addm<size_t>());
-  offset.push_back(tot_size);
-  parlay::sequence<std::pair<keytype, uint64_t>> v(tot_size);
+  // NOTE: scan() below walks the range and returns a count without
+  // materializing it, so there is no output buffer to size here. The previous
+  // version allocated sum(result sizes) pairs up front -- 2.5e10 pairs =
+  // 372GiB for the largest rectangle type at 1e8 -- and never wrote to it: the
+  // only reader was the commented-out range_report branch. bwtree died there
+  // with bad_alloc; masstree only survived because ConQueryAfterStep skips that
+  // rectangle type for it.
+  (void)rec_num;
 
-  auto func2 = [num_thread, idx, index_type, &v, &offset, &query_box_seq](
+  auto func2 = [num_thread, idx, index_type, &query_box_seq](
                  uint64_t thread_id, bool) {
     size_t total_num_op = query_box_seq.size();
     size_t op_per_thread = total_num_op / num_thread;
