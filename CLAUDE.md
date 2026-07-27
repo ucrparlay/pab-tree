@@ -571,3 +571,188 @@ and the `Leaf`/`Interior` aliases). Each has a thin `tests/<name>.cpp` driver
   → SIGSEGV inside parlay's parallel `sequence` construction (crash is in the
   framework, *before* any `Contain` call — affected every baseline equally, not
   TLX-specific). Fixed to slice `wp` (the keys actually built into the tree).
+
+## Concurrent-index incremental sweep (`external/index-microbench/workload.cpp`)
+
+Tags 5 (`1<<5`, insert) and 6 (`1<<6`, delete) in `ApplyConcurrentIndex` are the
+masstree/bwtree mirror of `BatchInsertByStep`/`BatchDeleteByStep`
+(`tests/test_framework.h`). Driven by `scripts/incre_updates.sh`
+(`tag=2#1100000` = 96, both bits).
+
+### `ConInsertByStep` / `ConDeleteByStep`
+
+Both slice the input into `1/ratio` batches over
+`ratio_seq = {0.0001, 0.001, 0.01, 0.1}`, time the whole chain **once** (no
+`rounds` loop — `-r` is ignored), then **rebuild** to reach a half state rather
+than unwinding, because masstree's `remove` never reclaims (measured: 1e9 delete
+grows RSS 98GB → 1491GB and dies). `half_n = min((slice_num/2)*step, n)`, which
+is only `n/2` when `slice_num` is even and `step` divides `n`.
+
+### `ConRunBatched` — why threads are spawned once
+
+`threadinfo::make` mallocs 8KB, links into a never-pruned global `allthreads`,
+and grabs a 2MB superpage pool. One `StartThreads` per batch would leak
+`slice_num * num_thread` threadinfos (1e9 @ ratio 1e-4 → 2.24M ≈ 4.4TB, killing
+the run via `pthread_create` EAGAIN). `ConRunBatched` spawns one thread per
+worker, one threadinfo each, and walks all batches inside with a `std::barrier`
+between them. Work split inside a batch is **proportional**
+(`in.size()*tid/num_thread`), unlike `ConInsert`/`ConDelete`, which use
+`key_per_thread*tid` and drop the remainder.
+
+### Output format
+
+Per ratio: 9 columns = 1 timing + 2 membership (in-tree, not-in-tree) + 3 range
+query + 3 range count (`kRangeQueryType = 3`). Masstree emits `-` for range
+query `rec_type 2` and for all 3 range counts, so column count stays fixed.
+A leading `-` stands in for the primal build, which tags 5/6 skip
+(`needs_primal` is false when only bits 5/6 are set).
+
+### Gotchas found 2026-07-27
+
+- **`-t 96` used to yield only the insert half for masstree** — tag 5 ran first
+  in the same process, masstree returned nothing to the OS, and the
+  `ConDeleteSweepFits` guard then saw a depleted `MemAvailable` and skipped tag
+  6. **Fixed**: `ReclaimMassTreeMemory` frees the memory between phases and the
+  guard is gone, so `-t 96` now produces both halves in one process (verified at
+  1e8 for masstree and bwtree). Splitting into `-t 32` / `-t 64` is no longer
+  needed.
+- **Ratio 0.0001 is noisy.** Observed 7.16–14.51s for the same insert chain
+  across runs, while the other three ratios hold within a few percent — 10000
+  batches means 10000 barrier syncs. These are single-shot (`-r` is ignored on
+  this path), so average before trusting that column.
+- **Insert/delete blocks read different files**: tag 5 reads `base_path` into
+  `wp`, tag 6 reads `batch_path` into `wi`. Equal only when `-b 1`. At `-b 0.1`
+  the delete sweep is 10x smaller, and since `batch_size` derives from
+  `wp.size()` vs `wi.size()`, the membership columns differ 10x too — the two
+  blocks are not comparable as logged.
+- **Build config trap**: `main` dispatches to `ApplyConcurrentIndexDynamicGraph`
+  when `DYNAMIC_GRAPH` or `OSM` is defined, and that function only handles tags
+  3 and 4 — tags 5/6 produce *no output at all*, silently. Rebuild with
+  `-DDYNAMIC_GRAPH=OFF -DOSM=OFF` before running tags 5/6 by hand.
+  `incre_updates.sh` is safe because its `run_cmake` passes those flags.
+
+### Dataset note
+
+Ratio-1 dirs (`ins/1`, `del/1`, i.e. batch == base) exist only for some
+`<dis>/<n>` combinations — at 1e8 only `dual_norm` has them; `uni/100000000_1`
+has just `10/100/1000/10000`. `-b 1` against a distribution lacking `1/` aborts
+in `ReadEntries` before any work.
+
+### `ConRangeQuery` dead-allocation fix (2026-07-27)
+
+`ConRangeQuery` used to prefix-sum the per-query result sizes and allocate
+`parlay::sequence<std::pair<keytype,uint64_t>> v(tot_size)` up front. Nothing
+ever wrote to `v` — its only reader was the commented-out `range_report`
+branch — but at 1e8 with rectangle type 2 that is 2.5e10 pairs = **372GiB**,
+and bwtree died there with `std::bad_alloc`. Removed `v`, `offset`, and the
+`parlay::scan`; `rec_num` is now unused (`(void)rec_num`).
+
+Masstree never reached it only because `ConQueryAfterStep` skips rectangle type
+2 for masstree. That carve-out is **still required after this fix**: masstree's
+own `scan` (`index.h:827`) declares `Str results[range]`, a stack VLA sized to
+the result count, which blows the stack at ~5e5 elements. Two separate bugs,
+same shape (a buffer sized to the query result), different memory.
+
+Both index types implement `scan(key, range)` as "walk `range` elements from
+`key`" (masstree `get_next_n`, bwtree iterator walk), so the timings are
+comparable. If the `range_report` branch is ever restored, note
+`v.begin() + offset[start_index]` is wrong — it offsets by the thread's first
+query index, not per-query, so queries within a thread would overlap.
+
+### `GenRectangles` non-FixSize path never sets the lower bound
+
+In `tests/test_framework.h:126-139` (the `FixSize == false` branch, which is
+what `GenRectangles<TT, false, false>` — every concurrent-index call site —
+uses), `range.first` is never assigned for types 1 and 2; `range.second` is
+assigned twice instead. `std::pair`'s default ctor value-initializes, so
+`range.first == 0`:
+
+| type | intended | actual |
+|---|---|---|
+| 0 | `[1, n^0.25)` | `[1, n^0.25)` — correct |
+| 1 | `[n^0.25, sqrt(n))` | `[0, sqrt(n))` |
+| 2 | `[sqrt(n), 1e6)` | `[0, 1e6)` |
+
+So the three "brackets" are nested rather than disjoint (compare the `FixSize`
+branch, which correctly sets both bounds to `[1,100) [100,10000) [10000,1e6)`).
+Large-bracket measurements therefore include arbitrarily small boxes and
+understate large-range cost. Cross-tree comparisons stay valid — `srand(10)`
+makes the box sequence identical for every tree at a given `(rec_num, type, n)`
+— but the brackets do not measure what their names say.
+
+### BwTree incremental results (1e8 uni, `-t 96 -b 0.1`)
+
+Works end to end after the fix (bwtree was never subject to the old memory
+guard, which only applied to masstree and has since been removed). Notable: rectangle-type-2 scans cost **17.0s in the delete block vs 10.5s in
+the insert block** despite the delete-block tree holding 10x fewer live entries
+(5e6 vs 5e7). Because type 2 caps at `[0,1e6)` for both and `srand(10)` fixes
+the length sequence, both blocks walk an *identical* number of elements — so
+that 1.6x is a real per-element slowdown, consistent with BwTree delta/tombstone
+chains left behind by the bulk deletion.
+
+### Masstree memory reclamation (2026-07-27)
+
+**Where masstree's memory actually lives.** Not in the tree. `threadinfo::make`
+(`masstree/kvthread.cc:98`) mallocs a *fresh* 8KB threadinfo with zeroed
+`pool_[]` on every call, and `StartThreads`/`ConRunBatched` call it once per
+thread per invocation. Pools are per-threadinfo, refilled from `posix_memalign`
+superpages recorded in `pool_ptrs_`. So nothing an index frees is ever returned
+to the OS or reused by a later index.
+
+Consequence: **restoring `~mt_index` would reclaim nothing.** Its body is
+commented out (`masstree/mtIndexAPI.hh:76`) and references a `ti_` that is not a
+member, but even a correct `table_->destroy(ti)` would only push nodes onto a
+freelist no subsequent build consults, because that build gets new threadinfos.
+Don't spend time on it.
+
+**What does work** — `threadinfo::release_all_pools()` (added to `kvthread.hh`
+next to `deallocate_ti`): walks the global `allthreads` list, calls
+`deallocate_ti()` on each (frees its superpages plus the `pool_ptrs_` buffer),
+frees the threadinfo struct, and nulls `allthreads`. `deallocate_ti()` already
+existed and had **no callers** — it is the only thing in the tree that releases
+pool pages.
+
+`ReclaimMassTreeMemory()` in `workload.cpp` wraps it and is called at six points
+where the workers have joined and no index is live: inside
+`ConInsertByStep`/`ConDeleteByStep` between the full and half builds, and after
+each `delete idx` in tags 3, 5 and 6. All six are **outside** the timed regions
+(each follows a `t.stop()`).
+
+**Stop at the allocator — do not release to the OS.** An earlier version also
+called `MallocExtension::instance()->ReleaseFreeMemory()` (this binary links
+`tcmalloc_minimal`, CMakeLists.txt:246, which parks freed pages in its page
+heap). That was only ever needed to raise `MemAvailable` for the guard, and the
+guard is gone. Worse, it made the *next* build fault every page back in, and
+that cost lands inside its timed region — ratio 0.0001 swung 7.16–14.51s with
+it, and settled to 6.30–7.26s once removed. Leaving the pages with tcmalloc
+still prevents growth, because tcmalloc reuses them for the next build.
+
+**SAFETY**: `release_all_pools()` frees the pages masstree nodes live in and the
+threadinfo objects themselves. Only call it with no masstree index live, no
+`threadinfo*` held, and the Con* worker threads joined. Deliberately *not*
+called in tags 0/1, where `primal_idx` stays live across ratios.
+
+**The `ConDeleteSweepFits` guard is gone** (removed 2026-07-27). It multiplied
+the input size by a hand-picked 1000 bytes/entry, compared that against
+`MemAvailable`, and skipped the whole delete block when it did not fit — the
+`fits` flag, the 36 `-` placeholders, and all. It was ~2.3x over (93.1GiB
+demanded at 1e8 for a sweep peaking near 40GB) and its constant had been
+calibrated against the leaking behaviour that `ReclaimMassTreeMemory` now
+prevents. The delete sweep runs unconditionally.
+
+### Tag 3 (batch update by size) fixes
+
+- Removed the post-measurement `ConDelete` "reset" sweeps from both masstree
+  branches. `idx` is freshly built each iteration and dropped on the next line,
+  so emptying it bought nothing while costing ~1.4KB of unreclaimed RSS per
+  entry — `ConDelete(append(wi, wp))` was ~1.4TB at 1e9, plus a full
+  concatenated copy of the input. Both branches then became identical to the
+  bwtree branch, so they are now one path.
+- Tag 3 honours `opts.summary`: `1` keeps the in-process 13-ratio sweep, `0`
+  runs the single `-b` ratio so the sweep can be driven one process per ratio.
+- **Blocked on data**: tag 3's `ratio_seq` needs ratio dirs
+  `{10000,5000,2000,1000,500,200,100,50,20,10,5,2,1}`; only
+  `{1,10,100,1000,10000}` exist for any distribution, so it aborts on ratio 2.
+  Regenerate with `gen_graph.sh`'s full `batch_ratio_seq` uncommented before
+  trying to validate. `merge_batch_updates.py` expects one `Tree:` header
+  followed by a single line of 26 values, which a per-process sweep would break.
