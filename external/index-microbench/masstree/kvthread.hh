@@ -440,6 +440,24 @@ class threadinfo {
     }
   }
 
+  // Frees every page any threadinfo ever took, plus the threadinfo list, so
+  // masstree is back to how it starts.
+  // This is the only way to get the memory back: make() builds a new threadinfo
+  // with empty pools on every call, so pages one index frees are never reused
+  // by the next one. deallocate_ti() releases them but nothing else calls it.
+  // Only safe with no index live and no threadinfo pointer held anywhere --
+  // it frees the pages the tree nodes sit in.
+  static void release_all_pools() {
+    threadinfo* ti = allthreads;
+    while (ti) {
+      threadinfo* next = ti->next();
+      ti->deallocate_ti(); // frees the superpages + the pool_ptrs_ buffer
+      ::free(ti);          // the 8192-byte threadinfo make() malloc'd
+      ti = next;
+    }
+    allthreads = nullptr;
+  }
+
   void rcu_clean() {
     limbo_group *lg = limbo_head_;
     limbo_element *lb = &lg->e_[lg->head_];

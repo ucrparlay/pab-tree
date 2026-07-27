@@ -750,13 +750,9 @@ ConRangeQuery(auto num_thread,
               int rec_num,
               auto const& query_box_seq)
 {
-  // NOTE: scan() below walks the range and returns a count without
-  // materializing it, so there is no output buffer to size here. The previous
-  // version allocated sum(result sizes) pairs up front -- 2.5e10 pairs =
-  // 372GiB for the largest rectangle type at 1e8 -- and never wrote to it: the
-  // only reader was the commented-out range_report branch. bwtree died there
-  // with bad_alloc; masstree only survived because ConQueryAfterStep skips that
-  // rectangle type for it.
+  // NOTE: scan() below only counts, so there is nothing to store. This used to
+  // allocate one slot per expected result -- 372GiB at 1e8 on the biggest boxes
+  // -- and never write to it. bwtree ran out of memory there.
   (void)rec_num;
 
   auto func2 = [num_thread, idx, index_type, &query_box_seq](
@@ -822,6 +818,19 @@ struct ConStepResult
 // (RSS climbs to the 1491GB ceiling and pthread_create then fails with EAGAIN).
 // Spawn the threads -- and their one threadinfo each -- once, and walk the
 // batches inside, with a barrier between batches so the run stays sequential.
+// Hands masstree's pages back to the allocator between rounds, so the next
+// round reuses them instead of taking more. Needed because masstree parks them
+// in per-thread pools that no later round ever touches.
+// We stop at the allocator on purpose. Returning the pages to the OS as well
+// would make the next build fault every one of them back in, and that cost
+// lands inside its timed region.
+// Only call with no index live and the worker threads finished.
+static void
+ReclaimMassTreeMemory()
+{
+  threadinfo::release_all_pools();
+}
+
 template<typename Body>
 void
 ConRunBatched(Index<keytype, keycomp>* idx,
@@ -862,29 +871,9 @@ ConRunBatched(Index<keytype, keycomp>* idx,
   }
 }
 
-// NOTE: masstree memory is never returned to the OS, and the delete sweep
-// rebuilds the index twice per ratio, so the whole run costs far more than the
-// ~105 bytes/entry a single build does. Measured end to end over a 1e8 delete
-// sweep: 81GB peak, i.e. ~870 bytes/entry; 1000 is that plus margin. This is an
-// extrapolation from 1e8 and has not been validated at 1e9. Checked against
-// MemAvailable so the block can bow out with a message instead of dying in the
-// middle of a log.
-static bool
-ConDeleteSweepFits(size_t n)
-{
-  constexpr size_t kBytesPerDeletedEntry = 1000;
-  std::ifstream meminfo("/proc/meminfo");
-  std::string key;
-  size_t kb = 0;
-  while (meminfo >> key >> kb) {
-    if (key == "MemAvailable:") {
-      return n * kBytesPerDeletedEntry < kb * 1024;
-    }
-    meminfo.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  }
-  return true; // NOTE: cannot tell -- let it run
-}
-
+// NOTE: a guard here used to skip the whole delete block when a guessed memory
+// cost exceeded free memory. Removed: the guess was about 2.3x too high (93GiB
+// for a sweep that peaked near 40GB) and it blocked runs that finished fine.
 // NOTE: mirror of BatchInsertByStep (tests/test_framework.h). Grows the index
 // from empty by inserting WP in `1 / insert_ratio` equal-sized batches and
 // times the whole chain. Following the convention of the other Con* helpers,
@@ -937,6 +926,7 @@ ConInsertByStep(auto num_thread,
 
   // NOTE: rebuild the half state instead of deleting the upper half back out.
   delete idx;
+  ReclaimMassTreeMemory(); // safe here: threads joined, idx gone
   idx = getInstance<keytype, keycomp>(index_type, key_type);
   insert_batches(idx, slice_num / 2);
   return { idx, half_n };
@@ -988,7 +978,8 @@ ConDeleteByStep(auto num_thread,
   t.stop();
   std::cout << t.total_time() << " " << std::flush;
 
-  delete idx; // NOTE: already empty
+  delete idx;                      // NOTE: already empty
+  ReclaimMassTreeMemory(); // safe here: threads joined, idx gone
   idx = ConBuild<0>(num_thread, index_type, WP);
   delete_batches(idx, slice_num / 2);
   return { idx, half_n };
@@ -1571,27 +1562,29 @@ ApplyConcurrentIndex(Options const& opts)
   if (opts.tag & (1 << 3)) {
     release_primal();
 
-    parlay::sequence<double> const ratio_seq = { 0.0001, 0.0002, 0.0005, 0.001,
-                                                 0.002,  0.005,  0.01,   0.02,
-                                                 0.05,   0.1,    0.2,    0.5,
-                                                 1.0 };
+    parlay::sequence<double> const full_ratio_seq = {
+      0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+      0.02,   0.05,   0.1,    0.2,   0.5,   1.0
+    };
+    // NOTE: 13 rounds in one process need 13 indexes worth of memory: ~136GB at
+    // 1e8, ~1.27TB at 1e9, against 125GB of RAM. With summary == 0 we run one
+    // ratio, so the caller can give each ratio its own process.
+    auto const ratio_seq =
+      opts.summary ? full_ratio_seq
+                   : parlay::sequence<double>{ opts.batch_ratio };
+
     for (auto ratio : ratio_seq) {
       auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
       // std::cout << base_path << " " << batch_path << std::endl;
       auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
       auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      // BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
-      if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
-                                         // if rebuild the whole index
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConInsert<1>(num_thread, idx, wi);
-        ConDelete<0>(num_thread, idx, parlay::append(wi, wp));
-        delete idx;
-      } else if (index_type == TYPE_BWTREE) {
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConInsert<1>(num_thread, idx, wi);
-        delete idx;
-      }
+      // NOTE: don't empty idx before dropping it. It is rebuilt every round and
+      // freed on the next line, and masstree never gives back what remove()
+      // touches -- the old clear-out cost about 1.4TB at 1e9.
+      auto* idx = ConBuild<0>(num_thread, index_type, wp);
+      ConInsert<1>(num_thread, idx, wi);
+      delete idx;
+      ReclaimMassTreeMemory();
     }
 
     for (auto ratio : ratio_seq) {
@@ -1599,16 +1592,11 @@ ApplyConcurrentIndex(Options const& opts)
       // std::cout << base_path << " " << batch_path << std::endl;
       auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
       auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      if (index_type == TYPE_MASSTREE) {
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConDelete<1>(num_thread, idx, wi);
-        ConDelete<0>(num_thread, idx, wp);
-        delete idx;
-      } else if (index_type == TYPE_BWTREE) {
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConDelete<1>(num_thread, idx, wi);
-        delete idx;
-      }
+      // NOTE: same here -- no clearing an index we are about to drop.
+      auto* idx = ConBuild<0>(num_thread, index_type, wp);
+      ConDelete<1>(num_thread, idx, wi);
+      delete idx;
+      ReclaimMassTreeMemory();
     }
   }
 
@@ -1631,6 +1619,7 @@ ApplyConcurrentIndex(Options const& opts)
                             wp.cut(half_n, wp.size()),
                             batch_size);
       delete idx;
+      ReclaimMassTreeMemory();
     }
   }
 
@@ -1642,27 +1631,7 @@ ApplyConcurrentIndex(Options const& opts)
     parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
     auto const batch_size = static_cast<size_t>(wi.size() * kMemberQueryRatio);
 
-    // NOTE: this sweep deletes every key once per ratio. Masstree cannot pay
-    // that at 1e9 -- see ConDeleteSweepFits -- so bow out with placeholders
-    // rather than dying part way through the log.
-    bool const fits =
-      index_type != TYPE_MASSTREE || ConDeleteSweepFits(wi.size());
-    if (!fits) {
-      fprintf(stderr,
-              "Skipping incremental delete: masstree needs ~%.0fGB to delete "
-              "%zu entries and will not fit\n",
-              (wi.size() * 1500.0) / (1024.0 * 1024.0 * 1024.0),
-              wi.size());
-    }
-
     for (auto ratio : ratio_seq) {
-      if (!fits) {
-        // NOTE: 1 timing + 2 membership + 3 range query + 3 range count
-        for (int k = 0; k < 9; k++) {
-          std::cout << "- " << " ";
-        }
-        continue;
-      }
       auto [idx, half_n] = ConDeleteByStep(num_thread, index_type, wi, ratio);
 
       // NOTE: the teardown removed wi[0, half_n), so the *upper* part is what
@@ -1674,6 +1643,7 @@ ApplyConcurrentIndex(Options const& opts)
                             wi.cut(0, half_n),
                             batch_size);
       delete idx;
+      ReclaimMassTreeMemory();
     }
   }
   std::cout << "\n" << std::flush;
