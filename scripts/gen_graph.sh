@@ -11,17 +11,18 @@ set -o xtrace
 
 # path_prefix=/data/zmen002/kv_pair
 path_prefix=/data/zmen002/kv_pair/
-base_n_seq=(100000000)
+base_n_seq=(1000000000)
 file_num=1
-batch_ratio_seq=(10000 1000 100 10)
+# batch_ratio_seq=(10000 1000 100 10)
 # batch_ratio_seq=(10000 2000 5000 1000 200 500 100 20 50 10 2 5 1)
-# batch_ratio_seq=(10)
+batch_ratio_seq=(1)
 
 # dis_seq=(0 1 2 3)
-dis_seq=(0 1)
+dis_seq=(3)
 batch_op=(0 1)
 # batch_op=(1)
 val_n=1
+binary=1
 
 logger_path="log.in"
 : >"${logger_path}"
@@ -60,7 +61,7 @@ for base_n in "${base_n_seq[@]}"; do
 				fi
 			fi
 			for b_op in "${batch_op[@]}"; do
-				./../build/data_generator -path "${path_prefix}" -base_n "${base_n}" -batch_n "${batch_n}" -val_n "${val_n}" -file_num "${file_num}" -dis "${dis}" -batch_op "${b_op}" -base_param "${base_param}" -batch_param "${batch_param}" 2>&1 | tee -a "${logger_path}"
+				./../build/data_generator -path "${path_prefix}" -base_n "${base_n}" -batch_n "${batch_n}" -val_n "${val_n}" -file_num "${file_num}" -binary "${binary}" -dis "${dis}" -batch_op "${b_op}" -base_param "${base_param}" -batch_param "${batch_param}" 2>&1 | tee -a "${logger_path}"
 			done
 		done
 	done
