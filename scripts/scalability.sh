@@ -4,7 +4,6 @@ set -o xtrace
 
 /usr/bin/drop_caches
 
-declare -a leaf_wrap_seq=(64)
 declare -a cores=(1 4 16 32 64 112 224)
 declare -a threads=(
 	"PARLAY_NUM_THREADS=1"
@@ -115,30 +114,30 @@ function run_cmake() {
 # run_test 0 "${solver}" "${tree}"
 
 # PMA
-# tree=3
-# solver="pma"
+tree=3
+solver="pma"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+# PAM
+# tree=2
+# solver="cpam"
 # run_cmake 0 "${solver}"
 # run_test 0 "${solver}" "${tree}"
 
-# PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
-
 # CPAM
-tree=1
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# tree=1
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # ours
-solver="b_test"
-tree=0
-for idx in "${!leaf_wrap_seq[@]}"; do
-	run_cmake "${idx}" "${solver}"
-	run_test "${idx}" "${solver}" "${tree}"
-done
+# solver="b_test"
+# tree=0
+# for idx in "${!leaf_wrap_seq[@]}"; do
+# 	run_cmake "${idx}" "${solver}"
+# 	run_test "${idx}" "${solver}" "${tree}"
+# done
 
 # Tree=(0 1 2 3)
 # make -C ../build/ kd_test p_test baselines
