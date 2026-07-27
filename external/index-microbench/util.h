@@ -105,19 +105,20 @@ static int core_alloc_map_numa[] = {
 };
 
 
-constexpr static size_t MAX_CORE_NUM = 40;
+// NOTE: this host is 4-socket x 28-core x 2-SMT = 224 logical CPUs. The kernel
+// numbers CPUs 0..111 as one-thread-per-physical-core (CPU c on NUMA node
+// c % 4) and 112..223 as their SMT siblings, so an identity map (thread t ->
+// CPU t) fills distinct physical cores round-robin across all four sockets
+// first and only shares SMT siblings past 112 threads -- the right order for a
+// scalability sweep. The old 40-entry core_alloc_map_* tables (above) were for
+// a 2-socket x 20-core box and are left unused.
+constexpr static size_t MAX_CORE_NUM = 224;
 
 inline void PinToCore(size_t thread_id) {
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
 
-  size_t core_id = thread_id % MAX_CORE_NUM;
-
-  if(hyperthreading == true) {
-    CPU_SET(core_alloc_map_hyper[core_id], &cpu_set);
-  } else {
-    CPU_SET(core_alloc_map_numa[core_id], &cpu_set);
-  }
+  CPU_SET(thread_id % MAX_CORE_NUM, &cpu_set);
 
   int ret = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
   if(ret != 0) {

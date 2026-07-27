@@ -6,6 +6,7 @@
 #include "../../tests/test_framework.h"
 #include "parlay/primitives.h"
 #include <atomic>
+#include <barrier>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
@@ -797,6 +798,242 @@ ConRangeQuery(auto num_thread,
   return t.total_time();
 }
 
+// NOTE: index lifetime in the two incremental helpers below.
+// Neither helper ever reaches its half state by deleting entries back out of a
+// full index -- it always drops the index and rebuilds. That looks wasteful but
+// is far cheaper for masstree, whose remove never reclaims: measured at 1e9
+// entries a full build costs 98GB / 66s, while deleting those same entries
+// grows RSS to 1491GB (~1.4KB per removed entry) and dies. Rebuilding costs
+// another ~105 bytes/entry instead, which fits.
+struct ConStepResult
+{
+  Index<keytype, keycomp>* idx;
+  size_t half_n; // NOTE: entries on the low side of the half split
+};
+
+// NOTE: threadinfo::make mallocs 8KB, links itself into a global `allthreads`
+// list that is never pruned, and immediately grabs a 2MB superpage pool for its
+// limbo group -- and StartThreads calls it once per thread per Con* call.
+// Driving an incremental sweep through one StartThreads per batch therefore
+// leaks slice_num * num_thread threadinfos: at 1e9 with ratio 0.0001 that is
+// 10000 * 224 = 2.24M of them, some 4.4TB of pools, which is what kills the run
+// (RSS climbs to the 1491GB ceiling and pthread_create then fails with EAGAIN).
+// Spawn the threads -- and their one threadinfo each -- once, and walk the
+// batches inside, with a barrier between batches so the run stays sequential.
+template<typename Body>
+void
+ConRunBatched(Index<keytype, keycomp>* idx,
+              size_t const num_thread,
+              size_t const batch_num,
+              Body body)
+{
+  if (idx != nullptr) {
+    idx->UpdateThreadLocal(num_thread);
+  }
+  std::barrier sync(static_cast<std::ptrdiff_t>(num_thread));
+  std::vector<std::thread> thread_group;
+  thread_group.reserve(num_thread);
+
+  for (size_t tid = 0; tid < num_thread; tid++) {
+    thread_group.emplace_back([&, tid]() {
+      if (idx != nullptr) {
+        idx->AssignGCID(tid);
+      }
+      PinToCore(tid);
+      threadinfo* ti = threadinfo::make(threadinfo::TI_MAIN, -1);
+      int counter = 0;
+      for (size_t b = 0; b < batch_num; b++) {
+        body(tid, b, ti, counter);
+        sync.arrive_and_wait();
+      }
+      ti->rcu_quiesce();
+      if (idx != nullptr) {
+        idx->UnregisterThread(tid);
+      }
+    });
+  }
+  for (auto& th : thread_group) {
+    th.join();
+  }
+  if (idx != nullptr) {
+    idx->UpdateThreadLocal(1);
+  }
+}
+
+// NOTE: masstree memory is never returned to the OS, and the delete sweep
+// rebuilds the index twice per ratio, so the whole run costs far more than the
+// ~105 bytes/entry a single build does. Measured end to end over a 1e8 delete
+// sweep: 81GB peak, i.e. ~870 bytes/entry; 1000 is that plus margin. This is an
+// extrapolation from 1e8 and has not been validated at 1e9. Checked against
+// MemAvailable so the block can bow out with a message instead of dying in the
+// middle of a log.
+static bool
+ConDeleteSweepFits(size_t n)
+{
+  constexpr size_t kBytesPerDeletedEntry = 1000;
+  std::ifstream meminfo("/proc/meminfo");
+  std::string key;
+  size_t kb = 0;
+  while (meminfo >> key >> kb) {
+    if (key == "MemAvailable:") {
+      return n * kBytesPerDeletedEntry < kb * 1024;
+    }
+    meminfo.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+  return true; // NOTE: cannot tell -- let it run
+}
+
+// NOTE: mirror of BatchInsertByStep (tests/test_framework.h). Grows the index
+// from empty by inserting WP in `1 / insert_ratio` equal-sized batches and
+// times the whole chain. Following the convention of the other Con* helpers,
+// this is a single timed run -- there is no `rounds` loop.
+// Leaves an index half way through the build, holding WP[0, half_n). Masstree
+// gets `reuse_idx` back, which must be empty on entry; bwtree gets a fresh
+// index the caller must delete.
+ConStepResult
+ConInsertByStep(auto num_thread,
+                int index_type,
+                auto const& WP,
+                double const insert_ratio)
+{
+  size_t const n = WP.size();
+  auto const step =
+    std::max<size_t>(static_cast<size_t>(insert_ratio * n), size_t(1));
+  size_t const slice_num = (n / step) + (n % step != 0);
+  // NOTE: the true half boundary is (slice_num / 2) * step, which is only equal
+  // to n / 2 when slice_num is even and step divides n.
+  size_t const half_n = std::min((slice_num / 2) * step, n);
+
+  auto insert_batches = [&](Index<keytype, keycomp>* idx,
+                            size_t const batch_num) {
+    ConRunBatched(
+      idx,
+      num_thread,
+      batch_num,
+      [&](size_t const tid, size_t const b, threadinfo* ti, int& counter) {
+        auto in = WP.cut(b * step, std::min((b + 1) * step, n));
+        // NOTE: proportional split, so the tail is not dropped and batches
+        // smaller than num_thread still get inserted.
+        size_t const lo = (in.size() * tid) / num_thread;
+        size_t const hi = (in.size() * (tid + 1)) / num_thread;
+        for (size_t i = lo; i < hi; i++) {
+          idx->insert(in[i].GetKey(), in[i].GetVal(), ti);
+          if (++counter % 4096 == 0) {
+            ti->rcu_quiesce();
+          }
+        }
+      });
+  };
+
+  auto* idx = getInstance<keytype, keycomp>(index_type, key_type);
+
+  parlay::internal::timer t;
+  t.reset(), t.start();
+  insert_batches(idx, slice_num);
+  t.stop();
+  std::cout << t.total_time() << " " << std::flush;
+
+  // NOTE: rebuild the half state instead of deleting the upper half back out.
+  delete idx;
+  idx = getInstance<keytype, keycomp>(index_type, key_type);
+  insert_batches(idx, slice_num / 2);
+  return { idx, half_n };
+}
+
+// NOTE: mirror of BatchDeleteByStep (tests/test_framework.h). Starts from an
+// index over the whole of WP and deletes WP back out of it in
+// `1 / delete_ratio` equal-sized batches until it is empty. Only the chain of
+// deletes is timed, once; the build is untimed.
+// Leaves an index half way through the teardown: WP[0, half_n) is gone, so
+// WP[half_n, n) remains. Masstree gets `reuse_idx` back, which must hold all of
+// WP on entry; bwtree gets a fresh index the caller must delete.
+ConStepResult
+ConDeleteByStep(auto num_thread,
+                int index_type,
+                auto const& WP,
+                double const delete_ratio)
+{
+  size_t const n = WP.size();
+  auto const step =
+    std::max<size_t>(static_cast<size_t>(delete_ratio * n), size_t(1));
+  size_t const slice_num = (n / step) + (n % step != 0);
+  size_t const half_n = std::min((slice_num / 2) * step, n);
+
+  auto delete_batches = [&](Index<keytype, keycomp>* idx,
+                            size_t const batch_num) {
+    ConRunBatched(
+      idx,
+      num_thread,
+      batch_num,
+      [&](size_t const tid, size_t const b, threadinfo* ti, int& counter) {
+        auto in = WP.cut(b * step, std::min((b + 1) * step, n));
+        size_t const lo = (in.size() * tid) / num_thread;
+        size_t const hi = (in.size() * (tid + 1)) / num_thread;
+        for (size_t i = lo; i < hi; i++) {
+          idx->remove(in[i].GetKey(), in[i].GetVal(), ti);
+          if (++counter % 4096 == 0) {
+            ti->rcu_quiesce();
+          }
+        }
+      });
+  };
+
+  auto* idx = ConBuild<0>(num_thread, index_type, WP);
+
+  parlay::internal::timer t;
+  t.reset(), t.start();
+  delete_batches(idx, slice_num);
+  t.stop();
+  std::cout << t.total_time() << " " << std::flush;
+
+  delete idx; // NOTE: already empty
+  idx = ConBuild<0>(num_thread, index_type, WP);
+  delete_batches(idx, slice_num / 2);
+  return { idx, half_n };
+}
+
+// NOTE: the query trio run after an incremental insert/delete, matching the
+// order the tag 5 / tag 6 blocks in tests/test_framework.h print them in:
+// membership on keys that are in the index, membership on keys that are not,
+// then range query and range count. The masstree carve-outs are the same ones
+// the query_type lambdas in ApplyConcurrentIndex use.
+template<typename TT>
+void
+ConQueryAfterStep(auto num_thread,
+                  auto idx,
+                  int index_type,
+                  auto const& entry_in_tree,
+                  auto const& entry_not_in_tree,
+                  size_t const batch_size)
+{
+  auto to_keys = [](auto const& r) {
+    return parlay::map(r, [](auto const& e) { return e.GetKey(); });
+  };
+  ConMembership(num_thread, idx, to_keys(entry_in_tree.cut(0, batch_size)));
+  ConMembership(num_thread, idx, to_keys(entry_not_in_tree.cut(0, batch_size)));
+
+  for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+    if (index_type == TYPE_MASSTREE && rec_type == kRangeQueryType - 1) {
+      // Skip the largest rectangle type for masstree since it segfaults
+      std::cout << "- " << " ";
+      continue;
+    }
+    auto [query_box_seq, max_size] =
+      GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
+    ConRangeQuery(num_thread, idx, index_type, kRangeQueryNum, query_box_seq);
+  }
+
+  for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+    if (index_type == TYPE_MASSTREE) {
+      std::cout << "- " << " ";
+      continue;
+    }
+    auto [query_box_seq, max_size] =
+      GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
+    ConRangeCount(num_thread, idx, query_box_seq);
+  }
+}
+
 template<typename TT>
 void
 ConcurrentIdxOSM(auto num_thread,
@@ -1145,8 +1382,19 @@ ApplyConcurrentIndex(Options const& opts)
   EntrySeq wi;
   ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
 
-  // NOTE: build
-  auto* primal_idx = ConBuild<1>(num_thread, index_type, wp);
+  // NOTE: build. The incremental blocks (tag 5 / tag 6) manage their own
+  // indexes and never touch primal_idx, so building it for them would cost a
+  // full index -- 98GB and ~66s for masstree at 1e9 -- for nothing. Emit a "-"
+  // in its place so the column count of the log stays fixed.
+  bool const needs_primal =
+    (opts.tag & ((1 << 0) | (1 << 1))) != 0 || opts.query_type != 0;
+  Index<keytype, keycomp>* primal_idx = nullptr;
+  if (needs_primal) {
+    primal_idx = ConBuild<1>(num_thread, index_type, wp);
+  } else {
+    primal_idx = getInstance<keytype, keycomp>(index_type, key_type);
+    std::cout << "- " << std::flush;
+  }
   // std::cout << "build" << std::endl;
 
   // NOTE: insert
@@ -1302,14 +1550,24 @@ ApplyConcurrentIndex(Options const& opts)
     }
   }
 
+  // NOTE: do *not* ConDelete a masstree to "reset" it before dropping it.
+  // Masstree's remove never reclaims: measured at 1e9 entries, emptying the
+  // index grew RSS from 98GB to 1491GB and then died in pthread_create. A bulk
+  // delete therefore costs roughly 14x what the inserts did and buys nothing
+  // when the index is about to be discarded anyway -- dropping the object leaks
+  // the same memory, minus the blowup. Guarded so several blocks can call it.
+  bool primal_released = false;
+  auto release_primal = [&]() {
+    if (!primal_released) {
+      delete primal_idx;
+      primal_idx = nullptr;
+      primal_released = true;
+    }
+  };
+
   // NOTE: batch update by size
   if (opts.tag & (1 << 3)) {
-    if (index_type == TYPE_MASSTREE) { // reset the status
-      ConDelete<0>(num_thread, primal_idx, wp);
-      delete primal_idx;
-    } else {
-      delete primal_idx;
-    }
+    release_primal();
 
     parlay::sequence<double> const ratio_seq = { 0.0001, 0.0002, 0.0005, 0.001,
                                                  0.002,  0.005,  0.01,   0.02,
@@ -1349,6 +1607,71 @@ ApplyConcurrentIndex(Options const& opts)
         ConDelete<1>(num_thread, idx, wi);
         delete idx;
       }
+    }
+  }
+
+  //  NOTE: incremental insert
+  if (opts.tag & (1 << 5)) {
+    release_primal();
+    auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
+    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+    parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+    auto const batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
+
+    for (auto ratio : ratio_seq) {
+      auto [idx, half_n] = ConInsertByStep(num_thread, index_type, wp, ratio);
+
+      // NOTE: half built, so wp[0, half_n) is present and wp[half_n, n) is not.
+      ConQueryAfterStep<TT>(num_thread,
+                            idx,
+                            index_type,
+                            wp.cut(0, half_n),
+                            wp.cut(half_n, wp.size()),
+                            batch_size);
+      delete idx;
+    }
+  }
+
+  //  NOTE: incremental delete
+  if (opts.tag & (1 << 6)) {
+    release_primal();
+    auto [base_path, batch_path] = opts.ParseDeleteBatchPath(opts.batch_ratio);
+    auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+    parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+    auto const batch_size = static_cast<size_t>(wi.size() * kMemberQueryRatio);
+
+    // NOTE: this sweep deletes every key once per ratio. Masstree cannot pay
+    // that at 1e9 -- see ConDeleteSweepFits -- so bow out with placeholders
+    // rather than dying part way through the log.
+    bool const fits =
+      index_type != TYPE_MASSTREE || ConDeleteSweepFits(wi.size());
+    if (!fits) {
+      fprintf(stderr,
+              "Skipping incremental delete: masstree needs ~%.0fGB to delete "
+              "%zu entries and will not fit\n",
+              (wi.size() * 1500.0) / (1024.0 * 1024.0 * 1024.0),
+              wi.size());
+    }
+
+    for (auto ratio : ratio_seq) {
+      if (!fits) {
+        // NOTE: 1 timing + 2 membership + 3 range query + 3 range count
+        for (int k = 0; k < 9; k++) {
+          std::cout << "- " << " ";
+        }
+        continue;
+      }
+      auto [idx, half_n] = ConDeleteByStep(num_thread, index_type, wi, ratio);
+
+      // NOTE: the teardown removed wi[0, half_n), so the *upper* part is what
+      // is still in the index.
+      ConQueryAfterStep<TT>(num_thread,
+                            idx,
+                            index_type,
+                            wi.cut(half_n, wi.size()),
+                            wi.cut(0, half_n),
+                            batch_size);
+      delete idx;
     }
   }
   std::cout << "\n" << std::flush;
