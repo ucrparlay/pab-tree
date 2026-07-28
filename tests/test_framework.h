@@ -1785,66 +1785,6 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
   Tree tree;
   constexpr bool kTestTime = true;
 
-#ifdef MEMCHECK
-  read_points_serial<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
-  tree.Build(wp.cut(0, wp.size()));
-  tree.DeleteTree();
-  return;
-#endif // MEMCHECK
-
-  ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
-  BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
-
-  // // NOTE: batch insert
-  if (opts.tag & (1 << 0)) {
-    if (opts.summary) {
-      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-      for (auto ratio : ratio_seq) {
-        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
-        // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-        BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
-      }
-    } else {
-      auto [base_path, batch_path] =
-        opts.ParseInsertBatchPath(opts.batch_ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
-    }
-  }
-
-  // NOTE: batch delete
-  if (opts.tag & (1 << 1)) {
-    if (opts.summary) {
-      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-      // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
-      for (auto ratio : ratio_seq) {
-        // puts("------------------------------");
-        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
-        // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-        BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
-      }
-    } else {
-      auto [base_path, batch_path] =
-        opts.ParseDeleteBatchPath(opts.batch_ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
-    }
-  }
-
-  if (opts.query_type != 0 && opts.tag != 0) {
-    auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
-    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-    BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
-  }
-
   // PARA: lambda for membership
   auto membership_query = [&](auto const& query_ele) {
     auto res = parlay::sequence<bool>(query_ele.size(), true);
@@ -1874,106 +1814,207 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
     }
   };
 
-  // NOTE: membership
-  if (opts.query_type & (1 << 0)) {
-    auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
-    typename TT::EntrySeq query_ele;
-    if (wi.size() == 0) {
-      query_ele = wp.subseq(0, batch_size);
-      membership_query(query_ele);
-    } else {
-      query_ele = wp.subseq(0, batch_size);
-      membership_query(query_ele);
+  // PARA: lambda for the queries run on a half filled tree, shared by tags
+  // 1 << 5, 1 << 6 and 1 << 7. Pass the half the tree holds and the half it
+  // does not.
+  auto incre_update_query = [&](auto const& entry_in_tree,
+                                auto const& entry_not_in_tree) {
+    // NOTE: take the ratio over the whole input, like the membership block
+    // above.
+    auto const batch_size = static_cast<size_t>(
+      (entry_in_tree.size() + entry_not_in_tree.size()) * kMemberQueryRatio);
 
-      query_ele = wi.subseq(0, batch_size);
-      membership_query(query_ele);
+    // NOTE: one membership pass. Put both halves together, shuffle, then take
+    // the first batch_size, so hits and misses are mixed.
+    auto const shuffled =
+      parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
+    membership_query(shuffled.subseq(0, batch_size));
 
-      query_ele = parlay::append(wp.subseq(0, batch_size / 2),
-                                 wi.subseq(0, batch_size - (batch_size / 2)));
-      query_ele = parlay::random_shuffle(query_ele);
-      membership_query(query_ele);
+    range_query(entry_in_tree);
+    range_count(entry_in_tree);
+  };
+
+#ifdef MEMCHECK
+  read_points_serial<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+  tree.Build(wp.cut(0, wp.size()));
+  tree.DeleteTree();
+  return;
+#endif // MEMCHECK
+
+  if ((opts.tag & (1 << 5)) == 0) {
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+
+    // // NOTE: batch insert
+    if (opts.tag & (1 << 0)) {
+      if (opts.summary) {
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        for (auto ratio : ratio_seq) {
+          auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+          // std::cout << base_path << " " << batch_path << std::endl;
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+        }
+      } else {
+        auto [base_path, batch_path] =
+          opts.ParseInsertBatchPath(opts.batch_ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
     }
-  }
 
-  // NOTE: range query
-  if (opts.query_type & (1 << 1)) {
-    range_query(wp);
-  }
-
-  // NOTE: range count
-  if (opts.query_type & (1 << 2)) {
-    range_count(wp);
-  }
-
-  // NOTE: range query with log
-  if (opts.query_type & (1 << 3)) {
-    bool constexpr kSavePoint = false;
-    bool constexpr kFixSize = false;
-    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      auto [query_box_seq, max_size] = GenRectangles<TT, kSavePoint, kFixSize>(
-        kRangeQueryWithLogNum, rec_type, wp);
-      typename TT::EntrySeq Out;
-      RangeQuerySerialWithLog<TT>(
-        tree, opts.rounds, Out, kRangeQueryWithLogNum, rec_type, query_box_seq);
+    // NOTE: batch delete
+    if (opts.tag & (1 << 1)) {
+      if (opts.summary) {
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
+        for (auto ratio : ratio_seq) {
+          // puts("------------------------------");
+          auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+          // std::cout << base_path << " " << batch_path << std::endl;
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+        }
+      } else {
+        auto [base_path, batch_path] =
+          opts.ParseDeleteBatchPath(opts.batch_ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
     }
-  }
 
-  // NOTE: batch update by size
-  if (opts.tag & (1 << 3)) {
-    parlay::sequence<double> const ratio_seq = { 0.0001, 0.0002, 0.0005, 0.001,
-                                                 0.002,  0.005,  0.01,   0.02,
-                                                 0.05,   0.1,    0.2,    0.5,
-                                                 1.0 };
-    // parlay::sequence<double> const ratio_seq = { 1.0 };
-    for (auto ratio : ratio_seq) {
-      auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
+    if (opts.query_type != 0 && opts.tag != 0) {
+      auto [base_path, batch_path] =
+        opts.ParseInsertBatchPath(opts.batch_ratio);
       auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
     }
 
-    for (auto ratio : ratio_seq) {
-      auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+    // NOTE: membership
+    if (opts.query_type & (1 << 0)) {
+      auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
+      typename TT::EntrySeq query_ele;
+      if (wi.size() == 0) {
+        query_ele = wp.subseq(0, batch_size);
+        membership_query(query_ele);
+      } else {
+        query_ele = wp.subseq(0, batch_size);
+        membership_query(query_ele);
+
+        query_ele = wi.subseq(0, batch_size);
+        membership_query(query_ele);
+
+        query_ele = parlay::append(wp.subseq(0, batch_size / 2),
+                                   wi.subseq(0, batch_size - (batch_size / 2)));
+        query_ele = parlay::random_shuffle(query_ele);
+        membership_query(query_ele);
+      }
+    }
+
+    // NOTE: range query
+    if (opts.query_type & (1 << 1)) {
+      range_query(wp);
+    }
+
+    // NOTE: range count
+    if (opts.query_type & (1 << 2)) {
+      range_count(wp);
+    }
+
+    // NOTE: range query with log
+    if (opts.query_type & (1 << 3)) {
+      bool constexpr kSavePoint = false;
+      bool constexpr kFixSize = false;
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] =
+          GenRectangles<TT, kSavePoint, kFixSize>(
+            kRangeQueryWithLogNum, rec_type, wp);
+        typename TT::EntrySeq Out;
+        RangeQuerySerialWithLog<TT>(tree,
+                                    opts.rounds,
+                                    Out,
+                                    kRangeQueryWithLogNum,
+                                    rec_type,
+                                    query_box_seq);
+      }
+    }
+
+    // NOTE: batch update by size
+    if (opts.tag & (1 << 3)) {
+      parlay::sequence<double> const ratio_seq = {
+        0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+        0.02,   0.05,   0.1,    0.2,   0.5,   1.0
+      };
+      // parlay::sequence<double> const ratio_seq = { 1.0 };
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
+
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
+      }
+    }
+
+    // NOTE: test randomness
+    if (opts.tag & (1 << 4)) {
+      const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30, 40, 50,
+                                                     60, 70, 80, 90, 100 };
+      auto const time_period_num = 100;
+      auto const random_in = parlay::random_shuffle(wp);
+      auto const step = wp.size() / time_period_num;
+      auto const insert_batch_seq =
+        parlay::tabulate(time_period_num, [&](size_t i) {
+          return Tree::ParseInput(
+            random_in.subseq(i * step, std::min((i + 1) * step, wp.size())));
+        });
+      auto const delete_batch_seq =
+        parlay::tabulate(time_period_num, [&](size_t i) {
+          return Tree::ParseDeleteInput(
+            random_in.subseq(i * step, std::min((i + 1) * step, wp.size())));
+        });
+
+      puts("");
+      for (auto ratio : sort_ratio_seq) {
+        TestLeafRandom<TT>(tree,
+                           wp,
+                           insert_batch_seq,
+                           delete_batch_seq,
+                           time_period_num,
+                           opts.rounds,
+                           ratio);
+      }
     }
   }
 
-  // NOTE: test randomness
-  if (opts.tag & (1 << 4)) {
-    const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30, 40, 50,
-                                                   60, 70, 80, 90, 100 };
-    auto const time_period_num = 100;
-    auto const random_in = parlay::random_shuffle(wp);
-    auto const step = wp.size() / time_period_num;
-    auto const insert_batch_seq =
-      parlay::tabulate(time_period_num, [&](size_t i) {
-        return Tree::ParseInput(
-          random_in.subseq(i * step, std::min((i + 1) * step, wp.size())));
-      });
-    auto const delete_batch_seq =
-      parlay::tabulate(time_period_num, [&](size_t i) {
-        return Tree::ParseDeleteInput(
-          random_in.subseq(i * step, std::min((i + 1) * step, wp.size())));
-      });
+  //  NOTE: static build then query
+  if (opts.tag & (1 << 5)) {
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    // NOTE: subseq, not cut. BuildTree wants a sequence, a slice will not bind.
+    // The extra copy is not timed.
+    BuildTree<TT, Tree, kTestTime, 2>(
+      wp.subseq(0, wp.size() / 2), opts.rounds, tree);
 
-    puts("");
-    for (auto ratio : sort_ratio_seq) {
-      TestLeafRandom<TT>(tree,
-                         wp,
-                         insert_batch_seq,
-                         delete_batch_seq,
-                         time_period_num,
-                         opts.rounds,
-                         ratio);
-    }
+    // NOTE: only the first half of wp was built into the tree.
+    incre_update_query(wp.cut(0, wp.size() / 2),
+                       wp.cut(wp.size() / 2, wp.size()));
   }
 
   //  NOTE: incremental insert
-  if (opts.tag & (1 << 5)) {
+  if (opts.tag & (1 << 6)) {
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
     auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
     // auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
@@ -1981,24 +2022,14 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
     for (auto ratio : ratio_seq) {
       BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
 
-      auto entry_in_tree = wp.cut(0, wp.size() / 2);
-      auto entry_not_in_tree = wp.cut(wp.size() / 2, wp.size());
-
-      // membership
-      auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
-      auto query_ele = entry_in_tree.cut(0, batch_size);
-      membership_query(query_ele);
-      query_ele = entry_not_in_tree.cut(0, batch_size);
-      membership_query(query_ele);
-
-      // range query
-      range_query(entry_in_tree);
-      range_count(entry_in_tree);
+      // NOTE: the first half of wp was inserted, the second half was not.
+      incre_update_query(wp.cut(0, wp.size() / 2),
+                         wp.cut(wp.size() / 2, wp.size()));
     }
   }
 
   //  NOTE: incremental delete
-  if (opts.tag & (1 << 6)) {
+  if (opts.tag & (1 << 7)) {
     auto [base_path, batch_path] = opts.ParseDeleteBatchPath(opts.batch_ratio);
     // std::cout << base_path << " " << batch_path << std::endl;
     // auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
@@ -2007,21 +2038,13 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
     for (auto ratio : ratio_seq) {
       BatchDeleteByStep<TT, Tree, kTestTime>(tree, wi, ratio, opts.rounds);
 
-      auto entry_not_in_tree = wi.cut(0, wi.size() / 2);
-      auto entry_in_tree = wi.cut(wi.size() / 2, wi.size());
-
-      // membership
-      auto batch_size = static_cast<size_t>(wi.size() * kMemberQueryRatio);
-      auto query_ele = entry_in_tree.cut(0, batch_size);
-      membership_query(query_ele);
-      query_ele = entry_not_in_tree.cut(0, batch_size);
-      membership_query(query_ele);
-
-      // range query
-      range_query(entry_in_tree);
-      range_count(entry_in_tree);
+      // NOTE: the first half of wi was deleted, so the second half is the one
+      // left in the tree.
+      incre_update_query(wi.cut(wi.size() / 2, wi.size()),
+                         wi.cut(0, wi.size() / 2));
     }
   }
+
   std::cout << "\n" << std::flush;
 
   tree.DeleteTree();
