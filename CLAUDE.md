@@ -602,8 +602,9 @@ between them. Work split inside a batch is **proportional**
 ### Output format
 
 Per ratio: 9 columns = 1 timing + 2 membership (in-tree, not-in-tree) + 3 range
-query + 3 range count (`kRangeQueryType = 3`). Masstree emits `-` for range
-query `rec_type 2` and for all 3 range counts, so column count stays fixed.
+query + 3 range count (`kRangeQueryType = 3`). Masstree emits `-` for all 3
+range counts, so column count stays fixed. It reports all 3 range queries as of
+2026-07-28 — see the `scan` stack-array fix below.
 A leading `-` stands in for the primal build, which tags 5/6 skip
 (`needs_primal` is false when only bits 5/6 are set).
 
@@ -647,11 +648,11 @@ branch — but at 1e8 with rectangle type 2 that is 2.5e10 pairs = **372GiB**,
 and bwtree died there with `std::bad_alloc`. Removed `v`, `offset`, and the
 `parlay::scan`; `rec_num` is now unused (`(void)rec_num`).
 
-Masstree never reached it only because `ConQueryAfterStep` skips rectangle type
-2 for masstree. That carve-out is **still required after this fix**: masstree's
-own `scan` (`index.h:827`) declares `Str results[range]`, a stack VLA sized to
-the result count, which blows the stack at ~5e5 elements. Two separate bugs,
-same shape (a buffer sized to the query result), different memory.
+Masstree never reached it only because `ConQueryAfterStep` skipped rectangle
+type 2 for it — masstree had the *same* bug in its own `scan` (`index.h:829`),
+`Str results[range]`, a stack array sized to the result count, ~8MB at 5e5
+elements on an 8MB stack. Same shape, different memory. **Both are fixed now**
+(see below); the range query skips are gone.
 
 Both index types implement `scan(key, range)` as "walk `range` elements from
 `key`" (masstree `get_next_n`, bwtree iterator walk), so the timings are
@@ -756,3 +757,39 @@ prevents. The delete sweep runs unconditionally.
   Regenerate with `gen_graph.sh`'s full `batch_ratio_seq` uncommented before
   trying to validate. `merge_batch_updates.py` expects one `Tree:` header
   followed by a single line of 26 values, which a per-process sweep would break.
+
+### Masstree range query — `scan` stack array (fixed 2026-07-28)
+
+`MassTreeIndex::scan` sized a stack array from the caller's argument:
+
+```cpp
+Str results[range];   // Str is 16B; range reaches ~5e5 on rec_type 2 => ~8MB
+```
+
+That overruns the 8MB thread stack, which is the crash `ConQueryAfterStep` and
+the `range_query` lambdas were dodging with `if (index_type == TYPE_MASSTREE &&
+rec_type == kRangeQueryType - 1)`. Replaced with a `thread_local
+std::vector<Str>` grown on demand and reused (bounded ~16MB/thread by the 1e6
+box cap), and **all three range query skips removed**.
+
+Measured at 1e8 after the fix — rec2 is correct but expensive:
+
+| | rec0 | rec1 | rec2 |
+|---|---|---|---|
+| insert block | 0.015 | 0.55 | **~76s** |
+| delete block | 0.020 | 0.71 | **~105s** |
+
+rec2 boxes hold ~141x the elements of rec1 and cost ~138x the time, i.e. time
+tracks element count — evidence the scan is doing complete work, not bailing
+early. Cost: ~12 min/run vs ~1 min before, since rec2 adds 75-105s per ratio
+across 8 ratios. Masstree is ~7.5x slower per element than bwtree here (3.3e8
+vs 2.5e9 elements/s) because its scanner writes a 16-byte `Str` per element.
+
+**Range count is still skipped for masstree, and it is a different problem.**
+`MassTreeIndex::range_count` is cursor-based and cannot crash, but
+`dynamic_get_next` (`mtIndexAPI.hh:198`) descends from the root *and builds a
+fresh `Json` request for every key* — rec2 would mean ~2.5e10 descents plus
+2.5e10 Json allocations. It would run for hours, not fail. Making that column
+work needs a counting scanner built on `get_next_n`'s callback, not a flag flip.
+(The old comment there claimed "segfaults", copy-pasted from the range query
+skip; it was never true for the count path.)

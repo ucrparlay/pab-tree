@@ -1006,17 +1006,16 @@ ConQueryAfterStep(auto num_thread,
   ConMembership(num_thread, idx, to_keys(entry_not_in_tree.cut(0, batch_size)));
 
   for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-    if (index_type == TYPE_MASSTREE && rec_type == kRangeQueryType - 1) {
-      // Skip the largest rectangle type for masstree since it segfaults
-      std::cout << "- " << " ";
-      continue;
-    }
     auto [query_box_seq, max_size] =
       GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
     ConRangeQuery(num_thread, idx, index_type, kRangeQueryNum, query_box_seq);
   }
 
   for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+    // NOTE: masstree counts a range one key at a time through
+    // dynamic_get_next, which walks down from the root and builds a Json
+    // request for every key. On the big boxes that is far too slow to wait for.
+    // Not a crash -- it would need a counting scanner to be worth running.
     if (index_type == TYPE_MASSTREE) {
       std::cout << "- " << " ";
       continue;
@@ -1494,11 +1493,6 @@ ApplyConcurrentIndex(Options const& opts)
   // PARA: lambda for range query
   auto range_query = [&](auto const& base_points) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      if (index_type == TYPE_MASSTREE && rec_type == kRangeQueryType - 1) {
-        // Skip the largest rectangle type for masstree since it segfaults
-        std::cout << "- " << " ";
-        continue;
-      }
       auto [query_box_seq, max_size] =
         GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
       ConRangeQuery(
@@ -1509,8 +1503,8 @@ ApplyConcurrentIndex(Options const& opts)
   // PARA: lambda for range count
   auto range_count = [&](auto const& base_points) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      // NOTE: too slow to wait for, not a crash -- see ConQueryAfterStep.
       if (index_type == TYPE_MASSTREE) {
-        // Skip the largest rectangle type for masstree since it segfaults
         std::cout << "- " << " ";
         continue;
       }
@@ -1533,9 +1527,6 @@ ApplyConcurrentIndex(Options const& opts)
   // NOTE: range query with log
   if (opts.query_type & (1 << 3)) {
     for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      if (index_type == TYPE_MASSTREE && rec_type == kRangeQueryType - 1) {
-        continue;
-      }
       auto [query_box_seq, max_size] =
         GenRectangles<TT, false, false>(kRangeQueryWithLogNum, rec_type, wp);
       ConRangeQuerySerialWithLog(

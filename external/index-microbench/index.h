@@ -826,15 +826,19 @@ public:
 
   uint64_t scan(KeyType key, int range, threadinfo* ti)
   {
-    Str results[range];
+    // NOTE: this was `Str results[range]`, a stack array sized by the caller.
+    // On the biggest boxes range reaches ~5e5, about 8MB, which overruns the
+    // stack -- that is the crash the range query skips were working around.
+    // One heap buffer per thread, grown as needed and reused, instead.
+    static thread_local std::vector<Str> results;
+    if (results.size() < static_cast<size_t>(range)) {
+      results.resize(range);
+    }
 
     swap_endian(key);
     int key_len = sizeof(KeyType);
 
-    int resultCount =
-      idx->get_next_n(results, (char*)&key, &key_len, range, ti);
-    // printf("scan: requested: %d, actual: %d\n", range, resultCount);
-    return resultCount;
+    return idx->get_next_n(results.data(), (char*)&key, &key_len, range, ti);
   }
 
   uint64_t range_report(
