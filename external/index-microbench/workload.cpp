@@ -755,8 +755,8 @@ ConRangeQuery(auto num_thread,
   // -- and never write to it. bwtree ran out of memory there.
   (void)rec_num;
 
-  auto func2 = [num_thread, idx, index_type, &query_box_seq](
-                 uint64_t thread_id, bool) {
+  auto func2 = [num_thread, idx, index_type, &query_box_seq](uint64_t thread_id,
+                                                             bool) {
     size_t total_num_op = query_box_seq.size();
     size_t op_per_thread = total_num_op / num_thread;
     size_t start_index = op_per_thread * thread_id;
@@ -978,7 +978,7 @@ ConDeleteByStep(auto num_thread,
   t.stop();
   std::cout << t.total_time() << " " << std::flush;
 
-  delete idx;                      // NOTE: already empty
+  delete idx;              // NOTE: already empty
   ReclaimMassTreeMemory(); // safe here: threads joined, idx gone
   idx = ConBuild<0>(num_thread, index_type, WP);
   delete_batches(idx, slice_num / 2);
@@ -996,14 +996,21 @@ ConQueryAfterStep(auto num_thread,
                   auto idx,
                   int index_type,
                   auto const& entry_in_tree,
-                  auto const& entry_not_in_tree,
-                  size_t const batch_size)
+                  auto const& entry_not_in_tree)
 {
-  auto to_keys = [](auto const& r) {
-    return parlay::map(r, [](auto const& e) { return e.GetKey(); });
-  };
-  ConMembership(num_thread, idx, to_keys(entry_in_tree.cut(0, batch_size)));
-  ConMembership(num_thread, idx, to_keys(entry_not_in_tree.cut(0, batch_size)));
+  // NOTE: ratio over the whole input, matching incre_update_query in
+  // tests/test_framework.h.
+  auto const batch_size = static_cast<size_t>(
+    (entry_in_tree.size() + entry_not_in_tree.size()) * kMemberQueryRatio);
+
+  // NOTE: one membership pass. Both halves together, shuffled, then the first
+  // batch_size, so hits and misses are mixed.
+  auto const shuffled =
+    parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
+  ConMembership(num_thread,
+                idx,
+                parlay::map(shuffled.cut(0, batch_size),
+                            [](auto const& e) { return e.GetKey(); }));
 
   for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
     auto [query_box_seq, max_size] =
@@ -1372,34 +1379,69 @@ ApplyConcurrentIndex(Options const& opts)
 
   EntrySeq wp;
   EntrySeq wi;
-  ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
 
-  // NOTE: build. The incremental blocks (tag 5 / tag 6) manage their own
-  // indexes and never touch primal_idx, so building it for them would cost a
-  // full index -- 98GB and ~66s for masstree at 1e9 -- for nothing. Emit a "-"
-  // in its place so the column count of the log stays fixed.
-  bool const needs_primal =
-    (opts.tag & ((1 << 0) | (1 << 1))) != 0 || opts.query_type != 0;
   Index<keytype, keycomp>* primal_idx = nullptr;
-  if (needs_primal) {
-    primal_idx = ConBuild<1>(num_thread, index_type, wp);
-  } else {
-    primal_idx = getInstance<keytype, keycomp>(index_type, key_type);
-    std::cout << "- " << std::flush;
-  }
-  // std::cout << "build" << std::endl;
 
-  // NOTE: insert
-  if (opts.tag & (1 << 0)) {
-    if (opts.summary) {
-      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-      for (auto ratio : ratio_seq) {
-        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+  // NOTE: do *not* ConDelete a masstree to "reset" it before dropping it.
+  // Masstree's remove never reclaims, so a bulk delete costs far more than the
+  // inserts did and buys nothing when the index is about to be discarded --
+  // dropping the object leaks the same memory, minus the blowup. Guarded so
+  // several blocks can call it.
+  bool primal_released = false;
+  auto release_primal = [&]() {
+    if (!primal_released) {
+      delete primal_idx;
+      primal_idx = nullptr;
+      primal_released = true;
+    }
+  };
+
+  // NOTE: tag 1<<5 builds its own index from half the input, so skip the shared
+  // build and everything that uses it. Mirrors the same gate in
+  // tests/test_framework.h.
+  if ((opts.tag & (1 << 5)) == 0) {
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+
+    // NOTE: build. The incremental blocks manage their own indexes and never
+    // touch primal_idx, so building it for them would cost a full index -- 98GB
+    // and ~66s for masstree at 1e9 -- for nothing. Emit a "-" in its place so
+    // the column count of the log stays fixed.
+    bool const needs_primal =
+      (opts.tag & ((1 << 0) | (1 << 1))) != 0 || opts.query_type != 0;
+    if (needs_primal) {
+      primal_idx = ConBuild<1>(num_thread, index_type, wp);
+    } else {
+      primal_idx = getInstance<keytype, keycomp>(index_type, key_type);
+      std::cout << "- " << std::flush;
+    }
+    // std::cout << "build" << std::endl;
+
+    // NOTE: insert
+    if (opts.tag & (1 << 0)) {
+      if (opts.summary) {
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        for (auto ratio : ratio_seq) {
+          auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+          // std::cout << base_path << " " << batch_path << std::endl;
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
+                                             // if rebuild the whole index
+            ConInsert<1>(num_thread, primal_idx, wi);
+            ConDelete<0>(num_thread, primal_idx, wi);
+          } else if (index_type == TYPE_BWTREE) {
+            auto* idx = ConBuild<0>(num_thread, index_type, wp);
+            ConInsert<1>(num_thread, idx, wi);
+            delete idx;
+          }
+        }
+      } else {
+        auto [base_path, batch_path] =
+          opts.ParseInsertBatchPath(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
         auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
         auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-        if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
-                                           // if rebuild the whole index
+        if (index_type == TYPE_MASSTREE) {
           ConInsert<1>(num_thread, primal_idx, wi);
           ConDelete<0>(num_thread, primal_idx, wi);
         } else if (index_type == TYPE_BWTREE) {
@@ -1408,31 +1450,31 @@ ApplyConcurrentIndex(Options const& opts)
           delete idx;
         }
       }
-    } else {
-      auto [base_path, batch_path] =
-        opts.ParseInsertBatchPath(opts.batch_ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      if (index_type == TYPE_MASSTREE) {
-        ConInsert<1>(num_thread, primal_idx, wi);
-        ConDelete<0>(num_thread, primal_idx, wi);
-      } else if (index_type == TYPE_BWTREE) {
-        auto* idx = ConBuild<0>(num_thread, index_type, wp);
-        ConInsert<1>(num_thread, idx, wi);
-        delete idx;
-      }
     }
-  }
 
-  // NOTE: batch delete
-  if (opts.tag & (1 << 1)) {
-    if (opts.summary) {
-      parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-      // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
-      for (auto ratio : ratio_seq) {
-        // puts("------------------------------");
-        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+    // NOTE: batch delete
+    if (opts.tag & (1 << 1)) {
+      if (opts.summary) {
+        parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+        // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
+        for (auto ratio : ratio_seq) {
+          // puts("------------------------------");
+          auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+          // std::cout << base_path << " " << batch_path << std::endl;
+          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          if (index_type == TYPE_MASSTREE) {
+            ConDelete<1>(num_thread, primal_idx, wi);
+            ConInsert<0>(num_thread, primal_idx, wi);
+          } else if (index_type == TYPE_BWTREE) {
+            auto* idx = ConBuild<0>(num_thread, index_type, wp);
+            ConDelete<1>(num_thread, idx, wi);
+            delete idx;
+          }
+        }
+      } else {
+        auto [base_path, batch_path] =
+          opts.ParseDeleteBatchPath(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
         auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
         auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
@@ -1445,159 +1487,146 @@ ApplyConcurrentIndex(Options const& opts)
           delete idx;
         }
       }
-    } else {
-      auto [base_path, batch_path] =
-        opts.ParseDeleteBatchPath(opts.batch_ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      if (index_type == TYPE_MASSTREE) {
-        ConDelete<1>(num_thread, primal_idx, wi);
-        ConInsert<0>(num_thread, primal_idx, wi);
-      } else if (index_type == TYPE_BWTREE) {
+    }
+
+    // PARA: lambda for membership
+    auto membership_query = [&](auto const& input_query_ele) {
+      auto query_ele =
+        parlay::map(input_query_ele, [&](auto const& e) { return e.GetKey(); });
+      ConMembership(num_thread, primal_idx, query_ele);
+    };
+
+    // NOTE: Membership query
+    if (opts.query_type & (1 << 0)) {
+      auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
+      typename TT::EntrySeq query_ele;
+      if (wi.size() == 0) {
+        query_ele = wi.subseq(0, batch_size);
+        membership_query(query_ele);
+      } else {
+        query_ele = wp.subseq(0, batch_size);
+        membership_query(query_ele);
+
+        query_ele = wi.subseq(0, batch_size);
+        membership_query(query_ele);
+
+        query_ele = parlay::append(wp.subseq(0, batch_size / 2),
+                                   wi.subseq(0, batch_size - (batch_size / 2)));
+        query_ele = parlay::random_shuffle(query_ele);
+        membership_query(query_ele);
+      }
+    }
+
+    // PARA: lambda for range query
+    auto range_query = [&](auto const& base_points) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
+          kRangeQueryNum, rec_type, base_points);
+        ConRangeQuery(
+          num_thread, primal_idx, index_type, kRangeQueryNum, query_box_seq);
+      }
+    };
+
+    // PARA: lambda for range count
+    auto range_count = [&](auto const& base_points) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        // NOTE: too slow to wait for, not a crash -- see ConQueryAfterStep.
+        if (index_type == TYPE_MASSTREE) {
+          std::cout << "- " << " ";
+          continue;
+        }
+        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
+          kRangeQueryNum, rec_type, base_points);
+        ConRangeCount(num_thread, primal_idx, query_box_seq);
+      }
+    };
+
+    // NOTE: range query
+    if (opts.query_type & (1 << 1)) {
+      range_query(wp);
+    }
+
+    // NOTE: range count
+    if (opts.query_type & (1 << 2)) {
+      range_count(wp);
+    }
+
+    // NOTE: range query with log
+    if (opts.query_type & (1 << 3)) {
+      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+        auto [query_box_seq, max_size] =
+          GenRectangles<TT, false, false>(kRangeQueryWithLogNum, rec_type, wp);
+        ConRangeQuerySerialWithLog(
+          primal_idx, rec_type, kRangeQueryWithLogNum, query_box_seq);
+      }
+    }
+
+    // NOTE: batch update by size
+    if (opts.tag & (1 << 3)) {
+      release_primal();
+
+      parlay::sequence<double> const full_ratio_seq = {
+        0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+        0.02,   0.05,   0.1,    0.2,   0.5,   1.0
+      };
+      // NOTE: 13 rounds in one process need 13 indexes worth of memory: ~136GB
+      // at 1e8, ~1.27TB at 1e9, against 125GB of RAM. With summary == 0 we run
+      // one ratio, so the caller can give each ratio its own process.
+      auto const ratio_seq = opts.summary
+                               ? full_ratio_seq
+                               : parlay::sequence<double>{ opts.batch_ratio };
+
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        // NOTE: don't empty idx before dropping it. It is rebuilt every round
+        // and freed on the next line, and masstree never gives back what
+        // remove() touches -- the old clear-out cost about 1.4TB at 1e9.
+        auto* idx = ConBuild<0>(num_thread, index_type, wp);
+        ConInsert<1>(num_thread, idx, wi);
+        delete idx;
+        ReclaimMassTreeMemory();
+      }
+
+      for (auto ratio : ratio_seq) {
+        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+        // std::cout << base_path << " " << batch_path << std::endl;
+        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        // NOTE: same here -- no clearing an index we are about to drop.
         auto* idx = ConBuild<0>(num_thread, index_type, wp);
         ConDelete<1>(num_thread, idx, wi);
         delete idx;
+        ReclaimMassTreeMemory();
       }
     }
-  }
 
-  // PARA: lambda for membership
-  auto membership_query = [&](auto const& input_query_ele) {
-    auto query_ele =
-      parlay::map(input_query_ele, [&](auto const& e) { return e.GetKey(); });
-    ConMembership(num_thread, primal_idx, query_ele);
-  };
+  } // end of the (tag & (1 << 5)) == 0 gate
 
-  // NOTE: Membership query
-  if (opts.query_type & (1 << 0)) {
-    auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
-    typename TT::EntrySeq query_ele;
-    if (wi.size() == 0) {
-      query_ele = wi.subseq(0, batch_size);
-      membership_query(query_ele);
-    } else {
-      query_ele = wp.subseq(0, batch_size);
-      membership_query(query_ele);
-
-      query_ele = wi.subseq(0, batch_size);
-      membership_query(query_ele);
-
-      query_ele = parlay::append(wp.subseq(0, batch_size / 2),
-                                 wi.subseq(0, batch_size - (batch_size / 2)));
-      query_ele = parlay::random_shuffle(query_ele);
-      membership_query(query_ele);
-    }
-  }
-
-  // PARA: lambda for range query
-  auto range_query = [&](auto const& base_points) {
-    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      auto [query_box_seq, max_size] =
-        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
-      ConRangeQuery(
-        num_thread, primal_idx, index_type, kRangeQueryNum, query_box_seq);
-    }
-  };
-
-  // PARA: lambda for range count
-  auto range_count = [&](auto const& base_points) {
-    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      // NOTE: too slow to wait for, not a crash -- see ConQueryAfterStep.
-      if (index_type == TYPE_MASSTREE) {
-        std::cout << "- " << " ";
-        continue;
-      }
-      auto [query_box_seq, max_size] =
-        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
-      ConRangeCount(num_thread, primal_idx, query_box_seq);
-    }
-  };
-
-  // NOTE: range query
-  if (opts.query_type & (1 << 1)) {
-    range_query(wp);
-  }
-
-  // NOTE: range count
-  if (opts.query_type & (1 << 2)) {
-    range_count(wp);
-  }
-
-  // NOTE: range query with log
-  if (opts.query_type & (1 << 3)) {
-    for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-      auto [query_box_seq, max_size] =
-        GenRectangles<TT, false, false>(kRangeQueryWithLogNum, rec_type, wp);
-      ConRangeQuerySerialWithLog(
-        primal_idx, rec_type, kRangeQueryWithLogNum, query_box_seq);
-    }
-  }
-
-  // NOTE: do *not* ConDelete a masstree to "reset" it before dropping it.
-  // Masstree's remove never reclaims: measured at 1e9 entries, emptying the
-  // index grew RSS from 98GB to 1491GB and then died in pthread_create. A bulk
-  // delete therefore costs roughly 14x what the inserts did and buys nothing
-  // when the index is about to be discarded anyway -- dropping the object leaks
-  // the same memory, minus the blowup. Guarded so several blocks can call it.
-  bool primal_released = false;
-  auto release_primal = [&]() {
-    if (!primal_released) {
-      delete primal_idx;
-      primal_idx = nullptr;
-      primal_released = true;
-    }
-  };
-
-  // NOTE: batch update by size
-  if (opts.tag & (1 << 3)) {
+  //  NOTE: static build, then query. The control for the two incremental
+  //  blocks: same tree size, same queries, built in one shot instead of grown
+  //  batch by batch.
+  if (opts.tag & (1 << 5)) {
     release_primal();
+    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    auto half = wp.size() / 2;
+    auto* idx = ConBuild<1>(num_thread, index_type, wp.cut(0, half));
 
-    parlay::sequence<double> const full_ratio_seq = {
-      0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
-      0.02,   0.05,   0.1,    0.2,   0.5,   1.0
-    };
-    // NOTE: 13 rounds in one process need 13 indexes worth of memory: ~136GB at
-    // 1e8, ~1.27TB at 1e9, against 125GB of RAM. With summary == 0 we run one
-    // ratio, so the caller can give each ratio its own process.
-    auto const ratio_seq =
-      opts.summary ? full_ratio_seq
-                   : parlay::sequence<double>{ opts.batch_ratio };
-
-    for (auto ratio : ratio_seq) {
-      auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      // NOTE: don't empty idx before dropping it. It is rebuilt every round and
-      // freed on the next line, and masstree never gives back what remove()
-      // touches -- the old clear-out cost about 1.4TB at 1e9.
-      auto* idx = ConBuild<0>(num_thread, index_type, wp);
-      ConInsert<1>(num_thread, idx, wi);
-      delete idx;
-      ReclaimMassTreeMemory();
-    }
-
-    for (auto ratio : ratio_seq) {
-      auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
-      // std::cout << base_path << " " << batch_path << std::endl;
-      auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-      auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-      // NOTE: same here -- no clearing an index we are about to drop.
-      auto* idx = ConBuild<0>(num_thread, index_type, wp);
-      ConDelete<1>(num_thread, idx, wi);
-      delete idx;
-      ReclaimMassTreeMemory();
-    }
+    // NOTE: only the first half of wp went into the index.
+    ConQueryAfterStep<TT>(
+      num_thread, idx, index_type, wp.cut(0, half), wp.cut(half, wp.size()));
+    delete idx;
+    ReclaimMassTreeMemory();
   }
 
   //  NOTE: incremental insert
-  if (opts.tag & (1 << 5)) {
+  if (opts.tag & (1 << 6)) {
     release_primal();
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
     auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
     parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-    auto const batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
 
     for (auto ratio : ratio_seq) {
       auto [idx, half_n] = ConInsertByStep(num_thread, index_type, wp, ratio);
@@ -1607,20 +1636,18 @@ ApplyConcurrentIndex(Options const& opts)
                             idx,
                             index_type,
                             wp.cut(0, half_n),
-                            wp.cut(half_n, wp.size()),
-                            batch_size);
+                            wp.cut(half_n, wp.size()));
       delete idx;
       ReclaimMassTreeMemory();
     }
   }
 
   //  NOTE: incremental delete
-  if (opts.tag & (1 << 6)) {
+  if (opts.tag & (1 << 7)) {
     release_primal();
     auto [base_path, batch_path] = opts.ParseDeleteBatchPath(opts.batch_ratio);
     auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
     parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
-    auto const batch_size = static_cast<size_t>(wi.size() * kMemberQueryRatio);
 
     for (auto ratio : ratio_seq) {
       auto [idx, half_n] = ConDeleteByStep(num_thread, index_type, wi, ratio);
@@ -1631,8 +1658,7 @@ ApplyConcurrentIndex(Options const& opts)
                             idx,
                             index_type,
                             wi.cut(half_n, wi.size()),
-                            wi.cut(0, half_n),
-                            batch_size);
+                            wi.cut(0, half_n));
       delete idx;
       ReclaimMassTreeMemory();
     }

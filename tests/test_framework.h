@@ -1826,6 +1826,8 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
 
     // NOTE: one membership pass. Put both halves together, shuffle, then take
     // the first batch_size, so hits and misses are mixed.
+    membership_query(entry_in_tree.subseq(0, batch_size));
+    membership_query(entry_not_in_tree.subseq(0, batch_size));
     auto const shuffled =
       parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
     membership_query(shuffled.subseq(0, batch_size));

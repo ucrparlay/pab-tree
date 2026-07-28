@@ -9,7 +9,7 @@ declare -a leaf_wrap_seq=(64)
 
 Nodes=(1000000000)
 Dim=(1)
-tag=$((2#1100000))
+tag=$((2#11100000))
 summary=0
 query_type=$((2#0))
 instance_n=1
@@ -81,22 +81,22 @@ function run_cmake() {
 # run_test 0 "${solver}" "${tree}"
 
 # PMA
-# tree=3
-# solver="pma"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+tree=3
+solver="pma"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # PAM
-# tree=2
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+tree=2
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # CPAM
-# tree=1
-# solver="cpam"
-# run_cmake 4 "${solver}"
-# run_test 4 "${solver}" "${tree}"
+tree=1
+solver="cpam"
+run_cmake 4 "${solver}"
+run_test 4 "${solver}" "${tree}"
 
 # ours
 solver="b_test"
