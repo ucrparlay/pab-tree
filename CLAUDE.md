@@ -572,6 +572,90 @@ and the `Leaf`/`Interior` aliases). Each has a thin `tests/<name>.cpp` driver
   framework, *before* any `Contain` call — affected every baseline equally, not
   TLX-specific). Fixed to slice `wp` (the keys actually built into the tree).
 
+## Cache-miss profiling (`tests/perf_control.h` + `scripts/perf_cache.sh`)
+
+Measures hardware counters (cache misses etc.) over **one call** of `Build`,
+`BatchInsert` or `BatchDelete`, rather than over the whole process. Without
+gating, ~73% of the counts are setup: reading the input file, the dedup check in
+`ReadEntries`, and the untimed setup `Build` that precedes every
+`BatchInsert`/`BatchDelete` (measured at 1e6: 1.19B instructions ungated vs
+321M for the build region alone).
+
+### Mechanism
+
+`perf` is launched with `-D -1` (start with events disabled) and
+`--control fd:<ctl>,<ack>` over two fifos the script opens read-write. The
+binary writes `enable`/`disable` on the control fd and drains the `ack\n` reply.
+Verified present in this box's perf (4.18.0-553 / RHEL8) — both
+`perf stat --control` and `perf record --control` support it.
+
+- `PerfControl` (`tests/perf_control.h`) holds the two fds + the armed region
+  name; every entry point is a **no-op when either fd is 0**, so ordinary
+  timing runs are byte-for-byte unaffected.
+- `PerfRegion("name")` is a scope guard placed **inside the timed lambda of
+  `time_loop`** — that placement is what excludes the untimed `initf`
+  (`pkd.Build`) and `endf` (`pkd.DeleteTree`) phases.
+- Three regions exist: `"build"` (`BuildTree`), `"insert"` (`BatchInsert`),
+  `"delete"` (`BatchDelete`).
+
+### CLI flags (`options.h`)
+
+| Flag | Meaning |
+|---|---|
+| `-pcf` | perf control fd (0 = not under perf) |
+| `-pcaf` | perf ack fd |
+| `-pcr` | which region to count: `build`/`insert`/`delete`; empty = all |
+
+**`-pcr` is not optional in practice.** A `-t 1` run executes the unconditional
+top-of-function `BuildTree` *and* `BatchInsert`, both guarded; perf accumulates
+over every enabled interval, so without `-pcr` it reports build+insert summed.
+
+### Two hard requirements on the run
+
+- **`-r 1`.** `time_loop` enters the timed region `rounds` times *plus* at least
+  one warmup round (`loop_late = 0.01` when `rounds > 1`), and perf sums them
+  all. `Run()` prints a stderr warning if `-r != 1` under perf.
+- **`-s 0`.** `-s 1` sweeps 4 batch ratios through the same region.
+
+`-q 0` too, otherwise the `query_type != 0 && tag != 0` block runs another
+*counted* `BuildTree` (it passes `kTestTime = true`).
+
+### Event budget on this box (Xeon Silver 4314, Icelake-SP)
+
+`cycles,instructions,cache-references,cache-misses,LLC-load-misses,L1-dcache-load-misses`
+fits exactly: 2 fixed + 4 general-purpose counters, all reported at
+`100.00%` enabled. A 7th event starts multiplexing and every count silently
+becomes an extrapolation — check field 5 of the `-x,` output before trusting a
+changed `EVENTS`.
+
+### Serial vs parallel
+
+`THREADS=1` is the meaningful setting for cache-obliviousness work. At
+`THREADS=64` idle parlay workers spinning in `scheduler::get_own_job` are
+counted too: the same 1e5-element insert measured 57.6M instructions serial vs
+785M at 64 threads (13.6x), and cache misses 109K vs 247K (2.3x).
+
+### `MODE=record` sample rate
+
+`perf record` at its default period gives ~55 cache-miss samples for a ~20ms
+region — useless for ranking functions. The script passes `-F 20000`
+(`FREQ`), which raised it to 269; widen the region (larger `n` or `-b 1`)
+until `# Samples` is in the thousands. Release builds have **no `-g`**
+(CMakeLists.txt:90 is `-O3 -march=native`), so `perf report` resolves symbol
+names from `.symtab` but gives no line numbers, and `-O3` inlining folds the
+small leaf helpers into their callers.
+
+### Measured at 1e8 uni, 64 threads, `-b 0.1` (misses per element)
+
+| region | elements touched | cache-misses | per element | miss rate |
+|---|---|---|---|---|
+| build | 1e8 | 102.0M | 1.02 | 51.8% |
+| insert | 1e7 | 20.0M | 2.00 | 60.7% |
+| delete | 1e7 | 17.2M | 1.72 | 56.9% |
+
+Insert/delete cost ~2x the misses per element that build does — build streams,
+insert/delete chase scattered leaves.
+
 ## Concurrent-index incremental sweep (`external/index-microbench/workload.cpp`)
 
 Tags 5 (`1<<5`, insert) and 6 (`1<<6`, delete) in `ApplyConcurrentIndex` are the

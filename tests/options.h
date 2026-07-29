@@ -18,6 +18,14 @@ struct Options
     this->tree_type = params.getOptionIntValue("-T", 0);
     this->dis_type = std::string(params.getOptionValue("-D"));
     this->temporal_graph = params.getOptionIntValue("-G", 0);
+    // NOTE: perf --control fds, passed by scripts/perf_cache.sh. 0 = not under
+    // perf, which makes every PerfRegion a no-op. See perf_control.h.
+    this->perf_ctl_fd = params.getOptionIntValue("-pcf", 0);
+    this->perf_ctl_ack_fd = params.getOptionIntValue("-pcaf", 0);
+    // NOTE: which guarded region to count: "build", "insert" or "delete".
+    // Empty (the default) arms every region, which sums them -- a run with
+    // -t 1 would report build+insert together.
+    this->perf_region = params.getOptionValue("-pcr", std::string(""));
   }
 
   void PrintOptions() const
@@ -133,4 +141,7 @@ struct Options
   int tree_type;
   int temporal_graph;
   std::string dis_type;
+  int perf_ctl_fd;
+  int perf_ctl_ack_fd;
+  std::string perf_region;
 };

@@ -20,6 +20,7 @@
 #include "dependence/type_trait.h"
 #include "options.h"
 #include "parlay/internal/group_by.h"
+#include "perf_control.h"
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
@@ -190,7 +191,10 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
       rounds,
       loop_late,
       [&]() {},
-      [&]() { pkd.Build(wp); },
+      [&]() {
+        PerfRegion const perf_region("build");
+        pkd.Build(wp);
+      },
       [&]() { pkd.DeleteTree(); });
 
     pkd.Build(wp);
@@ -224,7 +228,10 @@ BatchInsert(Tree& pkd,
       rounds,
       loop_late,
       [&]() { pkd.Build(wp); },
-      [&]() { pkd.BatchInsert(wi); },
+      [&]() {
+        PerfRegion const perf_region("insert");
+        pkd.BatchInsert(wi);
+      },
       [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
@@ -636,7 +643,10 @@ BatchDelete(Tree& pkd,
       rounds,
       loop_late,
       [&]() { pkd.Build(wp); },
-      [&]() { pkd.BatchDelete(wi); },
+      [&]() {
+        PerfRegion const perf_region("delete");
+        pkd.BatchDelete(wi);
+      },
       [&]() { pkd.DeleteTree(); });
     std::cout << aveInsert << " " << std::flush;
     // std::cout << ratio << " " << aveInsert << " " << std::endl;
@@ -1826,8 +1836,10 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
 
     // NOTE: one membership pass. Put both halves together, shuffle, then take
     // the first batch_size, so hits and misses are mixed.
-    membership_query(entry_in_tree.subseq(0, batch_size));
-    membership_query(entry_not_in_tree.subseq(0, batch_size));
+    // NOTE: callers pass slices (wp.cut(...)), which have cut() but no
+    // subseq().
+    membership_query(entry_in_tree.cut(0, batch_size));
+    membership_query(entry_not_in_tree.cut(0, batch_size));
     auto const shuffled =
       parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
     membership_query(shuffled.subseq(0, batch_size));
@@ -2340,6 +2352,25 @@ Run(Options const& opts, RunFunc test_func)
                  TreeWrapper::TreeType::GetLeafSize());
   opts.PrintOptions();
   std::cout << "\n" << std::flush;
+
+  // NOTE: arm the perf --control gating (no-op unless both fds were passed).
+  PerfControl::Install(
+    opts.perf_ctl_fd, opts.perf_ctl_ack_fd, opts.perf_region);
+  if (PerfControl::Active()) {
+    std::cerr << "perf ctl: armed region '"
+              << (opts.perf_region.empty() ? "<all>" : opts.perf_region)
+              << "'\n"
+              << std::flush;
+  }
+  if (PerfControl::Active() && opts.rounds != 1) {
+    // NOTE: time_loop enters the timed region `rounds` times plus at least one
+    // warmup round, and perf accumulates over every enabled interval -- so the
+    // reported counts would be a sum over an unknown number of executions.
+    std::cerr << "perf ctl: -r " << opts.rounds
+              << " accumulates counters across rounds (plus a warmup round); "
+                 "use -r 1 for per-operation counts.\n"
+              << std::flush;
+  }
 
   // Apply the test function
   test_func.template operator()<TreeWrapper, TT>(opts);
