@@ -612,9 +612,29 @@ over every enabled interval, so without `-pcr` it reports build+insert summed.
 
 ### Two hard requirements on the run
 
-- **`-r 1`.** `time_loop` enters the timed region `rounds` times *plus* at least
-  one warmup round (`loop_late = 0.01` when `rounds > 1`), and perf sums them
-  all. `Run()` prints a stderr warning if `-r != 1` under perf.
+- **`-r 1`.** perf reports the **sum over `rounds + 1` executions**, not a
+  per-call figure. `time_loop` runs the region `rounds` times plus a warmup
+  pass, and perf accumulates over every enable/disable interval. Measured on
+  the insert region at 1e6 (instructions, which are near-noiseless):
+
+  | `-r` | instructions | ÷ r=1 | executions |
+  |---|---|---|---|
+  | 1 | 57,636,412 | 1.00 | 1 |
+  | 2 | 171,879,458 | 2.98 | 3 |
+  | 3 | 228,896,580 | 3.97 | 4 |
+
+  Note the asymmetry with the timing printed on the same line: `time_loop`
+  returns `total_time() / rounds` and only starts its timer inside the measured
+  loop, so the **time is a correct average over `rounds` while the perf count is
+  a raw sum over `rounds + 1`** — dividing the count by `rounds` is wrong by
+  `(rounds+1)/rounds`. `Run()` prints a stderr warning if `-r != 1` under perf.
+
+  The warmup contributes exactly one pass here because `while (t.total_time() <
+  0.01)` measures wall clock from the timer's construction (`parlay` timer's
+  ctor defaults `start_ = true`, and `total_time()` adds the live interval when
+  `on`), and the first pass's `initf()` — a full `Build` — already exceeds 10ms.
+  That is wall-clock determined, not fixed: at small enough `n` several warmup
+  passes fit inside 10ms and the multiplier becomes unpredictable.
 - **`-s 0`.** `-s 1` sweeps 4 batch ratios through the same region.
 
 `-q 0` too, otherwise the `query_type != 0 && tag != 0` block runs another
