@@ -168,7 +168,8 @@ GenRectangles(int rec_num, int const type, auto const& WP)
 template<typename TypeTrait,
          typename Tree,
          bool kTestTime = true,
-         int kPrint = 1>
+         int kPrint = 1,
+         int kOutputRatio = 1>
 void
 BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
 {
@@ -182,6 +183,7 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
   // size_t n = 100;
   // EntrySeq wp = EntrySeq::uninitialized(n);
   auto const wp = Tree::ParseInput(WP);
+  auto const partial_wp = Tree::ParseInput(WP.subseq(0, n / kOutputRatio));
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -193,14 +195,15 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
       [&]() { pkd.Build(wp); },
       [&]() { pkd.DeleteTree(); });
 
-    pkd.Build(wp);
+    pkd.Build(partial_wp);
+
     if constexpr (kPrint) {
       std::cout << aveBuild << " " << std::flush;
     }
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
-    pkd.Build(wp);
+    pkd.Build(partial_wp);
   }
 }
 
@@ -1824,13 +1827,14 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
     auto const batch_size = static_cast<size_t>(
       (entry_in_tree.size() + entry_not_in_tree.size()) * kMemberQueryRatio);
 
-    // NOTE: one membership pass. Put both halves together, shuffle, then take
-    // the first batch_size, so hits and misses are mixed.
-    membership_query(entry_in_tree.subseq(0, batch_size));
-    membership_query(entry_not_in_tree.subseq(0, batch_size));
+    // NOTE: three membership passes -- all hits, all misses, then a mix. For
+    // the mix, put both halves together, shuffle, and take the first
+    // batch_size. cut, not subseq: these are slices.
+    membership_query(entry_in_tree.cut(0, batch_size));
+    membership_query(entry_not_in_tree.cut(0, batch_size));
     auto const shuffled =
       parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
-    membership_query(shuffled.subseq(0, batch_size));
+    membership_query(shuffled.cut(0, batch_size));
 
     range_query(entry_in_tree);
     range_count(entry_in_tree);
@@ -2007,8 +2011,7 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
     ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
     // NOTE: subseq, not cut. BuildTree wants a sequence, a slice will not bind.
     // The extra copy is not timed.
-    BuildTree<TT, Tree, kTestTime, 2>(
-      wp.subseq(0, wp.size() / 2), opts.rounds, tree);
+    BuildTree<TT, Tree, kTestTime, 2, 2>(wp, opts.rounds, tree);
 
     // NOTE: only the first half of wp was built into the tree.
     incre_update_query(wp.cut(0, wp.size() / 2),
