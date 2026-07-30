@@ -25,6 +25,13 @@
 #   # print to the terminal as an aligned table as well as writing the csv
 #   cd scripts && ./merge_perf_cache.py -v perf_cache_1e9
 #
+# --- row order ---------------------------------------------------------------
+# Rows are grouped by distribution first, then operation (build, insert,
+# delete), then sweep, then tree -- so every tree for a given
+# (distribution, operation) sits together and can be read off against the
+# others. perf_cache.sh writes its raw csv in run order instead (tree
+# outermost), which interleaves the distributions.
+#
 # --- what it computes --------------------------------------------------------
 # region_n       elements the counted region actually processed. This is the
 #                important one: `build` touches all n, but `insert`/`delete`
@@ -40,8 +47,9 @@
 #                for ranking -- the rate has a tree-dependent denominator and can
 #                invert the ranking (at 1e9/b=1%, PMA insert shows a higher rate
 #                than CPAM while having fewer absolute misses).
-# vs_btree       cache-misses relative to BTree in the same (source, region).
-#                1.00 for BTree itself; blank if no BTree row exists.
+# vs_btree       cache-misses relative to BTree in the same
+#                (source, distribution, region). 1.00 for BTree itself; blank if
+#                no BTree row exists for that distribution+region.
 #
 # Counts are per single execution -- perf_cache.sh pins -r 1 for that reason.
 # Treat cache-miss differences under ~20% as unresolved from one run: measured
@@ -64,6 +72,34 @@ EVENTS = [
 # The counted region for insert/delete only processes the batch, not the tree.
 WHOLE_INPUT_REGIONS = {"build"}
 
+# Row order: distribution first, then operation, then sweep, then tree -- so all
+# rows for one (distribution, operation) sit together and the trees can be read
+# off against each other. perf_cache.sh emits rows in run order instead (tree
+# outermost), which interleaves the distributions.
+DIS_ORDER = ["uni", "exp", "norm", "dual_norm"]
+REGION_ORDER = ["build", "insert", "delete"]
+TREE_ORDER = ["BTree", "CPAM", "PAM", "PMA"]
+
+
+def _rank(value, order):
+    """Position in `order`; anything unlisted sorts after, alphabetically."""
+    try:
+        return (0, order.index(value))
+    except ValueError:
+        return (1, value)
+
+
+def sort_rows(rows):
+    return sorted(
+        rows,
+        key=lambda r: (
+            _rank(r["dis"], DIS_ORDER),
+            _rank(r["region"], REGION_ORDER),
+            r["source"],
+            _rank(r["tree"], TREE_ORDER),
+        ),
+    )
+
 
 def region_elements(region, n, batch_ratio):
     if region in WHOLE_INPUT_REGIONS:
@@ -73,9 +109,15 @@ def region_elements(region, n, batch_ratio):
 
 def derive(rows, source):
     out = []
-    # cache-misses of BTree, keyed by region, for the vs_btree column
+    # BTree's cache-misses for the vs_btree column. MUST be keyed by
+    # (dis, region), not region alone -- with more than one distribution in a
+    # sweep, a region-only key lets the last distribution's BTree row overwrite
+    # the others, and every row then gets compared against the wrong baseline
+    # (BTree vs itself came out as 0.988 and 3.221 instead of 1.000).
     baseline = {
-        r["region"]: int(r["cache-misses"]) for r in rows if r["tree"] == "BTree"
+        (r["dis"], r["region"]): int(r["cache-misses"])
+        for r in rows
+        if r["tree"] == "BTree"
     }
     for r in rows:
         n = int(r["n"])
@@ -91,6 +133,8 @@ def derive(rows, source):
             "n": n,
             "batch_ratio": ratio,
             "threads": int(r["threads"]),
+            # NOTE: .get -- csvs written before the numa column existed lack it.
+            "numa": r.get("numa", ""),
             "region_n": region_n,
         }
         for ev in EVENTS:
@@ -98,7 +142,7 @@ def derive(rows, source):
         for ev in EVENTS:
             rec[f"{ev}_per_elem"] = round(int(r[ev]) / region_n, 4)
         rec["miss_rate_pct"] = round(100.0 * cm / cr, 2) if cr else ""
-        base = baseline.get(r["region"])
+        base = baseline.get((r["dis"], r["region"]))
         rec["vs_btree"] = round(cm / base, 3) if base else ""
         out.append(rec)
     return out
@@ -113,7 +157,7 @@ def main(argv):
         return 1
 
     fields = (
-        ["source", "region", "tree", "dis", "n", "batch_ratio", "threads", "region_n"]
+        ["source", "region", "tree", "dis", "n", "batch_ratio", "threads", "numa", "region_n"]
         + EVENTS
         + [f"{e}_per_elem" for e in EVENTS]
         + ["miss_rate_pct", "vs_btree"]
@@ -129,12 +173,14 @@ def main(argv):
         if not rows:
             print(f"!!! {src} has no data rows -- skipping", file=sys.stderr)
             continue
-        derived = derive(rows, name)
+        derived = sort_rows(derive(rows, name))
         combined += derived
 
         dest = src.parent / "perf_cache_metrics.csv"
         with open(dest, "w", newline="") as fp:
-            w = csv.DictWriter(fp, fieldnames=fields)
+            # NOTE: lineterminator -- csv defaults to CRLF, which leaves a \r on
+            # the last field for awk/cut and breaks comparisons against it.
+            w = csv.DictWriter(fp, fieldnames=fields, lineterminator="\n")
             w.writeheader()
             w.writerows(derived)
         print(f"wrote {dest}  ({len(derived)} rows)")
@@ -142,21 +188,34 @@ def main(argv):
     if not combined:
         return 1
 
+    combined = sort_rows(combined)
+
     if len(names) > 1:
         alldest = Path("data") / "perf_cache_metrics_all.csv"
         with open(alldest, "w", newline="") as fp:
-            w = csv.DictWriter(fp, fieldnames=fields)
+            # NOTE: lineterminator -- csv defaults to CRLF, which leaves a \r on
+            # the last field for awk/cut and breaks comparisons against it.
+            w = csv.DictWriter(fp, fieldnames=fields, lineterminator="\n")
             w.writeheader()
             w.writerows(combined)
         print(f"wrote {alldest}  ({len(combined)} rows)")
 
     if verbose:
-        hdr = f"{'source':22} {'region':7} {'tree':6} {'region_n':>13} {'cache-misses':>15} {'/elem':>8} {'miss%':>7} {'vs BTree':>9}"
+        hdr = (
+            f"{'dis':10} {'region':7} {'tree':6} {'region_n':>13} "
+            f"{'cache-misses':>15} {'/elem':>8} {'miss%':>7} {'vs BTree':>9}"
+        )
         print("\n" + hdr)
         print("-" * len(hdr))
+        prev = None
         for r in combined:
+            # blank line between (dis, region) groups so the grouping is visible
+            key = (r["dis"], r["region"])
+            if prev is not None and key != prev:
+                print()
+            prev = key
             print(
-                f"{r['source']:22} {r['region']:7} {r['tree']:6} {r['region_n']:13,} "
+                f"{r['dis']:10} {r['region']:7} {r['tree']:6} {r['region_n']:13,} "
                 f"{r['cache-misses']:15,} {r['cache-misses_per_elem']:8.2f} "
                 f"{r['miss_rate_pct']:6}% {r['vs_btree']:>9}"
             )

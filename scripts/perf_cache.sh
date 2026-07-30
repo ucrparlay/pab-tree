@@ -42,6 +42,8 @@
 #   EXT          .bin | .in                              (default .bin)
 #   SKIP_BUILD   1 = do not re-run cmake/make            (default 0)
 #   DROP_CACHES  1 = drop page cache before each run     (default 1)
+#   NUMACTL      workload launcher prefix     (default "numactl -i all");
+#                set NUMACTL= (empty) for first-touch placement
 #
 # --- recipes -----------------------------------------------------------------
 #   # 1e8, all four trees, all three regions, parallel  (the standard sweep)
@@ -67,6 +69,10 @@
 #   # one tree only
 #   cd scripts && TREES=cpam:2:PAM DIS_SEQ=uni ./perf_cache.sh
 #
+#   # first-touch placement instead of interleaved (not comparable to the
+#   # rest of the project, which all uses numactl -i all)
+#   cd scripts && NUMACTL= DIS_SEQ=uni ./perf_cache.sh
+#
 #   # fewer events (zero risk of counter multiplexing)
 #   cd scripts && EVENTS=cache-references,cache-misses ./perf_cache.sh
 #
@@ -81,10 +87,17 @@
 # * Verify no counter multiplexing before trusting a changed EVENTS list:
 #     awk -F, 'NF>=5 && $5+0<100' logs/<LOG_NAME>/*.stat
 #   must print nothing (field 5 is the percentage of time the event ran).
-# * Single-shot runs. Cache-miss columns move ~14% run to run at fixed config,
-#   while instructions hold to ~4% -- repeat the whole invocation with a
-#   different LOG_NAME for error bars; averaging inside one process is not
-#   possible given the -r 1 requirement.
+# * Single-shot runs. Repeat the whole invocation with a different LOG_NAME for
+#   error bars; averaging inside one process is not possible given -r 1.
+#   Interleaved placement is far more repeatable: measured spread on BTree
+#   insert cache-misses was 22.6% under first-touch vs 1.0% with numactl,
+#   because first-touch placement depends on which worker faulted each page.
+# * NUMA placement changes the miss COUNT, not just latency: this box has a
+#   per-socket LLC and the counter sums both, so interleaving repartitions
+#   the working set across the two caches. Measured at 1e8 on BTree,
+#   interleave vs first-touch: build -5.3% misses but +30.2% cycles;
+#   insert -19.3% misses and -20.3% cycles. Do not mix numa modes in one
+#   table -- the `numa` column in the csv records which was used.
 # ============================================================================
 
 set -o pipefail
@@ -104,6 +117,19 @@ DATA_PREFIX="${DATA_PREFIX:-/data/zmen002/kv_pair}"
 EXT="${EXT:-.bin}"
 DROP_CACHES="${DROP_CACHES:-1}"
 
+# NOTE: matches the rest of the project (summary.sh, incre_updates.sh, ... all
+# use `numactl -i all`). Interleaving matters here beyond comparability: this box
+# has 2 NUMA nodes at 2.0x remote latency, and under first-touch the placement
+# depends on which parlay worker happened to fault each page in, which varies
+# per run -- measured 22.6% run-to-run spread on BTree insert cache-misses
+# first-touch vs 1.0% interleaved. Set NUMACTL= (empty) to disable.
+# Kept as an array: perf execs the workload directly, so an unsplit
+# "numactl -i all" string would be treated as one filename.
+NUMACTL="${NUMACTL-numactl -i all}"
+NUMACTL_CMD=(${NUMACTL})
+NUMA_LABEL="${NUMACTL:+interleave}"
+NUMA_LABEL="${NUMA_LABEL:-first-touch}"
+
 # cycles+instructions sit on fixed counters, the other four on the 4 general
 # purpose ones -- no multiplexing on this Icelake part. Adding a 5th general
 # purpose event starts time-sharing and every count becomes an extrapolation.
@@ -122,8 +148,7 @@ mkdir -p "${LOG_PATH}" "$(dirname "${CSV}")"
 
 # ------------------------------------------------------------------ csv header
 if [[ "${MODE}" == "stat" ]]; then
-	printf 'region,tree,dis,n,batch_ratio,threads,%s\n' \
-		"$(echo "${EVENTS}" | tr ',' ',')" >"${CSV}"
+	printf 'region,tree,dis,n,batch_ratio,threads,numa,%s\n' "${EVENTS}" >"${CSV}"
 fi
 
 # Run one (solver, tree, dis, node, region) point under perf.
@@ -161,13 +186,13 @@ function run_one() {
 		-T "${tree}" -D "${dis}"
 		-pcf "${ctl_fd}" -pcaf "${ack_fd}" -pcr "${region}")
 
-	echo ">>> ${region} ${tree_name} ${dis} n=${node} threads=${THREADS}"
+	echo ">>> ${region} ${tree_name} ${dis} n=${node} threads=${THREADS} numa=${NUMA_LABEL}"
 
 	if [[ "${MODE}" == "stat" ]]; then
 		# -x, gives machine-readable "count,unit,event,..." lines
 		perf stat -x, -e "${EVENTS}" -D -1 \
 			--control "fd:${ctl_fd},${ack_fd}" \
-			-o "${stem}.stat" -- "${prog[@]}" >"${stem}.out" 2>"${stem}.err"
+			-o "${stem}.stat" -- "${NUMACTL_CMD[@]}" "${prog[@]}" >"${stem}.out" 2>"${stem}.err"
 	else
 		# NOTE: -F matters. At perf's default period a ~20ms region yields ~50
 		# cache-miss samples, which is not enough to rank functions. Raise FREQ
@@ -176,7 +201,7 @@ function run_one() {
 		perf record -s -D -1 -F "${FREQ:-20000}" \
 			--control "fd:${ctl_fd},${ack_fd}" \
 			-o "${stem}.data" -e "${EVENTS}" \
-			-- "${prog[@]}" >"${stem}.out" 2>"${stem}.err"
+			-- "${NUMACTL_CMD[@]}" "${prog[@]}" >"${stem}.out" 2>"${stem}.err"
 		perf report --stdio --percent-limit 1 \
 			--input="${stem}.data" >"${stem}.report" 2>/dev/null
 	fi
@@ -193,7 +218,7 @@ function run_one() {
 
 	if [[ "${MODE}" == "stat" ]]; then
 		# Pull the counts out in the order EVENTS lists them.
-		local row="${region},${tree_name},${dis},${node},${BATCH_RATIO},${THREADS}"
+		local row="${region},${tree_name},${dis},${node},${BATCH_RATIO},${THREADS},${NUMA_LABEL}"
 		local ev
 		for ev in ${EVENTS//,/ }; do
 			local v
