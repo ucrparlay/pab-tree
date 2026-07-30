@@ -1,0 +1,183 @@
+#!/bin/bash
+
+set -o xtrace
+
+/usr/bin/drop_caches
+
+declare -a cores=(1 4 16 32 64 112 224)
+declare -a threads=(
+	"PARLAY_NUM_THREADS=1"
+	"PARLAY_NUM_THREADS=4"
+	"PARLAY_NUM_THREADS=16"
+	"PARLAY_NUM_THREADS=32"
+	"PARLAY_NUM_THREADS=64"
+	"PARLAY_NUM_THREADS=112"
+	"PARLAY_NUM_THREADS=224"
+)
+
+Nodes=(1000000000)
+Dim=(1)
+tag=$((2#0011))
+summary=0
+query_type=$((2#0))
+instance_n=1
+round=4
+
+log_path="logs/scalability"
+mkdir -p "${log_path}"
+
+data_prefix="/data/zmen002/kv_pair"
+batch_op_seq=("ins")
+# dis_seq=("uni" "exp" "norm" "dual_norm")
+dis_seq=("uni" "exp")
+batch_ratio=0.01
+
+log_path="logs/scalability"
+mkdir -p "${log_path}"
+
+function run_test() {
+	local leaf_idx="$1"
+	local solver="$2"
+	local tree="$3"
+
+	local exe="../build/${solver}"
+
+	for dim in "${Dim[@]}"; do
+		for dis in "${dis_seq[@]}"; do
+			for thid_idx in "${!threads[@]}"; do
+				for batch_op in "${batch_op_seq[@]}"; do
+					for node in "${Nodes[@]}"; do
+
+						local x=$(bc <<<"scale=0; 1/$batch_ratio") || return 1
+						local file_prefix="${data_prefix}/${dis}/${node}_${dim}/${batch_op}/${x}"
+
+						local dest="${log_path}/${tree}/${dis}/${cores[${thid_idx}]}.log"
+						mkdir -p "${dest%/*}"
+						: >"${dest}"
+						echo ">>>${dest}"
+
+						# scalability
+						export "${threads[${thid_idx}]}"
+						if [[ ${thid_idx} -eq 0 || ${thid_idx} -eq 1 ]]; then
+							round=1
+						else
+							round=2
+						fi
+
+						for ((j = 1; j <= instance_n; j++)); do
+							# ${commands[${i}]} "${exe}" -p "${input}" -I "${insert}" -k ${k} -t ${tag} -d 2 -r ${round} -q 0 -i 1 -s 0 -T ${tree} -l ${split} 2>&1 | tee -a "${dest}"
+							"${exe}" -p "${file_prefix}/${j}.base.bin" -r "${round}" -s ${summary} -t ${tag} -q ${query_type} -b "${batch_ratio}" -T "${tree}" -D "${dis}" 2>&1 | tee -a "${dest}"
+						done
+					done
+				done
+			done
+		done
+	done
+}
+
+function run_cmake() {
+	/usr/bin/drop_caches
+	local leaf_idx="$1"
+	local solver="$2"
+
+	local cur_path
+	cur_path=$(pwd)
+	cd ../build || exit
+	rm -rf *
+	cmake -DDEBUG=OFF -DCMAKE_CXX_COMPILER=g++ -DOSM=OFF -DDYNAMIC_GRAPH=OFF -DJEMA=ON -DLEAF="${leaf_wrap_seq[${leaf_idx}]}" "${HOME}/ParallelMultiwayOrderedSet"
+	make "${solver}" -j
+	cd "${cur_path}" || exit
+}
+
+# Masstree
+export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+tree=5
+solver="index_microbench_workload"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+# BwTree
+export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+tree=6
+solver="index_microbench_workload"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
+
+# Tree=(0 1 2 3)
+# make -C ../build/ kd_test p_test baselines
+#
+# for tree in "${Tree[@]}"; do
+# 	if [[ ${tree} -eq 0 ]]; then
+# 		solver="kd_test"
+# 		splits=(0)
+# 	elif [[ ${tree} -eq 1 ]]; then
+# 		solver="kd_test"
+# 		splits=(3)
+# 	elif [[ ${tree} -eq 2 ]]; then
+# 		solver="p_test"
+# 		splits=(1)
+# 	elif [[ ${tree} -eq 3 ]]; then
+# 		solver="baselines"
+# 		splits=(1)
+# 	else
+# 		solver="baselines"
+# 		splits=(1)
+# 	fi
+#
+# 	for split in "${splits[@]}"; do
+# 		for i in "${!threads[@]}"; do
+# 			for j in "${!origin_paths[@]}"; do
+# 				file="${origin_paths[${j}]##*/}"
+# 				dest="${log_path}/${file}_${cores[${i}]}_${tree}_${split}.log"
+# 				: >"${dest}"
+# 				echo ">>>${dest}"
+# 				exe="../build/${solver}"
+# 				export "${threads[${i}]}"
+# 				if [[ ${i} -eq 0 || ${i} -eq 1 ]]; then
+# 					round=1
+# 				else
+# 					round=2
+# 				fi
+#
+# 				input="${origin_paths[${j}]}"
+# 				insert="${insert_paths[${j}]}"
+# 				echo ${input}
+# 				echo ${insert}
+#
+# 				${commands[${i}]} "${exe}" -p "${input}" -I "${insert}" -k ${k} -t ${tag} -d 2 -r ${round} -q 0 -i 1 -s 0 -T ${tree} -l ${split} 2>&1 | tee -a "${dest}"
+# 			done
+# 		done
+# 	done
+# done
+
+#for solver in "${Solvers[@]}"; do
+#    exe="../build/${solver}"
+#    #* decide output file
+#    if [[ ${solver} == "test" ]]; then
+#        resFile="res.out"
+#    elif [[ ${solver} == "cgal" ]]; then
+#        resFile="cgal.out"
+#    elif [[ ${solver} == "zdtree" ]]; then
+#        resFile="zdtree.out"
+#        exe="/home/zmen002/pbbsbench_x/build/zdtree"
+#    fi
+
+#    for i in "${!threads[@]}"; do
+#        for dataPath in "${!datas[@]}"; do
+#            for node in "${Node[@]}"; do
+#                logPath=${datas[${dataPath}]}
+
+#                files_path="${dataPath}${node}_${dim}"
+#                log_path="${logPath}${node}_${dim}"
+#                mkdir -p "${log_path}"
+#                dest="${log_path}/${cores[${i}]}_${resFile}"
+#                : >"${dest}"
+#                echo ">>>${dest}"
+
+#                export "${threads[${i}]}"
+#                ${commands[${i}]} "${exe}" -p "${files_path}/1.in" -k ${k} -t ${tag} -d ${dim} -r 1 -q 0 -i 1 >>"${dest}"
+
+#            done
+#        done
+#    done
+#done

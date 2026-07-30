@@ -803,11 +803,8 @@ ConRangeQuery(auto num_thread,
 // entries a full build costs 98GB / 66s, while deleting those same entries
 // grows RSS to 1491GB (~1.4KB per removed entry) and dies. Rebuilding costs
 // another ~105 bytes/entry instead, which fits.
-struct ConStepResult
-{
-  Index<keytype, keycomp>* idx;
-  size_t half_n; // NOTE: entries on the low side of the half split
-};
+// NOTE: both return the half filled index. The caller splits the input at
+// size / 2 to tell which keys are in it, the same as tests/test_framework.h.
 
 // NOTE: threadinfo::make mallocs 8KB, links itself into a global `allthreads`
 // list that is never pruned, and immediately grabs a 2MB superpage pool for its
@@ -881,7 +878,7 @@ ConRunBatched(Index<keytype, keycomp>* idx,
 // Leaves an index half way through the build, holding WP[0, half_n). Masstree
 // gets `reuse_idx` back, which must be empty on entry; bwtree gets a fresh
 // index the caller must delete.
-ConStepResult
+Index<keytype, keycomp>*
 ConInsertByStep(auto num_thread,
                 int index_type,
                 auto const& WP,
@@ -891,9 +888,6 @@ ConInsertByStep(auto num_thread,
   auto const step =
     std::max<size_t>(static_cast<size_t>(insert_ratio * n), size_t(1));
   size_t const slice_num = (n / step) + (n % step != 0);
-  // NOTE: the true half boundary is (slice_num / 2) * step, which is only equal
-  // to n / 2 when slice_num is even and step divides n.
-  size_t const half_n = std::min((slice_num / 2) * step, n);
 
   auto insert_batches = [&](Index<keytype, keycomp>* idx,
                             size_t const batch_num) {
@@ -929,7 +923,7 @@ ConInsertByStep(auto num_thread,
   ReclaimMassTreeMemory(); // safe here: threads joined, idx gone
   idx = getInstance<keytype, keycomp>(index_type, key_type);
   insert_batches(idx, slice_num / 2);
-  return { idx, half_n };
+  return idx;
 }
 
 // NOTE: mirror of BatchDeleteByStep (tests/test_framework.h). Starts from an
@@ -939,7 +933,7 @@ ConInsertByStep(auto num_thread,
 // Leaves an index half way through the teardown: WP[0, half_n) is gone, so
 // WP[half_n, n) remains. Masstree gets `reuse_idx` back, which must hold all of
 // WP on entry; bwtree gets a fresh index the caller must delete.
-ConStepResult
+Index<keytype, keycomp>*
 ConDeleteByStep(auto num_thread,
                 int index_type,
                 auto const& WP,
@@ -949,7 +943,6 @@ ConDeleteByStep(auto num_thread,
   auto const step =
     std::max<size_t>(static_cast<size_t>(delete_ratio * n), size_t(1));
   size_t const slice_num = (n / step) + (n % step != 0);
-  size_t const half_n = std::min((slice_num / 2) * step, n);
 
   auto delete_batches = [&](Index<keytype, keycomp>* idx,
                             size_t const batch_num) {
@@ -982,14 +975,13 @@ ConDeleteByStep(auto num_thread,
   ReclaimMassTreeMemory(); // safe here: threads joined, idx gone
   idx = ConBuild<0>(num_thread, index_type, WP);
   delete_batches(idx, slice_num / 2);
-  return { idx, half_n };
+  return idx;
 }
 
-// NOTE: the query trio run after an incremental insert/delete, matching the
-// order the tag 5 / tag 6 blocks in tests/test_framework.h print them in:
-// membership on keys that are in the index, membership on keys that are not,
-// then range query and range count. The masstree carve-outs are the same ones
-// the query_type lambdas in ApplyConcurrentIndex use.
+// NOTE: the queries run on a half filled index, the same set and the same
+// order as incre_update_query in tests/test_framework.h: three membership
+// passes, then range query, then range count. The masstree carve-outs are the
+// same ones the query_type lambdas in ApplyConcurrentIndex use.
 template<typename TT>
 void
 ConQueryAfterStep(auto num_thread,
@@ -1003,14 +995,20 @@ ConQueryAfterStep(auto num_thread,
   auto const batch_size = static_cast<size_t>(
     (entry_in_tree.size() + entry_not_in_tree.size()) * kMemberQueryRatio);
 
-  // NOTE: one membership pass. Both halves together, shuffled, then the first
-  // batch_size, so hits and misses are mixed.
+  auto membership = [&](auto const& ele) {
+    ConMembership(
+      num_thread,
+      idx,
+      parlay::map(ele, [](auto const& e) { return e.GetKey(); }));
+  };
+
+  // NOTE: three membership passes -- all hits, all misses, then a mix. For the
+  // mix, put both halves together, shuffle, and take the first batch_size.
+  membership(entry_in_tree.cut(0, batch_size));
+  membership(entry_not_in_tree.cut(0, batch_size));
   auto const shuffled =
     parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
-  ConMembership(num_thread,
-                idx,
-                parlay::map(shuffled.cut(0, batch_size),
-                            [](auto const& e) { return e.GetKey(); }));
+  membership(shuffled.cut(0, batch_size));
 
   for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
     auto [query_box_seq, max_size] =
@@ -1402,18 +1400,11 @@ ApplyConcurrentIndex(Options const& opts)
   if ((opts.tag & (1 << 5)) == 0) {
     ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
 
-    // NOTE: build. The incremental blocks manage their own indexes and never
-    // touch primal_idx, so building it for them would cost a full index -- 98GB
-    // and ~66s for masstree at 1e9 -- for nothing. Emit a "-" in its place so
-    // the column count of the log stays fixed.
-    bool const needs_primal =
-      (opts.tag & ((1 << 0) | (1 << 1))) != 0 || opts.query_type != 0;
-    if (needs_primal) {
-      primal_idx = ConBuild<1>(num_thread, index_type, wp);
-    } else {
-      primal_idx = getInstance<keytype, keycomp>(index_type, key_type);
-      std::cout << "- " << std::flush;
-    }
+    // NOTE: always built, so the first column is a real build time here just
+    // like in tests/test_framework.h. Tags 1<<6 and 1<<7 do not use it and
+    // release it right away, so for them this costs a full index -- 98GB and
+    // ~66s for masstree at 1e9 -- only to keep the column comparable.
+    primal_idx = ConBuild<1>(num_thread, index_type, wp);
     // std::cout << "build" << std::endl;
 
     // NOTE: insert
@@ -1612,7 +1603,15 @@ ApplyConcurrentIndex(Options const& opts)
     release_primal();
     ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
     auto half = wp.size() / 2;
-    auto* idx = ConBuild<1>(num_thread, index_type, wp.cut(0, half));
+
+    // NOTE: time the build over the whole input, then rebuild from half so the
+    // queries see a half filled index. BuildTree with kOutputRatio 2 in
+    // tests/test_framework.h does the same: it times the full build and only
+    // its last, untimed build is the half one.
+    auto* idx = ConBuild<1>(num_thread, index_type, wp);
+    delete idx;
+    ReclaimMassTreeMemory();
+    idx = ConBuild<0>(num_thread, index_type, wp.cut(0, half));
 
     // NOTE: only the first half of wp went into the index.
     ConQueryAfterStep<TT>(
@@ -1629,14 +1628,14 @@ ApplyConcurrentIndex(Options const& opts)
     parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
 
     for (auto ratio : ratio_seq) {
-      auto [idx, half_n] = ConInsertByStep(num_thread, index_type, wp, ratio);
+      auto* idx = ConInsertByStep(num_thread, index_type, wp, ratio);
 
-      // NOTE: half built, so wp[0, half_n) is present and wp[half_n, n) is not.
+      // NOTE: the first half of wp was inserted, the second half was not.
       ConQueryAfterStep<TT>(num_thread,
                             idx,
                             index_type,
-                            wp.cut(0, half_n),
-                            wp.cut(half_n, wp.size()));
+                            wp.cut(0, wp.size() / 2),
+                            wp.cut(wp.size() / 2, wp.size()));
       delete idx;
       ReclaimMassTreeMemory();
     }
@@ -1650,15 +1649,15 @@ ApplyConcurrentIndex(Options const& opts)
     parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
 
     for (auto ratio : ratio_seq) {
-      auto [idx, half_n] = ConDeleteByStep(num_thread, index_type, wi, ratio);
+      auto* idx = ConDeleteByStep(num_thread, index_type, wi, ratio);
 
-      // NOTE: the teardown removed wi[0, half_n), so the *upper* part is what
-      // is still in the index.
+      // NOTE: the first half of wi was deleted, so the second half is the one
+      // left in the index.
       ConQueryAfterStep<TT>(num_thread,
                             idx,
                             index_type,
-                            wi.cut(half_n, wi.size()),
-                            wi.cut(0, half_n));
+                            wi.cut(wi.size() / 2, wi.size()),
+                            wi.cut(0, wi.size() / 2));
       delete idx;
       ReclaimMassTreeMemory();
     }
