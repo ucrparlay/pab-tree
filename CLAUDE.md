@@ -881,3 +881,57 @@ fresh `Json` request for every key* — rec2 would mean ~2.5e10 descents plus
 work needs a counting scanner built on `get_next_n`'s callback, not a flag flip.
 (The old comment there claimed "segfaults", copy-pasted from the range query
 skip; it was never true for the count path.)
+
+## Scalability sweep (`scripts/scalability.sh`)
+
+Sweeps `PARLAY_NUM_THREADS` over `1 4 16 32 64 112 224` at n=1e9, pinning each
+step with `taskset` (stride 4 at 1/4/16 threads, stride 2 at 32, then dense) plus
+`numactl -i all` above 1 thread. `scalability_concurrent.sh` is the same sweep
+without the taskset/numactl prefixes, for the concurrent indexes.
+
+`round` is set **per thread count** — 1 round at 1 and 4 threads, 2 above — so a
+1-thread run does not cost 4× a 224-thread one. Timings are per-round averages,
+so they stay comparable across the sweep.
+
+Config: `tag=2#0011` (batch insert 1<<0 + batch delete 1<<1), `query_type=0`,
+`batch_ratio=0.01`, `dis_seq=("uni" "exp")` — norm/dual_norm are commented out.
+`scalability.sh` currently has only MassTree and BwTree uncommented; the tree
+side (0–3) is commented out but its logs are present from an earlier run.
+
+### Log layout — the core count is only in the filename
+
+`logs/scalability/<tree>/<dis>/<cores>.log`, one run each: a `Tree:` header then
+**3 values — build, insert, delete** (the primal build always reports, then the
+two tag bits; `query_type=0` means no query columns, unlike the incremental
+sweep's 90).
+
+The thread count appears **nowhere in the log body** — `Buf:` is the leaf size
+(64 for BTree, 1 for the rest), not the core count. So `merge_scalability.py`
+walks `<tree>/<dis>/<cores>.log` per file and takes cores from the stem;
+concatenating first and parsing the flat file, the way
+`merge_incre_updates.py` does, would silently lose the sweep's x axis. The
+concatenated log is still written (with a `>>> <path>` marker per file) for
+reading by hand.
+
+### `merge_scalability.py`
+
+Writes `data/scalability/<name>.csv`, **long/tidy**: one row per
+`(benchmark, tree, cores)` = 9 columns, `build/insert/delete` plus
+`build_su/insert_su/delete_su`, where `*_su` is self-relative speedup
+`t(1 core) / t(n cores)`. Long rather than cores-as-columns because cores is the
+x axis of every plot this feeds. Speedup cells are left **blank** when the 1-core
+baseline for that `(benchmark, tree)` is missing or blank — never fabricated from
+a partial baseline. Sorting is `bench_order`, `tree_order`, then cores
+**numerically** (a lexical sort gives 1, 112, 16, 224…).
+
+Shares the incremental merge's three robustness rules: `-` is a legal value,
+values accumulate until the next header so a `madvise`-spliced row still parses,
+and a short row is padded with a warning. A header with no timings at all (a run
+that died before printing) is reported and skipped rather than emitted as an
+empty row.
+
+Current state: 84 rows = 6 trees × 2 distributions × 7 core counts, all clean.
+One stray `logs/scalability/3/uni/.log` (empty filename stem, header only, no
+timings) is skipped with a note — note that both bash's `*` and Python's `glob`
+skip leading-dot names, so it is invisible to the concatenation but *is* seen by
+the per-file walk, which uses `os.listdir`.
