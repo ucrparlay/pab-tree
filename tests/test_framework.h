@@ -184,7 +184,21 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
   // size_t n = 100;
   // EntrySeq wp = EntrySeq::uninitialized(n);
   auto const wp = Tree::ParseInput(WP);
-  auto const partial_wp = Tree::ParseInput(WP.subseq(0, n / kOutputRatio));
+
+  // NOTE: leaves the tree holding the first n / kOutputRatio entries. At the
+  // default kOutputRatio == 1 that is all of WP, i.e. exactly `wp`, so reuse it
+  // rather than materializing an identical copy: ParseInput returns by value
+  // and WP.subseq() copies first, so a hoisted `partial_wp` costs two extra
+  // full copies of the input -- invisible at 1e8, 16GB at n = 1e9, which is the
+  // difference between PAM fitting in RAM and not. Untimed and outside every
+  // PerfRegion either way, so this cannot affect a measurement.
+  auto build_output_tree = [&]() {
+    if constexpr (kOutputRatio == 1) {
+      pkd.Build(wp);
+    } else {
+      pkd.Build(Tree::ParseInput(WP.subseq(0, n / kOutputRatio)));
+    }
+  };
 
   if constexpr (kTestTime) {
     pkd.DeleteTree();
@@ -199,7 +213,7 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
       },
       [&]() { pkd.DeleteTree(); });
 
-    pkd.Build(partial_wp);
+    build_output_tree();
 
     if constexpr (kPrint) {
       std::cout << aveBuild << " " << std::flush;
@@ -207,7 +221,7 @@ BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
   } else {
     // NOTE: always return a built tree
     pkd.DeleteTree();
-    pkd.Build(partial_wp);
+    build_output_tree();
   }
 }
 

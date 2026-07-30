@@ -1,0 +1,8 @@
+# started on Wed Jul 29 16:38:27 2026
+
+7248990795,,cycles,2791463373,100.00,,
+6935270843,,instructions,2800668067,100.00,0.96,insn per cycle
+29421077,,cache-references,2809102887,100.00,,
+24282574,,cache-misses,2817237410,100.00,82.535,of all cache refs
+748316,,LLC-load-misses,2825040029,100.00,,
+39374081,,L1-dcache-load-misses,2832644145,100.00,,

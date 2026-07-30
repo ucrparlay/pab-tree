@@ -11,7 +11,81 @@
 #   stat   (default) exact aggregate counts per region -> data/<log>/*.csv
 #   record sampled profile -> per-function attribution via `perf report`
 #
-# Sample usage at the end of this file.
+# ============================================================================
+# HOW TO RUN
+# ============================================================================
+# Always run from inside scripts/ (paths to ../build and data/, logs/ are
+# relative). Everything is configured through environment variables -- there are
+# no positional arguments.
+#
+#   cd scripts && DIS_SEQ=uni ./perf_cache.sh
+#
+# Results land in two places:
+#   data/${LOG_NAME}/perf_cache.csv   one row per (region, tree), all events
+#   logs/${LOG_NAME}/*.stat|.report   raw perf output, one file per run
+#
+# --- knobs -------------------------------------------------------------------
+#   LOG_NAME     output dir name under data/ and logs/   (default perf_cache)
+#   TREES        space-separated "solver:-T:name" specs
+#                (default "b_test:0:BTree cpam:1:CPAM cpam:2:PAM pma:3:PMA";
+#                 CPAM and PAM share the cpam binary, selected by -T)
+#   REGIONS      subset of "build insert delete"         (default all three)
+#   DIS_SEQ      subset of "uni exp norm dual_norm"      (default all four)
+#   NODES        base size, e.g. 100000000 / 1000000000  (default 1e8)
+#   BATCH_RATIO  insert/delete batch as a fraction of base (default 0.1); also
+#                picks the dataset dir, ins/<1/ratio>
+#   THREADS      PARLAY_NUM_THREADS                      (default 1)
+#   MODE         stat | record                           (default stat)
+#   FREQ         record mode sampling frequency          (default 20000)
+#   EVENTS       perf event list (see counter budget note below)
+#   DATA_PREFIX  dataset root                    (default /data/zmen002/kv_pair)
+#   EXT          .bin | .in                              (default .bin)
+#   SKIP_BUILD   1 = do not re-run cmake/make            (default 0)
+#   DROP_CACHES  1 = drop page cache before each run     (default 1)
+#
+# --- recipes -----------------------------------------------------------------
+#   # 1e8, all four trees, all three regions, parallel  (the standard sweep)
+#   cd scripts && NODES=100000000 DIS_SEQ=uni THREADS=64 ./perf_cache.sh
+#
+#   # 1e9. PAM needs ~110GB at insert -- drop it on a <128GB box, and put it
+#   # last regardless so an OOM does not cost the other trees.
+#   cd scripts && NODES=1000000000 DIS_SEQ=uni THREADS=64 \
+#       TREES="b_test:0:BTree cpam:1:CPAM pma:3:PMA" \
+#       LOG_NAME=perf_cache_1e9 ./perf_cache.sh
+#
+#   # serial -- the meaningful setting for misses/element. At THREADS=64 idle
+#   # parlay workers spinning in scheduler::get_own_job are counted too.
+#   cd scripts && THREADS=1 DIS_SEQ=uni REGIONS=insert ./perf_cache.sh
+#
+#   # which functions the misses land in, instead of totals
+#   cd scripts && MODE=record REGIONS=delete DIS_SEQ=uni ./perf_cache.sh
+#
+#   # fast smoke test: small dataset, existing build, keep the page cache
+#   cd scripts && SKIP_BUILD=1 DROP_CACHES=0 NODES=1000000 DIS_SEQ=uni \
+#       DATA_PREFIX=/ssd1/zmen002/kv_pair LOG_NAME=smoke ./perf_cache.sh
+#
+#   # one tree only
+#   cd scripts && TREES=cpam:2:PAM DIS_SEQ=uni ./perf_cache.sh
+#
+#   # fewer events (zero risk of counter multiplexing)
+#   cd scripts && EVENTS=cache-references,cache-misses ./perf_cache.sh
+#
+# --- reading the output ------------------------------------------------------
+# * The counted region is ONE call of the operation. Per-element figures divide
+#   the build row by NODES, but the insert/delete rows by NODES*BATCH_RATIO --
+#   those regions only touch the batch, not the whole tree.
+# * ROUND and SUMMARY are pinned to 1 and 0 below and must stay there: perf
+#   sums over every enable/disable interval, so -r N reports N+1 executions
+#   added together (time_loop's warmup pass counts too), and -s 1 would sweep
+#   four batch ratios into a single count.
+# * Verify no counter multiplexing before trusting a changed EVENTS list:
+#     awk -F, 'NF>=5 && $5+0<100' logs/<LOG_NAME>/*.stat
+#   must print nothing (field 5 is the percentage of time the event ran).
+# * Single-shot runs. Cache-miss columns move ~14% run to run at fixed config,
+#   while instructions hold to ~4% -- repeat the whole invocation with a
+#   different LOG_NAME for error bars; averaging inside one process is not
+#   possible given the -r 1 requirement.
+# ============================================================================
 
 set -o pipefail
 
@@ -163,40 +237,38 @@ function run_tree() {
 	done
 }
 
+# NOTE: "solver:-T:name" -- CPAM and PAM share the cpam binary, selected by -T.
+# TREES overrides the set, e.g. TREES="b_test:0:BTree cpam:1:CPAM".
+TREE_SPECS=(${TREES:-b_test:0:BTree cpam:1:CPAM cpam:2:PAM pma:3:PMA})
+
 function run_cmake() {
-	local cur_path
+	local cur_path spec
 	cur_path=$(pwd)
 	cd ../build || exit 1
 	cmake -DDEBUG=OFF -DOSM=OFF -DDYNAMIC_GRAPH=OFF \
 		-DCMAKE_CXX_COMPILER=g++ "${HOME}/ParallelMultiwayOrderedSet" >/dev/null
-	make b_test -j"$(nproc)" || exit 1
+	local -A seen=()
+	for spec in "${TREE_SPECS[@]}"; do
+		local solver="${spec%%:*}"
+		[[ -n "${seen[$solver]:-}" ]] && continue
+		seen[$solver]=1
+		make "${solver}" -j"$(nproc)" || exit 1
+	done
 	cd "${cur_path}" || exit 1
 }
 
 [[ "${SKIP_BUILD:-0}" == "1" ]] || run_cmake
 
-run_tree b_test 0 BTree
+for spec in "${TREE_SPECS[@]}"; do
+	IFS=: read -r spec_solver spec_tree spec_name <<<"${spec}"
+	run_tree "${spec_solver}" "${spec_tree}" "${spec_name}"
+done
 
 if [[ "${MODE}" == "stat" ]]; then
 	echo
 	echo "=== ${CSV} ==="
 	column -s, -t <"${CSV}"
+	echo
+	echo "derived per-element metrics:"
+	echo "  ./merge_perf_cache.py ${LOG_NAME}"
 fi
-
-# Sample usage:
-#
-#   # all three regions, uniform only, 1e8, serial (clean attribution)
-#   cd scripts && DIS_SEQ=uni ./perf_cache.sh
-#
-#   # just batch insert, all four distributions, parallel (real-world rates)
-#   cd scripts && REGIONS=insert THREADS=64 ./perf_cache.sh
-#
-#   # per-function breakdown of where the misses land, instead of totals
-#   cd scripts && MODE=record REGIONS=delete DIS_SEQ=uni ./perf_cache.sh
-#
-#   # quick check against a small dataset, reusing the existing build
-#   cd scripts && SKIP_BUILD=1 DROP_CACHES=0 NODES=1000000 DIS_SEQ=uni \
-#       DATA_PREFIX=/ssd1/zmen002/kv_pair ./perf_cache.sh
-#
-#   # narrow the event set (fewer events = no risk of counter multiplexing)
-#   cd scripts && EVENTS=cache-references,cache-misses ./perf_cache.sh
