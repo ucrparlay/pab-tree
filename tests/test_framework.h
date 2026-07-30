@@ -843,7 +843,11 @@ RangeQuery(auto const& wp,
 //* test range query for fix rectangle
 template<typename TT, typename Tree>
 void
-Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
+Membership(Tree const& pkd,
+           auto const& query_ele,
+           int kRounds,
+           auto& res,
+           std::string_view perf_region_name = "")
 {
   using Entry = typename TT::Entry;
   int query_num = query_ele.size();
@@ -857,6 +861,7 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
     loop_late,
     [&]() {},
     [&]() {
+      PerfRegion const perf_region(perf_region_name);
       parlay::parallel_for(
         0,
         query_num,
@@ -1813,9 +1818,13 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
   constexpr bool kTestTime = true;
 
   // PARA: lambda for membership
-  auto membership_query = [&](auto const& query_ele) {
+  // NOTE: perf_region_name defaults to "" so a pass is only counted when a
+  // caller names it -- the membership block below runs three passes (all hits,
+  // all misses, 50/50 mix) and perf would otherwise sum all three.
+  auto membership_query = [&](auto const& query_ele,
+                              std::string_view perf_region_name = "") {
     auto res = parlay::sequence<bool>(query_ele.size(), true);
-    Membership<TT>(tree, query_ele, opts.rounds, res);
+    Membership<TT>(tree, query_ele, opts.rounds, res, perf_region_name);
   };
 
   // PARA: lambda for range query
@@ -1941,10 +1950,13 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc,
         query_ele = wi.subseq(0, batch_size);
         membership_query(query_ele);
 
+        // NOTE: the half-half mix -- half the probes are keys in the tree,
+        // half are not, shuffled together. This is the pass the perf
+        // "membership" region measures.
         query_ele = parlay::append(wp.subseq(0, batch_size / 2),
                                    wi.subseq(0, batch_size - (batch_size / 2)));
         query_ele = parlay::random_shuffle(query_ele);
-        membership_query(query_ele);
+        membership_query(query_ele, "membership");
       }
     }
 

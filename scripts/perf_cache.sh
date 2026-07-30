@@ -29,7 +29,7 @@
 #   TREES        space-separated "solver:-T:name" specs
 #                (default "b_test:0:BTree cpam:1:CPAM cpam:2:PAM pma:3:PMA";
 #                 CPAM and PAM share the cpam binary, selected by -T)
-#   REGIONS      subset of "build insert delete"         (default all three)
+#   REGIONS      subset of "build insert delete membership" (default all 4)
 #   DIS_SEQ      subset of "uni exp norm dual_norm"      (default all four)
 #   NODES        base size, e.g. 100000000 / 1000000000  (default 1e8)
 #   BATCH_RATIO  insert/delete batch as a fraction of base (default 0.1); also
@@ -77,9 +77,15 @@
 #   cd scripts && EVENTS=cache-references,cache-misses ./perf_cache.sh
 #
 # --- reading the output ------------------------------------------------------
-# * The counted region is ONE call of the operation. Per-element figures divide
-#   the build row by NODES, but the insert/delete rows by NODES*BATCH_RATIO --
-#   those regions only touch the batch, not the whole tree.
+# * The counted region is ONE call of the operation. Per-element denominators
+#   therefore differ per region: build = NODES; insert/delete =
+#   NODES*BATCH_RATIO (they only touch the batch); membership =
+#   NODES*kMemberQueryRatio (0.01, from test_framework.h).
+# * `membership` measures the HALF-HALF probe only: half the keys are in the
+#   tree, half are not, shuffled. DefaultTestFunc runs three membership
+#   passes (all hits, all misses, mix) and only the mix is armed, so perf
+#   does not sum them. The tree is rebuilt on base before the queries, so
+#   the probed tree holds NODES entries.
 # * ROUND and SUMMARY are pinned to 1 and 0 below and must stay there: perf
 #   sums over every enable/disable interval, so -r N reports N+1 executions
 #   added together (time_loop's warmup pass counts too), and -s 1 would sweep
@@ -108,11 +114,13 @@ NODES="${NODES:-100000000}"
 DIM="${DIM:-1}"
 ROUND=1                    # MUST stay 1: perf accumulates across time_loop rounds
 SUMMARY=0                  # MUST stay 0: -s 1 sweeps 4 ratios into one count
-QUERY_TYPE=0               # keep query regions out of the run
+# NOTE: QUERY_TYPE is per region now (see REGION_QUERY): the update regions
+# want 0 so no query work runs at all, but `membership` needs -q 1 to make
+# DefaultTestFunc execute the membership block.
 BATCH_RATIO="${BATCH_RATIO:-0.1}"
 THREADS="${THREADS:-1}"    # 1 = clean per-function attribution; else real-world
 DIS_SEQ=(${DIS_SEQ:-uni exp norm dual_norm})
-REGIONS=(${REGIONS:-build insert delete})
+REGIONS=(${REGIONS:-build insert delete membership})
 DATA_PREFIX="${DATA_PREFIX:-/data/zmen002/kv_pair}"
 EXT="${EXT:-.bin}"
 DROP_CACHES="${DROP_CACHES:-1}"
@@ -139,10 +147,15 @@ LOG_NAME="${LOG_NAME:-perf_cache}"
 LOG_PATH="logs/${LOG_NAME}"
 CSV="data/${LOG_NAME}/perf_cache.csv"
 
-# region -> the -t tag that makes DefaultTestFunc execute it
-declare -A REGION_TAG=([build]=0 [insert]=1 [delete]=2)
-# region -> which dataset subdir holds its base/batch pair
-declare -A REGION_OP=([build]=ins [insert]=ins [delete]=del)
+# region -> the -t tag that makes DefaultTestFunc execute it. `membership` uses
+# tag 1 because the half-half pass needs `wi` populated, which only the batch
+# insert block does; -pcr keeps the insert itself out of the counts.
+declare -A REGION_TAG=([build]=0 [insert]=1 [delete]=2 [membership]=1)
+# region -> -q value. Only membership needs a query bit set.
+declare -A REGION_QUERY=([build]=0 [insert]=0 [delete]=0 [membership]=1)
+# region -> which dataset subdir holds its base/batch pair. membership probes
+# base (in tree) against batch (not in tree), so it needs the disjoint ins pair.
+declare -A REGION_OP=([build]=ins [insert]=ins [delete]=del [membership]=ins)
 
 mkdir -p "${LOG_PATH}" "$(dirname "${CSV}")"
 
@@ -182,7 +195,7 @@ function run_one() {
 	export PARLAY_NUM_THREADS="${THREADS}"
 
 	local -a prog=("${exe}" -p "${base}" -r "${ROUND}" -s "${SUMMARY}"
-		-t "${tag}" -q "${QUERY_TYPE}" -b "${BATCH_RATIO}"
+		-t "${tag}" -q "${REGION_QUERY[$region]}" -b "${BATCH_RATIO}"
 		-T "${tree}" -D "${dis}"
 		-pcf "${ctl_fd}" -pcaf "${ack_fd}" -pcr "${region}")
 

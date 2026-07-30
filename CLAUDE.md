@@ -665,6 +665,71 @@ until `# Samples` is in the thousands. Release builds have **no `-g`**
 names from `.symtab` but gives no line numbers, and `-O3` inlining folds the
 small leaf helpers into their callers.
 
+### The four regions and their per-element denominators
+
+| region | `-t` | `-q` | dataset | region_n |
+|---|---|---|---|---|
+| build | 0 | 0 | ins | `NODES` |
+| insert | 1 | 0 | ins | `NODES * BATCH_RATIO` |
+| delete | 2 | 0 | del | `NODES * BATCH_RATIO` |
+| membership | 1 | 1 | ins | `NODES * kMemberQueryRatio` (0.01) |
+
+`membership` measures **only the half-half probe** — half the keys are in the
+tree, half are not, shuffled. `DefaultTestFunc` runs three membership passes
+(all hits, all misses, mix) and perf would sum all three, so `Membership()`
+takes a `perf_region_name` defaulting to `""` (unarmed) and only the mix call
+site passes `"membership"`. Check `grep -c 'Events enabled'` on the `.err` file:
+it must be exactly 1.
+
+It uses `-t 1` because the half-half pass needs `wi` populated, which only the
+batch-insert block does; `-pcr membership` keeps the insert out of the counts.
+The `ins` pair is required because base and batch keys are **disjoint** there —
+that is what makes the in-tree/not-in-tree split meaningful.
+
+`MEMBER_QUERY_RATIO` in `merge_perf_cache.py` duplicates `kMemberQueryRatio`
+from `test_framework.h`; they must stay in sync.
+
+### IPC sorts the operations into three regimes
+
+`merge_perf_cache.py` emits an `ipc` column (instructions/cycles). It decides
+whether the miss columns explain the cycle cost:
+
+| regime | IPC | meaning |
+|---|---|---|
+| membership | 0.15-0.39 | latency-bound: dependent load chains, nothing to overlap. Misses **do** track cycles; ranking by misses = ranking by time. |
+| build | 0.55-0.60 | bandwidth-bound: all three trees within 8% of each other despite different structures. |
+| batch update | 0.67-1.32 | mixed — misses can mislead badly here. |
+
+The worked counterexample: **CPAM's exp delete has 6.9% fewer cache misses than
+BTree yet runs 10% slower** (0.0810s vs 0.0733s wall, confirmed by both the
+tree's own timing and perf's per-CPU enabled time). It executes **46.7% more
+instructions** (1317 vs 898 per element) at a **33% better IPC** (1.083 vs
+0.815) — 47% more work at 33% better throughput nets +10% time. Its memory
+behaviour is strictly better (LLC-load-misses 2.42M vs 7.00M, −65%) while its
+L1d misses are 25% *higher*: the extra traffic is absorbed by L2, the signature
+of a compressed layout trading ALU work for locality.
+
+So: cycles is the cost; misses only explain it when IPC says latency-bound.
+
+### Membership results (1e9, 1e7 probes, 64 threads, interleaved)
+
+| dis | tree | misses/probe | IPC | vs BTree |
+|---|---|---|---|---|
+| uni | BTree | 16.41 | 0.180 | 1.00 |
+| uni | CPAM | 24.96 | 0.150 | 1.52 |
+| uni | PMA | **11.26** | 0.365 | **0.69** |
+| exp | BTree | 14.82 | 0.198 | 1.00 |
+| exp | CPAM | 23.29 | 0.167 | 1.57 |
+| exp | PMA | **10.83** | 0.394 | **0.73** |
+
+Point queries are the **most miss-intensive operation measured** (11-25 per
+probe vs 1.1-1.7 for build), because the root-to-leaf descent is unamortized.
+PMA wins decisively — a binary search over a contiguous array keeps the upper
+levels resident (LLC-load-misses 3.7/probe vs BTree's 11.4), the exact inverse
+of its 16x loss on `exp` insert. CPAM is worst, and it is a locality loss not a
+compute one (instructions only +18%, lowest IPC of the three). Distribution
+barely matters (uni vs exp within 10%) since lookup cost is descent depth.
+
 ### `miss_rate_pct` is an LLC miss rate, not an overall one
 
 `perf stat -vv` confirms `cache-references`/`cache-misses` are the generic

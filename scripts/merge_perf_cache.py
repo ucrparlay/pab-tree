@@ -34,8 +34,11 @@
 #
 # --- what it computes --------------------------------------------------------
 # region_n       elements the counted region actually processed. This is the
-#                important one: `build` touches all n, but `insert`/`delete`
-#                only touch the batch, so their denominator is n*batch_ratio.
+#                important one, and it differs per region: `build` touches all
+#                n, `insert`/`delete` only the batch (n*batch_ratio), and
+#                `membership` probes n*0.01 keys (kMemberQueryRatio).
+#                `membership` is the half-half probe -- half the keys are in the
+#                tree, half are not.
 # <ev>_per_elem  each event divided by region_n.
 # miss_rate_pct  100 * cache-misses / cache-references. NOTE this is an *LLC*
 #                miss rate, not "fraction of memory accesses that miss":
@@ -47,6 +50,14 @@
 #                for ranking -- the rate has a tree-dependent denominator and can
 #                invert the ranking (at 1e9/b=1%, PMA insert shows a higher rate
 #                than CPAM while having fewer absolute misses).
+# ipc            instructions / cycles. Worth reading next to the miss columns:
+#                misses only explain the cycle cost when the operation is
+#                latency-bound. Point queries run at IPC 0.15-0.39 (dependent
+#                load chains, nothing to overlap) so misses do track cycles
+#                there, while batch updates run at 0.8-1.1 and can be dominated
+#                by instruction count instead -- CPAM's exp delete has 6.9%
+#                FEWER misses than BTree yet is 10% slower, because it executes
+#                46.7% more instructions.
 # vs_btree       cache-misses relative to BTree in the same
 #                (source, distribution, region). 1.00 for BTree itself; blank if
 #                no BTree row exists for that distribution+region.
@@ -69,15 +80,20 @@ EVENTS = [
     "L1-dcache-load-misses",
 ]
 
-# The counted region for insert/delete only processes the batch, not the tree.
+# Per-element denominators differ by region: `build` touches all n, while
+# `insert`/`delete` only touch the batch (n*batch_ratio) and `membership` probes
+# n*kMemberQueryRatio keys. Keep MEMBER_QUERY_RATIO in sync with
+# kMemberQueryRatio in tests/test_framework.h.
 WHOLE_INPUT_REGIONS = {"build"}
+MEMBER_QUERY_REGIONS = {"membership"}
+MEMBER_QUERY_RATIO = 0.01
 
 # Row order: distribution first, then operation, then sweep, then tree -- so all
 # rows for one (distribution, operation) sit together and the trees can be read
 # off against each other. perf_cache.sh emits rows in run order instead (tree
 # outermost), which interleaves the distributions.
 DIS_ORDER = ["uni", "exp", "norm", "dual_norm"]
-REGION_ORDER = ["build", "insert", "delete"]
+REGION_ORDER = ["build", "insert", "delete", "membership"]
 TREE_ORDER = ["BTree", "CPAM", "PAM", "PMA"]
 
 
@@ -104,6 +120,8 @@ def sort_rows(rows):
 def region_elements(region, n, batch_ratio):
     if region in WHOLE_INPUT_REGIONS:
         return n
+    if region in MEMBER_QUERY_REGIONS:
+        return int(round(n * MEMBER_QUERY_RATIO))
     return int(round(n * batch_ratio))
 
 
@@ -141,6 +159,8 @@ def derive(rows, source):
             rec[ev] = int(r[ev])
         for ev in EVENTS:
             rec[f"{ev}_per_elem"] = round(int(r[ev]) / region_n, 4)
+        cy = int(r["cycles"])
+        rec["ipc"] = round(int(r["instructions"]) / cy, 3) if cy else ""
         rec["miss_rate_pct"] = round(100.0 * cm / cr, 2) if cr else ""
         base = baseline.get((r["dis"], r["region"]))
         rec["vs_btree"] = round(cm / base, 3) if base else ""
@@ -160,7 +180,7 @@ def main(argv):
         ["source", "region", "tree", "dis", "n", "batch_ratio", "threads", "numa", "region_n"]
         + EVENTS
         + [f"{e}_per_elem" for e in EVENTS]
-        + ["miss_rate_pct", "vs_btree"]
+        + ["ipc", "miss_rate_pct", "vs_btree"]
     )
 
     combined = []
@@ -202,8 +222,9 @@ def main(argv):
 
     if verbose:
         hdr = (
-            f"{'dis':10} {'region':7} {'tree':6} {'region_n':>13} "
-            f"{'cache-misses':>15} {'/elem':>8} {'miss%':>7} {'vs BTree':>9}"
+            f"{'dis':10} {'region':11} {'tree':6} {'region_n':>13} "
+            f"{'cache-misses':>15} {'/elem':>8} {'miss%':>7} {'IPC':>6} "
+            f"{'vs BTree':>9}"
         )
         print("\n" + hdr)
         print("-" * len(hdr))
@@ -215,9 +236,9 @@ def main(argv):
                 print()
             prev = key
             print(
-                f"{r['dis']:10} {r['region']:7} {r['tree']:6} {r['region_n']:13,} "
+                f"{r['dis']:10} {r['region']:11} {r['tree']:6} {r['region_n']:13,} "
                 f"{r['cache-misses']:15,} {r['cache-misses_per_elem']:8.2f} "
-                f"{r['miss_rate_pct']:6}% {r['vs_btree']:>9}"
+                f"{r['miss_rate_pct']:6}% {r['ipc']:>6} {r['vs_btree']:>9}"
             )
     return 0
 
