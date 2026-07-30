@@ -665,6 +665,51 @@ until `# Samples` is in the thousands. Release builds have **no `-g`**
 names from `.symtab` but gives no line numbers, and `-O3` inlining folds the
 small leaf helpers into their callers.
 
+### `miss_rate_pct` is an LLC miss rate, not an overall one
+
+`perf stat -vv` confirms `cache-references`/`cache-misses` are the generic
+`PERF_TYPE_HARDWARE` aliases (config `0x2`/`0x3`), which Intel maps to
+`LONGEST_LAT_CACHE.REFERENCE`/`.MISS`. So the ratio's denominator is only the
+accesses that already missed L1+L2 and reached the LLC — everything L2 absorbed
+is excluded. The per-element funnel for BTree build at 1e9 shows the filtering:
+
+| counter | /elem | meaning |
+|---|---|---|
+| L1-dcache-load-misses | 4.59 | left L1 (loads only) |
+| cache-references | 2.76 | reached the LLC (all request types) |
+| cache-misses | 1.35 | of those, went to DRAM |
+| LLC-load-misses | 0.12 | load-only subset of the misses |
+
+LLC references below L1d load misses is expected, not a bug. **Rank trees by
+`cache-misses_per_elem`, not by the rate** — the rate's denominator varies per
+tree and can invert the ranking (1e9/`b=0.01`: PMA insert 75.0% vs CPAM 52.1%,
+yet PMA has *fewer* absolute misses, 148.1M vs 161.3M, because CPAM issued 1.6x
+the LLC references).
+
+### Batch size dominates misses per element
+
+Same n = 1e9, 10% vs 1% batch — a 10x smaller batch costs 4-8x *more* misses
+per element, because batch updates amortize the root-to-leaf descent across keys
+landing in the same subtree:
+
+| region | tree | b=10% | b=1% | ratio |
+|---|---|---|---|---|
+| insert | BTree | 2.15 | 12.05 | 5.6x |
+| insert | CPAM | 4.24 | 16.13 | 3.8x |
+| insert | PMA | 14.91 | 14.81 | **1.0x** |
+| delete | BTree | 1.75 | 12.92 | 7.4x |
+| delete | CPAM | 1.45 | 11.08 | 7.7x |
+| delete | PMA | 2.67 | 11.31 | 4.2x |
+
+PMA insert is the exception — flat, because its cost is packed-array
+shift/redistribute work that does not amortize over a batch the way a tree
+descent does. Consequence: PMA goes from 6.94x worse than BTree at `b=0.1` to
+only 1.23x at `b=0.01`, i.e. BTree's insert advantage is a large-batch effect.
+
+The build region reproduced across the two 1e9 sweeps to within -0.3%/+0.2%/-1.1%
+(BTree/CPAM/PMA), so the earlier ~14% spread seen at 1e8 was probably warm-vs-cold
+page cache, not intrinsic counter noise — both 1e9 sweeps ran `DROP_CACHES=1`.
+
 ### Measured at 1e8 uni, 64 threads, `-b 0.1` (misses per element)
 
 | region | elements touched | cache-misses | per element | miss rate |

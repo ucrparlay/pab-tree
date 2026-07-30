@@ -30,7 +30,16 @@
 #                important one: `build` touches all n, but `insert`/`delete`
 #                only touch the batch, so their denominator is n*batch_ratio.
 # <ev>_per_elem  each event divided by region_n.
-# miss_rate      cache-misses / cache-references, as a percentage.
+# miss_rate_pct  100 * cache-misses / cache-references. NOTE this is an *LLC*
+#                miss rate, not "fraction of memory accesses that miss":
+#                perf's `cache-references`/`cache-misses` are the generic
+#                PERF_TYPE_HARDWARE aliases (config 0x2/0x3), which Intel maps
+#                to LONGEST_LAT_CACHE.REFERENCE/.MISS. The denominator is only
+#                the accesses that already missed L1+L2 and reached the LLC, so
+#                it excludes everything L2 absorbed. Prefer cache-misses_per_elem
+#                for ranking -- the rate has a tree-dependent denominator and can
+#                invert the ranking (at 1e9/b=1%, PMA insert shows a higher rate
+#                than CPAM while having fewer absolute misses).
 # vs_btree       cache-misses relative to BTree in the same (source, region).
 #                1.00 for BTree itself; blank if no BTree row exists.
 #
