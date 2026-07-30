@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import csv
 import sys
 from pathlib import Path
@@ -16,9 +18,22 @@ DEFAULT_INPUT = Path("scripts/data/perf_1e9_b001_uni_exp/perf_cache_metrics.csv"
 DEFAULT_OUTPUT = Path("scripts/data/perf_1e9_b001_uni_exp/perf_cache_metrics_sliced.csv")
 UNIT = 1_000_000.0
 
-INPUT_COLUMNS = ["dis", "region", "tree", "cycles", "instructions", "cache-misses"]
+INPUT_COLUMNS = [
+    "dis",
+    "region",
+    "tree",
+    "cycles",
+    "instructions",
+    "cache-references",
+    "cache-misses",
+]
 REGIONS = ["build", "insert", "delete", "membership"]
-METRICS = [("cycles", "cycles"), ("instructions", "ins"), ("cache-misses", "cache")]
+METRICS = [
+    ("cycles", "cycles"),
+    ("instructions", "ins"),
+    ("cache-references", "cache_ref"),
+    ("cache-misses", "cache"),
+]
 DIS_ORDER = ["uni", "exp"]
 TREE_ORDER = ["btree", "pam", "cpam", "pma"]
 
