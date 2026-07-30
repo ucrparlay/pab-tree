@@ -574,10 +574,28 @@ and the `Leaf`/`Interior` aliases). Each has a thin `tests/<name>.cpp` driver
 
 ## Concurrent-index incremental sweep (`external/index-microbench/workload.cpp`)
 
-Tags 5 (`1<<5`, insert) and 6 (`1<<6`, delete) in `ApplyConcurrentIndex` are the
-masstree/bwtree mirror of `BatchInsertByStep`/`BatchDeleteByStep`
-(`tests/test_framework.h`). Driven by `scripts/incre_updates.sh`
-(`tag=2#1100000` = 96, both bits).
+Three tags, **numbered identically in `workload.cpp` and `tests/test_framework.h`**
+(renumbered 2026-07-28 — anything older that says "tag 5 = insert" predates this):
+
+| tag | block | b_test | concurrent |
+|---|---|---|---|
+| `1<<5` | static build, then query — the control | `BuildTree<…,kOutputRatio=2>` | `ConBuild` |
+| `1<<6` | incremental insert | `BatchInsertByStep` | `ConInsertByStep` |
+| `1<<7` | incremental delete | `BatchDeleteByStep` | `ConDeleteByStep` |
+
+Driven by `scripts/incre_updates.sh` (`tag=2#11100000` = 224, all three).
+
+All three end in the same query suite on a **half-filled** tree, factored into one
+helper per side — `incre_update_query` (`test_framework.h`, a lambda beside
+`membership_query`/`range_query`/`range_count`) and `ConQueryAfterStep`
+(`workload.cpp`). Both take `(entry_in_tree, entry_not_in_tree)` and run: one
+membership pass over `random_shuffle(append(both halves))` truncated to
+`batch_size`, then `kRangeQueryType` range queries and `kRangeQueryType` range
+counts, all on `entry_in_tree`. `batch_size` is `kMemberQueryRatio` of the
+**whole** input, not of one half.
+
+Tag `1<<5` being set also skips the shared primal build block (`if ((opts.tag &
+(1<<5)) == 0)`) in both files, since that block builds from the same input.
 
 ### `ConInsertByStep` / `ConDeleteByStep`
 
@@ -585,8 +603,21 @@ Both slice the input into `1/ratio` batches over
 `ratio_seq = {0.0001, 0.001, 0.01, 0.1}`, time the whole chain **once** (no
 `rounds` loop — `-r` is ignored), then **rebuild** to reach a half state rather
 than unwinding, because masstree's `remove` never reclaims (measured: 1e9 delete
-grows RSS 98GB → 1491GB and dies). `half_n = min((slice_num/2)*step, n)`, which
-is only `n/2` when `slice_num` is even and `step` divides `n`.
+grows RSS 98GB → 1491GB and dies).
+
+The half state is `slice_num / 2` batches, and callers split the input at
+`size() / 2` to decide which keys are in the index — these agree exactly only
+when `step` divides `n` (true for every real dataset). Both sides use `size()/2`
+so the two drivers classify keys identically.
+
+### Timing vs. query state (tag `1<<5`)
+
+The timed build covers the **whole** input; only the final untimed build is the
+half one. `BuildTree`'s `kOutputRatio` template parameter does this (times
+`Build(wp)`, ends with `Build(wp[0, n/kOutputRatio))`), and the tag `1<<5` block
+in `workload.cpp` mirrors it with `ConBuild<1>(wp)` → drop → `ConBuild<0>(half)`.
+This is what makes the control comparable to tags `1<<6`/`1<<7`, which likewise
+time the full chain and then rebuild to half.
 
 ### `ConRunBatched` — why threads are spawned once
 
@@ -601,36 +632,47 @@ between them. Work split inside a batch is **proportional**
 
 ### Output format
 
-Per ratio: 9 columns = 1 timing + 2 membership (in-tree, not-in-tree) + 3 range
-query + 3 range count (`kRangeQueryType = 3`). Masstree emits `-` for all 3
-range counts, so column count stays fixed. It reports all 3 range queries as of
-2026-07-28 — see the `scan` stack-array fix below.
-A leading `-` stands in for the primal build, which tags 5/6 skip
-(`needs_primal` is false when only bits 5/6 are set).
+Per ratio: 8 columns = 1 timing + 1 membership + 3 range query + 3 range count
+(`kRangeQueryType = 3`). Masstree emits `-` for all 3 range counts, so column
+count stays fixed. It reports all 3 range queries as of 2026-07-28 — see the
+`scan` stack-array fix below.
+
+Whole-run totals (verified 2026-07-28 at n=2000, both drivers, all index types):
+tag `1<<5` → 8 tokens; tags `1<<6` and `1<<7` → 1 primal build + 4 ratios × 8 =
+33 tokens each.
+
+The primal build is **always** run and always a real number, in both drivers —
+`workload.cpp` used to skip it and print `-` when only the incremental bits were
+set. Restoring it costs masstree a full 98GB / ~66s index at 1e9 that tags
+`1<<6`/`1<<7` immediately release; it is paid only to keep that column
+comparable against `b_test`.
 
 ### Gotchas found 2026-07-27
 
-- **`-t 96` used to yield only the insert half for masstree** — tag 5 ran first
-  in the same process, masstree returned nothing to the OS, and the
-  `ConDeleteSweepFits` guard then saw a depleted `MemAvailable` and skipped tag
-  6. **Fixed**: `ReclaimMassTreeMemory` frees the memory between phases and the
-  guard is gone, so `-t 96` now produces both halves in one process (verified at
-  1e8 for masstree and bwtree). Splitting into `-t 32` / `-t 64` is no longer
-  needed.
+- **Running the incremental blocks together used to yield only the insert half
+  for masstree** — the insert block ran first in the same process, masstree
+  returned nothing to the OS, and the `ConDeleteSweepFits` guard then saw a
+  depleted `MemAvailable` and skipped the delete block. **Fixed**:
+  `ReclaimMassTreeMemory` frees the memory between phases and the guard is gone,
+  so one process now produces both halves (verified at 1e8 for masstree and
+  bwtree). Splitting into one tag per process is no longer needed.
 - **Ratio 0.0001 is noisy.** Observed 7.16–14.51s for the same insert chain
   across runs, while the other three ratios hold within a few percent — 10000
   batches means 10000 barrier syncs. These are single-shot (`-r` is ignored on
   this path), so average before trusting that column.
-- **Insert/delete blocks read different files**: tag 5 reads `base_path` into
-  `wp`, tag 6 reads `batch_path` into `wi`. Equal only when `-b 1`. At `-b 0.1`
-  the delete sweep is 10x smaller, and since `batch_size` derives from
+- **Insert/delete blocks read different files**: tag `1<<6` reads `base_path`
+  into `wp`, tag `1<<7` reads `batch_path` into `wi`. Equal only when `-b 1`. At
+  `-b 0.1` the delete sweep is 10x smaller, and since `batch_size` derives from
   `wp.size()` vs `wi.size()`, the membership columns differ 10x too — the two
   blocks are not comparable as logged.
 - **Build config trap**: `main` dispatches to `ApplyConcurrentIndexDynamicGraph`
   when `DYNAMIC_GRAPH` or `OSM` is defined, and that function only handles tags
-  3 and 4 — tags 5/6 produce *no output at all*, silently. Rebuild with
-  `-DDYNAMIC_GRAPH=OFF -DOSM=OFF` before running tags 5/6 by hand.
+  3 and 4 — tags `1<<5`/`1<<6`/`1<<7` produce *no output at all*, silently.
+  Rebuild with `-DDYNAMIC_GRAPH=OFF -DOSM=OFF` before running them by hand.
   `incre_updates.sh` is safe because its `run_cmake` passes those flags.
+- **`BatchInsertByStep` divides by zero when `ratio * n < 1`** (SIGFPE, rc 136):
+  `step` has no `max(…, 1)` guard, unlike `BatchDeleteByStep`. Only bites tiny
+  smoke datasets — at n ≥ 1e8 the smallest ratio still gives `step = 10000`.
 
 ### Dataset note
 
