@@ -1,8 +1,8 @@
-# started on Wed Jul 29 18:27:22 2026
+# started on Wed Jul 29 22:31:37 2026
 
-21245727903,,cycles,5295153740,66.38,,
-13568670564,,instructions,6877036339,83.81,0.64,insn per cycle
-58195157,,cache-references,7052721164,84.04,,
-49533941,,cache-misses,7234311486,84.35,85.117,of all cache refs
-6193784,,LLC-load-misses,7418841767,84.72,,
-72166566,,L1-dcache-load-misses,7659618699,85.32,,
+29843483595,,cycles,8013226936,71.62,,
+19309695768,,instructions,9537070662,86.03,0.65,insn per cycle
+59170308,,cache-references,9427874737,85.89,,
+48788617,,cache-misses,9259018418,85.57,82.455,of all cache refs
+6258454,,LLC-load-misses,9000685519,85.29,,
+74583180,,L1-dcache-load-misses,8833677397,83.98,,
