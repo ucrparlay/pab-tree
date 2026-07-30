@@ -632,20 +632,66 @@ between them. Work split inside a batch is **proportional**
 
 ### Output format
 
-Per ratio: 8 columns = 1 timing + 1 membership + 3 range query + 3 range count
-(`kRangeQueryType = 3`). Masstree emits `-` for all 3 range counts, so column
-count stays fixed. It reports all 3 range queries as of 2026-07-28 — see the
-`scan` stack-array fix below.
+Per ratio: 10 columns = 1 timing + **3 membership** + 3 range query + 3 range
+count (`kRangeQueryType = 3`). The 3 membership passes are `IND` (keys all in
+the tree), `OOD` (keys all absent) and `MIX` (both halves appended, shuffled,
+truncated to `batch_size`) — see `incre_update_query` / `ConQueryAfterStep`.
+Masstree emits `-` for all 3 range counts, so column count stays fixed. It
+reports all 3 range queries as of 2026-07-28 — see the `scan` stack-array fix
+below.
 
-Whole-run totals (verified 2026-07-28 at n=2000, both drivers, all index types):
-tag `1<<5` → 8 tokens; tags `1<<6` and `1<<7` → 1 primal build + 4 ratios × 8 =
-33 tokens each.
+Whole-run totals (both drivers, all index types): tag `1<<5` → 10 tokens; tags
+`1<<6` and `1<<7` → 4 ratios × 10 = 40 tokens each, **plus** 1 primal build
+token when tag `1<<5` is not also set (tag `1<<5` suppresses the shared primal
+build block). So `tag=2#11100000` (all three, what `incre_updates.sh` runs) is
+`10 + 40 + 40 = 90` tokens, and a lone `1<<6` or `1<<7` is 41.
 
 The primal build is **always** run and always a real number, in both drivers —
 `workload.cpp` used to skip it and print `-` when only the incremental bits were
 set. Restoring it costs masstree a full 98GB / ~66s index at 1e9 that tags
 `1<<6`/`1<<7` immediately release; it is paid only to keep that column
 comparable against `b_test`.
+
+### Merging the logs (`scripts/merge_incre_updates.py`)
+
+Concatenates `logs/incremental_updates/<tree>/<dis>/<leaf_wrap>.log` (tree dirs
+are the numeric `-T` values: 0=BTree, 1=CPAM, 2=PAM, 3=PMA, 5=MassTree,
+6=BwTree) into one log, then writes `data/incremental_updates/<name>.csv` — one
+row per run, 93 columns = `benchmark, tree, leaf_wrap` + the 90 values.
+
+Column names are prefixed by their block (`build`, `ins_0.01%` … `del_10%`)
+because the 9 query names repeat once per block; a bare repeated `IND` × 9 is
+ambiguous to any consumer. Nothing reads this CSV yet — `merge_incre_updates.py`
+is its only reference.
+
+Three log realities the parser has to absorb:
+
+- **`-` is a legal value**, not a parse error (masstree's 27 range-count cells).
+  The pre-2026-07-29 version tested `float(tok)` on every token and therefore
+  dropped every masstree row silently.
+- **A row can be split across lines.** Masstree's allocator writes `madvise
+  superpage: Cannot allocate memory` to stderr while the row is going to stdout,
+  and `2>&1 | tee` splices it mid-row. The parser strips known noise phrases
+  (`kNoisePhrases`) and accumulates values until the *next header*, rather than
+  expecting one row per line. Verified against a saved noisy log.
+- **A run can end short.** A killed process leaves a partial row (BwTree at 1e9
+  uniform died mid-`del 1%`, 76 of 90 values). Those are padded to keep columns
+  aligned and reported on stderr — the valid prefix is real data.
+
+**Stale logs are dropped, deliberately.** A `2.log`/`32.log` from the older
+73-value layout (`build + 8 × 9`, no MIX and no static query block) carries a
+header *identical* to a current run's — `Buf` is the tree's internal block size,
+not the filename — so padding it would emit a duplicate
+`(benchmark, tree, leaf_wrap)` key holding shifted values. `kLegacyFieldNum`
+catches exactly 73 values and skips with a note.
+
+The 16 pre-MIX logs that existed (CPAM `32.log`, PAM/PMA/BwTree `2.log`, × 4
+distributions) were `git mv`d to `logs/incremental_updates_old/<tree>/<dis>/` on
+2026-07-29, keeping the `<tree>/<dis>/` structure because the bare filenames
+(`2.log` under three different trees) collide if flattened. That folder is a
+**sibling** of `logs/incremental_updates/`, deliberately outside
+`concat_logs()`'s `logs/incremental_updates/*/*/*.log` glob. `kLegacyFieldNum`
+stays as a net for future stragglers.
 
 ### Gotchas found 2026-07-27
 

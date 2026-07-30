@@ -13,10 +13,10 @@ input_path = f"logs/{log_folder_name}/{input_type}.log"
 store_path = f"data/{log_folder_name}/{input_type}.csv"
 
 # Column indices within each data row: randomness=0, insert_t=1, delete_t=2, query_t=3
-OPERATIONS = ["insert_t(s)", "delete_t(s)", "query_t(s)"]
-OP_COL_IDX = [1, 2, 3]
+OPERATIONS = ["insert_t(s)", "delete_t(s)", "find(s)", "range(s)", "ratio"]
+OP_COL_IDX = [1, 2, 3, 4, 5]
 
-BENCH_ORDER = ["uni"]
+BENCH_ORDER = ["osm"]
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
 
 
@@ -62,7 +62,8 @@ def build_rows(blocks):
     for benchmark, tree, buf_value, data_rows in blocks:
         for row in data_rows:
             rand = int(row[0])
-            values = [row[col_idx] if col_idx < len(row) else "" for col_idx in OP_COL_IDX]
+            values = [row[col_idx] if col_idx < len(
+                row) else "" for col_idx in OP_COL_IDX]
             rows.append([benchmark, tree, buf_value, rand] + values)
     return rows
 
@@ -81,7 +82,8 @@ def write_csv(rows, path):
     target.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["benchmark", "tree", "buf_value", "randomness"] + OPERATIONS)
+        writer.writerow(["benchmark", "tree", "buf_value",
+                        "randomness"] + OPERATIONS)
         writer.writerows(rows)
     print(f"Written {len(rows)} rows to {path}")
 

@@ -11,13 +11,25 @@ Each log holds a header line
 
     Tree: BTree; Buf: 32; InputFile: 1.base.bin; Dis: uni;
 
-followed by one whitespace-separated row of 73 timings:
+followed by one whitespace-separated row of 90 values:
 
-    build | 8 x (update_time, IND, OOD, RRS, RRM, RRL, RCS, RCM, RCL)
+    build | 9 queries | 8 x (update_time, 9 queries)
 
-the 8 blocks being, in order, ins 0.01% / 0.1% / 1% / 10% then del 0.01% /
-0.1% / 1% / 10%.  Lines that are not numeric (e.g. numactl / driver errors)
-are skipped with a note on stderr.
+The 9 queries are always in the same order: IND, OOD, MIX (membership over
+keys that are all in the tree, all absent from it, then a shuffled mix of
+both), RRS, RRM, RRL (range report over small / mid / large boxes), then
+RCS, RCM, RCL (range count over the same three box sizes).
+
+The first (build, 9 queries) pair is the statically built tree -- tag 1<<5.
+The 8 update blocks that follow are, in order, ins then del, each at ratio
+0.0001 / 0.001 / 0.01 / 0.1 of the input, i.e. 0.01% / 0.1% / 1% / 10%.
+
+Two log quirks are handled.  Masstree prints "-" for the range counts it does
+not implement, so "-" is a legal value.  And a message the allocator writes to
+stderr can be spliced into the middle of a row by `2>&1 | tee`, splitting it
+across lines -- so values are accumulated until the next header rather than
+being read one row per line.  A run whose values end short (a killed process)
+is padded to keep the CSV columns aligned, and reported on stderr.
 """
 import csv
 import subprocess
@@ -32,9 +44,22 @@ input_path = "logs/" + log_folder_name + "/" + input_type + ".log"
 store_path = "data/" + log_folder_name + "/" + input_type + ".csv"
 
 batch_ratio_seq = ["0.01%", "0.1%", "1%", "10%"]
-query_seq = ["IND", "OOD", "RRS", "RRM", "RRL", "RCS", "RCM", "RCL"]
+query_seq = ["IND", "OOD", "MIX", "RRS", "RRM", "RRL", "RCS", "RCM", "RCL"]
 block_seq = [f"{op}_{r}" for op in ("ins", "del") for r in batch_ratio_seq]
-kFieldNum = 1 + len(block_seq) * (1 + len(query_seq))  # build + 8 x 9 = 73
+# build + its 9 queries, then 8 update blocks of (time + 9 queries) = 90
+kFieldNum = (1 + len(query_seq)) * (1 + len(block_seq))
+
+# a row from the older driver: build + 8 blocks of (time + 8 queries), i.e. no
+# MIX membership and no query block over the statically built tree.  Its values
+# line up with nothing in the current layout, and its header is identical to a
+# current one, so such rows are dropped rather than written as duplicate keys.
+kLegacyFieldNum = 1 + len(block_seq) * (1 + len(query_seq) - 1)  # 73
+
+# a value masstree writes for the queries it does not implement
+kMissingValue = "-"
+
+# stderr messages that get interleaved into a result row by `2>&1 | tee`
+kNoisePhrases = ("madvise superpage: Cannot allocate memory",)
 
 bench_order = ["uni", "exp", "norm", "dual_norm"]
 tree_order = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
@@ -61,13 +86,44 @@ def is_number(tok) -> bool:
         return False
 
 
+def is_value(tok) -> bool:
+    return tok == kMissingValue or is_number(tok)
+
+
 def combine(P) -> List:
-    buf_value = 0
-    benchmark = ""
-    tree = ""
     all_data = []
+    context = None  # (benchmark, tree, buf) of the header we are under
+    values = []  # values collected since that header
+
+    def flush():
+        # one run ends where the next header begins, not at a line break
+        if context is None or len(values) == 0:
+            return
+        benchmark, tree, buf_value = context
+        row = list(values)
+        if len(row) == kLegacyFieldNum:
+            print(
+                f"skip {benchmark}/{tree}/{buf_value}: {kLegacyFieldNum} values, "
+                f"the pre-MIX layout -- stale log, rerun or move it aside",
+                file=sys.stderr,
+            )
+            values.clear()
+            return
+        if len(row) != kFieldNum:
+            print(
+                f"warn: {benchmark}/{tree}/{buf_value} has {len(row)} values, "
+                f"expected {kFieldNum}"
+                + (" (padded)" if len(row) < kFieldNum else " (kept as is)"),
+                file=sys.stderr,
+            )
+            row += [""] * (kFieldNum - len(row))  # no-op when the row is long
+        all_data.append([benchmark, tree, buf_value] + row)
+        values.clear()
 
     for line in open(P, "r").readlines():
+        for phrase in kNoisePhrases:
+            line = line.replace(phrase, " ")
+
         lin_sep = line.split()
 
         if len(lin_sep) == 0:  # Skip empty lines
@@ -75,28 +131,30 @@ def combine(P) -> List:
 
         # Tree information - parse Buf value
         if lin_sep[0] == "Tree:":
-            tree = str(lin_sep[1].strip(";"))
-            buf_value = int(lin_sep[3].strip(";"))
-            benchmark = str(lin_sep[7].strip(";"))
+            flush()
+            if len(lin_sep) < 8:
+                print(f"skip short header line: {line.strip()}", file=sys.stderr)
+                context = None
+                continue
+            context = (
+                str(lin_sep[7].strip(";")),  # benchmark, i.e. the distribution
+                str(lin_sep[1].strip(";")),  # tree
+                int(lin_sep[3].strip(";")),  # leaf wrap
+            )
             continue
 
-        # parse result - one row of timings per run
-        if not all(is_number(t) for t in lin_sep):
+        # parse result - the values of one run, possibly split over lines
+        if not all(is_value(t) for t in lin_sep):
             print(f"skip non-numeric line: {line.strip()}", file=sys.stderr)
             continue
 
-        if tree == "":
+        if context is None:
             print(f"skip orphan result line: {line.strip()}", file=sys.stderr)
             continue
 
-        if len(lin_sep) != kFieldNum:
-            print(
-                f"warn: {benchmark}/{tree}/{buf_value} has {len(lin_sep)} fields, "
-                f"expected {kFieldNum}",
-                file=sys.stderr,
-            )
+        values.extend(lin_sep)
 
-        all_data.append([benchmark, tree, buf_value] + lin_sep)
+    flush()  # the last run in the file has no header after it
 
     return all_data
 
@@ -124,10 +182,11 @@ def csvSetup():
     csv_file_pointer.truncate()
     csv_writer = csv.writer(csv_file_pointer)
 
-    header = ["benchmark", "tree", "leaf_wrap", "build"]
-    for block in block_seq:
+    # the query names repeat once per block, so prefix them with their block
+    header = ["benchmark", "tree", "leaf_wrap"]
+    for block in ["build"] + block_seq:
         header.append(block)
-        header.extend(query_seq)
+        header.extend(f"{block}_{q}" for q in query_seq)
     csv_writer.writerow(header)
 
     return csv_writer, csv_file_pointer
