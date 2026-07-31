@@ -1002,32 +1002,39 @@ ConQueryAfterStep(auto num_thread,
       parlay::map(ele, [](auto const& e) { return e.GetKey(); }));
   };
 
-  // NOTE: three membership passes -- all hits, all misses, then a mix. For the
-  // mix, put both halves together, shuffle, and take the first batch_size.
-  membership(entry_in_tree.cut(0, batch_size));
-  membership(entry_not_in_tree.cut(0, batch_size));
+  // NOTE: one membership pass, the mix -- both halves put together, shuffled,
+  // first batch_size taken.  The separate all-hits and all-misses passes are
+  // commented out to match incre_update_query in tests/test_framework.h; the
+  // two drivers must emit the same columns in the same order.
+  // membership(entry_in_tree.cut(0, batch_size));
+  // membership(entry_not_in_tree.cut(0, batch_size));
   auto const shuffled =
     parlay::random_shuffle(parlay::append(entry_in_tree, entry_not_in_tree));
   membership(shuffled.cut(0, batch_size));
 
-  for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+  // NOTE: rectangle type 1 only, again matching test_framework.h.
+  // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+  {
+    int const rec_type = 1;
     auto [query_box_seq, max_size] =
       GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
     ConRangeQuery(num_thread, idx, index_type, kRangeQueryNum, query_box_seq);
   }
 
-  for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+  // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+  {
+    int const rec_type = 1;
     // NOTE: masstree counts a range one key at a time through
     // dynamic_get_next, which walks down from the root and builds a Json
     // request for every key. On the big boxes that is far too slow to wait for.
     // Not a crash -- it would need a counting scanner to be worth running.
     if (index_type == TYPE_MASSTREE) {
       std::cout << "- " << " ";
-      continue;
+    } else {
+      auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
+        kRangeQueryNum, rec_type, entry_in_tree);
+      ConRangeCount(num_thread, idx, query_box_seq);
     }
-    auto [query_box_seq, max_size] =
-      GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
-    ConRangeCount(num_thread, idx, query_box_seq);
   }
 }
 
@@ -1508,28 +1515,32 @@ ApplyConcurrentIndex(Options const& opts)
       }
     }
 
-    // PARA: lambda for range query
+    // PARA: lambda for range query.  Rectangle type 1 only, matching the
+    // range_query lambda in tests/test_framework.h -- the two drivers must emit
+    // the same columns in the same order.
     auto range_query = [&](auto const& base_points) {
-      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
-          kRangeQueryNum, rec_type, base_points);
-        ConRangeQuery(
-          num_thread, primal_idx, index_type, kRangeQueryNum, query_box_seq);
-      }
+      // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      int const rec_type = 1;
+      auto [query_box_seq, max_size] =
+        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
+      ConRangeQuery(
+        num_thread, primal_idx, index_type, kRangeQueryNum, query_box_seq);
+      // }
     };
 
     // PARA: lambda for range count
     auto range_count = [&](auto const& base_points) {
-      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        // NOTE: too slow to wait for, not a crash -- see ConQueryAfterStep.
-        if (index_type == TYPE_MASSTREE) {
-          std::cout << "- " << " ";
-          continue;
-        }
+      // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      int const rec_type = 1;
+      // NOTE: too slow to wait for, not a crash -- see ConQueryAfterStep.
+      if (index_type == TYPE_MASSTREE) {
+        std::cout << "- " << " ";
+      } else {
         auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
           kRangeQueryNum, rec_type, base_points);
         ConRangeCount(num_thread, primal_idx, query_box_seq);
       }
+      // }
     };
 
     // NOTE: range query
@@ -1620,14 +1631,25 @@ ApplyConcurrentIndex(Options const& opts)
     ReclaimMassTreeMemory();
   }
 
+  // NOTE: one dataset per ratio, reloaded inside the loop rather than one file
+  // sliced four ways -- mirrors incre_ratio_seq in tests/test_framework.h.
+  // incre_data_generator lays its batches out so that consecutive windows of
+  // `batch_n` entries ARE the batches, which only lines up with the step
+  // Con*ByStep slices at when the file was generated for that ratio.
+  // ins/<1/ratio>/ is exactly the directory the generator writes for
+  // -batch_n = base_n * ratio.  opts.batch_ratio (-b) is unused here.
+  parlay::sequence<double> const incre_ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
+
   //  NOTE: incremental insert
   if (opts.tag & (1 << 6)) {
     release_primal();
-    auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
-    auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-    parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
 
-    for (auto ratio : ratio_seq) {
+    for (auto ratio : incre_ratio_seq) {
+      // NOTE: batch_path, not base_path -- incre_data_generator writes the
+      // insert stream as ins/<1/ratio>/<i>.batch.bin. There is no base/batch
+      // pair in these datasets; the whole file is the batch stream.
+      auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+      ReadEntries<typename TT::E>(batch_path.c_str(), wp);
       auto* idx = ConInsertByStep(num_thread, index_type, wp, ratio);
 
       // NOTE: the first half of wp was inserted, the second half was not.
@@ -1644,11 +1666,10 @@ ApplyConcurrentIndex(Options const& opts)
   //  NOTE: incremental delete
   if (opts.tag & (1 << 7)) {
     release_primal();
-    auto [base_path, batch_path] = opts.ParseDeleteBatchPath(opts.batch_ratio);
-    auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-    parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
 
-    for (auto ratio : ratio_seq) {
+    for (auto ratio : incre_ratio_seq) {
+      auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+      ReadEntries<typename TT::E>(batch_path.c_str(), wi);
       auto* idx = ConDeleteByStep(num_thread, index_type, wi, ratio);
 
       // NOTE: the first half of wi was deleted, so the second half is the one

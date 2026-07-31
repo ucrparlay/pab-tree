@@ -444,7 +444,206 @@ transparently. All writers/readers go through these two helpers — **older
 
 `data_generator` **segfaults** if `-base_param`/`-batch_param` are omitted
 (`std::string(nullptr)` from `getOptionValue`) — pass dummies (e.g. `1`) even
-for uniform, which ignores them.
+for uniform, which ignores them. `incre_data_generator` uses the
+`getOptionValue(opt, default)` **string** overload instead and does not have
+this bug.
+
+### `incre_data_generator` (`tests/incre_data_generate.cpp`)
+
+Datasets for the incremental-update tags (`1<<6` / `1<<7`), added 2026-07-30.
+
+**The problem it solves.** `data_generator`'s `Generator::ToEntry`
+random-shuffles the whole key set before writing, so slicing that file into
+consecutive chunks — exactly what `BatchInsertByStep`/`BatchDeleteByStep` do —
+gives every batch a *uniform* sample of the key space no matter what `-dis`
+said. The distribution survives only globally, never per batch, so `exp` and
+`uni` produce statistically identical incremental workloads.
+
+**Construction.** Base keys are the dense uniform space `[0, base_n)` (key ==
+rank; a rank-discretised base comes out dense anyway, see `Discreatize`). Then
+repeatedly, over a shrinking pool of surviving keys:
+
+```
+draw batch_n positions from the requested distribution, mapped onto [0, |pool|)
+  -- these are RANKS INTO THE POOL, not keys
+batch <- pool entries at those ranks;  pool <- pool minus batch
+```
+
+Output = the batches concatenated **in generation order**, shuffled *within*
+each batch but not across. So the harness's existing slicing picks the batches
+up unchanged. Verified at 1e6/1e4 (`exp`, λ=10): batch mean walks 0.10 → 0.15 →
+… → 0.99 of the key space with a tight p10–p90 band, i.e. a clustered hotspot
+that migrates as the front is thinned. `norm` starts tight around 0.5 and
+spreads outward as the middle is consumed; `uni` stays flat (correctly).
+
+**Flags.** Same shape as `data_generator`: `-path -base_n -batch_n -val_n 1
+-file_num -dis {0,1,2,3} -batch_op {0,1} -binary {0,1} -batch_param <csv>`,
+plus `-validate {0,1}` (full distinctness check; the cheap count/sum/max
+permutation check always runs). `-batch_param` is now a **fraction of the
+surviving pool**: exp → λ (default 10); norm → mean,dev (0.5,0.2); dual_norm →
+mean1,dev1,mean2,dev2 (0.25,0.05,0.75,0.05).
+
+**`dual_norm` changed meaning.** In `data_generator` "dual" meant base *and*
+batch normal. Here the base distribution is meaningless (the base is the whole
+dense key space), so `-dis 3` is a **two-mode batch** instead — otherwise it
+would be identical to `-dis 2`.
+
+**Writes one file, not a pair, and the stem is `.batch` for BOTH ops** (renamed
+2026-07-31): `ins/<base_n/batch_n>/<i>.batch.<ext>` and
+`del/<base_n/batch_n>/<i>.batch.<ext>`. There is no base/batch pair in these
+datasets — the whole file *is* the batch stream, sliced into equal windows by
+the harness — so the old `.base` stem on the insert side (inherited from what
+tag `1<<6` happened to read) made two identical things look different. Both
+tags now read `ParseXBatchPath(ratio).batch_path`.
+
+This required `Options::ExtractPrefixes` to also strip `.batch` — it stripped
+only `.bin`/`.in`/`.base`, so a `-p` pointing at a batch file left the prefix as
+`<i>.batch` and every derived path became `<i>.batch.base.<ext>`. Verified: `-p`
+on `ins/<x>/<i>.batch.bin` now resolves all four ratios on both sides, and
+`tag=224` emits 36 tokens from `b_test`, masstree and bwtree alike. The change is
+additive — the standard `/data/zmen002/kv_pair` datasets still have real
+base/batch pairs and tags `1<<0`/`1<<1`/`1<<3` still read `base_path`.
+
+The layout is otherwise identical to the standard datasets so
+`ParseInsertBatchPath`/`ParseDeleteBatchPath` resolve it unchanged — which also
+means **point `-path` at a fresh root** or it overwrites them.
+
+**λ must track the batch ratio — there is a hard arithmetic ceiling.** The
+exponential asks for `batch_n · λ / pool` of the ranks at the very front of the
+pool ("demand"), and nothing can supply more than 100% of them, so
+
+```
+λ ≤ pool / batch_n   ==  the number of batches still to come
+```
+
+Demand rises through a run because the pool drains: `demand_b = demand_0 /
+(1 − b/batch_num)`. So the **fraction of the run that is exactly on-shape is
+`1 − demand_0`**. Past the ceiling the excess probability is capped at 1 and the
+batch becomes the sharpest achievable rather than the requested shape (reported
+as a NOTE with the count of capped rank-slots).
+
+### Sampler — three generations, and why the last one won
+
+`SelectBatchFlags` computes an inclusion probability per surviving rank and then
+flips an independent weighted coin for each. Measured shape error and scatter at
+batch 50/100, ratio 100 (scatter 1.0 = what a genuine random draw gives):
+
+| sampler | λ=10 | λ=20 | λ=50 | scatter |
+|---|---|---|---|---|
+| guess-and-retry (v1) | −2.0% | −4.6% | −11.7% | 1.1 / 1.8 / 13.6 |
+| running-total sweep (v2) | −0.0% | −0.0% | −0.0% | **0.007** |
+| independent coins (v3, current) | −0.3% | −0.5% | −0.1% | **1.07 / 1.00 / 0.89** |
+
+- **v1 was wrong, not just noisy.** Rejection sampling wastes every draw that
+  lands on an already-taken rank, and in a crowded region nearly all of them do,
+  so keys leaked out of the peak into the tail. Its inflated "scatter" at λ=50 is
+  the systematic bias showing up in the chi-square, not real scatter.
+- **v2 got the shape exactly right but killed the randomness** — picks spaced
+  evenly along the cumulative curve by construction, ~150× less scatter than a
+  real draw. Every stretch of the key range got almost precisely its predicted
+  count, so there were no lucky hot spots, which is most of what makes a skewed
+  workload hard on a tree.
+- **v3 keeps v2's accuracy and restores v1's randomness.** Residual shape errors
+  of ±0.5% are within one standard deviation of the per-batch count — they *are*
+  the scatter, not bias. Also ~25% faster than v2 (no prefix scan).
+
+Inclusion probabilities: `π_i = min(1, w_i/t)` where `w_i` is the unnormalised
+target density at rank i and `t` solves `#{w_i ≥ t} + (Σ_{w_i<t} w_i)/t = want`.
+Since `π ∝ w` for every uncapped rank, "capped" is exactly `w_i ≥ t` for a single
+scalar `t`, so the solve is a scalar fixed-point iteration (`g(t)` is strictly
+decreasing; the step always moves the right way), not a per-element search.
+
+Independent coins give a count near `want`, not on it (±√want ≈ 0.03%), and the
+file is sliced into equal windows downstream, so the count is repaired: drop
+uniformly at random when over (uniform dropping scales every π by the same
+factor, leaving the shape untouched), add uniformly at random from the unselected
+when under. Both repairs are ≪ the natural scatter. The repair draws positions by
+oversample-and-dedupe rather than materialising and shuffling a `pool_n`-sized
+index array.
+
+**Bug that v2 introduced and the permutation check caught** (worth remembering,
+since the same shape of error can recur): under heavy capping the scalar solve
+does not fully converge, the running total lands just under `want`, the rescale
+goes slightly *above* 1, and a capped slot (π = 1) can then straddle two whole
+numbers while the sweep can only ever pick that rank once. One lost pick leaves
+an **uninitialised** output slot, and the file stops being a permutation. The
+cheap sum/max check in `ValidatePermutation` is what surfaced it — keep it.
+
+Other implementation notes: distribution objects are constructed inside the
+lambda because `std::normal_distribution` caches a spare deviate (sharing one
+across workers, as `data_op.h`'s generators do, is a data race). `parlay::filter`
+must not be used with a side-effecting predicate — its predicate runs over a
+delayed sequence and may be evaluated more than once per element.
+
+### Per-ratio datasets — the harness now reloads per ratio
+
+Tags `1<<6`/`1<<7` used to read *one* file and slice it four ways. As of
+2026-07-30 the loops in `test_framework.h` hoist `incre_ratio_seq =
+{1e-4, 1e-3, 1e-2, 1e-1}` above both blocks and call
+`ParseInsertBatchPath(ratio)` / `ParseDeleteBatchPath(ratio)` **inside** the
+loop, reloading `ins/<1/ratio>/` and `del/<1/ratio>/` each time. That matches
+`incre_data_generator`'s ratio dir (`base_n / batch_n` == `1/ratio`), so each
+ratio gets batches laid out for the step it slices at.
+
+Consequences:
+
+- **`-b` / `opts.batch_ratio` is now unused by tags `1<<6`/`1<<7`.** It only
+  picks the file handed to `-p`, which tag `1<<5` builds its control from.
+- 4 file reads per block instead of 1 (~64 GB of extra I/O per run at 1e9).
+- Under the new root both sides are 1e9 entries; under the old root
+  `del/<x>/*.batch.bin` is `base_n/x` entries, so the insert and delete blocks
+  were not comparable at `-b != 1`. That asymmetry is gone.
+
+**Silent-wrong-data hazard.** The old root `/data/zmen002/kv_pair` *also* has
+`ins/{10,100,1000,10000}/`, so pointing the sweep there still runs to
+completion — it just measures the globally-shuffled data. `incre_updates.sh`
+now sets `data_prefix=/data/zmen002/kv_pair_incre` and `batch_ratio=0.01`
+(so `-p` resolves to `ins/100/1.base.bin`); the old prefix is kept commented
+one line below.
+
+**The two halves are no longer interchangeable.** With globally-shuffled data
+both halves of `wp` were uniform samples of the whole key space. With the new
+data the first half is the low-key region (for `exp`) and the second the high-key
+region, so in `incre_update_query`: membership `IND` probes only low keys and
+`OOD` only high keys, and `GenRectangles` builds every range box out of
+`entry_in_tree`, i.e. entirely inside the low half. Arguably what a skewed
+workload should do, but the columns do not mean what they did.
+
+### `scripts/gen_incre_data.sh`
+
+Generates the whole sweep: 4 ratios x 4 distributions x 2 ops = 32 files x 8 GB
+= **~256 GB** (the volume had 698 GB free on 2026-07-30). Ratios are generated
+**cheapest first** (`10 100 1000 10000`) and existing non-empty outputs are
+skipped unless `-f` is passed, so it is resumable.
+
+**λ = `batch_ratio / 2`** → `{5, 50, 500, 5000}`. That puts demand at 0.5 at the
+start of a run, so it reaches the ceiling of 1.0 exactly at the half-way point:
+**every batch in the first half is exactly on-shape**, and the first half is what
+builds the tree state the queries run against. Front-vs-back odds inside a batch
+are `e^λ`, so even the widest batches (10% of the pool, λ=5) lean ~148x. The
+earlier `batch_ratio / 10` was 5x flatter for no accuracy gain once the sampler
+became exact. `norm`/`dual_norm` need no scaling — their mass sits in a band
+~`2*dev` wide, so even the widest batch here stays under the ceiling.
+
+**Generation cost is the real constraint, and it is worse than first estimated.**
+Cost is linear in total pool-work `base_n * batch_num / 2`, measured at ~2.9 ns
+per unit (n=1e7, 100/1000/10000 batches → 1.6 / 13.3 / ~145 s). Projected at
+base_n=1e9, per file and per 8-file tier:
+
+| ratio dir | per file | tier |
+|---|---|---|
+| 10 | 0.2 min | 0.03 h |
+| 100 | 2.4 min | 0.3 h |
+| 1000 | 24 min | 3.2 h |
+| **10000** | **4.0 h** | **32 h** |
+
+~36 h total, **90% of it in the finest tier**. Not yet implemented, but the clear
+fix: at λ=5000 the density is negligible beyond ~0.6% of the pool, so 99.4% of
+every pass is spent on ranks with essentially zero chance of selection.
+Restricting the work to that front window, and compacting by shifting survivors
+rightward against a moving start offset instead of rebuilding the whole pool,
+would cut the finest tier by roughly 160x (≈15 min). Do this before generating at
+1e9.
 
 ### `temporal_graph_signal` driver (`tests/temporal_graph_signal.cpp`)
 

@@ -193,6 +193,11 @@ add_executable(data_generator ${PROJECT_SOURCE_DIR}/tests/data_generate.cpp)
 target_link_libraries(data_generator PUBLIC TEST_FRAME)
 target_include_directories(data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
+# batches for the incremental-update benchmarks (b_test tags 1 << 6 / 1 << 7)
+add_executable(incre_data_generator ${PROJECT_SOURCE_DIR}/tests/incre_data_generate.cpp)
+target_link_libraries(incre_data_generator PUBLIC TEST_FRAME)
+target_include_directories(incre_data_generator PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
 # convert text .in datasets to binary .bin
 add_executable(data_to_binary ${PROJECT_SOURCE_DIR}/tests/data_to_binary.cpp)
 target_link_libraries(data_to_binary PUBLIC TEST_FRAME)
