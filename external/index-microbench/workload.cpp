@@ -1024,17 +1024,9 @@ ConQueryAfterStep(auto num_thread,
   // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
   {
     int const rec_type = 1;
-    // NOTE: masstree counts a range one key at a time through
-    // dynamic_get_next, which walks down from the root and builds a Json
-    // request for every key. On the big boxes that is far too slow to wait for.
-    // Not a crash -- it would need a counting scanner to be worth running.
-    if (index_type == TYPE_MASSTREE) {
-      std::cout << "- " << " ";
-    } else {
-      auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
-        kRangeQueryNum, rec_type, entry_in_tree);
-      ConRangeCount(num_thread, idx, query_box_seq);
-    }
+    auto [query_box_seq, max_size] =
+      GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
+    ConRangeCount(num_thread, idx, query_box_seq);
   }
 }
 
@@ -1532,14 +1524,9 @@ ApplyConcurrentIndex(Options const& opts)
     auto range_count = [&](auto const& base_points) {
       // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
       int const rec_type = 1;
-      // NOTE: too slow to wait for, not a crash -- see ConQueryAfterStep.
-      if (index_type == TYPE_MASSTREE) {
-        std::cout << "- " << " ";
-      } else {
-        auto [query_box_seq, max_size] = GenRectangles<TT, false, false>(
-          kRangeQueryNum, rec_type, base_points);
-        ConRangeCount(num_thread, primal_idx, query_box_seq);
-      }
+      auto [query_box_seq, max_size] =
+        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
+      ConRangeCount(num_thread, primal_idx, query_box_seq);
       // }
     };
 

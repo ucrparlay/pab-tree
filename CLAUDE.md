@@ -831,19 +831,30 @@ between them. Work split inside a batch is **proportional**
 
 ### Output format
 
-Per ratio: 10 columns = 1 timing + **3 membership** + 3 range query + 3 range
-count (`kRangeQueryType = 3`). The 3 membership passes are `IND` (keys all in
-the tree), `OOD` (keys all absent) and `MIX` (both halves appended, shuffled,
-truncated to `batch_size`) — see `incre_update_query` / `ConQueryAfterStep`.
-Masstree emits `-` for all 3 range counts, so column count stays fixed. It
-reports all 3 range queries as of 2026-07-28 — see the `scan` stack-array fix
-below.
+**The suite was trimmed at some point after the 2026-07-28 notes below, and both
+drivers were trimmed identically** — verify against the code before trusting any
+column count here. As of 2026-07-31 `incre_update_query` (`test_framework.h`) and
+`ConQueryAfterStep` (`workload.cpp`) each run:
 
-Whole-run totals (both drivers, all index types): tag `1<<5` → 10 tokens; tags
-`1<<6` and `1<<7` → 4 ratios × 10 = 40 tokens each, **plus** 1 primal build
-token when tag `1<<5` is not also set (tag `1<<5` suppresses the shared primal
-build block). So `tag=2#11100000` (all three, what `incre_updates.sh` runs) is
-`10 + 40 + 40 = 90` tokens, and a lone `1<<6` or `1<<7` is 41.
+- **one** membership pass — `MIX` only (both halves appended, shuffled, truncated
+  to `batch_size`). The `IND` and `OOD` passes are commented out in both files.
+- **one** range query, `rec_type = 1` only (the `for rec_type` loop is commented
+  out in both).
+- **one** range count, `rec_type = 1` only.
+
+So per ratio it is **4 columns** = 1 timing + 1 membership + 1 range query + 1
+range count, not 10. Whole-run totals: tag `1<<5` → 4 tokens; tags `1<<6`/`1<<7`
+→ 4 ratios × 4 = 16 each, **plus** 1 primal build token when tag `1<<5` is not
+also set. `tag=2#11100000` (all three, what `incre_updates.sh` runs) is
+`4 + 16 + 16 = 36` tokens; a lone `1<<6` or `1<<7` is 17.
+
+Every column is a real number for every index type as of 2026-07-31 — masstree's
+range-count `-` placeholders are gone (see the `q_[0]` race fix below), and it
+reported all range queries from 2026-07-28 (the `scan` stack-array fix).
+
+**`merge_incre_updates.py` still expects the old 90-value layout** and has not
+been updated for the trim; it will treat a current 36-value run as a short row
+and pad it. Fix the parser before merging new logs.
 
 The primal build is **always** run and always a real number, in both drivers —
 `workload.cpp` used to skip it and print `-` when only the incremental bits were
@@ -865,9 +876,11 @@ is its only reference.
 
 Three log realities the parser has to absorb:
 
-- **`-` is a legal value**, not a parse error (masstree's 27 range-count cells).
-  The pre-2026-07-29 version tested `float(tok)` on every token and therefore
-  dropped every masstree row silently.
+- **`-` is a legal value**, not a parse error (masstree's 27 range-count cells in
+  logs recorded before 2026-07-31). The pre-2026-07-29 version tested
+  `float(tok)` on every token and therefore dropped every masstree row silently.
+  Runs after the `q_[0]` race fix emit no `-` at all, but keep the handling for
+  the older logs.
 - **A row can be split across lines.** Masstree's allocator writes `madvise
   superpage: Cannot allocate memory` to stderr while the row is going to stdout,
   and `2>&1 | tee` splices it mid-row. The parser strips known noise phrases
@@ -1072,14 +1085,45 @@ early. Cost: ~12 min/run vs ~1 min before, since rec2 adds 75-105s per ratio
 across 8 ratios. Masstree is ~7.5x slower per element than bwtree here (3.3e8
 vs 2.5e9 elements/s) because its scanner writes a 16-byte `Str` per element.
 
-**Range count is still skipped for masstree, and it is a different problem.**
-`MassTreeIndex::range_count` is cursor-based and cannot crash, but
-`dynamic_get_next` (`mtIndexAPI.hh:198`) descends from the root *and builds a
-fresh `Json` request for every key* — rec2 would mean ~2.5e10 descents plus
-2.5e10 Json allocations. It would run for hours, not fail. Making that column
-work needs a counting scanner built on `get_next_n`'s callback, not a flag flip.
-(The old comment there claimed "segfaults", copy-pasted from the range query
-skip; it was never true for the count path.)
+### Masstree range count — shared `q_[0]` data race (fixed 2026-07-31)
+
+**The old note here was wrong.** It claimed the count path "cannot crash" and was
+merely slow, so the skip was cosmetic. It is not: with the skip removed, masstree
+**SIGSEGVs inside tcmalloc** (`CentralFreeList::ReleaseListToSpans`) at n=1e6 on
+16 threads, within a second. Reproduce with
+`./build/index_microbench_workload -p <file.bin> -D uni -t 0 -q 4 -T 5 -r 1`.
+
+**Root cause — one shared `query` object, not slowness.** `mt_index` holds a
+single `query<row_type> q_[1]` member (`mtIndexAPI.hh`), and the old
+`range_count` walked the range by calling `dynamic_get_next` once per key, which
+runs its scan through that shared `q_[0]`. `query_json_scanner::visit_value`
+(`kvrow.hh:405`) rewrites `q_.scankey_` — a **refcounted `lcdf::String` it
+reallocates whenever the key no longer fits** — and `run_scan` clears/refills
+`q_.f_`, a `std::vector`, on entry. Two threads scanning at once therefore free
+the same buffer twice. `get_next_n` never had the problem because its scanner is
+a plain stack local and it calls `table_->table().scan()` directly, bypassing
+`q_` entirely — which is why range *query* worked and range *count* did not.
+
+**The fix**: `mt_index::count_range` (`mtIndexAPI.hh`, next to `get_next_n`) —
+a stack-local `count_scanner` whose `visit_value` compares the key bytes against
+the upper bound and returns false to stop. `MassTreeIndex::range_count`
+(`index.h`) byte-swaps both ends of the box and makes one `count_range` call.
+This is thread safe *and* one tree descent per query instead of one per key,
+with no Json allocation at all.
+
+Correctness checked against `GenRectangles`' own oracle — the boxes are built as
+`(wp[l].key, wp[r].key)` over the sorted deduplicated input, so `.second == r-l`
+is the exact expected count. 50 000 boxes, 0 mismatches, at 8 and 32 threads.
+
+**Both masstree range-count skips are gone** (`ConQueryAfterStep` and the
+`range_count` lambda in `ApplyConcurrentIndex`), so masstree no longer emits `-`
+in any column. Measured at n=1e6 / 64 threads, rec_type 1: masstree 0.064s vs
+bwtree 0.096s — it is now the *faster* of the two on this column.
+
+**`range_report` still has the identical race** and is marked `WARN` in
+`index.h`. It is dead code (`ConRangeQuery` calls `scan()`, the branch that would
+use it is commented out), but it drives the same `dynamic_get_next`. Rebuild it
+on a stack-local scanner before ever calling it from more than one thread.
 
 ## Scalability sweep (`scripts/scalability.sh`)
 
