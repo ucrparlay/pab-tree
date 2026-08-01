@@ -969,6 +969,82 @@ set. Restoring it costs masstree a full 98GB / ~66s index at 1e9 that tags
 `1<<6`/`1<<7` immediately release; it is paid only to keep that column
 comparable against `b_test`.
 
+### Merging the trimmed logs (`scripts/merge_incre_updates_new.py`)
+
+Merges **both** log trees into one 36-value CSV at
+`data/incremental_updates_new/<name>.csv`, and writes a concatenation of every
+source log (with `>>> <path>` markers) beside it for reading by hand.
+
+Row layout is `build | 3 queries | 8 x (update_time, 3 queries)` = **36 values**,
+9 blocks of 4. The 3 queries are `MIX`, `RRM`, `RCM` — the driver dropped the
+`IND`/`OOD` membership passes and the `RRS`/`RRL`/`RCS`/`RCL` box sizes, taking
+the row from 90 to 36. Block order is unchanged: build, then ins then del at
+0.01% / 0.1% / 1% / 10%. Field mapping was confirmed by magnitude against the
+old 90-column CSV (`exp,BTree,64` gives RRM 0.0837 vs 0.0804, RCM 0.00215 vs
+0.00205; MassTree's del timings track the old row within a few percent).
+
+**The 36 columns are a strict subset of the 90**, so the old logs are *projected*
+down rather than skipped — keep the timing plus MIX/RRM/RCM per block, drop the
+other six. Projection is **by column name**, not index, so it cannot drift if
+either layout changes. Only the 73-value pre-MIX layout is unprojectable (no MIX
+column at all) and still skipped.
+
+`kSources` decides which sweep supplies which distribution:
+
+| source | values | supplies |
+|---|---|---|
+| `logs/incremental_updates_new/` | 36 | `exp` |
+| `logs/incremental_updates/` | 90 | `uni` |
+
+**Each distribution comes wholly from one sweep, deliberately.** The two sweeps
+are not interchangeable, and the difference is **per tree, not a uniform scale
+factor** — same tree, `exp` ins_0.01%, old → new:
+
+| BTree | CPAM | PAM | PMA | MassTree | BwTree |
+|---|---|---|---|---|---|
+| 29.25 → 6.40 | 55.60 → 6.41 | 29.75 → 8.24 | 29.90 → **181.17** | 87.29 → 84.70 | 55.68 → 55.15 |
+
+PMA got ~6x *slower* while MassTree and BwTree barely moved, so a tree
+backfilled from the old logs would sit at its own unrelated operating point next
+to trees measured on the new one. Backfill nothing; rerun the missing tree into
+`incremental_updates_new/` instead. norm and dual_norm are dropped entirely.
+
+(An earlier revision of this note claimed a "~9x" factor between the sweeps.
+That was derived by comparing `exp/BwTree`-old against `exp/BTree`-new — two
+different trees — and is wrong. The table above is the same-tree comparison.)
+
+**BTree is pinned to leaf size 64** (`kBTreeLeafWrap`) — it is the only tree
+swept over leaf sizes, so the old `uni` logs carry 2..1024 for it, which would
+otherwise give 10 BTree rows against 1 of everything else.
+
+**`leaf_wrap` must come from the header's `Buf:` field, not the filename.** The
+new sweep names every file `64.log` after the BTree leaf size, so PAM, PMA and
+MassTree runs sit in a `64.log` while reporting `Buf: 1`. A merger written
+against the path would mislabel three of the six trees.
+
+Current state: **12 rows** — `uni` × 6 trees and `exp` × 6, all parsing at
+exactly 36 values with no warnings. `uni/MassTree` legitimately carries `-` in
+every `RCM` column; those logs predate the `q_[0]` race fix.
+
+**A short row means a lost token, and it shifts every later column.** The
+BwTree `exp` log arrived once at 35 values, missing `del_0.01%_MIX`; the parser
+pads at the *end*, so `del_0.01%_MIX` read as 0.455 (a membership probe with a
+range-report magnitude) and `del_0.01%_RCM` as 38.6 seconds. The count is the
+cheap check — `sed -n '2,$p' <log> | tr -s ' \n' '\n' | grep -c .` should be 36
+for every file before trusting a merge.
+
+### `scripts/filter_incremental_updates.py`
+
+Cuts a merged CSV down to 20 columns: `benchmark, tree, leaf_wrap`, the 8 update
+timings, and the `build` and `1%` blocks' `MIX`/`RRM`/`RCM`. Defaults to the
+36-value CSV above, writing `<name>_filtered.csv` next to it.
+
+The kept columns are a subset of **both** layouts, so passing the old
+`data/incremental_updates/incremental_updates.csv` explicitly still works
+(verified). This script is the only place the 20-column list lives —
+`merge_incre_updates_new.py` deliberately has no `--slim` flag, so the two
+cannot drift apart.
+
 ### Merging the logs (`scripts/merge_incre_updates.py`)
 
 Concatenates `logs/incremental_updates/<tree>/<dis>/<leaf_wrap>.log` (tree dirs

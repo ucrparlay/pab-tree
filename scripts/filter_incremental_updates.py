@@ -9,15 +9,23 @@ from pathlib import Path
 #   python3 scripts/filter_incremental_updates.py <input_csv> [output_csv]
 #
 # Defaults:
-#   input  = scripts/data/incremental_updates/incremental_updates.csv
-#   output = scripts/data/incremental_updates/incremental_updates_filtered.csv
+#   input  = scripts/data/incremental_updates_new/incremental_updates_new.csv
+#   output = scripts/data/incremental_updates_new/incremental_updates_new_filtered.csv
+#
+# The default input is merge_incre_updates_new.py's 36-value CSV (uni + exp,
+# BTree pinned to leaf size 64).  The columns below are a subset of both that
+# layout and the older 90-value one that merge_incre_updates.py writes, so
+# either can be passed explicitly -- pass the old CSV's path to filter it.
 
-DEFAULT_INPUT = Path("scripts/data/incremental_updates/incremental_updates.csv")
-DEFAULT_OUTPUT = Path("scripts/data/incremental_updates/incremental_updates_filtered.csv")
+DEFAULT_INPUT = Path("scripts/data/incremental_updates_new/incremental_updates_new.csv")
+DEFAULT_OUTPUT = Path(
+    "scripts/data/incremental_updates_new/incremental_updates_new_filtered.csv"
+)
 
 KEEP_COLUMNS = [
     "benchmark",
     "tree",
+    "leaf_wrap",
     "build",
     "build_MIX",
     "build_RRM",
