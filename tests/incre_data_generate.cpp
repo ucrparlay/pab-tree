@@ -26,6 +26,7 @@
 // harness's existing "slice the file into equal chunks" consumption picks the
 // batches up unchanged.
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 
@@ -130,6 +131,33 @@ TargetDensity(int const dis_type,
          (0.5 * std::exp(-0.5 * z2 * z2) / d2);
 }
 
+// NOTE: an upper bound on the density over [0, 1), used as the rejection
+// ceiling in the sparse path.  Evaluated on a grid plus the analytic mode
+// locations, then given headroom: over-estimating only costs a few wasted
+// draws, under-estimating would clip the peak and silently flatten the shape.
+inline double
+TargetDensityBound(int const dis_type, parlay::sequence<double> const& param)
+{
+  double m = 0.0;
+  static constexpr int kGrid = 4096;
+  for (int i = 0; i <= kGrid; i++) {
+    m = std::max(m, TargetDensity(dis_type, param, double(i) / kGrid));
+  }
+  // NOTE: a narrow peak can fall between grid points, so probe the modes too.
+  if (dis_type == kDisExponential) {
+    m = std::max(m, TargetDensity(dis_type, param, 0.0));
+  } else if (dis_type == kDisNormal) {
+    m = std::max(
+      m, TargetDensity(dis_type, param, std::clamp(ParamOr(param, 0, 0.5), 0.0, 1.0)));
+  } else if (dis_type == kDisDualNormal) {
+    m = std::max(
+      m, TargetDensity(dis_type, param, std::clamp(ParamOr(param, 0, 0.25), 0.0, 1.0)));
+    m = std::max(
+      m, TargetDensity(dis_type, param, std::clamp(ParamOr(param, 2, 0.75), 0.0, 1.0)));
+  }
+  return m * 1.05;
+}
+
 // NOTE: how many LEADING ranks of the pool can possibly matter this batch.
 //
 // A steep exponential is essentially zero past the front: the mass beyond
@@ -232,6 +260,79 @@ SelectBatchFlags(size_t const win_n,
     return TargetDensity(
       dis_type, param, (static_cast<double>(i) + 0.5) / pool_n);
   });
+
+  // ---------------------------------------------------------------- sparse
+  // NOTE: when the batch is a tiny share of the window, the per-rank sweep
+  // below is enormously wasteful -- at 1e9 ranks and want=1e5 it evaluates the
+  // density a billion times and draws a billion uniforms to select a hundred
+  // thousand keys.  Measured: the density evaluations alone are ~2/3 of the
+  // runtime for `norm` (107.9s vs 35.3s for a constant density at identical
+  // pool-work).
+  //
+  // In that regime draw the ranks directly instead: pick a uniform rank, keep
+  // it with probability w/bound.  That is rejection sampling from the same
+  // shape, and it costs O(want / acceptance) rather than O(win_n).
+  //
+  // It is only valid while collisions are negligible.  Sampling without
+  // replacement by "draw, drop duplicates, redraw" differs from the exact
+  // inclusion probabilities by O(peak inclusion probability) -- which is the
+  // very bias that sank the original guess-and-retry sampler.  Here the path is
+  // gated on that quantity being under kSparsePi, so the error stays ~1e-2 of
+  // the natural scatter.  Above the gate we fall through to the exact sweep.
+  static constexpr double kSparsePi = 0.02;
+  {
+    double const bound = TargetDensityBound(dis_type, param);
+    // mean of w by sampling -- O(1), no pass over the pool
+    static constexpr int kProbe = 4096;
+    double acc = 0.0;
+    for (int i = 0; i < kProbe; i++) {
+      acc += TargetDensity(dis_type, param,
+                           (double(i) + 0.5) / kProbe * (double(win_n) / pool_n));
+    }
+    double const mean_w = acc / kProbe;
+    double const peak_pi =
+      mean_w > 0.0 ? (want * bound) / (static_cast<double>(win_n) * mean_w) : 1.0;
+    double const accept = bound > 0.0 ? mean_w / bound : 0.0;
+
+    if (peak_pi < kSparsePi && accept > 1e-3) {
+      // NOTE: the flags array is only needed to hand the result back in the
+      // shape the windowed compaction wants.  When the caller can take ranks
+      // instead (see sparse_ranks) it skips this O(win_n) allocation entirely.
+      auto flags = parlay::sequence<bool>(win_n, false);
+      size_t got_sparse = 0;
+      for (int attempt = 0; attempt < 32 && got_sparse < want; attempt++) {
+        size_t const need = want - got_sparse;
+        size_t const draw_n =
+          static_cast<size_t>((need / accept) * 1.3) + 64;
+        parlay::random_generator g(seed + 5077 + (attempt * 6151ULL));
+        auto const cand = parlay::tabulate(draw_n, [&](size_t j) -> size_t {
+          auto r = g[j];
+          return std::uniform_int_distribution<size_t>(0, win_n - 1)(r);
+        });
+        auto const keep = parlay::tabulate(draw_n, [&](size_t j) -> bool {
+          size_t const v = cand[j];
+          if (flags[v]) {
+            return false;
+          }
+          auto r = g[draw_n + j];
+          return std::uniform_real_distribution<double>(0.0, 1.0)(r) <
+                 (TargetDensity(dis_type, param,
+                                (static_cast<double>(v) + 0.5) / pool_n) / bound);
+        });
+        auto const fresh = parlay::remove_duplicates(parlay::pack(cand, keep));
+        size_t const take = std::min(need, fresh.size());
+        parlay::parallel_for(
+          0, take, [&](size_t j) { flags[fresh[j]] = true; });
+        got_sparse += take;
+      }
+      if (got_sparse == want) {
+        return flags;
+      }
+      // NOTE: could not fill it -- fall through to the exact sweep rather than
+      // ship a short batch.
+    }
+  }
+  // ------------------------------------------------------------ end sparse
 
   auto const dwant = static_cast<double>(want);
   auto const sum_all = parlay::reduce(w, parlay::addm<double>());
@@ -442,12 +543,28 @@ GenIncrementalBatches(size_t const base_n,
   // suffix [lo, base_n), so ranks are offsets from `lo`.
   auto pool = parlay::tabulate(base_n, [](size_t i) -> size_t { return i; });
   size_t lo = 0;
+  // NOTE: the live pool is [lo, lo + live_n).  The windowed compaction leaves it
+  // a SUFFIX (lo advances), the unwindowed one leaves it a PREFIX (lo resets),
+  // so the length has to be tracked on its own rather than derived from lo.
+  size_t live_n = base_n;
   size_t written = 0;
   size_t clamped_total = 0;
   size_t win_total = 0; // for the cost report
 
+  // NOTE: scratch buffer for the unwindowed compaction below.  Allocated once
+  // and ping-ponged with `pool`; the old code let every parlay::pack allocate a
+  // fresh multi-GB sequence, which at 10000 batches meant 10000 allocate-and-
+  // first-touch cycles.  Measured effective throughput was 20-50 GB/s on a box
+  // that sustains >100, and that gap was where it went.
+  parlay::sequence<size_t> pool_alt;
+  bool const needs_alt =
+    (dis_type != kDisExponential && dis_type != kDisSeg && dis_type != kDisUniform);
+  if (needs_alt) {
+    pool_alt = parlay::sequence<size_t>::uninitialized(base_n);
+  }
+
   for (size_t b = 0; b < batch_num; b++) {
-    size_t const pool_n = base_n - lo;
+    size_t const pool_n = live_n;
     size_t const want = std::min(batch_n, pool_n);
     size_t const win_n = WindowSize(dis_type, param, pool_n, want);
     win_total += win_n;
@@ -475,19 +592,44 @@ GenIncrementalBatches(size_t const base_n,
       report(b, pool_n, win_n);
     }
 
-    // NOTE: only the window could have lost anything, so compact just the
-    // window and leave the untouched suffix where it is.  The window's
-    // survivors are shifted RIGHT to end flush against the window's end, which
-    // makes the new live pool the suffix [lo + took, base_n) -- contiguous,
-    // still in key order, and the tail never moved.  That is what turns the
-    // per-batch cost from O(pool_n) into O(win_n).
-    auto const survivors = parlay::pack(
-      pool.cut(lo, lo + win_n),
-      parlay::delayed_tabulate(win_n, [&](size_t i) { return !flags[i]; }));
-    parlay::parallel_for(0, survivors.size(), [&](size_t i) {
-      pool[lo + took + i] = survivors[i];
-    });
-    lo += took;
+    if (!needs_alt) {
+      // NOTE: windowed shapes (exp, seg) -- only the window could have lost
+      // anything, so compact just the window and leave the untouched suffix
+      // where it is.  The window's survivors are shifted RIGHT to end flush
+      // against the window's end, which makes the new live pool the suffix
+      // [lo + took, base_n) -- contiguous, still in key order, tail never
+      // moved.  That is what turns the per-batch cost into O(win_n).
+      auto const survivors = parlay::pack(
+        pool.cut(lo, lo + win_n),
+        parlay::delayed_tabulate(win_n, [&](size_t i) { return !flags[i]; }));
+      parlay::parallel_for(0, survivors.size(), [&](size_t i) {
+        pool[lo + took + i] = survivors[i];
+      });
+      lo += took;
+      live_n -= took;
+    } else {
+      // NOTE: unwindowed shapes (norm, dual_norm) remove from all over the
+      // pool, so there is no suffix to spare -- but the removals are only
+      // `took` positions out of pool_n, and `picked` already lists them in
+      // ascending order.  So copy the (took + 1) runs BETWEEN the removed
+      // positions straight into the scratch buffer: run j slides left by
+      // exactly j, every destination is disjoint, and it is one read plus one
+      // write with no flags array and no allocation.
+      //
+      // Writing into a separate buffer is what makes it safely parallel -- run
+      // j's destination overlaps run j-1's SOURCE, so an in-place version would
+      // have to run sequentially.
+      parlay::parallel_for(0, took + 1, [&](size_t j) {
+        size_t const beg = (j == 0) ? 0 : picked[j - 1] + 1;
+        size_t const end = (j == took) ? pool_n : picked[j];
+        for (size_t i = beg; i < end; i++) {
+          pool_alt[i - j] = pool[lo + i];
+        }
+      });
+      std::swap(pool, pool_alt);
+      lo = 0; // the live pool is now the prefix [0, pool_n - took)
+      live_n -= took;
+    }
   }
 
   {

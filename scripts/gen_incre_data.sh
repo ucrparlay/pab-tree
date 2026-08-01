@@ -27,7 +27,30 @@ set -o xtrace
 force=0
 [[ "$1" == "-f" ]] && force=1
 
-path_prefix=/data/zmen002/kv_pair_incre
+# NOTE: the output tree is named after the distribution, so two exp variants of
+# different steepness cannot share a root -- give the softer one its own.
+path_prefix=/data/zmen002/kv_pair_incre_exp15
+# path_prefix=/data/zmen002/kv_pair_incre_soft
+
+# exp steepness: lambda = batch_ratio / exp_div.  Judge it by how many of a
+# batch's keys land in the same 64-key leaf, NOT by the p10-p90 width -- the
+# exponential's tail keeps touching leaves long after the peak has flattened, so
+# width overstates how much softening you actually get.  Measured at ratio 100:
+#
+#   exp_div      2      4      8     20     50   | uniform
+#   keys/leaf  5.67   3.09   1.98   1.56   1.40  |  1.34
+#   vs uniform  4.2x   2.3x   1.5x   1.2x   1.0x |  1.0x
+#
+# So the usable range is roughly exp_div 2..4; by 8 it is already close to the
+# uniform control and past 20 it is indistinguishable from it.  exp_div=4 sits
+# at the geometric midpoint between sharp and uniform and is the recommended
+# soft variant.  For reference seg mult=2 is sharper than any of these (10.0
+# keys/leaf) -- a hard-edged window concentrates better than an exponential can.
+#
+# Pair a change here with a matching path_prefix above.
+# exp_div=2
+exp_div=15
+
 base_n=1000000000
 file_num=1
 val_n=1
@@ -39,7 +62,7 @@ batch_ratio_seq=(10 100 1000 10000)
 # PARA: 0 uni, 1 exp, 2 norm, 3 dual_norm, 4 seg.  Here -dis shapes each BATCH;
 # the base is always the dense uniform key space.
 # dis_seq=(0 1 2 3 4)
-dis_seq=(4)
+dis_seq=(1)
 batch_op_seq=(0 1)
 
 logger_path="log_incre_data.in"
@@ -58,15 +81,20 @@ make -C ../build/ incre_data_generator || exit
 # batch in the first half exactly exponential -- and the first half is what
 # builds the tree state the queries run against.
 #
-# lambda = batch_ratio / 2 -> {5, 50, 500, 5000}.  Front-vs-back odds inside a
-# batch are e^lambda, so even the widest batches (10% of the pool, lambda 5) now
-# lean ~148x instead of the 2.7x a smaller lambda would give.
+# lambda = batch_ratio / exp_div; at the default exp_div=2 that is
+# {5, 50, 500, 5000}.  See the exp_div block at the top for what other values do.
+#
+# CAVEAT at ratio 10: only 10 batches exist there, so a hot region wider than
+# ~10 batch-widths cannot fit.  exp_div=10 gives lambda=1, which spreads a batch
+# over ~77% of the key space -- effectively the uniform control.  The soft
+# variant is only meaningful at ratios 100/1000/10000.
 #
 # norm / dual_norm need no scaling: their mass sits in a band ~2*dev wide, so
 # even the widest batch here stays under the limit.
 function exp_lambda() {
-	# lambda = batch_ratio / 2
-	echo $(($1 / 2))
+	local l=$(($1 / exp_div))
+	[ "${l}" -lt 1 ] && l=1 # lambda 0 would be a flat density, not an exponential
+	echo "${l}"
 }
 
 for batch_ratio in "${batch_ratio_seq[@]}"; do
@@ -94,7 +122,7 @@ for batch_ratio in "${batch_ratio_seq[@]}"; do
 			# the window is defined relative to batch_n, not to the pool, so the
 			# same value is equally concentrated at every ratio. That is the one
 			# thing exp cannot do (its lambda is capped by pool/batch).
-			batch_param="2"
+			batch_param="10"
 			dis_name="seg"
 			;;
 		esac
