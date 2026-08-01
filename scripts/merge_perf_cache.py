@@ -34,11 +34,17 @@
 #
 # --- what it computes --------------------------------------------------------
 # region_n       elements the counted region actually processed. This is the
-#                important one, and it differs per region: `build` touches all
-#                n, `insert`/`delete` only the batch (n*batch_ratio), and
-#                `membership` probes n*0.01 keys (kMemberQueryRatio).
+#                important one, and it differs per region: `build`,
+#                `incre_insert` and `incre_delete` touch all n, `insert`/
+#                `delete` only the batch (n*batch_ratio), and `membership`
+#                probes n*0.01 keys (kMemberQueryRatio).
 #                `membership` is the half-half probe -- half the keys are in the
 #                tree, half are not.
+#                For `incre_insert`/`incre_delete` the counted region is the
+#                whole chain of 1/batch_ratio batches, so batch_ratio is the
+#                step size and the divisor stays n. Do NOT read those rows as
+#                comparable to `insert`/`delete`: one builds (or empties) the
+#                entire tree, the other adds one batch to a finished tree.
 # <ev>_per_elem  each event divided by region_n.
 # miss_rate_pct  100 * cache-misses / cache-references. NOTE this is an *LLC*
 #                miss rate, not "fraction of memory accesses that miss":
@@ -80,11 +86,18 @@ EVENTS = [
     "L1-dcache-load-misses",
 ]
 
-# Per-element denominators differ by region: `build` touches all n, while
-# `insert`/`delete` only touch the batch (n*batch_ratio) and `membership` probes
-# n*kMemberQueryRatio keys. Keep MEMBER_QUERY_RATIO in sync with
-# kMemberQueryRatio in tests/test_framework.h.
-WHOLE_INPUT_REGIONS = {"build"}
+# Per-element denominators differ by region:
+#   build, incre_insert, incre_delete   all n
+#   insert, delete                      n * batch_ratio  (just the batch)
+#   membership                          n * kMemberQueryRatio
+#
+# incre_insert / incre_delete are the ones to watch. The counted region is the
+# WHOLE chain of 1/batch_ratio BatchInsert (or BatchDelete) calls, which between
+# them walk every one of the n entries -- so batch_ratio there is the step size,
+# not the amount of work, and the divisor is n no matter what it is set to.
+# Keep MEMBER_QUERY_RATIO in sync with kMemberQueryRatio in
+# tests/test_framework.h.
+WHOLE_INPUT_REGIONS = {"build", "incre_insert", "incre_delete"}
 MEMBER_QUERY_REGIONS = {"membership"}
 MEMBER_QUERY_RATIO = 0.01
 
@@ -93,7 +106,16 @@ MEMBER_QUERY_RATIO = 0.01
 # off against each other. perf_cache.sh emits rows in run order instead (tree
 # outermost), which interleaves the distributions.
 DIS_ORDER = ["uni", "exp", "norm", "dual_norm"]
-REGION_ORDER = ["build", "insert", "delete", "membership"]
+# NOTE: build -> membership -> incre_insert -> incre_delete is the profiling
+# order the sweep is run in; the legacy batch regions trail it.
+REGION_ORDER = [
+    "build",
+    "membership",
+    "incre_insert",
+    "incre_delete",
+    "insert",
+    "delete",
+]
 TREE_ORDER = ["BTree", "CPAM", "PAM", "PMA"]
 
 
@@ -222,7 +244,7 @@ def main(argv):
 
     if verbose:
         hdr = (
-            f"{'dis':10} {'region':11} {'tree':6} {'region_n':>13} "
+            f"{'dis':10} {'region':13} {'tree':6} {'region_n':>13} "
             f"{'cache-misses':>15} {'/elem':>8} {'miss%':>7} {'IPC':>6} "
             f"{'vs BTree':>9}"
         )
@@ -236,7 +258,7 @@ def main(argv):
                 print()
             prev = key
             print(
-                f"{r['dis']:10} {r['region']:11} {r['tree']:6} {r['region_n']:13,} "
+                f"{r['dis']:10} {r['region']:13} {r['tree']:6} {r['region_n']:13,} "
                 f"{r['cache-misses']:15,} {r['cache-misses_per_elem']:8.2f} "
                 f"{r['miss_rate_pct']:6}% {r['ipc']:>6} {r['vs_btree']:>9}"
             )

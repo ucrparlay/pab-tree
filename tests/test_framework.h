@@ -300,9 +300,17 @@ BatchInsertByStep(Tree& pkd,
     }
   };
 
+  // NOTE: same convention as BuildTree / BatchInsert / BatchDelete / Membership
+  // -- a negative delay at rounds == 1 suppresses time_loop's warmup pass, so
+  // -r 1 really does run the region once. This function used to hardcode 0.01,
+  // which always took a warmup and made the perf counts (which are summed over
+  // every enabled interval) exactly 2x the per-execution figure while build and
+  // membership reported 1x. -r 3, what incre_updates.sh uses, is unaffected.
+  double const loop_late = rounds > 1 ? 0.01 : -100;
+
   double ave_time = time_loop(
     rounds,
-    0.01,
+    loop_late,
     [&]() { prepare_func(); },
     [&]() {
       // NOTE: covers the whole chain of slice_num BatchInsert calls, i.e. the
@@ -363,9 +371,14 @@ BatchDeleteByStep(Tree& pkd,
 
   pkd.DeleteTree();
 
+  // NOTE: see BatchInsertByStep -- a negative delay at rounds == 1 suppresses
+  // time_loop's warmup pass so -r 1 runs the region exactly once, which is what
+  // the perf counts assume. -r 3 is unaffected.
+  double const loop_late = rounds > 1 ? 0.01 : -100;
+
   double ave_time = time_loop(
     rounds,
-    0.01,
+    loop_late,
     [&]() { prepare_func(); },
     [&]() {
       // NOTE: covers the whole chain of slice_num BatchDelete calls, i.e. the

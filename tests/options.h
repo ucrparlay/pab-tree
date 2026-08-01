@@ -22,9 +22,10 @@ struct Options
     // perf, which makes every PerfRegion a no-op. See perf_control.h.
     this->perf_ctl_fd = params.getOptionIntValue("-pcf", 0);
     this->perf_ctl_ack_fd = params.getOptionIntValue("-pcaf", 0);
-    // NOTE: which guarded region to count: "build", "insert" or "delete".
-    // Empty (the default) arms every region, which sums them -- a run with
-    // -t 1 would report build+insert together.
+    // NOTE: which guarded region to count: "build", "insert", "delete",
+    // "membership", "incre_insert" or "incre_delete". Empty (the default) arms
+    // every region, which sums them -- a run with -t 1 would report
+    // build+insert together.
     this->perf_region = params.getOptionValue("-pcr", std::string(""));
   }
 

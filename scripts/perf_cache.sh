@@ -1,5 +1,6 @@
 #!/bin/bash
-# Measure hardware cache behaviour of Build / BatchInsert / BatchDelete.
+# Measure hardware cache behaviour of Build / BatchInsert / BatchDelete and of
+# the incremental (by-step) insert and delete chains.
 #
 # The binary is run under `perf` with counting initially disabled (-D -1) and
 # re-enabled over exactly one call of the operation under test, via perf's
@@ -29,16 +30,21 @@
 #   TREES        space-separated "solver:-T:name" specs
 #                (default "b_test:0:BTree cpam:1:CPAM cpam:2:PAM pma:3:PMA";
 #                 CPAM and PAM share the cpam binary, selected by -T)
-#   REGIONS      subset of "build insert delete membership" (default all 4)
+#   REGIONS      subset of "build membership incre_insert incre_delete
+#                insert delete"    (default "build membership incre_insert
+#                incre_delete" -- the tag 1<<5 / 1<<6 / 1<<7 family)
 #   DIS_SEQ      subset of "uni exp norm dual_norm"      (default all four)
 #   NODES        base size, e.g. 100000000 / 1000000000  (default 1e8)
-#   BATCH_RATIO  insert/delete batch as a fraction of base (default 0.1); also
-#                picks the dataset dir, ins/<1/ratio>
+#   BATCH_RATIO  batch as a fraction of base (default 0.1); also picks the
+#                dataset dir, <op>/<1/ratio>.  For incre_insert / incre_delete
+#                it is the STEP of the chain, not a batch size -- see below.
 #   THREADS      PARLAY_NUM_THREADS                      (default 1)
 #   MODE         stat | record                           (default stat)
 #   FREQ         record mode sampling frequency          (default 20000)
 #   EVENTS       perf event list (see counter budget note below)
-#   DATA_PREFIX  dataset root                    (default /data/zmen002/kv_pair)
+#   DATA_PREFIX  root for insert/delete    (default /data/zmen002/kv_pair)
+#   INCRE_PREFIX root for the 1<<5/6/7 family
+#                                    (default /data/zmen002/kv_pair_incre)
 #   EXT          .bin | .in                              (default .bin)
 #   SKIP_BUILD   1 = do not re-run cmake/make            (default 0)
 #   DROP_CACHES  1 = drop page cache before each run     (default 1)
@@ -46,8 +52,17 @@
 #                set NUMACTL= (empty) for first-touch placement
 #
 # --- recipes -----------------------------------------------------------------
-#   # 1e8, all four trees, all three regions, parallel  (the standard sweep)
-#   cd scripts && NODES=100000000 DIS_SEQ=uni THREADS=64 ./perf_cache.sh
+#   # THE ONE: build -> membership -> incre insert -> incre delete, 1e9 at a 1%
+#   # step, uni and exp, all four trees. ~4h; drop PAM on a <128GB box.
+#   cd scripts && NODES=1000000000 BATCH_RATIO=0.01 DIS_SEQ="uni exp" \
+#       THREADS=224 DROP_CACHES=1 \
+#       TREES="b_test:0:BTree cpam:1:CPAM pma:3:PMA cpam:2:PAM" \
+#       LOG_NAME=perf_incre_1e9_b001 ./perf_cache.sh \
+#     && ./merge_perf_cache.py -v perf_incre_1e9_b001
+#
+#   # the older batch-update regions (different tags, different dataset root)
+#   cd scripts && REGIONS="insert delete" NODES=100000000 DIS_SEQ=uni \
+#       THREADS=64 ./perf_cache.sh
 #
 #   # 1e9. PAM needs ~110GB at insert -- drop it on a <128GB box, and put it
 #   # last regardless so an OOM does not cost the other trees.
@@ -56,7 +71,8 @@
 #       LOG_NAME=perf_cache_1e9 ./perf_cache.sh
 #
 #   # serial -- the meaningful setting for misses/element. At THREADS=64 idle
-#   # parlay workers spinning in scheduler::get_own_job are counted too.
+#   # parlay workers spinning in scheduler::get_own_job are counted too. Not
+#   # advisable for the incre regions at 1e9: they walk the WHOLE input.
 #   cd scripts && THREADS=1 DIS_SEQ=uni REGIONS=insert ./perf_cache.sh
 #
 #   # which functions the misses land in, instead of totals
@@ -76,20 +92,37 @@
 #   # fewer events (zero risk of counter multiplexing)
 #   cd scripts && EVENTS=cache-references,cache-misses ./perf_cache.sh
 #
-# --- reading the output ------------------------------------------------------
-# * The counted region is ONE call of the operation. Per-element denominators
-#   therefore differ per region: build = NODES; insert/delete =
-#   NODES*BATCH_RATIO (they only touch the batch); membership =
-#   NODES*kMemberQueryRatio (0.01, from test_framework.h).
+# --- the regions -------------------------------------------------------------
+#   region        tag     what perf counts                     per-elem divisor
+#   build         1<<5    one Build() over the whole input      NODES
+#   membership    1<<5    the half-half Contain() probe pass    NODES*0.01
+#   incre_insert  1<<6    ALL 1/BATCH_RATIO BatchInsert calls   NODES
+#   incre_delete  1<<7    ALL 1/BATCH_RATIO BatchDelete calls   NODES
+#   insert        1       one BatchInsert() of the batch        NODES*BATCH_RATIO
+#   delete        2       one BatchDelete() of the batch        NODES*BATCH_RATIO
+#
+# * MIND THE DIVISOR. incre_insert / incre_delete count the entire chain, which
+#   walks the whole input in 1/BATCH_RATIO steps -- so BATCH_RATIO is the STEP
+#   SIZE, not the amount of work. All of NODES gets inserted (or deleted)
+#   whatever the ratio; a smaller ratio just means more, smaller batches. That
+#   is the opposite of `insert`/`delete`, where BATCH_RATIO IS the work.
+#   Comparing incre_insert against insert is therefore comparing "build the
+#   whole tree incrementally" against "add one batch to a finished tree".
 # * `membership` measures the HALF-HALF probe only: half the keys are in the
-#   tree, half are not, shuffled. DefaultTestFunc runs three membership
-#   passes (all hits, all misses, mix) and only the mix is armed, so perf
-#   does not sum them. The tree is rebuilt on base before the queries, so
-#   the probed tree holds NODES entries.
+#   tree, half are not, shuffled. It runs inside incre_update_query, which the
+#   tag 1<<5 block calls right after the build -- so it needs no -q bit, and
+#   the probed tree holds NODES/2 entries (BuildTree's kOutputRatio=2 hands
+#   back the half-filled tree). The two single-sided passes next to it in
+#   incre_update_query are commented out upstream and unarmed regardless.
+# * RUN ONE TAG PER PROCESS. incre_update_query is shared by tags 1<<5, 1<<6
+#   and 1<<7, so a -t with several of them set would run the membership pass
+#   several times and perf would sum them. run_one always passes exactly one.
 # * ROUND and SUMMARY are pinned to 1 and 0 below and must stay there: perf
 #   sums over every enable/disable interval, so -r N reports N+1 executions
 #   added together (time_loop's warmup pass counts too), and -s 1 would sweep
-#   four batch ratios into a single count.
+#   four batch ratios into a single count. For the same reason the incre
+#   ratio sweep in test_framework.h collapses to the single -b ratio whenever
+#   -pcf/-pcaf are set.
 # * Verify no counter multiplexing before trusting a changed EVENTS list:
 #     awk -F, 'NF>=5 && $5+0<100' logs/<LOG_NAME>/*.stat
 #   must print nothing (field 5 is the percentage of time the event ran).
@@ -120,8 +153,15 @@ SUMMARY=0                  # MUST stay 0: -s 1 sweeps 4 ratios into one count
 BATCH_RATIO="${BATCH_RATIO:-0.1}"
 THREADS="${THREADS:-1}"    # 1 = clean per-function attribution; else real-world
 DIS_SEQ=(${DIS_SEQ:-uni exp norm dual_norm})
-REGIONS=(${REGIONS:-build insert delete membership})
+REGIONS=(${REGIONS:-build membership incre_insert incre_delete})
 DATA_PREFIX="${DATA_PREFIX:-/data/zmen002/kv_pair}"
+# NOTE: the tag 1<<5 / 1<<6 / 1<<7 family reads a different dataset root. Those
+# files are laid out so that consecutive windows of base_n*ratio entries ARE the
+# batches, which only holds for the ratio they were generated at; the standard
+# kv_pair datasets are globally shuffled, so every batch there comes out uniform
+# no matter what <dis> says. They also have no base/batch pair -- the whole
+# <i>.batch<EXT> file is the stream, and it holds all NODES entries.
+INCRE_PREFIX="${INCRE_PREFIX:-/data/zmen002/kv_pair_incre}"
 EXT="${EXT:-.bin}"
 DROP_CACHES="${DROP_CACHES:-1}"
 
@@ -147,15 +187,35 @@ LOG_NAME="${LOG_NAME:-perf_cache}"
 LOG_PATH="logs/${LOG_NAME}"
 CSV="data/${LOG_NAME}/perf_cache.csv"
 
-# region -> the -t tag that makes DefaultTestFunc execute it. `membership` uses
-# tag 1 because the half-half pass needs `wi` populated, which only the batch
-# insert block does; -pcr keeps the insert itself out of the counts.
-declare -A REGION_TAG=([build]=0 [insert]=1 [delete]=2 [membership]=1)
-# region -> -q value. Only membership needs a query bit set.
-declare -A REGION_QUERY=([build]=0 [insert]=0 [delete]=0 [membership]=1)
-# region -> which dataset subdir holds its base/batch pair. membership probes
-# base (in tree) against batch (not in tree), so it needs the disjoint ins pair.
-declare -A REGION_OP=([build]=ins [insert]=ins [delete]=del [membership]=ins)
+# region -> the -t tag that makes DefaultTestFunc execute it. Exactly one tag
+# per run: incre_update_query is shared by 1<<5 / 1<<6 / 1<<7, so setting two of
+# them would run the membership pass twice and perf would sum both.
+# 32 = 1<<5 static build then query, 64 = 1<<6 incre insert, 128 = 1<<7 incre
+# delete. `build` and `membership` are two regions of the same tag-32 run,
+# separated by -pcr.
+declare -A REGION_TAG=(
+	[build]=32 [membership]=32 [incre_insert]=64 [incre_delete]=128
+	[insert]=1 [delete]=2
+)
+# region -> -q value. The 1<<5/6/7 family calls incre_update_query
+# unconditionally, so it needs no query bit; the legacy insert/delete regions do
+# no query work at all.
+declare -A REGION_QUERY=(
+	[build]=0 [membership]=0 [incre_insert]=0 [incre_delete]=0
+	[insert]=0 [delete]=0
+)
+# region -> which dataset subdir it reads.
+declare -A REGION_OP=(
+	[build]=ins [membership]=ins [incre_insert]=ins [incre_delete]=del
+	[insert]=ins [delete]=del
+)
+# region -> which file -p points at, and thus which root. The 1<<5/6/7 family
+# takes the batch stream out of INCRE_PREFIX (there is no .base there); the
+# legacy regions take the .base of a base/batch pair out of DATA_PREFIX.
+declare -A REGION_STEM=(
+	[build]=batch [membership]=batch [incre_insert]=batch [incre_delete]=batch
+	[insert]=base [delete]=base
+)
 
 mkdir -p "${LOG_PATH}" "$(dirname "${CSV}")"
 
@@ -170,9 +230,13 @@ function run_one() {
 
 	local tag="${REGION_TAG[$region]}"
 	local batch_op="${REGION_OP[$region]}"
+	local stem_kind="${REGION_STEM[$region]}"
 	local x
 	x=$(bc <<<"scale=0; 1/${BATCH_RATIO}") || return 1
-	local base="${DATA_PREFIX}/${dis}/${node}_${DIM}/${batch_op}/${x}/1.base${EXT}"
+
+	local root="${DATA_PREFIX}"
+	[[ "${stem_kind}" == "batch" ]] && root="${INCRE_PREFIX}"
+	local base="${root}/${dis}/${node}_${DIM}/${batch_op}/${x}/1.${stem_kind}${EXT}"
 
 	if [[ ! -f "${base}" ]]; then
 		echo "!!! missing ${base} -- skipping ${region}/${dis}/${node}" >&2

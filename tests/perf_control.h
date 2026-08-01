@@ -14,8 +14,20 @@
 // Region filtering matters because a single run walks several guarded regions:
 // `-t 1` (batch insert) first builds the tree via BuildTree, which is itself
 // guarded. perf accumulates over every enabled interval, so without `-pcr` the
-// reported counts would be build+insert summed. Pass `-pcr build|insert|delete`
-// to arm exactly one.
+// reported counts would be build+insert summed. Pass
+// `-pcr build|insert|delete|membership|incre_insert|incre_delete` to arm
+// exactly one.
+//
+// The guarded regions and what each one covers:
+//   build         one Build() over the whole input          (BuildTree)
+//   insert        one BatchInsert() of the batch            (BatchInsert)
+//   delete        one BatchDelete() of the batch            (BatchDelete)
+//   membership    the half-half Contain() probe pass        (Membership)
+//   incre_insert  the whole chain of 1/ratio BatchInserts   (BatchInsertByStep)
+//   incre_delete  the whole chain of 1/ratio BatchDeletes   (BatchDeleteByStep)
+//
+// Note the denominators differ: incre_insert / incre_delete walk the *entire*
+// input in 1/ratio batches, so their per-element divisor is n, not n*ratio.
 //
 // When either fd is 0 (the default, i.e. not running under the perf script)
 // every entry point below is a no-op, so normal timing runs are unaffected.
