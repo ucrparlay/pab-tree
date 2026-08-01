@@ -841,6 +841,11 @@ public:
     return idx->get_next_n(results.data(), (char*)&key, &key_len, range, ti);
   }
 
+  // WARN: currently dead code (ConRangeQuery calls scan(), not this), and it
+  // must not be revived as written -- it drives dynamic_get_next, which is the
+  // same shared-q_[0] scan that made range_count segfault under concurrency.
+  // Rebuild it on a stack local scanner the way count_range/get_next_n do
+  // before calling it from more than one thread.
   uint64_t range_report(
     std::pair<KeyType, KeyType> key_range,
     parlay::sequence<std::pair<KeyType, uint64_t>>::iterator output_iter,
@@ -893,42 +898,32 @@ public:
     return write_idx;
   }
 
+  // NOTE: this walked the range one key at a time through dynamic_get_next,
+  // which segfaults under concurrency -- that call runs its scan through the
+  // single q_[0] member mt_index owns, whose scankey_ buffer is reallocated on
+  // every visited value, so concurrent scanners double-free it (the crash
+  // lands in tcmalloc, not in masstree). It was also a full root descent plus a
+  // Json allocation per key. count_range does one descent with a stack local
+  // counting scanner instead, which is both thread safe and O(1) descents.
   uint64_t range_count(std::pair<KeyType, KeyType> key_range, threadinfo* ti)
   {
-    uint64_t count = 0;
     KeyComparator comp;
     if (!comp(key_range.first, key_range.second)) {
       return 0UL;
     }
 
+    // NOTE: big-endian on the wire, so masstree's byte order matches numeric
+    // order and count_range's compare against the upper bound is exact.
     KeyType lower = key_range.first;
+    KeyType upper = key_range.second;
     swap_endian(lower);
-    char cursor_key[sizeof(KeyType)];
-    memcpy(cursor_key, &lower, sizeof(KeyType));
-    int cursor_len = sizeof(KeyType);
+    swap_endian(upper);
 
-    while (cursor_len > 0) {
-      Str current_key;
-      Str current_value;
-      if (!idx->dynamic_get_next(
-            current_key, current_value, cursor_key, &cursor_len, ti)) {
-        break;
-      }
-      if (current_key.len != sizeof(KeyType)) {
-        break;
-      }
-
-      KeyType key;
-      memcpy(&key, current_key.s, sizeof(KeyType));
-      swap_endian(key);
-
-      if (!comp(key, key_range.second)) {
-        break;
-      }
-      ++count;
-    }
-
-    return count;
+    return idx->count_range((const char*)&lower,
+                            sizeof(KeyType),
+                            (const char*)&upper,
+                            sizeof(KeyType),
+                            ti);
   }
 
   int64_t getMemory() const

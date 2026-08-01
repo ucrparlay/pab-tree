@@ -1,0 +1,336 @@
+>>> logs/scalability/0/exp/1.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+92.389 2.19502 2.38224 
+
+>>> logs/scalability/0/exp/112.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+1.41346 0.0347035 0.036866 
+
+>>> logs/scalability/0/exp/16.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+6.91755 0.172703 0.186544 
+
+>>> logs/scalability/0/exp/224.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+1.21712 0.033468 0.030578 
+
+>>> logs/scalability/0/exp/32.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+3.60485 0.089199 0.095722 
+
+>>> logs/scalability/0/exp/4.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+27.0609 0.640827 0.690665 
+
+>>> logs/scalability/0/exp/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+1.92054 0.0480235 0.0514545 
+
+>>> logs/scalability/0/uni/1.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+92.6453 5.78138 4.95234 
+
+>>> logs/scalability/0/uni/112.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+1.42271 0.0919745 0.0891025 
+
+>>> logs/scalability/0/uni/16.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+6.92411 0.461424 0.413273 
+
+>>> logs/scalability/0/uni/224.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+1.22465 0.0757085 0.085537 
+
+>>> logs/scalability/0/uni/32.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+3.62406 0.235415 0.214337 
+
+>>> logs/scalability/0/uni/4.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+27.0792 1.70715 1.4889 
+
+>>> logs/scalability/0/uni/64.log
+Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+1.91568 0.124276 0.11588 
+
+>>> logs/scalability/1/exp/1.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+95.8235 2.21808 2.13387 
+
+>>> logs/scalability/1/exp/112.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+1.99486 0.044188 0.0410785 
+
+>>> logs/scalability/1/exp/16.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+7.33668 0.179896 0.165129 
+
+>>> logs/scalability/1/exp/224.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+1.72705 0.0453605 0.0368995 
+
+>>> logs/scalability/1/exp/32.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+3.77057 0.0944 0.0865695 
+
+>>> logs/scalability/1/exp/4.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+28.0182 0.649419 0.56945 
+
+>>> logs/scalability/1/exp/64.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: exp; 
+2.0977 0.05308 0.049168 
+
+>>> logs/scalability/1/uni/1.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+95.5463 5.15596 5.80772 
+
+>>> logs/scalability/1/uni/112.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+2.35218 0.107785 0.106166 
+
+>>> logs/scalability/1/uni/16.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+7.30235 0.43415 0.474778 
+
+>>> logs/scalability/1/uni/224.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+1.82923 0.104014 0.103458 
+
+>>> logs/scalability/1/uni/32.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+3.79034 0.224373 0.246055 
+
+>>> logs/scalability/1/uni/4.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+28.1369 1.4751 1.73046 
+
+>>> logs/scalability/1/uni/64.log
+Tree: CPAM; Buf: 64; InputFile: 1.base.bin; Dis: uni; 
+2.12023 0.123888 0.13564 
+
+>>> logs/scalability/2/exp/1.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+120.698 2.77583 2.66246 
+
+>>> logs/scalability/2/exp/112.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+2.70191 0.070544 0.05935 
+
+>>> logs/scalability/2/exp/16.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+8.67727 0.233212 0.235247 
+
+>>> logs/scalability/2/exp/224.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+2.22841 0.064662 0.057271 
+
+>>> logs/scalability/2/exp/32.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+4.5695 0.125941 0.126099 
+
+>>> logs/scalability/2/exp/4.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+36.2034 0.836116 0.800624 
+
+>>> logs/scalability/2/exp/64.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+2.71911 0.0781865 0.0743005 
+
+>>> logs/scalability/2/uni/1.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+120.861 5.30211 5.18888 
+
+>>> logs/scalability/2/uni/112.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+2.60327 0.13851 0.1224 
+
+>>> logs/scalability/2/uni/16.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+8.75342 0.527558 0.557335 
+
+>>> logs/scalability/2/uni/224.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+2.38332 0.118594 0.105491 
+
+>>> logs/scalability/2/uni/32.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+4.60586 0.286866 0.290722 
+
+>>> logs/scalability/2/uni/4.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+36.4996 1.75805 1.71672 
+
+>>> logs/scalability/2/uni/64.log
+Tree: PAM; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+2.81896 0.168286 0.160876 
+
+>>> logs/scalability/3/exp/1.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+141.691 13.6843 1.39284 
+
+>>> logs/scalability/3/exp/112.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+3.906 0.752327 0.031344 
+
+>>> logs/scalability/3/exp/16.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+11.5965 1.54058 0.10765 
+
+>>> logs/scalability/3/exp/224.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+3.36401 0.831065 0.031717 
+
+>>> logs/scalability/3/exp/32.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+6.12956 1.06073 0.0621365 
+
+>>> logs/scalability/3/exp/4.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+40.6 4.82918 0.389259 
+
+>>> logs/scalability/3/exp/64.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+3.5458 0.722456 0.036233 
+
+>>> logs/scalability/3/uni/1.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+142.013 3.97519 2.97217 
+
+>>> logs/scalability/3/uni/112.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+3.72352 0.133979 0.0748795 
+
+>>> logs/scalability/3/uni/16.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+11.6253 0.333742 0.242039 
+
+>>> logs/scalability/3/uni/224.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+3.29841 0.14733 0.0738065 
+
+>>> logs/scalability/3/uni/32.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+6.12645 0.208135 0.152641 
+
+>>> logs/scalability/3/uni/4.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+40.5238 1.19084 0.865082 
+
+>>> logs/scalability/3/uni/64.log
+Tree: PMA; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+3.51914 0.139422 0.082462 
+
+>>> logs/scalability/5/exp/1.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+741.319 7.14515 16.8882 
+
+>>> logs/scalability/5/exp/112.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+67.6176 0.68804 0.755924 
+
+>>> logs/scalability/5/exp/16.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+97.2058 1.1705 4.9226 
+
+>>> logs/scalability/5/exp/224.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+64.3832 0.737215 0.959862 
+
+>>> logs/scalability/5/exp/32.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+76.2009 0.775028 0.752994 
+
+>>> logs/scalability/5/exp/4.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+286.038 3.02744 17.462 
+
+>>> logs/scalability/5/exp/64.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+68.628 0.691763 0.715081 
+
+>>> logs/scalability/5/uni/1.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+737.102 8.36955 18.4959 
+
+>>> logs/scalability/5/uni/112.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+70.1639 0.720707 0.809224 
+
+>>> logs/scalability/5/uni/16.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+101.52 1.23908 4.56544 
+
+>>> logs/scalability/5/uni/224.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+62.8897 0.707019 0.999905 
+
+>>> logs/scalability/5/uni/32.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+76.1414 0.776711 1.09817 
+
+>>> logs/scalability/5/uni/4.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+289.633 3.17161 5.53174 
+
+>>> logs/scalability/5/uni/64.log
+Tree: MassTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+68.6172 0.703635 0.783139 
+
+>>> logs/scalability/6/exp/1.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+2049.39 18.1619 18.3957 
+
+>>> logs/scalability/6/exp/112.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+40.3806 0.528036 0.46155 
+
+>>> logs/scalability/6/exp/16.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+181.851 1.80948 1.61354 
+
+>>> logs/scalability/6/exp/224.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+37.832 0.680481 0.584462 
+
+>>> logs/scalability/6/exp/32.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+87.1517 0.822088 0.874303 
+
+>>> logs/scalability/6/exp/4.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+736.042 6.49146 6.41831 
+
+>>> logs/scalability/6/exp/64.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: exp; 
+49.5222 0.548672 0.532541 
+
+>>> logs/scalability/6/uni/1.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+2047.32 24.2979 24.474 
+
+>>> logs/scalability/6/uni/112.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+40.2051 0.551586 0.501993 
+
+>>> logs/scalability/6/uni/16.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+183.195 1.88527 2.09804 
+
+>>> logs/scalability/6/uni/224.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+37.9136 0.69863 0.553681 
+
+>>> logs/scalability/6/uni/32.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+86.6666 0.991352 1.66511 
+
+>>> logs/scalability/6/uni/4.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+852.222 7.27479 7.63109 
+
+>>> logs/scalability/6/uni/64.log
+Tree: BwTree; Buf: 1; InputFile: 1.base.bin; Dis: uni; 
+49.0362 0.621931 0.549589 
+

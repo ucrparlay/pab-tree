@@ -248,6 +248,45 @@ public:
     return count;
   }
 
+  //#################################################################################
+  // Count Range [begin_key, end_key) (ordered)
+  //#################################################################################
+  // NOTE: counting used to be done by calling dynamic_get_next once per key.
+  // That is not usable concurrently: dynamic_get_next drives the scan through
+  // the shared q_[0] member, and query_json_scanner::visit_value rewrites
+  // q_.scankey_ (a refcounted String it reallocates) and q_.f_ on every value
+  // it visits. Two threads scanning at once therefore free the same buffer
+  // twice -- it segfaults inside the allocator, it does not merely run slow.
+  // One descent with a stack local scanner, the same way get_next_n works.
+  struct count_scanner {
+    Str endkey;
+    uint64_t count;
+
+    explicit count_scanner(Str endkey)
+      : endkey(endkey), count(0) {
+    }
+
+    template <typename SS2, typename K2>
+    void visit_leaf(const SS2&, const K2&, threadinfo&) {}
+    bool visit_value(Str key, const row_type*, threadinfo&) {
+      // NOTE: masstree orders keys by their bytes, so comparing the raw bytes
+      // against the upper bound is the tree's own order. Callers holding
+      // integer keys must hand them over big-endian (MassTreeIndex does, via
+      // swap_endian) for that to agree with numeric order.
+      if (key.compare(endkey) >= 0)
+        return false;
+      ++count;
+      return true;
+    }
+  };
+
+  uint64_t count_range(const char *begin_key, int begin_keylen,
+                       const char *end_key, int end_keylen, threadinfo *ti) {
+    count_scanner s(Str(end_key, end_keylen));
+    table_->table().scan(Str(begin_key, begin_keylen), true, s, *ti);
+    return s.count;
+  }
+
 private:
   T *table_;
   query<row_type> q_[1];

@@ -73,6 +73,12 @@ struct Options
     strip_suffix(filename, ".bin");
     strip_suffix(filename, ".in");
     strip_suffix(filename, ".base");
+    // NOTE: ".batch" too, so -p can point at a batch file. The incremental
+    // datasets (incre_data_generator) name both the insert and the delete
+    // stream "<i>.batch.<ext>" -- there is no base/batch pair there, the whole
+    // file IS the batch stream. Without this the prefix comes out as
+    // "<i>.batch" and every derived path becomes "<i>.batch.base.<ext>".
+    strip_suffix(filename, ".batch");
 
     return { dirPrefix, filename };
   }
