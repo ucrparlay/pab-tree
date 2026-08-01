@@ -216,6 +216,26 @@ declare -A REGION_STEM=(
 	[build]=batch [membership]=batch [incre_insert]=batch [incre_delete]=batch
 	[insert]=base [delete]=base
 )
+# region -> which whitespace field of the driver's output line holds ITS time.
+# The .out file is two lines: a "Tree: ...; Dis: ...;" header, then every timing
+# the run printed, in execution order. Only tag 32 puts the region of interest
+# first -- every other tag runs a build before it (the primal build block is
+# guarded by `(tag & (1<<5)) == 0`, so tags 1/2/64/128 all execute it) and that
+# build's time is field 1.
+#
+#   -t 32   build_time  mix_time                  -> build=1, membership=2
+#   -t 64   build_time  incre_insert_time         -> 2
+#   -t 128  build_time  incre_delete_time         -> 2
+#   -t 1    build_time  insert_time               -> 2
+#   -t 2    build_time  delete_time               -> 2
+#
+# Re-derive these if the driver's print order changes; a wrong index yields a
+# plausible-looking number, so merge_perf_cache.py cross-checks it against
+# perf's enabled time (see execs_est).
+declare -A REGION_TIME_COL=(
+	[build]=1 [membership]=2 [incre_insert]=2 [incre_delete]=2
+	[insert]=2 [delete]=2
+)
 
 # NOTE: test_framework.h currently PINS incre_ratio_seq to {0.01} -- the
 # PerfControl::Active() gate that honoured -b is commented out there. So tags
@@ -243,7 +263,10 @@ mkdir -p "${LOG_PATH}" "$(dirname "${CSV}")"
 
 # ------------------------------------------------------------------ csv header
 if [[ "${MODE}" == "stat" ]]; then
-	printf 'region,tree,dis,n,batch_ratio,threads,numa,%s\n' "${EVENTS}" >"${CSV}"
+	# NOTE: time_s and enabled_s go AFTER the events so the per-event extraction
+	# below stays a plain positional append.
+	printf 'region,tree,dis,n,batch_ratio,threads,numa,%s,time_s,enabled_s\n' \
+		"${EVENTS}" >"${CSV}"
 fi
 
 # Run one (solver, tree, dis, node, region) point under perf.
@@ -324,6 +347,24 @@ function run_one() {
 			v=$(awk -F, -v e="${ev}" '$3==e {print $1; exit}' "${stem}.stat")
 			row+=",${v:-NA}"
 		done
+
+		# The tree's OWN wall-clock for this region, as time_loop measured it --
+		# not perf's, which brackets a bit more and is per-CPU. Line 2 of .out
+		# holds every printed timing in execution order; REGION_TIME_COL says
+		# which field is ours.
+		local tsec
+		tsec=$(awk -v c="${REGION_TIME_COL[$region]}" \
+			'NR==2 {print $c; exit}' "${stem}.out")
+		row+=",${tsec:-NA}"
+
+		# perf's enabled time for the region, seconds (field 4 of any event row
+		# is ns the counter was enabled, summed over CPUs). Divided by
+		# time_s*threads downstream it estimates how many executions got counted
+		# -- the check that caught BatchInsertByStep counting two.
+		local ens
+		ens=$(awk -F, '$3=="cycles" {printf "%.6f", $4/1e9; exit}' "${stem}.stat")
+		row+=",${ens:-NA}"
+
 		echo "${row}" | tee -a "${CSV}"
 	else
 		# Print just the cache-misses section: the report concatenates one

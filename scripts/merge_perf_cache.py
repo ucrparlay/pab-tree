@@ -67,6 +67,21 @@
 # vs_btree       cache-misses relative to BTree in the same
 #                (source, distribution, region). 1.00 for BTree itself; blank if
 #                no BTree row exists for that distribution+region.
+# time_s         the TREE's own wall clock for the region, as time_loop measured
+#                it -- the same number b_test prints. Not perf's elapsed, which
+#                brackets file reads and setup too. Read it next to
+#                cache-misses_per_elem: when the two rank the trees differently
+#                the region is not miss-bound, and time is the one that counts.
+# ns_per_elem    time_s / region_n, in nanoseconds.
+# time_vs_btree  time_s relative to BTree, same keying as vs_btree.
+# enabled_s      perf's enabled time for the region, summed over CPUs.
+# execs_est      enabled_s / (time_s * threads). SANITY CHECK, not a metric:
+#                ~1 means perf counted one execution, ~2 means it counted a
+#                warmup pass as well and every count is doubled. Reads a little
+#                under 1 when the region does not saturate every worker
+#                (0.85 membership, 0.91 build, 0.96 incremental). This is what
+#                caught BatchInsertByStep hardcoding time_loop's delay and so
+#                always taking a warmup. Rows above 1.5 are reported on stderr.
 #
 # Counts are per single execution -- perf_cache.sh pins -r 1 for that reason.
 # Treat cache-miss differences under ~20% as unresolved from one run: measured
@@ -147,6 +162,14 @@ def region_elements(region, n, batch_ratio):
     return int(round(n * batch_ratio))
 
 
+def _num(v):
+    """float(v), or None for the blanks/NAs perf_cache.sh writes on failure."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def derive(rows, source):
     out = []
     # BTree's cache-misses for the vs_btree column. MUST be keyed by
@@ -158,6 +181,11 @@ def derive(rows, source):
         (r["dis"], r["region"]): int(r["cache-misses"])
         for r in rows
         if r["tree"] == "BTree"
+    }
+    time_baseline = {
+        (r["dis"], r["region"]): _num(r.get("time_s"))
+        for r in rows
+        if r["tree"] == "BTree" and _num(r.get("time_s"))
     }
     for r in rows:
         n = int(r["n"])
@@ -184,8 +212,30 @@ def derive(rows, source):
         cy = int(r["cycles"])
         rec["ipc"] = round(int(r["instructions"]) / cy, 3) if cy else ""
         rec["miss_rate_pct"] = round(100.0 * cm / cr, 2) if cr else ""
+
+        # NOTE: .get -- csvs written before the timing columns existed lack
+        # them. Everything derived from them stays blank for those.
+        t = _num(r.get("time_s"))
+        rec["time_s"] = t if t is not None else ""
+        rec["ns_per_elem"] = round(t * 1e9 / region_n, 1) if t else ""
+
+        # Sanity, not a metric. enabled_s is summed over CPUs, so dividing by
+        # time_s*threads gives ~1 for a single execution at full parallelism and
+        # ~2 if the region ran twice. It reads a bit under 1 whenever the region
+        # does not keep every worker busy (measured 0.85 for membership, 0.96
+        # for the incremental chains, 0.91 for build). Treat >1.5 as "perf
+        # counted a warmup pass too" -- that is exactly how the 2x overcount in
+        # BatchInsertByStep was found. Not exact: it conflates execution count
+        # with average CPU utilisation.
+        en = _num(r.get("enabled_s"))
+        thr = int(r["threads"])
+        rec["enabled_s"] = en if en is not None else ""
+        rec["execs_est"] = round(en / (t * thr), 2) if (en and t and thr) else ""
+
         base = baseline.get((r["dis"], r["region"]))
         rec["vs_btree"] = round(cm / base, 3) if base else ""
+        tbase = time_baseline.get((r["dis"], r["region"]))
+        rec["time_vs_btree"] = round(t / tbase, 3) if (t and tbase) else ""
         out.append(rec)
     return out
 
@@ -202,7 +252,16 @@ def main(argv):
         ["source", "region", "tree", "dis", "n", "batch_ratio", "threads", "numa", "region_n"]
         + EVENTS
         + [f"{e}_per_elem" for e in EVENTS]
-        + ["ipc", "miss_rate_pct", "vs_btree"]
+        + [
+            "ipc",
+            "miss_rate_pct",
+            "vs_btree",
+            "time_s",
+            "ns_per_elem",
+            "time_vs_btree",
+            "enabled_s",
+            "execs_est",
+        ]
     )
 
     combined = []
@@ -243,10 +302,13 @@ def main(argv):
         print(f"wrote {alldest}  ({len(combined)} rows)")
 
     if verbose:
+        # miss and time columns sit side by side deliberately: misses only
+        # explain the cycle cost when IPC says the region is latency-bound, so
+        # the two "vs BTree" ratios disagreeing is a signal, not an error.
         hdr = (
             f"{'dis':10} {'region':13} {'tree':6} {'region_n':>13} "
-            f"{'cache-misses':>15} {'/elem':>8} {'miss%':>7} {'IPC':>6} "
-            f"{'vs BTree':>9}"
+            f"{'misses/elem':>12} {'miss%':>7} {'IPC':>6} {'miss:vB':>8} "
+            f"{'time_s':>9} {'ns/elem':>9} {'time:vB':>8} {'ex':>5}"
         )
         print("\n" + hdr)
         print("-" * len(hdr))
@@ -259,9 +321,29 @@ def main(argv):
             prev = key
             print(
                 f"{r['dis']:10} {r['region']:13} {r['tree']:6} {r['region_n']:13,} "
-                f"{r['cache-misses']:15,} {r['cache-misses_per_elem']:8.2f} "
-                f"{r['miss_rate_pct']:6}% {r['ipc']:>6} {r['vs_btree']:>9}"
+                f"{r['cache-misses_per_elem']:12.2f} "
+                f"{r['miss_rate_pct']:6}% {r['ipc']:>6} {r['vs_btree']:>8} "
+                f"{r['time_s']:>9} {r['ns_per_elem']:>9} "
+                f"{r['time_vs_btree']:>8} {r['execs_est']:>5}"
             )
+
+        # execs_est should sit near 1. Anything much above says perf counted a
+        # warmup pass on top of the measured one, i.e. the counts are a multiple
+        # of the per-execution figure.
+        bad = [r for r in combined if _num(r["execs_est"]) and _num(r["execs_est"]) > 1.5]
+        if bad:
+            print(
+                f"\n!!! {len(bad)} row(s) with execs_est > 1.5 -- perf likely "
+                f"counted more than one execution; check time_loop's delay for "
+                f"those regions:",
+                file=sys.stderr,
+            )
+            for r in bad:
+                print(
+                    f"    {r['source']} {r['dis']} {r['region']} {r['tree']}"
+                    f"  execs_est={r['execs_est']}",
+                    file=sys.stderr,
+                )
     return 0
 
 
