@@ -217,6 +217,28 @@ declare -A REGION_STEM=(
 	[insert]=base [delete]=base
 )
 
+# NOTE: test_framework.h currently PINS incre_ratio_seq to {0.01} -- the
+# PerfControl::Active() gate that honoured -b is commented out there. So tags
+# 1<<6 / 1<<7 always slice at 1% and always re-derive ins|del/100/ themselves,
+# whatever -b says. BATCH_RATIO still chooses the file handed to -p and still
+# lands in the csv's batch_ratio column, so any other value would label the rows
+# with a step size that was never used, and point build/membership at a
+# differently-laid-out file than the incre regions read. Refuse rather than
+# mislabel. Restore the gate in test_framework.h to sweep other ratios again.
+INCRE_PINNED_RATIO=0.01
+for region in "${REGIONS[@]}"; do
+	case "${region}" in
+	incre_*)
+		if [[ "${BATCH_RATIO}" != "${INCRE_PINNED_RATIO}" ]]; then
+			echo "!!! BATCH_RATIO=${BATCH_RATIO} but incre_ratio_seq is pinned to" \
+				"${INCRE_PINNED_RATIO} in test_framework.h -- ${region} would slice at" \
+				"${INCRE_PINNED_RATIO} and be logged as ${BATCH_RATIO}. Aborting." >&2
+			exit 1
+		fi
+		;;
+	esac
+done
+
 mkdir -p "${LOG_PATH}" "$(dirname "${CSV}")"
 
 # ------------------------------------------------------------------ csv header

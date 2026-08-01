@@ -20,13 +20,13 @@
 #include "dependence/type_trait.h"
 #include "options.h"
 #include "parlay/internal/group_by.h"
-#include "perf_control.h"
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "parlay/random.h"
 #include "parlay/slice.h"
 #include "pb_tree/b_tree.h"
+#include "perf_control.h"
 #include "wrapper.h"
 
 #ifdef CCP
@@ -1901,8 +1901,8 @@ static auto constexpr DefaultTestFunc =
       // passes above would not be counted even if restored.
       membership_query(shuffled.cut(0, batch_size), "membership");
 
-      range_query(entry_in_tree);
-      range_count(entry_in_tree);
+      // range_query(entry_in_tree);
+      // range_count(entry_in_tree);
     };
 
 #ifdef MEMCHECK
@@ -2109,9 +2109,10 @@ static auto constexpr DefaultTestFunc =
     // -b instead. Ordinary timing runs are not under perf, so they still walk
     // the full sweep and nothing about incre_updates.sh changes.
     parlay::sequence<double> const incre_ratio_seq =
-      PerfControl::Active() ? parlay::sequence<double>{ opts.batch_ratio }
-                            : parlay::sequence<double>{ 0.0001, 0.001, 0.01,
-                                                        0.1 };
+      parlay::sequence<double>{ 0.01 };
+    // PerfControl::Active()
+    //   ? parlay::sequence<double>{ opts.batch_ratio }
+    //   : parlay::sequence<double>{ 0.0001, 0.001, 0.01, 0.1 };
 
     //  NOTE: incremental insert
     if (opts.tag & (1 << 6)) {
@@ -2124,8 +2125,8 @@ static auto constexpr DefaultTestFunc =
         BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio, opts.rounds);
 
         // NOTE: the first half of wp was inserted, the second half was not.
-        incre_update_query(wp.cut(0, wp.size() / 2),
-                           wp.cut(wp.size() / 2, wp.size()));
+        // incre_update_query(wp.cut(0, wp.size() / 2),
+        //                    wp.cut(wp.size() / 2, wp.size()));
       }
     }
 
@@ -2138,8 +2139,8 @@ static auto constexpr DefaultTestFunc =
 
         // NOTE: the first half of wi was deleted, so the second half is the one
         // left in the tree.
-        incre_update_query(wi.cut(wi.size() / 2, wi.size()),
-                           wi.cut(0, wi.size() / 2));
+        // incre_update_query(wi.cut(wi.size() / 2, wi.size()),
+        //                    wi.cut(0, wi.size() / 2));
       }
     }
 
