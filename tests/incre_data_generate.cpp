@@ -40,6 +40,13 @@ enum DisType : int
   kDisExponential = 1,
   kDisNormal = 2,
   kDisDualNormal = 3,
+  // NOTE: "seg" -- a sliding segment.  Each batch of m is drawn uniformly from
+  // the first `mult * m` surviving keys (mult = 2 by default), then removed, so
+  // the hot region is a fixed-width window of ranks that advances by exactly m
+  // per batch.  Unlike exp/norm its width does not depend on the pool size at
+  // all, which makes it the one shape that stays equally concentrated from the
+  // first batch to the last.
+  kDisSeg = 4,
 };
 
 parlay::sequence<double>
@@ -91,7 +98,10 @@ TargetDensity(int const dis_type,
               parlay::sequence<double> const& param,
               double const x)
 {
-  if (dis_type == kDisUniform) {
+  // NOTE: seg is flat like uniform -- everything that makes it a segment lives
+  // in WindowSize, which restricts the draw to the leading `mult * m` ranks.
+  // Inside that window every surviving key is equally likely.
+  if (dis_type == kDisUniform || dis_type == kDisSeg) {
     return 1.0;
   }
 
@@ -118,6 +128,56 @@ TargetDensity(int const dis_type,
   double const z2 = (x - m2) / d2;
   return (0.5 * std::exp(-0.5 * z1 * z1) / d1) +
          (0.5 * std::exp(-0.5 * z2 * z2) / d2);
+}
+
+// NOTE: how many LEADING ranks of the pool can possibly matter this batch.
+//
+// A steep exponential is essentially zero past the front: the mass beyond
+// x = K/lambda is e^-K of the total, so at lambda = 5000 more than 99% of every
+// pass was being spent evaluating std::exp on ranks whose probability rounds to
+// zero.  K = 40 puts the skipped mass at ~4e-18; the expected number of picks
+// lost to the truncation is bounded by lambda * want * e^-K, which is ~1e-9 even
+// at the largest configuration here, i.e. far below one key.
+//
+// The floor of 8 * want keeps the window usable when the shape is capped (demand
+// past 1), where the front saturates at probability 1 and the batch has to reach
+// further back than the density alone suggests.
+//
+// Only the exponential is front-loaded, so every other shape returns the whole
+// pool and behaves exactly as before.  A centred window would work for
+// norm/dual_norm but is a different change.
+inline size_t
+WindowSize(int const dis_type,
+           parlay::sequence<double> const& param,
+           size_t const pool_n,
+           size_t const want)
+{
+  // NOTE: seg IS its window -- the batch is drawn uniformly from the leading
+  // `mult * want` surviving keys and nothing else is ever a candidate, so this
+  // is the definition of the shape, not an approximation of it.  mult must be
+  // >= 1 (mult == 1 degenerates to "take the front `want` keys outright").
+  if (dis_type == kDisSeg) {
+    double const mult = std::max(1.0, ParamOr(param, 0, 2.0));
+    double const wide = mult * static_cast<double>(want);
+    return wide >= static_cast<double>(pool_n) ? pool_n
+                                               : static_cast<size_t>(wide);
+  }
+
+  if (dis_type != kDisExponential) {
+    return pool_n;
+  }
+  double const lambda = ParamOr(param, 0, 10.0);
+  if (!(lambda > 0.0)) {
+    return pool_n;
+  }
+
+  static constexpr double kTailCutoff = 40.0;
+  double const frac = kTailCutoff / lambda;
+  size_t const by_shape = frac >= 1.0
+                            ? pool_n
+                            : static_cast<size_t>(frac * pool_n) + 1;
+  size_t const floor_n = (want > pool_n / 8) ? pool_n : 8 * want;
+  return std::min(pool_n, std::max(by_shape, floor_n));
 }
 
 // NOTE: pick exactly `want` of the `pool_n` surviving ranks, so that rank i is
@@ -149,8 +209,12 @@ TargetDensity(int const dis_type,
 //
 // Returns the per-rank selection flags; the caller uses them both to gather the
 // batch and to compact the pool, so no separate claim array is needed.
+// `win_n` is how many leading ranks are actually considered (see WindowSize);
+// `pool_n` stays the denominator for the density position, so the shape is the
+// same whether or not the tail is skipped.
 parlay::sequence<bool>
-SelectBatchFlags(size_t const pool_n,
+SelectBatchFlags(size_t const win_n,
+                 size_t const pool_n,
                  size_t const want,
                  int const dis_type,
                  parlay::sequence<double> const& param,
@@ -160,11 +224,11 @@ SelectBatchFlags(size_t const pool_n,
   static constexpr int kMaxSolveIters = 24;
 
   // NOTE: the final batch takes whatever is left over.
-  if (want >= pool_n) {
-    return parlay::sequence<bool>(pool_n, true);
+  if (want >= win_n) {
+    return parlay::sequence<bool>(win_n, true);
   }
 
-  auto const w = parlay::delayed_tabulate(pool_n, [&](size_t i) {
+  auto const w = parlay::delayed_tabulate(win_n, [&](size_t i) {
     return TargetDensity(
       dis_type, param, (static_cast<double>(i) + 0.5) / pool_n);
   });
@@ -181,7 +245,7 @@ SelectBatchFlags(size_t const pool_n,
       // count of ranks at or above t, and the mass strictly below it
       auto const acc = parlay::reduce(
         parlay::delayed_tabulate(
-          pool_n,
+          win_n,
           [&](size_t i) {
             double const v = w[i];
             return v >= t ? std::make_pair(size_t(1), 0.0)
@@ -220,7 +284,7 @@ SelectBatchFlags(size_t const pool_n,
   // removes the lucky hot spots that make a skewed workload hard, so it is the
   // wrong trade even though it is tidier.
   parlay::random_generator gen(seed);
-  auto flags = parlay::tabulate(pool_n, [&, t](size_t i) -> bool {
+  auto flags = parlay::tabulate(win_n, [&, t](size_t i) -> bool {
     auto r = gen[i];
     return std::uniform_real_distribution<double>(0.0, 1.0)(r) <
            std::min(1.0, w[i] / t);
@@ -235,12 +299,12 @@ SelectBatchFlags(size_t const pool_n,
   // below the scatter this whole change exists to restore.
   size_t const got = parlay::reduce(
     parlay::delayed_tabulate(
-      pool_n, [&](size_t i) -> size_t { return flags[i] ? 1 : 0; }),
+      win_n, [&](size_t i) -> size_t { return flags[i] ? 1 : 0; }),
     parlay::addm<size_t>());
 
   // NOTE: `d` distinct positions in [0, span), drawn without materialising the
   // candidate set -- `d` is tiny, so oversample and dedupe rather than build
-  // and shuffle a pool_n-sized index array.
+  // and shuffle a win_n-sized index array.
   auto draw_positions = [&](size_t span, size_t d, size_t salt) {
     parlay::sequence<size_t> out;
     for (int attempt = 0; attempt < 16 && out.size() < d; attempt++) {
@@ -255,22 +319,54 @@ SelectBatchFlags(size_t const pool_n,
   };
 
   if (got > want) {
-    auto const sel = parlay::pack(parlay::iota(pool_n), flags);
+    auto const sel = parlay::pack(parlay::iota(win_n), flags);
     auto const drop = draw_positions(sel.size(), got - want, 1);
     parlay::parallel_for(
       0, drop.size(), [&](size_t j) { flags[sel[drop[j]]] = false; });
   } else if (got < want) {
-    // NOTE: most ranks are unselected, so rejection finds fresh ones in one or
-    // two rounds without touching the whole pool.
+    // NOTE: the additions have to follow the target density, NOT be spread
+    // uniformly over the free ranks.  Uniform top-up is invisible when the
+    // shape is gentle but obvious when it is steep: at lambda = 5000 it put
+    // ~0.5% of the batch flat across the whole window, which pushed the largest
+    // key out to 4x where the exponential could plausibly reach.  So draw
+    // candidates uniformly and then accept each with probability w/max(w),
+    // which is rejection sampling from the shape itself.
     size_t need = want - got;
-    for (int attempt = 0; attempt < 16 && need > 0; attempt++) {
-      auto const cand = draw_positions(pool_n, 4 * need, 2 + attempt);
-      auto const fresh =
-        parlay::filter(cand, [&](size_t v) { return !flags[v]; });
+    for (int attempt = 0; attempt < 24 && need > 0; attempt++) {
+      // NOTE: candidates are drawn WITHOUT deduping -- acceptance is only a few
+      // percent, so deduping the raw draw would hash tens of thousands of
+      // entries per batch to save a handful of collisions.  Dedupe the accepted
+      // set instead, which is ~`need` elements.
+      size_t const draw_n = (64 * need) + 64;
+      parlay::random_generator g(seed + 991 + (attempt * 7717ULL));
+      auto const cand = parlay::tabulate(draw_n, [&](size_t j) -> size_t {
+        auto r = g[j];
+        return std::uniform_int_distribution<size_t>(0, win_n - 1)(r);
+      });
+      auto const keep = parlay::tabulate(draw_n, [&](size_t j) -> bool {
+        size_t const v = cand[j];
+        if (flags[v]) {
+          return false;
+        }
+        auto r = g[draw_n + j];
+        return std::uniform_real_distribution<double>(0.0, 1.0)(r) <
+               (w[v] / max_all);
+      });
+      auto const fresh = parlay::remove_duplicates(parlay::pack(cand, keep));
       size_t const take = std::min(need, fresh.size());
       parlay::parallel_for(
         0, take, [&](size_t j) { flags[fresh[j]] = true; });
       need -= take;
+    }
+    // NOTE: last resort if the shaped draw could not fill it (only reachable
+    // when the density is degenerate); correctness of the batch size wins.
+    if (need > 0) {
+      auto const free_ranks = parlay::pack(
+        parlay::iota(win_n),
+        parlay::delayed_tabulate(win_n, [&](size_t i) { return !flags[i]; }));
+      parlay::parallel_for(0, std::min(need, free_ranks.size()), [&](size_t j) {
+        flags[free_ranks[j]] = true;
+      });
     }
   }
 
@@ -288,65 +384,120 @@ GenIncrementalBatches(size_t const base_n,
 {
   using K = typename E::K;
 
-  // NOTE: dense and sorted, so a key IS its rank and "rank into the pool"
-  // means the same thing before and after keys are removed.
-  auto pool = parlay::tabulate(base_n, [](size_t i) -> size_t { return i; });
-
   auto out = parlay::sequence<E>::uninitialized(base_n);
 
   size_t const batch_num = (base_n + batch_n - 1) / batch_n;
   size_t const report_every = std::max<size_t>(batch_num / 10, 1);
-  size_t written = 0;
-  size_t clamped_total = 0;
+  size_t const seed0 = (static_cast<size_t>(rand_seed) + 1) * 1'000'003ULL;
 
   std::cout << "batches: " << batch_num << " x " << batch_n << std::endl;
 
+  auto report = [&](size_t b, size_t pool_n, size_t win_n) {
+    size_t const beg = b * batch_n;
+    size_t const cnt = std::min(batch_n, base_n - beg);
+    auto keys = parlay::delayed_tabulate(
+      cnt, [&](size_t i) -> size_t { return out[beg + i].key; });
+    auto const key_lo = parlay::reduce(keys, parlay::minm<size_t>());
+    auto const key_hi = parlay::reduce(keys, parlay::maxm<size_t>());
+    auto const mean =
+      static_cast<double>(parlay::reduce(keys, parlay::addm<size_t>())) /
+      static_cast<double>(cnt);
+    std::cout << "  batch " << b << ": pool " << pool_n << ", window " << win_n
+              << ", keys [" << key_lo << ", " << key_hi << "], mean "
+              << mean / static_cast<double>(base_n) << " of the key space"
+              << std::endl;
+  };
+
+  // NOTE: uniform has a closed form -- one global shuffle IS the whole
+  // batch-by-batch carve.  Cut a uniform random permutation of [0, base_n) into
+  // consecutive batch_n blocks: block 0 is a uniform random subset of the key
+  // space, block 1 a uniform random subset of what is left, and so on, which is
+  // exactly the loop below.  Identical in distribution, O(base_n) instead of
+  // O(base_n * batch_num / 2) -- at 1e9 with 10000 batches that is seconds
+  // rather than 46 minutes, and the ratio stops mattering entirely.
+  //
+  // The seed is explicit: parlay::random_shuffle defaults to a FIXED seed, so
+  // without it every -file_num instance would come out identical.
+  if (dis_type == kDisUniform) {
+    auto const perm = parlay::random_shuffle(
+      parlay::tabulate(base_n, [](size_t i) -> size_t { return i; }),
+      parlay::random(seed0));
+    parlay::parallel_for(0, base_n, [&](size_t i) {
+      out[i] = E{ .key = static_cast<K>(perm[i]), .val = { i } };
+    });
+    for (size_t b = 0; b < batch_num; b++) {
+      if (b % report_every == 0 || b + 1 == batch_num) {
+        report(b, base_n - (b * batch_n), 0);
+      }
+    }
+    std::cout << "pool-work: " << static_cast<double>(base_n)
+              << " (uniform closed form -- one shuffle, no per-batch carve)"
+              << std::endl;
+    return out;
+  }
+
+  // NOTE: dense and sorted, so a key IS its rank and "rank into the pool"
+  // means the same thing before and after keys are removed.  The buffer is
+  // allocated once at full size and never reallocated; the live pool is the
+  // suffix [lo, base_n), so ranks are offsets from `lo`.
+  auto pool = parlay::tabulate(base_n, [](size_t i) -> size_t { return i; });
+  size_t lo = 0;
+  size_t written = 0;
+  size_t clamped_total = 0;
+  size_t win_total = 0; // for the cost report
+
   for (size_t b = 0; b < batch_num; b++) {
-    size_t const pool_n = pool.size();
+    size_t const pool_n = base_n - lo;
     size_t const want = std::min(batch_n, pool_n);
+    size_t const win_n = WindowSize(dis_type, param, pool_n, want);
+    win_total += win_n;
 
     auto const flags = SelectBatchFlags(
-      pool_n,
-      want,
-      dis_type,
-      param,
-      ((static_cast<size_t>(rand_seed) + 1) * 1'000'003ULL) + (b * 64ULL),
-      clamped_total);
-    auto picked = parlay::pack(parlay::iota(pool_n), flags);
+      win_n, pool_n, want, dis_type, param, seed0 + (b * 64ULL), clamped_total);
+    auto picked = parlay::pack(parlay::iota(win_n), flags);
 
     // NOTE: order *within* a batch carries no meaning, and a batch handed to
     // the tree in ascending key order would be an unrealistically easy input.
     // Shuffle inside the batch; the batches themselves stay in generation
-    // order, which is the entire point of this generator.
-    auto batch_rank = parlay::random_shuffle(picked);
+    // order, which is the entire point of this generator.  Seeded per batch --
+    // parlay::random_shuffle otherwise uses one fixed seed for every call.
+    auto batch_rank =
+      parlay::random_shuffle(picked, parlay::random(seed0 + (b * 64ULL) + 33));
     parlay::parallel_for(0, batch_rank.size(), [&](size_t i) {
-      out[written + i] = E{ .key = static_cast<K>(pool[batch_rank[i]]),
+      out[written + i] = E{ .key = static_cast<K>(pool[lo + batch_rank[i]]),
                             .val = { written + i } };
     });
 
+    size_t const took = batch_rank.size();
+    written += took;
+
     if (b % report_every == 0 || b + 1 == batch_num) {
-      auto keys = parlay::delayed_tabulate(
-        batch_rank.size(), [&](size_t i) { return pool[batch_rank[i]]; });
-      auto const lo = parlay::reduce(keys, parlay::minm<size_t>());
-      auto const hi = parlay::reduce(keys, parlay::maxm<size_t>());
-      auto const mean =
-        static_cast<double>(parlay::reduce(keys, parlay::addm<size_t>())) /
-        static_cast<double>(batch_rank.size());
-      std::cout << "  batch " << b << ": pool " << pool_n << ", keys [" << lo
-                << ", " << hi << "], mean "
-                << mean / static_cast<double>(base_n) << " of the key space"
-                << std::endl;
+      report(b, pool_n, win_n);
     }
 
-    written += batch_rank.size();
+    // NOTE: only the window could have lost anything, so compact just the
+    // window and leave the untouched suffix where it is.  The window's
+    // survivors are shifted RIGHT to end flush against the window's end, which
+    // makes the new live pool the suffix [lo + took, base_n) -- contiguous,
+    // still in key order, and the tail never moved.  That is what turns the
+    // per-batch cost from O(pool_n) into O(win_n).
+    auto const survivors = parlay::pack(
+      pool.cut(lo, lo + win_n),
+      parlay::delayed_tabulate(win_n, [&](size_t i) { return !flags[i]; }));
+    parlay::parallel_for(0, survivors.size(), [&](size_t i) {
+      pool[lo + took + i] = survivors[i];
+    });
+    lo += took;
+  }
 
-    // NOTE: drop what was taken, keeping the survivors in key order so the
-    // next batch's ranks keep meaning the same thing.  O(pool_n) per batch and
-    // so O(base_n * batch_num / 2) overall -- the dominant cost at small batch
-    // ratios.
-    pool = parlay::pack(pool, parlay::delayed_tabulate(pool_n, [&](size_t i) {
-                          return !flags[i];
-                        }));
+  {
+    // NOTE: total pool-work is what the runtime tracks; the ratio shows how much
+    // the front-window cut off (1.0x = no saving, i.e. every shape but exp).
+    double const full = static_cast<double>(base_n) *
+                        static_cast<double>(batch_num) / 2.0;
+    std::cout << "pool-work: " << static_cast<double>(win_total) << " vs "
+              << full << " unwindowed (" << (full / std::max(1.0, static_cast<double>(win_total)))
+              << "x saved)" << std::endl;
   }
 
   if (clamped_total != 0) {
@@ -419,8 +570,10 @@ ValidatePermutation(parlay::sequence<E> const& seq,
 // derived from it.
 //
 // -batch_param: exp -> lambda (default 10); norm -> mean,dev (default 0.5,0.2);
-// dual_norm -> mean1,dev1,mean2,dev2 (default 0.25,0.05,0.75,0.05); uni ignores
-// it.  All of them are fractions of the surviving pool, not absolute keys.
+// dual_norm -> mean1,dev1,mean2,dev2 (default 0.25,0.05,0.75,0.05);
+// seg -> window multiplier (default 2, i.e. draw each batch of m uniformly from
+// the leading 2m surviving keys); uni ignores it.  For exp/norm/dual_norm these
+// are fractions of the surviving pool, not absolute keys.
 //
 // Point -path at a FRESH root: the directory layout matches the existing
 // datasets on purpose (so Options::ParseInsertBatchPath / ParseDeleteBatchPath
@@ -432,7 +585,7 @@ main(int argc, char* argv[])
   commandLine P(argc,
                 argv,
                 "[-path <dir>] [-base_n <n>] [-batch_n <n>] [-val_n 1] "
-                "[-file_num <n>] [-dis {0,1,2,3}] [-batch_op {0,1}] "
+                "[-file_num <n>] [-dis {0,1,2,3,4}] [-batch_op {0,1}] "
                 "[-binary {0,1}] [-batch_param <csv>] [-validate {0,1}]");
 
   // NOTE: the std::string overloads, not the char* ones -- getOptionValue
@@ -446,7 +599,8 @@ main(int argc, char* argv[])
     static_cast<size_t>(P.getOptionLongValue("-batch_n", 10'000));
   int const val_n = P.getOptionIntValue("-val_n", 1);
   int const file_n = P.getOptionIntValue("-file_num", 1);
-  // PARA: 0: uniform, 1: exp, 2: norm, 3: dual norm -- shape of each BATCH
+  // PARA: 0: uniform, 1: exp, 2: norm, 3: dual norm, 4: seg -- shape of each
+  // BATCH
   int const dis_type = P.getOptionIntValue("-dis", 0);
   // PARA: 0: insert, 1: delete
   int const batch_op = P.getOptionIntValue("-batch_op", 0);
@@ -505,6 +659,20 @@ main(int argc, char* argv[])
     }
   }
 
+  if (dis_type == kDisSeg) {
+    double const mult = std::max(1.0, ParamOr(batch_param_seq, 0, 2.0));
+    std::cout << "segment width: " << mult << " x batch_n = "
+              << static_cast<size_t>(mult * static_cast<double>(batch_n))
+              << " keys; each batch takes " << (100.0 / mult)
+              << "% of its window, and the window advances by batch_n"
+              << std::endl;
+    if (mult < 1.0001) {
+      std::cout << "NOTE: mult == 1 means every batch is exactly the leading "
+                   "batch_n surviving keys -- no randomness at all"
+                << std::endl;
+    }
+  }
+
   std::string path = path_in;
   path += std::string(*path.rbegin() == '/' ? "" : "/");
   std::filesystem::create_directories(path);
@@ -512,6 +680,7 @@ main(int argc, char* argv[])
   path += std::string(dis_type == kDisUniform       ? "uni/"
                       : dis_type == kDisExponential ? "exp/"
                       : dis_type == kDisNormal      ? "norm/"
+                      : dis_type == kDisSeg         ? "seg/"
                                                     : "dual_norm/");
   std::filesystem::create_directories(path);
 

@@ -36,10 +36,10 @@ binary=1
 # NOTE: cheapest first -- ratio dir is 1/ratio, so 10 == ratio 0.1.
 batch_ratio_seq=(10 100 1000 10000)
 
-# PARA: 0 uni, 1 exp, 2 norm, 3 dual_norm.  Here -dis shapes each BATCH; the
-# base is always the dense uniform key space.
-# dis_seq=(0 1 2 3)
-dis_seq=(0 1)
+# PARA: 0 uni, 1 exp, 2 norm, 3 dual_norm, 4 seg.  Here -dis shapes each BATCH;
+# the base is always the dense uniform key space.
+# dis_seq=(0 1 2 3 4)
+dis_seq=(4)
 batch_op_seq=(0 1)
 
 logger_path="log_incre_data.in"
@@ -72,19 +72,32 @@ function exp_lambda() {
 for batch_ratio in "${batch_ratio_seq[@]}"; do
 	batch_n=$((base_n / batch_ratio))
 	for dis in "${dis_seq[@]}"; do
-		if [ "${dis}" -eq 0 ]; then # uni -- parameter ignored
+		case "${dis}" in
+		0) # uni -- parameter ignored
 			batch_param="1"
 			dis_name="uni"
-		elif [ "${dis}" -eq 1 ]; then # exp
+			;;
+		1) # exp: lambda, scaled per ratio (see exp_lambda above)
 			batch_param="$(exp_lambda "${batch_ratio}")"
 			dis_name="exp"
-		elif [ "${dis}" -eq 2 ]; then # norm: mean,dev as fractions of the pool
+			;;
+		2) # norm: mean,dev as fractions of the pool
 			batch_param="0.5,0.2"
 			dis_name="norm"
-		else # dual_norm: two modes, mean1,dev1,mean2,dev2
+			;;
+		3) # dual_norm: two modes, mean1,dev1,mean2,dev2
 			batch_param="0.25,0.1,0.75,0.1"
 			dis_name="dual_norm"
-		fi
+			;;
+		4) # seg: window multiplier. Each batch of m is drawn uniformly from the
+			# leading 2m surviving keys. NOTE this needs NO per-ratio tuning --
+			# the window is defined relative to batch_n, not to the pool, so the
+			# same value is equally concentrated at every ratio. That is the one
+			# thing exp cannot do (its lambda is capped by pool/batch).
+			batch_param="2"
+			dis_name="seg"
+			;;
+		esac
 
 		for b_op in "${batch_op_seq[@]}"; do
 			# NOTE: same stem for both ops -- the file IS the batch stream,
@@ -102,7 +115,7 @@ for batch_ratio in "${batch_ratio_seq[@]}"; do
 				continue
 			fi
 
-			./../build/incre_data_generator -path "${path_prefix}" \
+			numactl -i all ./../build/incre_data_generator -path "${path_prefix}" \
 				-base_n "${base_n}" -batch_n "${batch_n}" -val_n "${val_n}" \
 				-file_num "${file_num}" -binary "${binary}" -dis "${dis}" \
 				-batch_op "${b_op}" -batch_param "${batch_param}" 2>&1 |

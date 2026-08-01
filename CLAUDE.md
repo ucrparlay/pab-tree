@@ -488,6 +488,41 @@ batch normal. Here the base distribution is meaningless (the base is the whole
 dense key space), so `-dis 3` is a **two-mode batch** instead — otherwise it
 would be identical to `-dis 2`.
 
+### `seg` (`-dis 4`) — a sliding segment
+
+Each batch of `m` is drawn **uniformly from the leading `mult * m` surviving
+keys** (`-batch_param mult`, default 2), then removed. So the hot region is a
+fixed-width window of *ranks* that advances by exactly `m` per batch.
+
+Implemented as `TargetDensity == 1.0` (flat, like `uni`) plus
+`WindowSize == mult * want`. All of the shape lives in the window; nothing else
+in the sampler changes.
+
+**It has the one property `exp` cannot.** `exp`'s concentration is capped by
+`lambda <= pool/batch` and its demand rises as the pool drains, so the shape
+degrades over a run and needs per-ratio `lambda` tuning. `seg`'s window is
+defined relative to `batch_n`, not to the pool, so **one parameter is equally
+concentrated at every ratio and every point in the run** — no tuning, no
+degradation, no capping.
+
+Measured at 1e6 / 100 batches, `mult = 2`:
+
+- max rank used is `19999` of a `20000` window in every batch — the draw never
+  escapes the leading `2m`.
+- rank spread `p10/p50/p90 = 2000/9950/18000` of 20000 — exactly uniform inside.
+- key-space `p10..p90` width settles at **3.2%** of the key space and slides
+  0.002 → 0.036 → 0.235 → 0.487 → 0.736 → 0.966.
+
+The key span (~3.2m) is wider than the rank span (2m) because a key that
+survives a draw stays in the window and can be re-exposed — survival decays
+geometrically at `1/mult` per batch, so a thin tail trails behind.
+
+`mult` is a clean knob: `1` is **exactly sequential** (batch b is literally keys
+`[b*m, (b+1)*m)`), `2` gives a 3.2%-wide window, `16` a 31%-wide one.
+
+Also the cheapest shape to generate: pool-work saving is `pool_n / (mult*m)`,
+which at ratio 100 is already 25x and grows with the ratio.
+
 **Writes one file, not a pair, and the stem is `.batch` for BOTH ops** (renamed
 2026-07-31): `ins/<base_n/batch_n>/<i>.batch.<ext>` and
 `del/<base_n/batch_n>/<i>.batch.<ext>`. There is no base/batch pair in these
@@ -624,6 +659,78 @@ are `e^λ`, so even the widest batches (10% of the pool, λ=5) lean ~148x. The
 earlier `batch_ratio / 10` was 5x flatter for no accuracy gain once the sampler
 became exact. `norm`/`dual_norm` need no scaling — their mass sits in a band
 ~`2*dev` wide, so even the widest batch here stays under the ceiling.
+
+### Front-window optimization (2026-07-31)
+
+`WindowSize()` restricts each batch to the leading `win_n` ranks; only that
+prefix is scanned, and **compaction shifts the window's survivors right against
+a moving `lo` offset** so the untouched suffix never moves. Per-batch cost drops
+from `O(pool_n)` to `O(win_n)`.
+
+- `exp`: window is `40/lambda` of the pool (mass beyond is `e^-40`, and the
+  expected picks lost are bounded by `lambda*want*e^-40` ≈ 1e-9), floored at
+  `8*want` so a capped batch can still reach. **123.8x less pool-work** at
+  lambda 5000; measured 1e8/10000 batches **~22 min → 18 s (77x)**.
+- `seg`: window is `mult*want` by definition — 25x at ratio 100, more at finer
+  ratios.
+- `norm`/`dual_norm`: window is the whole pool (a centred window would work for
+  them but is a different change), so they behave as before.
+- `uni`: **closed form, no carve at all** (2026-07-31). For a flat density the
+  batch-by-batch process is provably one global shuffle — cut a uniform random
+  permutation of `[0, base_n)` into consecutive `batch_n` blocks and block 0 is
+  a uniform random subset of the key space, block 1 a uniform random subset of
+  what is left, and so on, which is exactly what the loop computes. `O(base_n)`
+  instead of `O(base_n * batch_num / 2)`. Measured at 1e8: **9.3 s at every
+  ratio** (was ~4.6 min at ratio 10000); at 1e9 it should drop 46 min → ~90 s.
+  Verified empirically before the change: `uni` batch 0 at ratio 100 had
+  p10/p50/p90 = 0.0999/0.5002/0.9000 of the key space, i.e. already a plain
+  uniform subset, so the carve was producing nothing the shuffle does not.
+
+  Corollary worth remembering: for `uni` this generator's output is
+  distributionally identical to `data_generator`'s. The new generator only earns
+  its keep on shapes that *have* per-batch structure.
+
+**`parlay::random_shuffle` defaults to a FIXED seed.** Both the uniform closed
+form and the per-batch within-batch shuffle now pass `parlay::random(seed)`
+explicitly. Without it every `-file_num` instance of a `uni` dataset would have
+come out byte-identical (verified: files 1 and 2 now differ).
+
+**Bug this surfaced.** The count repair used to top up **uniformly** over the
+free ranks. Harmless when the shape is gentle, badly wrong when it is steep: at
+lambda 5000 it sprayed ~0.5% of the batch flat across the window and pushed the
+largest key to **4x** where the exponential could plausibly reach (0.0078 vs an
+expected max of 0.0018). Fixed by rejection-sampling the additions from the
+shape itself (accept with probability `w/max(w)`). KS 0.0144 → **0.0073**, head
+error −0.72% → **+0.09%**, max key 0.0078 → **0.0017**. Dedupe the *accepted*
+set, not the raw candidate draw, or the repair costs more than the optimization
+saves (41 s vs 18 s at 1e8).
+
+### Rank-skew is not key-skew — what `exp` actually produces
+
+The sampler shapes **ranks in the surviving pool**, and the pool is sorted
+throughout (`pack` preserves order, the window is a prefix, survivors shift
+right, the untouched suffix holds strictly larger keys). Confirmed empirically:
+ranks computed as index-in-`sorted(pool)` match `exp(lambda)` to KS ≈ 0.005.
+
+But once the front is thinned the survivors are no longer evenly spaced, so the
+rank→key map goes nonlinear. Measured at lambda 50 (shape indicator
+`(p50-p10)/(p90-p10)`; 0.268 = exponential, 0.500 = symmetric):
+
+| batch | 0 | 5 | 25 | 50 | 90 |
+|---|---|---|---|---|---|
+| in rank space | 0.265 | 0.279 | 0.264 | 0.269 | 0.476 |
+| **in key space** | **0.265** | **0.447** | **0.452** | **0.419** | **0.508** |
+
+So each `exp` batch is a **tight migrating cluster in key space** (p10–p90 width
+3–7% of the key space, centre walking 0.014 → 0.25 → 0.50 → 0.90), but the shape
+*inside* the cluster is exponential only for batch 0 — afterwards it is roughly
+symmetric. At batch 25 the leading 10% of the pool's key span holds just **0.04x**
+the average survivor density, which is what bends the mapping.
+
+If per-batch key-space exponentiality is required, feed `TargetDensity` the key
+position `(pool[lo+i] - klo)/(khi - klo)` instead of `(i+0.5)/pool_n`; the window
+would then need a binary search on keys and would come out smaller. Not done.
+`seg` sidesteps the whole issue — its window is a rank count by definition.
 
 **Generation cost is the real constraint, and it is worse than first estimated.**
 Cost is linear in total pool-work `base_n * batch_num / 2`, measured at ~2.9 ns
