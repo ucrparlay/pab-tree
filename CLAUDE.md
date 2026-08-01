@@ -910,17 +910,21 @@ Verified present in this box's perf (4.18.0-553 / RHEL8) — both
 |---|---|
 | `-pcf` | perf control fd (0 = not under perf) |
 | `-pcaf` | perf ack fd |
-| `-pcr` | which region to count: `build`/`insert`/`delete`; empty = all |
+| `-pcr` | which region to count: `build`/`membership`/`incre_insert`/`incre_delete`/`insert`/`delete`; empty = all |
 
 **`-pcr` is not optional in practice.** A `-t 1` run executes the unconditional
 top-of-function `BuildTree` *and* `BatchInsert`, both guarded; perf accumulates
 over every enabled interval, so without `-pcr` it reports build+insert summed.
+Likewise a `-t 32` run walks both `build` and `membership`.
 
 ### Two hard requirements on the run
 
-- **`-r 1`.** perf reports the **sum over `rounds + 1` executions**, not a
-  per-call figure. `time_loop` runs the region `rounds` times plus a warmup
-  pass, and perf accumulates over every enable/disable interval. Measured on
+- **`-r 1`.** perf reports the **sum over every enabled interval**, not a
+  per-call figure. At `-r 1` the `loop_late = rounds > 1 ? 0.01 : -100`
+  convention suppresses the warmup pass, so one execution is counted — see
+  "The `loop_late` convention" below for the 2x bug this caused in the
+  incremental regions before they adopted it. At `-r > 1` the count is a sum
+  over `rounds + 1` executions (`rounds` plus the warmup). Measured on
   the insert region at 1e6 (instructions, which are near-noiseless):
 
   | `-r` | instructions | ÷ r=1 | executions |
@@ -944,7 +948,10 @@ over every enabled interval, so without `-pcr` it reports build+insert summed.
 - **`-s 0`.** `-s 1` sweeps 4 batch ratios through the same region.
 
 `-q 0` too, otherwise the `query_type != 0 && tag != 0` block runs another
-*counted* `BuildTree` (it passes `kTestTime = true`).
+*counted* `BuildTree` (it passes `kTestTime = true`). That block lives inside
+the `(tag & (1<<5)) == 0` guard, so the 1<<5/6/7 family cannot reach it — but
+`-q 0` is what those regions pass anyway, since their membership pass runs
+unconditionally.
 
 ### Event budget on this box (Xeon Silver 4314, Icelake-SP)
 
@@ -971,29 +978,107 @@ until `# Samples` is in the thousands. Release builds have **no `-g`**
 names from `.symtab` but gives no line numbers, and `-O3` inlining folds the
 small leaf helpers into their callers.
 
-### The four regions and their per-element denominators
+### The six regions and their per-element denominators
 
-| region | `-t` | `-q` | dataset | region_n |
-|---|---|---|---|---|
-| build | 0 | 0 | ins | `NODES` |
-| insert | 1 | 0 | ins | `NODES * BATCH_RATIO` |
-| delete | 2 | 0 | del | `NODES * BATCH_RATIO` |
-| membership | 1 | 1 | ins | `NODES * kMemberQueryRatio` (0.01) |
+The default sweep is the **tag 1<<5 / 1<<6 / 1<<7 family**, run in the order
+build → membership → incre_insert → incre_delete. `insert`/`delete` are the
+older batch-update regions, kept but no longer in `REGIONS` by default.
 
-`membership` measures **only the half-half probe** — half the keys are in the
-tree, half are not, shuffled. `DefaultTestFunc` runs three membership passes
-(all hits, all misses, mix) and perf would sum all three, so `Membership()`
-takes a `perf_region_name` defaulting to `""` (unarmed) and only the mix call
-site passes `"membership"`. Check `grep -c 'Events enabled'` on the `.err` file:
-it must be exactly 1.
+| region | `-t` | `-q` | root | dataset | region_n |
+|---|---|---|---|---|---|
+| build | 32 | 0 | incre | `ins/<1/b>/1.batch` | `NODES` |
+| membership | 32 | 0 | incre | `ins/<1/b>/1.batch` | `NODES * 0.01` |
+| incre_insert | 64 | 0 | incre | `ins/<1/b>/1.batch` | **`NODES`** |
+| incre_delete | 128 | 0 | incre | `del/<1/b>/1.batch` | **`NODES`** |
+| insert | 1 | 0 | kv_pair | `ins/<1/b>/1.base` | `NODES * BATCH_RATIO` |
+| delete | 2 | 0 | kv_pair | `del/<1/b>/1.base` | `NODES * BATCH_RATIO` |
 
-It uses `-t 1` because the half-half pass needs `wi` populated, which only the
-batch-insert block does; `-pcr membership` keeps the insert out of the counts.
-The `ins` pair is required because base and batch keys are **disjoint** there —
-that is what makes the in-tree/not-in-tree split meaningful.
+**`-b` means two different things.** For `insert`/`delete` it is the amount of
+work (the batch is `NODES * b` entries). For `incre_insert`/`incre_delete` it is
+the **step size**: the guarded region is the *whole chain* of `1/b`
+`BatchInsert`/`BatchDelete` calls, which between them walk every one of the
+`NODES` entries. All of `NODES` is inserted (or deleted) whatever `b` is; a
+smaller `b` just means more, smaller batches. So the divisor stays `NODES`, and
+`incre_insert` is **not** comparable to `insert` — one builds the entire tree
+incrementally, the other adds one batch to a finished tree.
+
+`WHOLE_INPUT_REGIONS` in `merge_perf_cache.py` is therefore
+`{build, incre_insert, incre_delete}`.
+
+### Two datasets roots, and why
+
+The 1<<5/6/7 family reads **`/data/zmen002/kv_pair_incre`** (knob:
+`INCRE_PREFIX`), not `/data/zmen002/kv_pair` (`DATA_PREFIX`). Two reasons:
+
+- Those files are laid out so consecutive windows of `NODES*b` entries **are**
+  the batches, which only holds for the ratio they were generated at. The
+  standard `kv_pair` datasets are globally shuffled, so every batch there comes
+  out uniform no matter what `<dis>` says — pointing at the wrong root still
+  *runs*, it just silently measures uniform data.
+- They have **no base/batch pair**: the whole `<i>.batch.bin` is the stream and
+  holds all `NODES` entries. Hence `REGION_STEM` in `perf_cache.sh` (`batch` for
+  this family, `base` for the legacy regions). `ExtractPrefixes` strips `.batch`
+  as well as `.base`, so `-p` can point straight at a batch file.
+
+Available at 1e9: `uni`, `exp`, `seg`, `seg_2`, each with `10/100/1000/10000`.
+
+### One tag per process
+
+`incre_update_query` (the membership + range pass on the half-filled tree) is
+shared by tags 1<<5, 1<<6 and 1<<7. A `-t` with several of them set runs it
+several times and perf sums them, so `run_one` always passes exactly one tag.
+`build` and `membership` are two regions of the *same* tag-32 run, separated
+only by `-pcr`.
+
+Under tag 1<<5 the membership pass runs unconditionally (it does not consult
+`query_type`), so **`-q 0` is correct for all six regions now** — unlike the old
+tag-1 membership region, which needed `-q 1`.
+
+### `membership` measures only the half-half probe
+
+Half the keys are in the tree, half are not, shuffled. `Membership()` takes a
+`perf_region_name` defaulting to `""` (unarmed); only the mix call site passes
+`"membership"`, so the two single-sided passes beside it are never counted
+(they are commented out upstream anyway). Check `grep -c 'Events enabled'` on
+the `.err` file: it must be exactly 1.
+
+Note the probed tree holds **`NODES/2`** entries under tag 1<<5 —
+`BuildTree`'s `kOutputRatio=2` hands back the half-filled tree. The older tag-1
+membership region probed a tree holding all `NODES`, so the two are not directly
+comparable.
 
 `MEMBER_QUERY_RATIO` in `merge_perf_cache.py` duplicates `kMemberQueryRatio`
 from `test_framework.h`; they must stay in sync.
+
+### The `loop_late` convention — a 2x overcount that was fixed
+
+Every timed function computes `double loop_late = rounds > 1 ? 0.01 : -100;`
+and passes it to `time_loop`. The **negative delay at `rounds == 1` is what
+suppresses the warmup pass**, which is why `-r 1` yields exactly one execution
+for `BuildTree`, `BatchInsert`, `BatchDelete` and `Membership`.
+
+`BatchInsertByStep`/`BatchDeleteByStep` originally hardcoded `0.01` instead, so
+they *always* took a warmup pass. Since perf sums every enabled interval, the
+two incremental regions reported **double** the per-execution figure while build
+and membership reported single. Measured on `exp` 1e8 before/after: enabled time
+1.98 executions → 0.96, cycles 139.8G → 69.1G. Both now use the shared
+convention. `-r 3` (what `incre_updates.sh` uses) is unaffected either way.
+
+**Verify execution count** rather than trusting it — divide perf's enabled time
+(field 4 of the `-x,` output, ns) by `printed_time * THREADS`; it must be ≈1:
+
+```bash
+en=$(awk -F, '$3=="cycles"{print $4}' X.stat); t=<time from X.out>
+awk -v en="$en" -v t="$t" 'BEGIN{print (en/1e9)/(t*64)}'
+```
+
+### Selecting a single incremental ratio
+
+Tags 1<<6/1<<7 normally sweep `incre_ratio_seq = {0.0001, 0.001, 0.01, 0.1}`,
+which perf would sum into one meaningless number. In `test_framework.h` the
+sequence collapses to the single `-b` ratio **when `PerfControl::Active()`**,
+i.e. only when `-pcf`/`-pcaf` were passed. Ordinary timing runs
+(`incre_updates.sh`) still walk the full sweep, unchanged.
 
 ### IPC sorts the operations into three regimes
 
