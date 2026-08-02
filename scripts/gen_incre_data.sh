@@ -29,7 +29,7 @@ force=0
 
 # NOTE: the output tree is named after the distribution, so two exp variants of
 # different steepness cannot share a root -- give the softer one its own.
-path_prefix="/data/zmen002/kv_pair_norm_005"
+path_prefix="/data/zmen002/kv_pair_incre"
 # path_prefix=/data/zmen002/kv_pair_incre_soft
 
 # exp steepness: lambda = batch_ratio / exp_div.  Judge it by how many of a
@@ -62,7 +62,7 @@ batch_ratio_seq=(10 100 1000 10000)
 # PARA: 0 uni, 1 exp, 2 norm, 3 dual_norm, 4 seg.  Here -dis shapes each BATCH;
 # the base is always the dense uniform key space.
 # dis_seq=(0 1 2 3 4)
-dis_seq=(2)
+dis_seq=(4)
 batch_op_seq=(0 1)
 
 logger_path="log_incre_data.in"
@@ -122,7 +122,7 @@ for batch_ratio in "${batch_ratio_seq[@]}"; do
 			# the window is defined relative to batch_n, not to the pool, so the
 			# same value is equally concentrated at every ratio. That is the one
 			# thing exp cannot do (its lambda is capped by pool/batch).
-			batch_param="10"
+			batch_param="2"
 			dis_name="seg"
 			;;
 		esac

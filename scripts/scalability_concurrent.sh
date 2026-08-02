@@ -28,8 +28,8 @@ mkdir -p "${log_path}"
 
 data_prefix="/data/zmen002/kv_pair"
 batch_op_seq=("ins")
-# dis_seq=("uni" "exp" "norm" "dual_norm")
-dis_seq=("uni" "exp")
+dis_seq=("norm")
+# dis_seq=("uni" "exp")
 batch_ratio=0.01
 
 log_path="logs/scalability"
