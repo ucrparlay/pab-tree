@@ -248,17 +248,21 @@ def main(argv):
         print("usage: ./merge_perf_cache.py [-v] <log_name> [<log_name> ...]")
         return 1
 
+    # Column order: identity, then TIME, then the raw counters, then per-element
+    # counters, then derived ratios, then the two diagnostics. Time comes before
+    # cycles deliberately -- it is the cost being explained; the counters are the
+    # explanation, and are only the right ranking when ipc says the region is
+    # latency-bound.
     fields = (
         ["source", "region", "tree", "dis", "n", "batch_ratio", "threads", "numa", "region_n"]
+        + ["time_s", "ns_per_elem", "time_vs_btree"]
         + EVENTS
         + [f"{e}_per_elem" for e in EVENTS]
         + [
             "ipc",
             "miss_rate_pct",
             "vs_btree",
-            "time_s",
-            "ns_per_elem",
-            "time_vs_btree",
+            # diagnostics, not results -- see the header comment on execs_est
             "enabled_s",
             "execs_est",
         ]
@@ -307,8 +311,8 @@ def main(argv):
         # the two "vs BTree" ratios disagreeing is a signal, not an error.
         hdr = (
             f"{'dis':10} {'region':13} {'tree':6} {'region_n':>13} "
-            f"{'misses/elem':>12} {'miss%':>7} {'IPC':>6} {'miss:vB':>8} "
-            f"{'time_s':>9} {'ns/elem':>9} {'time:vB':>8} {'ex':>5}"
+            f"{'time_s':>9} {'ns/elem':>9} {'time:vB':>8} "
+            f"{'misses/elem':>12} {'miss%':>7} {'IPC':>6} {'miss:vB':>8} {'ex':>5}"
         )
         print("\n" + hdr)
         print("-" * len(hdr))
@@ -321,10 +325,10 @@ def main(argv):
             prev = key
             print(
                 f"{r['dis']:10} {r['region']:13} {r['tree']:6} {r['region_n']:13,} "
+                f"{r['time_s']:>9} {r['ns_per_elem']:>9} {r['time_vs_btree']:>8} "
                 f"{r['cache-misses_per_elem']:12.2f} "
                 f"{r['miss_rate_pct']:6}% {r['ipc']:>6} {r['vs_btree']:>8} "
-                f"{r['time_s']:>9} {r['ns_per_elem']:>9} "
-                f"{r['time_vs_btree']:>8} {r['execs_est']:>5}"
+                f"{r['execs_est']:>5}"
             )
 
         # execs_est should sit near 1. Anything much above says perf counted a
