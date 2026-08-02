@@ -1,0 +1,8 @@
+# started on Sat Aug  1 19:32:22 2026
+
+24771770193,,cycles,6290879670,70.06,,
+11319015324,,instructions,7595705481,84.97,0.46,insn per cycle
+117845979,,cache-references,7518195837,84.85,,
+71223251,,cache-misses,7534122010,85.74,60.438,of all cache refs
+50705031,,LLC-load-misses,7514933971,86.86,,
+150903911,,L1-dcache-load-misses,7390408860,85.37,,

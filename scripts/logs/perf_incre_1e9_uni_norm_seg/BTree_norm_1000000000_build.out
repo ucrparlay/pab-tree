@@ -1,2 +1,2 @@
-Tree: BTree; Buf: 64; InputFile: 1.base.bin; Dis: norm; 
-2.90901 
+Tree: BTree; Buf: 64; InputFile: 1.batch.bin; Dis: norm; 
+2.94614 0.04778 
