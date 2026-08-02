@@ -309,10 +309,15 @@ def main(argv):
         # miss and time columns sit side by side deliberately: misses only
         # explain the cycle cost when IPC says the region is latency-bound, so
         # the two "vs BTree" ratios disagreeing is a signal, not an error.
+        # Raw totals, not per-element -- the _per_elem columns are still in the
+        # csv for anyone who wants them. Time and misses sit side by side
+        # deliberately: misses only explain the cycle cost when IPC says the
+        # region is latency-bound, so the two "vs BTree" ratios disagreeing is a
+        # signal, not an error.
         hdr = (
             f"{'dis':10} {'region':13} {'tree':6} {'region_n':>13} "
-            f"{'time_s':>9} {'ns/elem':>9} {'time:vB':>8} "
-            f"{'misses/elem':>12} {'miss%':>7} {'IPC':>6} {'miss:vB':>8} {'ex':>5}"
+            f"{'time_s':>9} {'time:vB':>8} "
+            f"{'cache-misses':>15} {'miss%':>7} {'IPC':>6} {'miss:vB':>8} {'ex':>5}"
         )
         print("\n" + hdr)
         print("-" * len(hdr))
@@ -325,8 +330,8 @@ def main(argv):
             prev = key
             print(
                 f"{r['dis']:10} {r['region']:13} {r['tree']:6} {r['region_n']:13,} "
-                f"{r['time_s']:>9} {r['ns_per_elem']:>9} {r['time_vs_btree']:>8} "
-                f"{r['cache-misses_per_elem']:12.2f} "
+                f"{r['time_s']:>9} {r['time_vs_btree']:>8} "
+                f"{r['cache-misses']:15,} "
                 f"{r['miss_rate_pct']:6}% {r['ipc']:>6} {r['vs_btree']:>8} "
                 f"{r['execs_est']:>5}"
             )
