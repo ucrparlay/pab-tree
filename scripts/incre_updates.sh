@@ -4,8 +4,8 @@ set -o xtrace
 
 /usr/bin/drop_caches
 
-# declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
-declare -a leaf_wrap_seq=(64)
+declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
+# declare -a leaf_wrap_seq=(64)
 
 Nodes=(1000000000)
 Dim=(1)
@@ -24,10 +24,10 @@ mkdir -p "${log_path}"
 # there comes out uniform no matter what <dis> says.  Both roots have the same
 # ins/<ratio>/ and del/<ratio>/ directories, so pointing this at the old one
 # still RUNS -- it just silently measures the old data.
-data_prefix="/data/zmen002/kv_pair_norm_0.1"
+data_prefix="/data/zmen002/kv_pair_incre"
 # data_prefix="/data/zmen002/kv_pair"
 batch_op_seq=("ins")
-dis_seq=("norm")
+dis_seq=("uni" "norm" "seg")
 # NOTE: -b only picks the file handed to -p (tag 1<<5's static-build control).
 # Tags 1<<6 / 1<<7 ignore it and walk incre_ratio_seq in test_framework.h,
 # reloading ins/<1/ratio>/ and del/<1/ratio>/ per ratio.  1/0.01 = 100, which is
@@ -77,23 +77,23 @@ function run_cmake() {
 	cd "${cur_path}" || exit
 }
 
-# PMA
-tree=3
-solver="pma"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# # PMA
+# tree=3
+# solver="pma"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
-# PAM
-tree=2
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# # PAM
+# tree=2
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
-# CPAM
-tree=1
-solver="cpam"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# # CPAM
+# tree=1
+# solver="cpam"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
 # ours
 solver="b_test"
@@ -103,16 +103,16 @@ for idx in "${!leaf_wrap_seq[@]}"; do
 	run_test "${idx}" "${solver}" "${tree}"
 done
 
-# Masstree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-tree=5
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# # Masstree
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=5
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
 
-# BwTree
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
-tree=6
-solver="index_microbench_workload"
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}"
+# # BwTree
+# export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=1099511627776
+# tree=6
+# solver="index_microbench_workload"
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}"
