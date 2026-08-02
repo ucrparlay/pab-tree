@@ -12,10 +12,13 @@ from pathlib import Path
 #   input  = scripts/data/incremental_updates_new/incremental_updates_new.csv
 #   output = scripts/data/incremental_updates_new/incremental_updates_new_filtered.csv
 #
-# The default input is merge_incre_updates_new.py's 36-value CSV (uni + exp,
-# BTree pinned to leaf size 64).  The columns below are a subset of both that
-# layout and the older 90-value one that merge_incre_updates.py writes, so
+# The default input is merge_incre_updates_new.py's 36-value CSV (uni, norm and
+# seg; BTree pinned to leaf size 64).  The columns below are a subset of both
+# that layout and the older 90-value one that merge_incre_updates.py writes, so
 # either can be passed explicitly -- pass the old CSV's path to filter it.
+#
+# build keeps only its timing; the build block's MIX/RRM/RCM are dropped, so the
+# only query columns are the 1% blocks'.
 
 DEFAULT_INPUT = Path("scripts/data/incremental_updates_new/incremental_updates_new.csv")
 DEFAULT_OUTPUT = Path(
@@ -27,9 +30,6 @@ KEEP_COLUMNS = [
     "tree",
     "leaf_wrap",
     "build",
-    "build_MIX",
-    "build_RRM",
-    "build_RCM",
     "ins_0.01%",
     "ins_0.1%",
     "ins_1%",
