@@ -24,10 +24,10 @@ mkdir -p "${log_path}"
 # there comes out uniform no matter what <dis> says.  Both roots have the same
 # ins/<ratio>/ and del/<ratio>/ directories, so pointing this at the old one
 # still RUNS -- it just silently measures the old data.
-data_prefix="/data/zmen002/kv_pair_incre"
+data_prefix="/data/zmen002/kv_pair_norm_0.1"
 # data_prefix="/data/zmen002/kv_pair"
 batch_op_seq=("ins")
-dis_seq=("exp")
+dis_seq=("norm")
 # NOTE: -b only picks the file handed to -p (tag 1<<5's static-build control).
 # Tags 1<<6 / 1<<7 ignore it and walk incre_ratio_seq in test_framework.h,
 # reloading ins/<1/ratio>/ and del/<1/ratio>/ per ratio.  1/0.01 = 100, which is

@@ -31,8 +31,12 @@ Block order is the same in both: the first (build, queries) pair is the
 statically built tree (tag 1<<5), then 8 update blocks, ins then del, each at
 ratio 0.0001 / 0.001 / 0.01 / 0.1 of the input, i.e. 0.01% / 0.1% / 1% / 10%.
 
-Only uni and exp are emitted; norm and dual_norm are dropped.  Each comes from
-exactly one sweep -- exp from the new logs, uni from the old ones -- because the
+Only uni, norm and seg are emitted (see kWantBench for what is dropped and how
+to bring it back), and norm and seg are reported under the names skew and
+adversary (see kBenchDisplay).  Each comes from exactly one sweep -- norm and
+seg from the new logs, uni from the old ones.  norm is in both sweeps and is
+taken from the new one; a tree that has no norm
+run there is left absent rather than backfilled from the old logs, because the
 two ran on different datasets and must not be mixed inside a distribution (see
 kSources).  BTree is additionally pinned to leaf size 64: it is the only tree
 swept over leaf sizes, so the old uni logs carry 2..1024 for it and one row per
@@ -72,8 +76,26 @@ block_seq = [f"{op}_{r}" for op in ("ins", "del") for r in batch_ratio_seq]
 query_seq = ["MIX", "RRM", "RCM"]
 query_seq_full = ["IND", "OOD", "MIX", "RRS", "RRM", "RRL", "RCS", "RCM", "RCL"]
 
-# the distributions worth keeping; norm and dual_norm are dropped
-kWantBench = ["uni", "exp"]
+# the distributions worth keeping, in output order.  norm and seg are only in
+# the new sweep, uni only in the old one.
+#
+# exp, seg_10 and dual_norm are dropped.  Their logs are still on disk -- adding
+# a name back here (and to kSources) is all it takes to bring one back.  seg_10
+# is the same sliding-segment shape as seg at a wider window (the generator's
+# -batch_param mult), so the two are separate distributions rather than two runs
+# of one; only the narrower one is reported.
+kWantBench = ["uni", "norm", "seg"]
+
+# what each distribution is called in the CSV.  The keys are the generator's own
+# names, which is what the driver writes into the log header's `Dis:` field and
+# what kWantBench/kSources match on; the values are the reporting names.  Doing
+# this here rather than renaming the logs means a rerun of the benchmark, which
+# writes `Dis: norm` / `Dis: seg` again, does not undo it.
+kBenchDisplay = {"norm": "skew", "seg": "adversary"}
+
+
+def display_bench(name: str) -> str:
+    return kBenchDisplay.get(name, name)
 
 # BTree is the only tree swept over leaf sizes (the old uni logs carry 2..1024);
 # every other tree reports a single Buf.  Keep just the default leaf size so the
@@ -92,7 +114,8 @@ kMissingValue = "-"
 # stderr messages that get interleaved into a result row by `2>&1 | tee`
 kNoisePhrases = ("madvise superpage: Cannot allocate memory",)
 
-bench_order = kWantBench
+# rows carry the display name, so sort on that
+bench_order = [display_bench(b) for b in kWantBench]
 tree_order = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
 
 kIdCols = ["benchmark", "tree", "leaf_wrap"]
@@ -118,7 +141,7 @@ header_90 = value_header(query_seq_full)
 # (BwTree, as of this writing) is left absent from exp rather than backfilled
 # from the old logs at the wrong scale.
 kSources = [
-    (log_folder_name, len(header_36), ["exp"]),
+    (log_folder_name, len(header_36), ["norm", "seg"]),
     ("incremental_updates", len(header_90), ["uni"]),
 ]
 
@@ -235,7 +258,11 @@ def collect() -> List[List[str]]:
                     file=sys.stderr,
                 )
                 continue
-            rows[context] = list(context) + project(values, src_header)
+            # keyed on the log name so dedupe is unaffected, reported as the
+            # display name
+            rows[context] = [display_bench(benchmark), tree, buf_value] + project(
+                values, src_header
+            )
     return list(rows.values())
 
 

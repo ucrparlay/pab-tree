@@ -1292,8 +1292,30 @@ column at all) and still skipped.
 
 | source | values | supplies |
 |---|---|---|
-| `logs/incremental_updates_new/` | 36 | `exp` |
+| `logs/incremental_updates_new/` | 36 | `norm`, `seg` |
 | `logs/incremental_updates/` | 90 | `uni` |
+
+**The CSV reports `norm` as `skew` and `seg` as `adversary`** (`kBenchDisplay`).
+This is a display mapping applied at row construction, *not* a rename of the
+logs: the driver writes `Dis: norm` / `Dis: seg` from the generator's own `-dis`
+values, so renaming directories and headers would be undone by the next
+benchmark run. `kWantBench`, `kSources` and the dedupe key all stay in
+generator names; only the emitted `benchmark` column changes.
+
+`seg` exists only in the new sweep and `uni` only in the old one, so neither is
+ambiguous. `norm` is in both and is taken from the new one — which means a tree
+with no new-sweep `norm` run (MassTree, BwTree) is **absent**, even though the
+old logs have it. Backfilling would put two operating points inside one
+distribution; rerun the tree instead.
+
+**`exp`, `seg_10` and `dual_norm` are dropped from the output**, their logs
+still on disk. Adding a name back to `kWantBench` *and* `kSources` restores it.
+
+`seg` and `seg_10` are the same sliding-segment shape at two window widths (the
+generator's `-batch_param mult`), so they are separate distributions rather than
+two runs of one — do not dedupe them. They differ per tree in *direction*, which
+is how you can tell: ins_0.01%, `seg` → `seg_10`, CPAM 7.43 → 12.60 and PAM
+8.40 → 12.66 (slower), but PMA 191.98 → 178.85 (faster).
 
 **Each distribution comes wholly from one sweep, deliberately.** The two sweeps
 are not interchangeable, and the difference is **per tree, not a uniform scale
@@ -1306,7 +1328,8 @@ factor** — same tree, `exp` ins_0.01%, old → new:
 PMA got ~6x *slower* while MassTree and BwTree barely moved, so a tree
 backfilled from the old logs would sit at its own unrelated operating point next
 to trees measured on the new one. Backfill nothing; rerun the missing tree into
-`incremental_updates_new/` instead. norm and dual_norm are dropped entirely.
+`incremental_updates_new/` instead. (`exp` itself is no longer emitted — the
+table is kept because it is the evidence for the no-backfill rule.)
 
 (An earlier revision of this note claimed a "~9x" factor between the sweeps.
 That was derived by comparing `exp/BwTree`-old against `exp/BTree`-new — two
@@ -1321,9 +1344,37 @@ new sweep names every file `64.log` after the BTree leaf size, so PAM, PMA and
 MassTree runs sit in a `64.log` while reporting `Buf: 1`. A merger written
 against the path would mislabel three of the six trees.
 
-Current state: **12 rows** — `uni` × 6 trees and `exp` × 6, all parsing at
-exactly 36 values with no warnings. `uni/MassTree` legitimately carries `-` in
-every `RCM` column; those logs predate the `q_[0]` race fix.
+Current state: **18 rows** — the full 3 × 6 grid, `uni`/`skew`/`adversary` ×
+BTree, PAM, CPAM, PMA, MassTree, BwTree — all parsing at exactly 36 values with
+no warnings. `uni/MassTree` legitimately carries `-` in every `RCM` column;
+those logs predate the `q_[0]` race fix.
+
+`skew` lands between `uni` and `adversary`, as its centred band should — BTree
+ins_0.01%: uni 29.35, skew 25.03, adversary 7.61.
+
+**`adversary/MassTree` and `adversary/BwTree` are byte-identical to those trees'
+`exp` logs** (ins_0.01% 84.7021 and 55.145, matching to every digit) — they were
+copied from `exp` and relabelled, so they are placeholders, not `seg` runs. The
+other four `adversary` rows and all six `skew` rows are genuine. Re-run those
+two against the `seg` dataset before publishing, or the table reads as "MassTree
+and BwTree are insensitive to distribution", which the other four trees
+contradict.
+
+**The `seg` in the CSV is `45f7a2c6`'s data**, restored on 2026-08-01 (BTree
+ins_0.01% 7.61, CPAM 7.43, PAM 8.40, PMA 191.98). The set that had been there is
+now `seg_10`, moved into `<tree>/seg_10/64.log`.
+
+**Moving a log between distributions means editing its header, not just the
+path.** The merger reads `benchmark` from the `Dis:` field; the directory is
+never consulted. The `seg` → `seg_10` move needed
+`sed 's/Dis: seg;/Dis: seg_10;/'` on each file — without it the moved logs would
+still have come out labelled `seg` and collided with the restored ones, and
+first-seen-wins would have silently produced a mix of the two.
+
+BTree's `exp` logs in the new sweep now carry the full leaf-size sweep
+(2..1024), not just 64. `kBTreeLeafWrap` still pins the CSV to one row, but the
+`exp/BTree` values shifted slightly (build 1.3142 → 1.31545) when `64.log` was
+rerun — expected, not a merge bug.
 
 **A short row means a lost token, and it shifts every later column.** The
 BwTree `exp` log arrived once at 35 values, missing `del_0.01%_MIX`; the parser
