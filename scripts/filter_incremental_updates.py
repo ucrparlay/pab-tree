@@ -13,7 +13,7 @@ from pathlib import Path
 #   output = scripts/data/incremental_updates_new/incremental_updates_new_filtered.csv
 #
 # The default input is merge_incre_updates_new.py's 36-value CSV (uni, norm and
-# seg; BTree pinned to leaf size 64).  The columns below are a subset of both
+# seg; one BTree row per leaf size run).  The columns below are a subset of both
 # that layout and the older 90-value one that merge_incre_updates.py writes, so
 # either can be passed explicitly -- pass the old CSV's path to filter it.
 #

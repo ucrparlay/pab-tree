@@ -4,9 +4,8 @@
 Usage:  ./merge_incre_updates_new.py [<name>]
 
 Reads   logs/incremental_updates_new/<tree>/<dis>/<leaf_wrap>.log   (36 values)
-        logs/incremental_updates/<tree>/<dis>/<leaf_wrap>.log       (90 values)
-Writes  logs/incremental_updates_new/<name>.log   (concatenation of both, for
-                                                   reading by hand)
+Writes  logs/incremental_updates_new/<name>.log   (concatenation, for reading by
+                                                   hand)
         data/incremental_updates_new/<name>.csv   (one row per run)
 
 Each log holds a header line
@@ -15,17 +14,19 @@ Each log holds a header line
 
 followed by one whitespace-separated row of values.
 
-The current driver emits **36 values** -- `build | 3 queries | 8 x
-(update_time, 3 queries)`, 9 blocks of 4.  The 3 queries are MIX (membership
-over a shuffled mix of present and absent keys), RRM (range report, rec_type 1)
-and RCM (range count, rec_type 1).  The older driver emitted **90**, running
-IND/OOD membership passes either side of MIX and three box sizes (S/M/L) for
-each of range report and range count.
+A tag=224 run (1<<5 | 1<<6 | 1<<7) emits **36 values** -- `build | 3 queries |
+8 x (update_time, 3 queries)`, 9 blocks of 4.  Setting 1<<5 also skips the
+shared primal build, so there is no build token ahead of the blocks.  Per
+tests/test_framework.h the 3 queries are one pass each of MIX (membership over
+a shuffled mix of present and absent keys), RRM (range report, rec_type 1) and
+RCM (range count, rec_type 1) -- the IND/OOD passes and the S/L box sizes are
+commented out in incre_update_query, which is what took the row from 90 to 36.
 
-The 36 columns are a strict subset of the 90, so the older logs are *projected*
-down rather than skipped: for each block we keep the timing plus MIX, RRM and
-RCM, and drop IND/OOD/RRS/RRL/RCS/RCL.  Projection is done **by column name**,
-not by index, so it cannot silently drift if either layout changes.
+The older 90-value layout is still handled: the 36 columns are a strict subset
+of it, so such a row is *projected* down -- for each block keep the timing plus
+MIX, RRM and RCM, drop IND/OOD/RRS/RRL/RCS/RCL.  Projection is done **by column
+name**, not by index, so it cannot silently drift if either layout changes.  No
+source uses it at present (see kSources).
 
 Block order is the same in both: the first (build, queries) pair is the
 statically built tree (tag 1<<5), then 8 update blocks, ins then del, each at
@@ -33,15 +34,22 @@ ratio 0.0001 / 0.001 / 0.01 / 0.1 of the input, i.e. 0.01% / 0.1% / 1% / 10%.
 
 Only uni, norm and seg are emitted (see kWantBench for what is dropped and how
 to bring it back), and norm and seg are reported under the names skew and
-adversary (see kBenchDisplay).  Each comes from exactly one sweep -- norm and
-seg from the new logs, uni from the old ones.  norm is in both sweeps and is
-taken from the new one; a tree that has no norm
-run there is left absent rather than backfilled from the old logs, because the
-two ran on different datasets and must not be mixed inside a distribution (see
-kSources).  BTree is additionally pinned to leaf size 64: it is the only tree
-swept over leaf sizes, so the old uni logs carry 2..1024 for it and one row per
-(distribution, tree) is what we want.  A (benchmark, tree, leaf_wrap) seen twice
-is reported and dropped rather than duplicated.
+adversary (see kBenchDisplay).  All three come from the same sweep, so they are
+measured on the same datasets and are comparable to each other; a tree missing
+from one of them is left absent rather than backfilled from the older sweep,
+which ran on different data (see kSources).
+
+Every leaf size that was run is emitted: BTree is the only tree swept over leaf
+sizes (the others report a single Buf), so a distribution holds one BTree row
+per leaf size and one row for each other tree.  Set kBTreeLeafWraps to pin it
+back to a subset.  A (benchmark, tree, leaf_wrap) seen twice is reported and
+dropped rather than duplicated.
+
+Which distributions and leaf sizes exist is a property of the logs, not of this
+script, so the coverage is printed on stderr at the end: a distribution whose
+BTree was only ever run at one leaf size shows up there rather than silently
+looking like a complete sweep, and one that produced no rows at all is warned
+about rather than just being absent from the CSV.
 
 `leaf_wrap` is read from the header's `Buf:` field rather than the filename:
 the new sweep names every file <leaf_wrap>.log after the BTree leaf size, so
@@ -97,10 +105,11 @@ kBenchDisplay = {"norm": "skew", "seg": "adversary"}
 def display_bench(name: str) -> str:
     return kBenchDisplay.get(name, name)
 
-# BTree is the only tree swept over leaf sizes (the old uni logs carry 2..1024);
-# every other tree reports a single Buf.  Keep just the default leaf size so the
-# CSV holds one row per (distribution, tree).
-kBTreeLeafWrap = 64
+# BTree is the only tree swept over leaf sizes (2..1024 where it has been run);
+# every other tree reports a single Buf.  None keeps every leaf size that was
+# run; set it to a collection -- e.g. {64}, or {2, 64, 1024} -- to pin the CSV
+# to a subset, which is what a plot with one line per tree wants.
+kBTreeLeafWraps = None
 
 # a row from the driver before MIX existed: build + 8 blocks of (time + 8
 # queries), with no query block over the statically built tree.  Unlike the
@@ -134,14 +143,25 @@ header_36 = value_header(query_seq)
 header_90 = value_header(query_seq_full)
 
 # (folder, how many values a row in it should have, which distributions to take
-# from it).  The two sweeps ran on different datasets -- the old one's exp
-# timings track its own uni timings, roughly 9x the new sweep's -- so they must
-# not be mixed inside one distribution.  exp therefore comes wholly from the new
-# sweep and uni wholly from the old one.  A tree missing from the new sweep
-# (BwTree, as of this writing) is left absent from exp rather than backfilled
-# from the old logs at the wrong scale.
+# from it).  Order matters: sources are tried in turn and the first to supply a
+# given (benchmark, tree, leaf_wrap) wins, so a later entry only fills gaps.
+#
+# The tag=224 sweep (36 values) is the primary source for all three
+# distributions.  The older 90-value sweep then BACKFILLS uni only: a
+# (tree, leaf_wrap) that sweep has and the new one does not is taken from
+# there, projected onto the 36 columns by name.
+#
+# CAUTION: the two sweeps ran on different datasets and are not interchangeable.
+# The difference is per tree, not a uniform scale factor -- same tree, exp
+# ins_0.01%, old -> new: PMA 29.90 -> 181.17 while MassTree 87.29 -> 84.70
+# barely moves.  So a backfilled row sits at its own operating point beside the
+# rest, and a uni/BTree leaf-size curve drawn across both sources will step
+# where the source changes rather than where the leaf size matters.
+# report_coverage() prints every backfilled row and flags any (benchmark, tree)
+# drawing from both -- read those lines before plotting.  Rerunning the missing
+# runs into the new sweep is what actually fixes it.
 kSources = [
-    (log_folder_name, len(header_36), ["norm", "seg"]),
+    (log_folder_name, len(header_36), kWantBench),
     ("incremental_updates", len(header_90), ["uni"]),
 ]
 
@@ -240,21 +260,29 @@ def project(values: List[str], src_header: List[str]) -> List[str]:
     return [by_name[name] for name in header_36]
 
 
-def collect() -> List[List[str]]:
+def collect() -> Tuple[List[List[str]], Dict[Tuple, str]]:
+    """Return (rows, source_of), source_of keyed by a row's first three fields.
+
+    Which source a row came from is not in the CSV, so it has to be carried out
+    of here for report_coverage() to be able to flag backfills.
+    """
     rows: Dict[Tuple, List[str]] = {}
+    source_of: Dict[Tuple, str] = {}
     for folder, field_num, take_bench in kSources:
         src_header = header_36 if field_num == len(header_36) else header_90
         for context, values in combine(iter_logs(folder), field_num):
             benchmark, tree, buf_value = context
             if benchmark not in take_bench:
                 continue
-            if tree == "BTree" and buf_value != kBTreeLeafWrap:
-                continue
+            if kBTreeLeafWraps is not None and tree == "BTree":
+                if buf_value not in kBTreeLeafWraps:
+                    continue
             if context in rows:
-                # the 36-value sweep is parsed first and wins
+                # first seen wins -- sources are tried in kSources order, and
+                # within one source the logs are walked in sorted path order
                 print(
-                    f"skip {benchmark}/{tree}/{buf_value} from {folder}: already "
-                    f"taken from the {len(header_36)}-value sweep",
+                    f"skip {benchmark}/{tree}/{buf_value} from {folder}: this "
+                    f"(benchmark, tree, leaf_wrap) was already taken",
                     file=sys.stderr,
                 )
                 continue
@@ -263,7 +291,8 @@ def collect() -> List[List[str]]:
             rows[context] = [display_bench(benchmark), tree, buf_value] + project(
                 values, src_header
             )
-    return list(rows.values())
+            source_of[(display_bench(benchmark), tree, buf_value)] = folder
+    return list(rows.values()), source_of
 
 
 def post_processing(data):
@@ -290,10 +319,94 @@ def write_concat_log():
                 out.write(path.read_text().rstrip("\n") + "\n\n")
 
 
+def report_coverage(data: List[List[str]], source_of: Dict[Tuple, str]) -> None:
+    """Print what the logs actually supplied, per (benchmark, tree).
+
+    Which distributions and leaf sizes exist is a property of the logs, not
+    something this script can fix -- a tree run at one leaf size under one
+    distribution and at ten under another is a gap in the sweep.  Say so, rather
+    than letting the CSV imply the coverage is even.
+
+    Also flags rows backfilled from a secondary source.  The CSV has no column
+    saying where a row came from, so without this a curve mixing two sweeps
+    looks exactly like a curve from one.
+    """
+    per_key: Dict[Tuple[str, str], List[int]] = {}
+    for row in data:
+        per_key.setdefault((row[0], row[1]), []).append(int(row[2]))
+
+    # anything not from the first source in kSources is a gap-fill
+    primary = kSources[0][0]
+    backfilled = sorted(k for k, folder in source_of.items() if folder != primary)
+    if backfilled:
+        by_folder: Dict[str, List[Tuple]] = {}
+        for key in backfilled:
+            by_folder.setdefault(source_of[key], []).append(key)
+        for folder, keys in by_folder.items():
+            print(
+                f"backfill: {len(keys)} row(s) taken from logs/{folder} because "
+                f"logs/{primary} had no such run:",
+                file=sys.stderr,
+            )
+            for benchmark, tree, buf_value in keys:
+                print(f"    {benchmark}/{tree}/{buf_value}", file=sys.stderr)
+
+        # the dangerous case: one curve drawn across two sweeps.  The sweeps ran
+        # on different datasets and differ per tree, so a step in such a curve
+        # is an artefact of the source, not of the leaf size.
+        mixed = sorted(
+            {
+                (benchmark, tree)
+                for benchmark, tree, _ in source_of
+                if len({source_of[k] for k in source_of if k[:2] == (benchmark, tree)})
+                > 1
+            }
+        )
+        for benchmark, tree in mixed:
+            sources = sorted(
+                {source_of[k] for k in source_of if k[:2] == (benchmark, tree)}
+            )
+            print(
+                f"WARN: {benchmark}/{tree} draws from {len(sources)} sweeps "
+                f"({', '.join(sources)}) -- these ran on different datasets, so "
+                f"comparing its leaf sizes against each other measures the "
+                f"source as much as the leaf size",
+                file=sys.stderr,
+            )
+
+    # a distribution in kWantBench that produced nothing is almost always a
+    # sweep that has not been run yet, not an intended omission -- and it is
+    # otherwise invisible, since the CSV simply has no such row
+    present = {benchmark for benchmark, _ in per_key}
+    for name in kWantBench:
+        if display_bench(name) not in present:
+            print(
+                f"warn: no rows for {display_bench(name)} ({name}) -- no log "
+                f"under logs/{log_folder_name}/*/{name}/ supplied one",
+                file=sys.stderr,
+            )
+
+    # a tree that is swept anywhere is worth reporting everywhere: the point of
+    # the note is the contrast between the distribution that has the sweep and
+    # the one that has a single point, which is invisible if only the sweep is
+    # printed
+    swept = {tree for (_, tree), wraps in per_key.items() if len(wraps) > 1}
+
+    for (benchmark, tree), wraps in per_key.items():
+        if tree in swept:
+            print(
+                f"note: {benchmark}/{tree} spans {len(wraps)} leaf size(s): "
+                + ",".join(str(w) for w in sorted(wraps)),
+                file=sys.stderr,
+            )
+
+
 def main() -> int:
     write_concat_log()
 
-    data = post_processing(collect())
+    collected, source_of = collect()
+    data = post_processing(collected)
+    report_coverage(data, source_of)
     header = kIdCols + header_36
 
     target = Path(store_path)

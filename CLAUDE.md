@@ -989,12 +989,20 @@ other six. Projection is **by column name**, not index, so it cannot drift if
 either layout changes. Only the 73-value pre-MIX layout is unprojectable (no MIX
 column at all) and still skipped.
 
-`kSources` decides which sweep supplies which distribution:
+`kSources` decides which sweep supplies which distribution. **Order matters**:
+sources are tried in turn and the first to supply a given
+`(benchmark, tree, leaf_wrap)` wins, so a later entry only fills gaps.
 
-| source | values | supplies |
-|---|---|---|
-| `logs/incremental_updates_new/` | 36 | `norm`, `seg` |
-| `logs/incremental_updates/` | 90 | `uni` |
+| order | source | values | supplies |
+|---|---|---|---|
+| 1 | `logs/incremental_updates_new/` | 36 | `uni`, `norm`, `seg` |
+| 2 | `logs/incremental_updates/` | 90 | `uni` — **backfill only** |
+
+As of 2026-08-02 the tag=224 sweep is primary for all three distributions, and
+the old 90-value sweep backfills `uni`: a `(tree, leaf_wrap)` it has that the new
+sweep lacks is taken from there and projected onto the 36 columns by name. This
+was requested explicitly; it is **not** the safe default — see the caution
+below.
 
 **The CSV reports `norm` as `skew` and `seg` as `adversary`** (`kBenchDisplay`).
 This is a display mapping applied at row construction, *not* a rename of the
@@ -1003,11 +1011,24 @@ values, so renaming directories and headers would be undone by the next
 benchmark run. `kWantBench`, `kSources` and the dedupe key all stay in
 generator names; only the emitted `benchmark` column changes.
 
-`seg` exists only in the new sweep and `uni` only in the old one, so neither is
-ambiguous. `norm` is in both and is taken from the new one — which means a tree
-with no new-sweep `norm` run (MassTree, BwTree) is **absent**, even though the
-old logs have it. Backfilling would put two operating points inside one
-distribution; rerun the tree instead.
+For `norm`/`seg` there is no second source, so a tree with no run under
+`logs/incremental_updates_new/<tree>/<dis>/` is **absent** from that
+distribution. A distribution in `kWantBench` that supplies **no** rows at all is
+warned about on stderr (`warn: no rows for …`), since it is otherwise invisible:
+the CSV simply has no such row.
+
+**The `uni` backfill mixes two sweeps inside one distribution, and the merger
+says so.** `report_coverage()` prints every backfilled row, then a `WARN:` for
+any `(benchmark, tree)` drawing from more than one sweep — the dangerous case,
+because such a curve steps where the *source* changes rather than where the
+parameter does. Concretely, if the new sweep's `uni` has only `64.log`, then
+`uni/BTree` leaf 64 comes from the new sweep and 2..1024 from the old, so the
+leaf-size curve has an artificial discontinuity at 64. Read those lines before
+plotting; the real fix is rerunning the missing leaf sizes into the new sweep,
+after which the backfill goes quiet on its own (no backfill lines, no `WARN`).
+
+Whether a row was backfilled is **not** a CSV column — the schema is unchanged
+so downstream consumers keep working — it exists only in the stderr report.
 
 **`exp`, `seg_10` and `dual_norm` are dropped from the output**, their logs
 still on disk. Adding a name back to `kWantBench` *and* `kSources` restores it.
@@ -1018,37 +1039,55 @@ two runs of one — do not dedupe them. They differ per tree in *direction*, whi
 is how you can tell: ins_0.01%, `seg` → `seg_10`, CPAM 7.43 → 12.60 and PAM
 8.40 → 12.66 (slower), but PMA 191.98 → 178.85 (faster).
 
-**Each distribution comes wholly from one sweep, deliberately.** The two sweeps
-are not interchangeable, and the difference is **per tree, not a uniform scale
-factor** — same tree, `exp` ins_0.01%, old → new:
+**How far apart the two sweeps are** — the evidence behind the caution above.
+They are not interchangeable, and the difference is **per tree, not a uniform
+scale factor** — same tree, `exp` ins_0.01%, old → new:
 
 | BTree | CPAM | PAM | PMA | MassTree | BwTree |
 |---|---|---|---|---|---|
 | 29.25 → 6.40 | 55.60 → 6.41 | 29.75 → 8.24 | 29.90 → **181.17** | 87.29 → 84.70 | 55.68 → 55.15 |
 
-PMA got ~6x *slower* while MassTree and BwTree barely moved, so a tree
-backfilled from the old logs would sit at its own unrelated operating point next
-to trees measured on the new one. Backfill nothing; rerun the missing tree into
-`incremental_updates_new/` instead. (`exp` itself is no longer emitted — the
-table is kept because it is the evidence for the no-backfill rule.)
+PMA got ~6x *slower* while MassTree and BwTree barely moved, so a backfilled row
+sits at its own unrelated operating point next to rows measured on the new
+sweep — which is why the `uni` backfill is reported per row rather than applied
+silently. Rerunning the missing runs into `incremental_updates_new/` is the only
+thing that actually removes the mismatch. (`exp` itself is no longer emitted —
+the table is kept because it is the evidence for this.)
 
 (An earlier revision of this note claimed a "~9x" factor between the sweeps.
 That was derived by comparing `exp/BwTree`-old against `exp/BTree`-new — two
 different trees — and is wrong. The table above is the same-tree comparison.)
 
-**BTree is pinned to leaf size 64** (`kBTreeLeafWrap`) — it is the only tree
-swept over leaf sizes, so the old `uni` logs carry 2..1024 for it, which would
-otherwise give 10 BTree rows against 1 of everything else.
+**Every leaf size that was run is emitted** (`kBTreeLeafWraps = None`, changed
+2026-08-02 — it was previously `kBTreeLeafWrap = 64`, a hard pin). BTree is the
+only tree swept over leaf sizes, so a distribution holds one BTree row per leaf
+size it was run at against 1 row for each other tree. Set
+`kBTreeLeafWraps` to a collection — `{64}` reproduces the old 18-row output
+exactly — to pin it back for a plot that wants one line per tree.
+
+Because coverage is a property of the logs and not of the merger, the script
+prints a `note:` per `(benchmark, tree)` for any tree that is swept *somewhere*,
+including the distributions where it is not — so `adversary/BTree spans 1 leaf
+size(s): 64` appears next to `uni/BTree spans 10`, rather than the gap being
+silent.
 
 **`leaf_wrap` must come from the header's `Buf:` field, not the filename.** The
 new sweep names every file `64.log` after the BTree leaf size, so PAM, PMA and
 MassTree runs sit in a `64.log` while reporting `Buf: 1`. A merger written
 against the path would mislabel three of the six trees.
 
-Current state: **18 rows** — the full 3 × 6 grid, `uni`/`skew`/`adversary` ×
-BTree, PAM, CPAM, PMA, MassTree, BwTree — all parsing at exactly 36 values with
-no warnings. `uni/MassTree` legitimately carries `-` in every `RCM` column;
-those logs predate the `q_[0]` race fix.
+Expected state: the 3 × 6 grid, `uni`/`skew`/`adversary` × BTree, PAM, CPAM,
+PMA, MassTree, BwTree, with BTree expanded over its leaf sizes — 18 rows when
+pinned, more once the leaf sweep is included. How many depends on which
+`logs/incremental_updates_new/<tree>/<dis>/<leaf_wrap>.log` files exist; read the
+`note:`/`warn:` lines the merger prints rather than assuming the grid is full.
+Every row should parse at exactly 36 values.
+
+The row counts and values recorded below predate the 2026-08-02 switch to a
+single source, when `uni` came from the old 90-value sweep — re-derive them from
+a current run before quoting. (The old `uni/MassTree` `-` in every `RCM` column
+was an artefact of those logs predating the `q_[0]` race fix; a `uni` run from
+the current sweep should have real numbers there.)
 
 `skew` lands between `uni` and `adversary`, as its centred band should — BTree
 ins_0.01%: uni 29.35, skew 25.03, adversary 7.61.
@@ -1073,7 +1112,7 @@ still have come out labelled `seg` and collided with the restored ones, and
 first-seen-wins would have silently produced a mix of the two.
 
 BTree's `exp` logs in the new sweep now carry the full leaf-size sweep
-(2..1024), not just 64. `kBTreeLeafWrap` still pins the CSV to one row, but the
+(2..1024), not just 64 — though `exp` is not emitted (see `kWantBench`). The
 `exp/BTree` values shifted slightly (build 1.3142 → 1.31545) when `64.log` was
 rerun — expected, not a merge bug.
 
