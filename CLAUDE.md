@@ -22,6 +22,52 @@ cd build && make <target> -j$(nproc)
 
 Build is CMake-based. The `build/` directory already exists; no need to re-run cmake.
 
+### `INDEX_MICROBENCH` — MassTree/BwTree are out of `all` (added 2026-08-03)
+
+`index_microbench_workload` (the concurrent-index driver: MassTree, BwTree,
+ARTOLC, skiplists) is still **configured** on every run, but carries
+`EXCLUDE_FROM_ALL` unless `-DINDEX_MICROBENCH=ON` is passed:
+
+| | default | `-DINDEX_MICROBENCH=ON` |
+|---|---|---|
+| part of `all` (plain `make`) | no | yes |
+| `make index_microbench_workload` | works | works |
+| configure-time warning | printed | silent |
+
+`EXCLUDE_FROM_ALL` rather than an `if()` around the whole block **on purpose**:
+the 8 benchmark scripts name the target explicitly (`make "${solver}"`), so
+gating its *existence* would break `scalability_concurrent.sh` and
+`range_query_with_log.sh`. This way the change stays entirely inside
+`CMakeLists.txt` and no script needs the flag. Verified in the generated
+`CMakeFiles/Makefile2`: with ON there is an `all:
+CMakeFiles/index_microbench_workload.dir/all` line, without it there is not,
+while the target's own `.dir/all` rule is present either way. (`make -n all` at
+the top level is *not* a usable check — it only prints the recursive
+`$(MAKE) -f CMakeFiles/Makefile2 all`, never the sub-make's commands.)
+
+Why it is out of `all`: the target hard-codes `-lpapi -ltcmalloc_minimal -ltbb
+-latomic` as naked link names (no `find_library`, so a miss is a link-time
+error, not a configure one), and `-include masstree/config.h` pulls in a
+**checked-in Linux configure output** (`HAVE_MADV_HUGEPAGE`,
+`HAVE_SYS_EPOLL_H`). PAPI has no macOS port, so the target cannot build on a
+Mac at all — in `all`, a plain `make` there fails on work nobody asked for.
+None of it is needed to build or test the tree itself.
+
+Package list (also in the warning): PAPI (`libpapi-dev` / `papi-devel`),
+gperftools (`libgoogle-perftools-dev` / `gperftools-devel`), oneTBB
+(`libtbb-dev` / `tbb-devel`), libatomic, pthreads+libm. MassTree additionally
+wants `external/index-microbench/masstree/config.h` (tracked in-tree; `git
+ls-files` confirms it, so no autotools run is normally needed) or a prebuilt
+`mtIndexAPI.a` beside it — absent that `.a`, CMake compiles the 17 masstree
+`.cc`/`.c` sources directly and says so in a warning. That `mtIndexAPI.a`
+warning and the `libatomic was not found` one (macOS only) fire on every
+configure, exactly as they did before this change, since the target is still
+configured.
+
+**Formatting gotcha**: `message()` reflows any line starting at column 0, which
+mangled the package table on the first attempt. Every line of that warning is
+indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
+
 ## Key source files
 
 | Path | Role |

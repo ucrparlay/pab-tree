@@ -34,6 +34,13 @@ option(SIEVE "" OFF)
 option(JEMA "" ON)
 option(CCP "" OFF)
 
+# NOTE: MassTree + BwTree (target index_microbench_workload).  OFF keeps them out
+#       of the default `all` target -- `make index_microbench_workload` still
+#       builds them on demand, so the benchmark scripts need no change.  ON puts
+#       them back into `all`.  See the warning near that target for the packages
+#       they need.
+option(INDEX_MICROBENCH "Build MassTree + BwTree (index_microbench_workload) as part of `all`" OFF)
+
 
 if(CILKPLUS)
 	add_compile_options(-DPARLAY_CILKPLUS -DCILK -fcilkplus)
@@ -233,6 +240,33 @@ add_executable(index_microbench_workload
 	"${INDEX_MICROBENCH_BTREE_SOURCE}"
 	${INDEX_MICROBENCH_SKIPLIST_SOURCES}
 )
+
+if(INDEX_MICROBENCH)
+	message(">>>>> MassTree + BwTree (index_microbench_workload) are part of `all`")
+else()
+	# Configured, but not built unless asked for by name.
+	set_target_properties(index_microbench_workload PROPERTIES EXCLUDE_FROM_ALL TRUE)
+	# NOTE: every line below is indented on purpose -- message() reflows lines that
+	#       start at column 0, which would mangle the package table.
+	message(WARNING
+		"MassTree + BwTree (index_microbench_workload) are NOT in the default build.\n"
+		"  Build them on demand:      make index_microbench_workload\n"
+		"  Or put them back in all:   cmake -DINDEX_MICROBENCH=ON ..\n"
+		"\n"
+		"  Packages they need (link line, see external/index-microbench/Makefile):\n"
+		"    -lpapi              PAPI          apt: libpapi-dev              dnf: papi-devel\n"
+		"    -ltcmalloc_minimal  gperftools    apt: libgoogle-perftools-dev  dnf: gperftools-devel\n"
+		"    -ltbb               Intel oneTBB  apt: libtbb-dev               dnf: tbb-devel\n"
+		"    -latomic            libatomic     apt: libatomic1               dnf: libatomic\n"
+		"    -lpthread -lm       glibc         apt: libc6-dev                dnf: glibc-devel\n"
+		"\n"
+		"  MassTree also needs external/index-microbench/masstree/config.h (tracked in-tree;\n"
+		"  regenerate with ./configure there -- needs autoconf), or a prebuilt mtIndexAPI.a\n"
+		"  beside it.  That config.h is a Linux build (HAVE_MADV_HUGEPAGE, HAVE_SYS_EPOLL_H)\n"
+		"  and PAPI has no macOS port, so this target is Linux-only.\n"
+	)
+endif()
+
 set_target_properties(index_microbench_workload PROPERTIES
 	CXX_STANDARD 20
 	CXX_STANDARD_REQUIRED ON
