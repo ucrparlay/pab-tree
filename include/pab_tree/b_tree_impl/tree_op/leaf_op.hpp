@@ -28,14 +28,15 @@ btree<TT>::post_process_leaf_change(Node *T, Range In,
 	assert(T->is_leaf);
 	auto TL = static_cast<Leaf *>(T);
 	if (leaf_entries_pattern == TT::leaf_entries_pattern::sorted) {
-		std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter());
+		std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter(),
+			  key_less);
 		TL->is_sorted = true;
 	} else if (leaf_entries_pattern == TT::leaf_entries_pattern::unsorted) {
 		TL->is_sorted = false;
 	} else if (leaf_entries_pattern == TT::leaf_entries_pattern::hybrid) {
 		if (leaf_sort_pred(T, In)) {
 			std::sort(TL->get_ele_begin_iter(),
-				  TL->get_ele_end_iter());
+				  TL->get_ele_end_iter(), key_less);
 			TL->is_sorted = true;
 		} else {
 			TL->is_sorted = false;
@@ -54,7 +55,7 @@ void btree<TT>::extract_points_in_leaf(Node *T, Range Out)
 	if constexpr (sorted) {
 		if (!TL->is_sorted) {
 			std::sort(TL->elements.begin(),
-				  TL->elements.begin() + TL->size);
+				  TL->elements.begin() + TL->size, key_less);
 			TL->is_sorted = true;
 		}
 	}
@@ -113,7 +114,7 @@ btree<TT>::handling_leaf_split_overflow(Node *T, Range In,
 			     parlay::make_slice(entry_seq.begin() + TL->size,
 						entry_seq.end()));
 		free_node<Leaf>(T);
-		entry_seq = parlay::sort(entry_seq);
+		entry_seq = parlay::sort(entry_seq, key_less);
 	}
 
 	size_type rt_bkt_n = generate_leaf_nodes(

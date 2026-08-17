@@ -21,8 +21,6 @@ template <typename Range>
 void btree<TT>::build(Range &&In)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
-	static_assert(parlay::is_less_than_comparable_v<
-		      parlay::range_reference_type_t<Range>>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
 					parlay::range_reference_type_t<Range>>);
@@ -37,7 +35,7 @@ void btree<TT>::Build_(Range In)
 {
 	// Release any existing tree first; without this a second build leaks it.
 	this->delete_tree();
-	auto sort_seq = parlay::sort(In);
+	auto sort_seq = parlay::sort(In, key_less);
 	// Keys must be distinct. is_sorted with <= is strict increase, so this
 	// catches duplicates; with < it would tolerate them.
 	assert(parlay::is_sorted(sort_seq, [](E const &a, E const &b) {

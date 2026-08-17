@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "pab_tree/dependence/comparator.h"
+#include "pab_tree/dependence/node_base.h"
 #include "parlay/sequence.h"
 #include "parlay/slice.h"
 
@@ -32,7 +33,7 @@ template <class EleType> struct ele_wrapper : EleType {
 };
 
 template <typename EleType, uint BufferSize, typename LeafAugType,
-	  typename InteriorAugType, uint_fast8_t SkHeightVal, typename NodeType>
+	  typename InteriorAugType, typename NodeType>
 class TypeTrait {
     public:
 	// NOTE: element type
@@ -76,14 +77,16 @@ class TypeTrait {
 	};
 };
 
-template <typename EleType, uint BufferSize, typename LeafAugType,
-	  typename InteriorAugType, uint_fast8_t SkHeightVal, typename NodeType>
+template <typename EleType, uint BufferSize,
+	  typename LeafAugType = empty_leaf_aug,
+	  typename InteriorAugType = empty_interior_aug,
+	  typename NodeType = proto_node>
 class btree_type_trait
 	: public TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-			   InteriorAugType, SkHeightVal, NodeType> {
+			   InteriorAugType, NodeType> {
     public:
 	using BT = TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-			     InteriorAugType, SkHeightVal, NodeType>;
+			     InteriorAugType, NodeType>;
 	using Split = BT::K;
 	using split_seq = parlay::sequence<Split>;
 	using split_slice = parlay::slice<Split *, Split *>;

@@ -18,6 +18,7 @@
 #include <variant>
 
 #include "pab_tree/dependence/comparator.h"
+#include "pab_tree/dependence/node_base.h"
 #include "pab_tree/dependence/concepts.h"
 #include "pab_tree/dependence/binary_search.h"
 #include "pab_tree/dependence/box_op.h"
@@ -28,18 +29,6 @@ namespace pab_tree
 
 struct alloc_normal_leaf_tag {};
 struct alloc_empty_leaf_tag {};
-
-struct proto_node {
-	proto_node()
-		: is_leaf{ false }
-		, size{ 0 } {};
-	proto_node(bool _is_leaf, size_t _size)
-		: is_leaf{ _is_leaf }
-		, size{ _size } {};
-
-	bool is_leaf;
-	size_t size;
-};
 
 template <typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
 struct leaf_node : TypeTrait::Node {

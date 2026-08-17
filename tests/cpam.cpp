@@ -27,7 +27,8 @@ void ApplyCPAM(Options const &opts, RunFunc test_func)
 	// using EleType = Element<uint32_t, uint32_t>;
 	using TypeTrait = pab_tree::btree_type_trait<
 		Wrapper::ElementWrapper<E>, 16, Wrapper::LeafAugEmpty,
-		Wrapper::InteriorAugEmpty, 8, pab_tree::proto_node>;
+		Wrapper::InteriorAugEmpty,
+		pab_tree::proto_node>;
 	if (opts.tree_type == 0) {
 		// B-tree
 	} else if (opts.tree_type == 1) {

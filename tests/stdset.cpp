@@ -22,7 +22,8 @@ void ApplyStdSet(Options const &opts, RunFunc test_func)
 	using E = Wrapper::E;
 	using TypeTrait = pab_tree::btree_type_trait<
 		Wrapper::ElementWrapper<E>, 16, Wrapper::LeafAugEmpty,
-		Wrapper::InteriorAugEmpty, 8, pab_tree::proto_node>;
+		Wrapper::InteriorAugEmpty,
+		pab_tree::proto_node>;
 	Run<StdSetWrapper<TypeTrait>>(opts, test_func);
 }
 

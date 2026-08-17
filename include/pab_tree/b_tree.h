@@ -247,6 +247,11 @@ template <class TypeTrait> class btree {
 
 	// ---- implementation ----
     private:
+	// Order by key. Element types are not required to define operator<.
+	static constexpr auto key_less = [](E const &a, E const &b) {
+		return Entry::get_key(a) < Entry::get_key(b);
+	};
+
 	// NOTE: helper function to decide the bucket number and range
 	static size_type get_bkt_num(size_type const item_n)
 	{

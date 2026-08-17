@@ -19,8 +19,6 @@ template <typename Range>
 void btree<TT>::batch_insert(Range &&In)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
-	static_assert(parlay::is_less_than_comparable_v<
-		      parlay::range_reference_type_t<Range>>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
 					parlay::range_reference_type_t<Range>>);
@@ -41,8 +39,6 @@ void btree<TT>::batch_insert(Range &&In,
 			     LeafSortPred const &leaf_sort_pred)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
-	static_assert(parlay::is_less_than_comparable_v<
-		      parlay::range_reference_type_t<Range>>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
 					parlay::range_reference_type_t<Range>>);
@@ -72,7 +68,7 @@ void btree<TT>::BatchInsert_(Range In,
 							  In.end() };
 	typename TT::entry_seq sorted_seq;
 	if (!sorted_input) {
-		sorted_seq = parlay::sort(In);
+		sorted_seq = parlay::sort(In, key_less);
 		sorted_slice = parlay::make_slice(sorted_seq.cbegin(),
 						  sorted_seq.cend());
 	}
