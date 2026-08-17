@@ -48,8 +48,8 @@ ApplyOrthogonal(Options const& opts, RunFunc test_func)
   using Wrapper = Wrapper<uint32_t, uint32_t>;
 #endif
 
-  using K = Wrapper::K;
-  using V = Wrapper::V;
+  using K [[maybe_unused]] = Wrapper::K;
+  using V [[maybe_unused]] = Wrapper::V;
   using E = Wrapper::E;
   using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
                                          kBuf,

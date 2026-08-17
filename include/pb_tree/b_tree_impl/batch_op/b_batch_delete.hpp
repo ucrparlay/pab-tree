@@ -148,8 +148,8 @@ BTree<TT>::BatchDeleteRecursive(Node* T,
   }
 
   if (T->is_leaf) {
-    auto old_size = T->size;
-    auto new_node =
+    [[maybe_unused]] auto old_size = T->size;
+    [[maybe_unused]] auto new_node =
       DeletePoints4Leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
     assert(new_node == T);
     assert(new_node->size + In.size() == old_size);

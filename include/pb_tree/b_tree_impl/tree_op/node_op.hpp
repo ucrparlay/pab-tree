@@ -276,7 +276,7 @@ BTree<TT>::FetchInvalidSubtreeNodes(Node* T,
     assert(reinsert_entries.size() == T->size);
     assert(has_tomb == false);
 
-    auto size = T->size;
+    [[maybe_unused]] auto size = T->size;
     assert(T != nullptr);
     FlattenRec<decltype(reinsert_entries), false, kSortReinsertEntries>(
       T, reinsert_entries);
@@ -482,7 +482,7 @@ BTree<TT>::BalanceOverLeaves(Node* T,
 
   // Validates that the last-emitted node falls inside its expected key range.
   // Called only from assert(), so has no cost in release builds.
-  auto quick_check = [&](BufSizeT g) -> bool {
+  [[maybe_unused]] auto quick_check = [&](BufSizeT g) -> bool {
     const auto box = GetNodeBoxRec(TI->tree_nodes[tree_idx - 1]);
     if (tree_idx == 1) {
       if (split_idx == 0) { // one tree node for the entire array
@@ -499,7 +499,9 @@ BTree<TT>::BalanceOverLeaves(Node* T,
 
   // NOTE: Case A: group is a single valid node — slide its pointer/split into
   // place.
-  auto handle_single = [&](BufSizeT i, BufSizeT g, bool is_rightmost) {
+  auto handle_single = [&](BufSizeT i,
+                           [[maybe_unused]] BufSizeT g,
+                           bool is_rightmost) {
     assert(NodeIsValid(TI->tree_nodes[i]));
     TI->tree_nodes[tree_idx++] = TI->tree_nodes[i];
     if (!is_rightmost) {
@@ -511,7 +513,10 @@ BTree<TT>::BalanceOverLeaves(Node* T,
   // NOTE: Case B: group total fits in one leaf — merge all into the rightmost
   // leaf.
   auto handle_merge =
-    [&](BufSizeT i, BufSizeT j, BufSizeT g, bool is_rightmost) {
+    [&](BufSizeT i,
+        BufSizeT j,
+        [[maybe_unused]] BufSizeT g,
+        bool is_rightmost) {
       auto* dest = static_cast<Leaf*>(TI->tree_nodes[j - 1]);
       assert(NodeIsValid(dest) || is_rightmost);
       auto* dst = dest->GetEleEndIter();
@@ -668,7 +673,7 @@ BTree<TT>::ReInsertTreeAfterDelete(Node* T,
 
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * reinsert_entries.size());
-  SizeT new_node_n = BatchInsertRecursive(T,
+  [[maybe_unused]] SizeT new_node_n = BatchInsertRecursive(T,
                                           reinsert_entries,
                                           parlay::make_slice(node_split_seq),
                                           leaf_entries_pattern,

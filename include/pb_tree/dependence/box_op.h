@@ -50,7 +50,7 @@ TT::Box
 GetBox(typename TT::BoxSeq const& box_seq)
 {
   auto box = box_seq[0];
-  for (int i = 1; i < box_seq.size(); i++) {
+  for (size_t i = 1; i < box_seq.size(); i++) {
     box.first = TT::Num::Min(box.first, box_seq[i].first);
     box.second = TT::Num::Max(box.second, box_seq[i].second);
   }

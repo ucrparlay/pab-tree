@@ -66,15 +66,15 @@ struct LeafNode : TypeTrait::Node
   // NOTE: default allocator
   LeafNode()
     : Node{ true, static_cast<size_t>(0) }
-    , is_sorted{ true }
     , aug(AT())
+    , is_sorted{ true }
   {
   }
 
   LeafNode(AT const& _aug)
     : Node{ true, static_cast<size_t>(0) }
-    , is_sorted{ true }
     , aug(_aug)
+    , is_sorted{ true }
   {
   }
 
@@ -83,8 +83,8 @@ struct LeafNode : TypeTrait::Node
   LeafNode(Range In, AllocNormalLeafTag)
     : Node{ true, static_cast<size_t>(In.size()) }
     , elements(EntryArr())
-    , is_sorted{ true }
     , aug(AT(In))
+    , is_sorted{ true }
   {
     assert(In.size() <= TT::kBufUB);
     assert(parlay::is_sorted(

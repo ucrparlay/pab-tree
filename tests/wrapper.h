@@ -22,10 +22,10 @@ public:
     LeafAugEmpty() = default;
 
     template<typename Slice>
-    LeafAugEmpty(Slice In) {};
+    LeafAugEmpty([[maybe_unused]] Slice In) {};
 
     template<typename Slice>
-    void UpdateAug(Slice In)
+    void UpdateAug([[maybe_unused]] Slice In)
     {
     }
 

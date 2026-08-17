@@ -116,7 +116,7 @@ BTree<TT>::BatchInsertRecursive(Node* T,
   if (T->is_leaf) {
     Leaf* TL = static_cast<Leaf*>(T);
     if (TL->size + n <= TT::kBufUB) {
-      Node* updated_node =
+      [[maybe_unused]] Node* updated_node =
         InsertPoints2Leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
       assert(updated_node == T);
       return 0;

@@ -42,13 +42,13 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
   parlay::sequence<typename TT::Box> box_seq(TI->GetNodeN());
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
     box_seq[i] = VerifyTreeProperty<kCheckSize>(TI->tree_nodes[i]);
-    auto node = TI->tree_nodes[i];
+    [[maybe_unused]] auto node = TI->tree_nodes[i];
     auto box = box_seq[i];
     // assert(node->is_leaf || static_cast<Interior*>(node)->box == box);
 
     if (i == 0) {
       assert(box.second < TI->split[0]);
-    } else if (i == TI->GetNodeN() - 1) {
+    } else if (i == static_cast<size_t>(TI->GetNodeN()) - 1) {
       assert(box.first >= TI->split[i - 1]);
     } else {
       if (box.first < TI->split[i - 1] || box.second >= TI->split[i]) {

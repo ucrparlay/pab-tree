@@ -140,7 +140,7 @@ GenRectangles(int rec_num, int const type, auto const& WP)
     }
   }
   BoxSeq box_seq(rec_num);
-  int cnt = 0;
+  [[maybe_unused]] int cnt = 0;
 
   srand(10);
   auto wp = parlay::sort(WP);
@@ -173,10 +173,10 @@ template<typename TypeTrait,
 void
 BuildTree(typename TypeTrait::EntrySeq const& WP, int const& rounds, Tree& pkd)
 {
-  using TT = TypeTrait;
-  using EntrySeq = typename TT::EntrySeq;
-  using Leaf = typename Tree::Leaf;
-  using Interior = typename Tree::Interior;
+  using TT [[maybe_unused]] = TypeTrait;
+  using EntrySeq [[maybe_unused]] = typename TT::EntrySeq;
+  using Leaf [[maybe_unused]] = typename Tree::Leaf;
+  using Interior [[maybe_unused]] = typename Tree::Interior;
 
   double loop_late = rounds > 1 ? 0.01 : -100;
   size_t n = WP.size();
@@ -399,7 +399,7 @@ TestLeafRandom(Tree& pkd,
                int const rounds,
                int const ratio)
 {
-  using TT = TypeTrait;
+  using TT [[maybe_unused]] = TypeTrait;
   auto const wp = Tree::ParseInput(WP);
 
   auto const query_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
@@ -489,7 +489,7 @@ TestLeafRandomDynamicGraph(Tree& pkd,
                            int const rounds,
                            int const ratio)
 {
-  using TT = TypeTrait;
+  using TT [[maybe_unused]] = TypeTrait;
   pkd.DeleteTree();
   parlay::sequence<typename Tree::InputRangeT> wi(time_period_num);
   parlay::sequence<typename Tree::InputDeleteRangeT> wd(time_period_num);
@@ -659,7 +659,7 @@ RangeCount(auto const& wp,
            int const rec_num,
            int const rec_type)
 {
-  using EntrySeq = typename TT::EntrySeq;
+  using EntrySeq [[maybe_unused]] = typename TT::EntrySeq;
 
   auto [query_box_seq, max_size] =
     GenRectangles<TT, false, false>(rec_num, rec_type, wp);
@@ -674,7 +674,7 @@ RangeCount(auto const& wp,
         // parlay::parallel_for(0, 1, [&](size_t i) {
         auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
         kdknn[i] = size;
-        int output_size = query_box_seq[i].second;
+        [[maybe_unused]] int output_size = query_box_seq[i].second;
         assert(std::cmp_equal(kdknn[i], output_size));
       });
     },
@@ -684,7 +684,7 @@ RangeCount(auto const& wp,
             << max_size << std::endl;
   for (int i = 0; i < rec_num; i++) {
     int output_size = query_box_seq[i].second;
-    if (kdknn[i] != output_size) {
+    if (std::cmp_not_equal(kdknn[i], output_size)) {
       std::cout << kdknn[i] << " " << output_size << " "
                 << query_box_seq[i].first.first << query_box_seq[i].first.second
                 << std::endl;
@@ -724,10 +724,10 @@ RangeQuery(auto const& wp,
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         // parlay::parallel_for(0, 1, [&](size_t i) {
-        auto [size, logger] = pkd.RangeReport(
+        [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
         kdknn[i] = size;
-        int output_size = query_box_seq[i].second.size();
+        [[maybe_unused]] int output_size = query_box_seq[i].second.size();
         assert(std::cmp_equal(kdknn[i], size) && Out.size() >= output_size);
       });
     },
@@ -737,7 +737,7 @@ RangeQuery(auto const& wp,
             << max_size << std::endl;
   for (int i = 0; i < rec_num; i++) {
     int output_size = query_box_seq[i].second.size();
-    if (kdknn[i] != output_size) {
+    if (std::cmp_not_equal(kdknn[i], output_size)) {
       std::cout << kdknn[i] << " " << output_size << " "
                 << query_box_seq[i].first.first << query_box_seq[i].first.second
                 << std::endl;
@@ -856,7 +856,7 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
 template<typename TT, typename Tree>
 void
 RangeCountFix(Tree& pkd,
-              int const& rounds,
+              [[maybe_unused]] int const& rounds,
               int rec_num,
               auto const& query_box_seq)
 {
@@ -890,7 +890,7 @@ RangeCountFix(Tree& pkd,
 template<typename TT, typename Tree>
 void
 RangeQueryFix(Tree& pkd,
-              int const& rounds,
+              [[maybe_unused]] int const& rounds,
               auto& Out,
               int rec_num,
               auto const& query_box_seq)
@@ -918,7 +918,7 @@ RangeQueryFix(Tree& pkd,
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         // for (int i = 0; i < rec_num; i++) {
-        auto [size, logger] = pkd.RangeReport(
+        [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
         vis_leaf[i] = logger.vis_leaf_num;
         vis_inter[i] = logger.vis_interior_num;
@@ -961,7 +961,7 @@ RangeQueryFix(Tree& pkd,
 template<typename TT, typename Tree>
 void
 RangeQuerySerialWithLog(Tree& pkd,
-                        int const& rounds,
+                        [[maybe_unused]] int const& rounds,
                         auto& Out,
                         const int rec_num,
                         const int rec_type,
@@ -977,7 +977,7 @@ RangeQuerySerialWithLog(Tree& pkd,
   for (int i = 0; i < rec_num; i++) {
     parlay::internal::timer t;
     t.reset(), t.start();
-    auto [size, logger] = pkd.RangeReport(query_box_seq[i].first,
+    [[maybe_unused]] auto [size, logger] = pkd.RangeReport(query_box_seq[i].first,
                                           Out.cut(offset[i], offset[i + 1]));
     t.stop();
     std::cout << rec_type << " " << query_box_seq[i].second << " "
@@ -1117,7 +1117,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 
       t.reset(), t.start();
       parlay::parallel_for(0, kOSMRangeQueryNum, [&](size_t i) {
-        auto [size, logger] = pkd.RangeReport(
+        [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
           query_box_seq[i].first, range_res.cut(offset[i], offset[i + 1]));
       });
       t.stop();
@@ -1629,8 +1629,8 @@ auto
 ReadEntriesText(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
   -> std::pair<size_t, int>
 {
-  using K = E::K;
-  using V = E::V;
+  using K [[maybe_unused]] = E::K;
+  using V [[maybe_unused]] = E::V;
 
   parlay::sequence<char> S = readStringFromFile(iFile);
   parlay::sequence<char*> W = stringToWords(S);
@@ -1779,7 +1779,7 @@ PrintTreeParam(char const* tree_name, int leaf_size)
 static auto constexpr DefaultTestFunc =
   []<class TreeDesc, typename TypeTrait, typename Options>(Options opts) {
     using Tree = TreeDesc::TreeType;
-    using TT = TypeTrait;
+    using TT [[maybe_unused]] = TypeTrait;
     using EntrySeq = TT::EntrySeq;
     EntrySeq wp;
     EntrySeq wi;
@@ -1861,16 +1861,16 @@ static auto constexpr DefaultTestFunc =
           for (auto ratio : ratio_seq) {
             auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
             // std::cout << base_path << " " << batch_path << std::endl;
-            auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-            auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+            [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+            [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
             BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
           }
         } else {
           auto [base_path, batch_path] =
             opts.ParseInsertBatchPath(opts.batch_ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
           BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       }
@@ -1886,16 +1886,16 @@ static auto constexpr DefaultTestFunc =
             // puts("------------------------------");
             auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
             // std::cout << base_path << " " << batch_path << std::endl;
-            auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-            auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+            [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+            [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
             BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
           }
         } else {
           auto [base_path, batch_path] =
             opts.ParseDeleteBatchPath(opts.batch_ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
           BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       }
@@ -1903,7 +1903,7 @@ static auto constexpr DefaultTestFunc =
       if (opts.query_type != 0 && opts.tag != 0) {
         auto [base_path, batch_path] =
           opts.ParseInsertBatchPath(opts.batch_ratio);
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+        [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
         BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
       }
 
@@ -1967,16 +1967,16 @@ static auto constexpr DefaultTestFunc =
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
           BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
 
         for (auto ratio : ratio_seq) {
           auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
+          [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
           BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
         }
       }
@@ -2091,7 +2091,7 @@ CountDynamicGraphBatches(std::string const& dir)
 static auto constexpr TestTemporalGraph =
   []<class TreeDesc, typename TypeTrait, typename Options>(Options opts) {
     using Tree = TreeDesc::TreeType;
-    using TT = TypeTrait;
+    using TT [[maybe_unused]] = TypeTrait;
     using EntrySeq = TT::EntrySeq;
     EntrySeq wp;
     EntrySeq wi;
@@ -2353,8 +2353,8 @@ static void
 Run(Options const& opts, RunFunc test_func)
 {
   using TT = typename TreeWrapper::TreeType::TT;
-  using E = typename TT::E;
-  using EntrySeq = typename TT::EntrySeq;
+  using E [[maybe_unused]] = typename TT::E;
+  using EntrySeq [[maybe_unused]] = typename TT::EntrySeq;
 
   PrintTreeParam(TreeWrapper::TreeType::GetTreeName(),
                  TreeWrapper::TreeType::GetLeafSize());
