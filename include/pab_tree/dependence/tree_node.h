@@ -170,7 +170,12 @@ struct leaf_node : TypeTrait::Node {
 		this->elements = entry_arr();
 	}
 
-	AT &get_aug() const
+	AT const &get_aug() const
+	{
+		return aug;
+	}
+
+	AT &get_aug()
 	{
 		return aug;
 	}
@@ -341,6 +346,9 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 	bool validate_key_in_node(TT::buf_size_type node_idx,
 				  TT::K const k) const
 	{
+		if (this->get_split_n() == 0) {
+			return true; // one child: every key belongs to it
+		}
 		return node_idx == 0 ?
 			       k < this->split.front() :
 			       (node_idx == this->get_split_n() ?

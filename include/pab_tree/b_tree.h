@@ -131,6 +131,7 @@ template <class TypeTrait> class btree {
 				   typename TT::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
+			, reinsert_size(0)
 		{
 		} // TODO:finish AT
 
@@ -140,6 +141,7 @@ template <class TypeTrait> class btree {
 				   typename TT::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
+			, reinsert_size(0)
 		{
 		} // TODO:finish AT
 
@@ -149,6 +151,7 @@ template <class TypeTrait> class btree {
 			: BaseNode(_tree_nodes, _split, _aug)
 			, valid(true)
 			, contain_invalid_subtree(0)
+			, reinsert_size(0)
 		{
 		}
 

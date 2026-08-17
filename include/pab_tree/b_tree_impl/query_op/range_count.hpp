@@ -14,7 +14,8 @@ template <typename TT>
 auto btree<TT>::range_count(TT::Box const query_box) const -> size_type
 {
 	size_type rt_size = 0;
-	if (this->root_ == nullptr) [[unlikely]] {
+	if (this->root_ == nullptr || query_box.first >= query_box.second)
+		[[unlikely]] {
 		return 0;
 	}
 	range_count_rec(this->root_, query_box, rt_size);
