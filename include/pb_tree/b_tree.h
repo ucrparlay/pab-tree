@@ -252,6 +252,8 @@ public:
   }
 
   // NOTE: build tree
+  // Keys must be distinct. Duplicates put elements on the wrong side of a
+  // split key, where no descent reaches them; debug builds assert.
   template<typename Range>
   void Build(Range&& In);
 

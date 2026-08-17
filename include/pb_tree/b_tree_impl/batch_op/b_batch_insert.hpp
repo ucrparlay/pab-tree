@@ -72,6 +72,12 @@ BTree<TT>::BatchInsert_(Range In,
     sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
   }
 
+  // Keys must be distinct, in the batch and against the tree. Only the batch
+  // is checkable here.
+  assert(parlay::is_sorted(sorted_slice, [](E const& a, E const& b) {
+    return Entry::GetKey(a) <= Entry::GetKey(b);
+  }));
+
   // NOTE: begin insert
   NodeSplitPairSeq node_split_seq =
     NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());

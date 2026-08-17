@@ -36,6 +36,11 @@ BTree<TT>::Build_(Range In)
   // Release any existing tree first; without this a second Build leaks it.
   this->DeleteTree();
   auto sort_seq = parlay::sort(In);
+  // Keys must be distinct. is_sorted with <= is strict increase, so this
+  // catches duplicates; with < it would tolerate them.
+  assert(parlay::is_sorted(sort_seq, [](E const& a, E const& b) {
+    return Entry::GetKey(a) <= Entry::GetKey(b);
+  }));
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
 }
