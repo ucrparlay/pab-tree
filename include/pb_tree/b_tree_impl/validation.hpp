@@ -10,22 +10,37 @@
 #include "parlay/primitives.h"
 
 namespace pb_tree {
+// Returns the subtree box and whether every checked property held. The bool is
+// the reportable verdict; the asserts beside it are unchanged.
 template<typename TT>
 template<bool kCheckSize>
-TT::Box
+std::pair<typename TT::Box, bool>
 BTree<TT>::VerifyTreeProperty(Node const* T)
 {
+  if (T == nullptr) {
+    return { GetEmptyBox<TT>(), false };
+  }
+
   if (T->is_leaf) {
     Leaf const* TL = static_cast<Leaf const*>(T);
+    bool ok = true;
     if constexpr (kCheckSize) {
       assert(T == this->root_ || (TL->GetEle().size() >= TT::kBufLB &&
                                   TL->GetEle().size() <= TT::kBufUB));
+      ok = ok && (T == this->root_ ||
+                  (TL->size >= TT::kBufLB && TL->size <= TT::kBufUB));
     }
     assert(!TL->is_sorted ||
            parlay::is_sorted(TL->GetEle(), [&](auto const& e1, auto const& e2) {
              return Entry::GetKey(e1) < Entry::GetKey(e2);
            }));
-    return pb_tree::GetBox<TT>(TL->GetEle());
+    ok = ok && (!TL->is_sorted ||
+                parlay::is_sorted(TL->GetEleSlice(),
+                                  [&](auto const& e1, auto const& e2) {
+                                    return Entry::GetKey(e1) <
+                                           Entry::GetKey(e2);
+                                  }));
+    return { pb_tree::GetBox<TT>(TL->GetEleSlice()), ok };
   }
 
   auto const* TI = static_cast<Interior const*>(T);
@@ -38,18 +53,33 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
   assert(parlay::is_sorted(TI->GetSplitSlice(),
                            [&](TT::K a, TT::K b) { return a < b; }));
 
+  bool node_ok =
+    (T == this->root_ ||
+     (TI->GetNodeN() >= TT::kBufLB && TI->GetNodeN() <= TT::kBufUB)) &&
+    TI->GetNodeN() > 0 &&
+    parlay::is_sorted(TI->GetSplitSlice(),
+                      [&](TT::K a, TT::K b) { return a < b; });
+
   // check the box of each child node falls within the split between
   parlay::sequence<typename TT::Box> box_seq(TI->GetNodeN());
+  parlay::sequence<bool> ok_seq(TI->GetNodeN(), true);
+  parlay::sequence<size_t> size_seq(TI->GetNodeN(), 0);
   parlay::parallel_for(0, TI->GetNodeN(), [&](size_t i) {
-    box_seq[i] = VerifyTreeProperty<kCheckSize>(TI->tree_nodes[i]);
+    auto [child_box, child_ok] =
+      VerifyTreeProperty<kCheckSize>(TI->tree_nodes[i]);
+    box_seq[i] = child_box;
+    ok_seq[i] = child_ok && TI->tree_nodes[i] != nullptr;
+    size_seq[i] = TI->tree_nodes[i] == nullptr ? 0 : TI->tree_nodes[i]->size;
     [[maybe_unused]] auto node = TI->tree_nodes[i];
     auto box = box_seq[i];
     // assert(node->is_leaf || static_cast<Interior*>(node)->box == box);
 
     if (i == 0) {
       assert(box.second < TI->split[0]);
+      ok_seq[i] = ok_seq[i] && box.second < TI->split[0];
     } else if (i == static_cast<size_t>(TI->GetNodeN()) - 1) {
       assert(box.first >= TI->split[i - 1]);
+      ok_seq[i] = ok_seq[i] && box.first >= TI->split[i - 1];
     } else {
       if (box.first < TI->split[i - 1] || box.second >= TI->split[i]) {
         std::cout << "Validation failed at interior node split check."
@@ -60,10 +90,27 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
         assert(false);
       }
       assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
+      ok_seq[i] = ok_seq[i] && box.first >= TI->split[i - 1] &&
+                  box.second < TI->split[i];
     }
   });
 
-  return pb_tree::GetBox<TT>(box_seq);
+  // TI->size must equal the sum of the child sizes. RangeCount and
+  // RangeReport both trust this field without visiting the children;
+  // RangeReport derives disjoint parallel output slices from it.
+  if constexpr (kCheckSize) {
+    size_t const child_sum = parlay::reduce(size_seq);
+    if (child_sum != TI->size) {
+      std::cout << "Validation failed: interior size " << TI->size
+                << " != sum of children " << child_sum << std::endl;
+      node_ok = false;
+    }
+  }
+
+  bool const children_ok =
+    parlay::reduce(ok_seq, parlay::binary_op(std::logical_and<bool>(), true));
+
+  return { pb_tree::GetBox<TT>(box_seq), node_ok && children_ok };
 }
 
 template<typename TT>
@@ -172,12 +219,18 @@ BTree<TT>::Validate(Node const* T)
     T = this->root_;
   }
 
+  // An empty tree is valid.
+  if (T == nullptr) {
+    return true;
+  }
+
   if constexpr (kVerbose) {
     std::cerr << std::endl;
     std::cerr << ">>> begin validate tree\n" << std::flush;
   }
 
-  VerifyTreeProperty<kCheckSize>(T);
+  auto const [box, ok] = VerifyTreeProperty<kCheckSize>(T);
+  (void)box;
 
   // typename TT::HeightT height =
   //   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
@@ -187,7 +240,7 @@ BTree<TT>::Validate(Node const* T)
   if constexpr (kVerbose) {
     std::cerr << "<<< end validate tree\n" << std::flush;
   }
-  return true;
+  return ok;
 }
 
 template<typename TT>

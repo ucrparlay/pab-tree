@@ -727,7 +727,7 @@ RangeQuery(auto const& wp,
         [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
         kdknn[i] = size;
-        [[maybe_unused]] int output_size = query_box_seq[i].second.size();
+        [[maybe_unused]] size_t output_size = query_box_seq[i].second.size();
         assert(std::cmp_equal(kdknn[i], size) && Out.size() >= output_size);
       });
     },

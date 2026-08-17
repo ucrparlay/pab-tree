@@ -517,8 +517,9 @@ public:
 
   // static TT::Box GetNodeBox(Node const* T);
 
+  // Returns {subtree box, all checked properties held}.
   template<bool kCheckSize = true>
-  TT::Box VerifyTreeProperty(Node const* T);
+  std::pair<typename TT::Box, bool> VerifyTreeProperty(Node const* T);
 
   bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice);
 
@@ -533,7 +534,7 @@ public:
   int GetTreeNodesNum(Node const* T);
 
   template<bool kCheckSize = true, bool kVerbose = true>
-  bool Validate(Node const* T = nullptr);
+  [[nodiscard]] bool Validate(Node const* T = nullptr);
 
   // Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at T.
   static std::pair<SizeT, SizeT> CountSortedLeaves(Node const* T);

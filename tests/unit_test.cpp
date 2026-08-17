@@ -112,9 +112,9 @@ protected:
     [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
     if (redirect_output) {
-      tree.template Validate<true, false>();
+      ASSERT_TRUE((tree.template Validate<true, false>()));
     } else {
-      tree.Validate();
+      ASSERT_TRUE(tree.Validate());
     }
 
     {
@@ -127,9 +127,9 @@ protected:
       BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
       ASSERT_EQ(tree.GetSize(), wp.size() + wi.size());
       if (redirect_output) {
-        tree.template Validate<true, false>();
+        ASSERT_TRUE((tree.template Validate<true, false>()));
       } else {
-        tree.Validate();
+        ASSERT_TRUE(tree.Validate());
       }
 
       {
@@ -146,9 +146,9 @@ protected:
       BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, 2);
       assert(tree.GetSize() == wp.size());
       if (redirect_output) {
-        tree.template Validate<true, false>();
+        ASSERT_TRUE((tree.template Validate<true, false>()));
       } else {
-        tree.Validate();
+        ASSERT_TRUE(tree.Validate());
       }
 
       EntrySeq tmp(wp.size());
