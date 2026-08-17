@@ -48,44 +48,48 @@ The short version:
   the insert path, the branchless `BinarySearch`, and the unsigned-`BufSizeT`
   underflow class.
 
-## Refactor status (2026-08-17)
+## Refactor status (2026-08-17) -- COMPLETE
 
 Plan: `docs/refactor_plan_2026-08.md`. Review: `docs/code_review_2026-08.md`.
 
-**Phase 0 (safety net) and Phase 1 (stop-ship defects) are done**, one commit
-each, every stage gated on `unit_test`:
+All phases done, 30 commits, each gated on `unit_test`.
 
-| commit | what |
-|---|---|
-| `a7375df` | `-Wall -Wextra` on; 40 warnings fixed |
-| `27531b9` | `-UNDEBUG` for unit_test; fixed dangling `argv` in RunTest |
-| `470d71a` | `Validate()` returns a real verdict; checks subtree sizes |
-| `af61d26` | null-root guards on the four query entry points |
-| `2ab4d85` | `Build()` no longer leaks the previous tree |
-| `6c0b0bf` | range constructor was ambiguous for every argument |
-| `a132879` | `CopyTreeRecursive` did not compile, so neither copy op did |
-| `bd02b63` | `BatchDelete(sorted_input=true)` deleted nothing |
-| `2a2d2ed` | `BatchDelete` freed the whole tree when all root children underfull |
-| `ad37bf3` | distinct-key precondition stated and checked |
+| | before | after |
+|---|---|---|
+| library | 4860 lines / 24 files | 4004 / 21 |
+| `sizeof(btree)` | 296 B | 8 B |
+| public surface | ~90 members | 12 + aliases |
+| warnings | off via `-w` | 0 with `-Wall -Wextra` |
+| asserts in tests | 0 of 152 | all live |
+| include roots | 2, three spellings | 1, headers self-contained |
+| lines over 80 cols | -- | 0 |
+| user boilerplate | ~45 lines | 13 |
+| installable | no | `find_package(pab_tree)` |
 
-Two findings worth carrying forward:
+**Defects fixed.** The review's seven stop-ship items, plus four it missed:
 
-- **The test harness had a use-after-free.** `RunTest` built seven argv entries
-  as `std::to_string(x).c_str()`; each temporary died at the end of the
-  full-expression. The suite was running with garbage `-t/-r/-q/-b` values and
-  the membership check never executed. Fixed in `27531b9`.
-- **Open defect, not yet fixed.** With data loss fixed and `Validate()`
-  reporting, a structural violation shows at small leaf sizes:
-  `box.second < TI->split[0]` — child 0's max key reaches its own split key.
-  4/200 randomized runs at `kBuf=2`, 2/200 at 4, 1/200 at 8, none at >=16.
-  **Queries are unaffected** (0 missing, 0 ghost in 1400 runs). The fix would
-  land in `BalanceOverLeaves`/`FetchInvalidSubtreeNodes`, which are frozen, so
-  it is flagged rather than changed.
+- `RunTest` built argv from `std::to_string(x).c_str()`, seven dangling
+  pointers, so the suite ran with garbage flags and the membership check never
+  executed.
+- `verify_tree_property` read `split[0]` on single-child interiors, where no
+  split key exists. This was the "kBuf<=8 structural violation"; the tree was
+  fine.
+- `tree_node.h` used `parlay::is_sorted` without including
+  `parlay/primitives.h`, surviving only on a transitive include from the
+  deleted `basic_point.h`.
+- The build path never called `update_aug`, so a fresh tree had a zero
+  augmentation.
 
-Two asserts were touched, both recorded: the wrong one in `b_batch_insert.hpp`
-was **kept** with the correct check added beside it; the one in
-`b_batch_delete.hpp` asserting `root_->size == 0` was **removed**, because it
-asserted exactly what the data-loss fix disproves.
+**Where measurement overrode the plan.** `range_report` clamping cost +3.5%,
+so the contract is documented and asserted instead. Node predicates went
+`private` rather than into a `detail` namespace: all 72 call sites are
+internal. Removing the loggers is performance-neutral (325.5 vs 327.8 ns), not
+the win first claimed.
+
+**Two asserts touched, both recorded.** The wrong one in `b_batch_insert.hpp`
+was kept with the correct check added beside it. The one in
+`b_batch_delete.hpp` asserting `root_->size == 0` was removed: it asserted
+exactly what the data-loss fix disproves.
 
 ## Conventions (set 2026-08-17)
 
