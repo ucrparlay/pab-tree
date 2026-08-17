@@ -62,8 +62,7 @@ BTree<TT>::BatchInsert_(Range In,
   }
 
   if (this->root_->size == 0) { // empty ghost node should be eliminated
-    this->DeleteTree();
-    return Build_(In);
+    return Build_(In);          // Build_ releases the old tree
   }
 
   parlay::slice<const E*, const E*> sorted_slice{ In.begin(), In.end() };

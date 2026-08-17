@@ -33,6 +33,8 @@ template<typename Range>
 void
 BTree<TT>::Build_(Range In)
 {
+  // Release any existing tree first; without this a second Build leaks it.
+  this->DeleteTree();
   auto sort_seq = parlay::sort(In);
   this->root_ = BuildRecursive(parlay::make_slice(sort_seq));
   assert(this->root_ != nullptr);
