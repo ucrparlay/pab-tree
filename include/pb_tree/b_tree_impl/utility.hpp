@@ -17,7 +17,7 @@ namespace pb_tree {
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::GetEntries(Range& Out)
+BTree<TT>::GetEntries(Range& Out) const
 {
   if (this->root_ == nullptr) [[unlikely]] {
     return;

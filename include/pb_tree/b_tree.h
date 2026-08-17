@@ -501,7 +501,7 @@ public:
   static void FlattenRec(Node* T, Range Out);
 
   template<typename Range>
-  void GetEntries(Range& Out);
+  void GetEntries(Range& Out) const;
 
   template<typename Range, bool sorted = false>
   static void ExtractPointsInLeaf(Node* T, Range Out);
@@ -518,13 +518,13 @@ public:
 
   // Returns {subtree box, all checked properties held}.
   template<bool kCheckSize = true>
-  std::pair<typename TT::Box, bool> VerifyTreeProperty(Node const* T);
+  std::pair<typename TT::Box, bool> VerifyTreeProperty(Node const* T) const;
 
-  bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice);
+  bool VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice) const;
 
-  TT::HeightT CheckHeight(Node const* T);
+  TT::HeightT CheckHeight(Node const* T) const;
 
-  bool CheckContainNode(Node const* T, Node const* P);
+  bool CheckContainNode(Node const* T, Node const* P) const;
 
   template<typename Leaf, typename Interior>
   int GetHeight(Node const* T);
@@ -533,14 +533,14 @@ public:
   int GetTreeNodesNum(Node const* T);
 
   template<bool kCheckSize = true, bool kVerbose = true>
-  [[nodiscard]] bool Validate(Node const* T = nullptr);
+  [[nodiscard]] bool Validate(Node const* T = nullptr) const;
 
   // Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at T.
   static std::pair<SizeT, SizeT> CountSortedLeaves(Node const* T);
 
   // Ratio of sorted leaves to total leaves in the subtree rooted at T
   // (defaults to the whole tree). Returns 0.0 for an empty tree.
-  double SortedLeafRatio(Node const* T = nullptr);
+  double SortedLeafRatio(Node const* T = nullptr) const;
 
   std::tuple<bool, bool, typename TT::SizeT> CheckTreeAugAfterDelete(Node* T);
 
@@ -602,7 +602,12 @@ public:
     return this->root_;
   }
 
-  size_t GetSize()
+  Node const* GetRoot() const
+  {
+    return this->root_;
+  }
+
+  size_t GetSize() const
   {
     return this->root_ ? this->root_->size : 0;
   }

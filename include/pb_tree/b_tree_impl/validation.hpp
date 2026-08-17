@@ -15,7 +15,7 @@ namespace pb_tree {
 template<typename TT>
 template<bool kCheckSize>
 std::pair<typename TT::Box, bool>
-BTree<TT>::VerifyTreeProperty(Node const* T)
+BTree<TT>::VerifyTreeProperty(Node const* T) const
 {
   if (T == nullptr) {
     return { GetEmptyBox<TT>(), false };
@@ -115,7 +115,8 @@ BTree<TT>::VerifyTreeProperty(Node const* T)
 
 template<typename TT>
 bool
-BTree<TT>::VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice)
+BTree<TT>::VerifyUnoverlappedTree(Node const* T,
+                                  TT::NodeSlice node_slice) const
 {
   int cnt = 0;
   for (int i = 0; i < node_slice.size(); i++) {
@@ -129,7 +130,7 @@ BTree<TT>::VerifyUnoverlappedTree(Node const* T, TT::NodeSlice node_slice)
 // check whether node P is in the tree T
 template<typename TT>
 bool
-BTree<TT>::CheckContainNode(Node const* T, Node const* P)
+BTree<TT>::CheckContainNode(Node const* T, Node const* P) const
 {
   if (T == P) {
     return true;
@@ -154,7 +155,7 @@ BTree<TT>::CheckContainNode(Node const* T, Node const* P)
 
 template<typename TT>
 TT::HeightT
-BTree<TT>::CheckHeight(Node const* T)
+BTree<TT>::CheckHeight(Node const* T) const
 {
   if (T->is_leaf) {
     return 1;
@@ -213,7 +214,7 @@ BTree<TT>::GetTreeNodesNum(Node const* T)
 template<typename TT>
 template<bool kCheckSize, bool kVerbose>
 bool
-BTree<TT>::Validate(Node const* T)
+BTree<TT>::Validate(Node const* T) const
 {
   if (T == nullptr) {
     T = this->root_;
@@ -271,7 +272,7 @@ BTree<TT>::CountSortedLeaves(Node const* T)
 
 template<typename TT>
 double
-BTree<TT>::SortedLeafRatio(Node const* T)
+BTree<TT>::SortedLeafRatio(Node const* T) const
 {
   if (T == nullptr) {
     T = this->root_;
