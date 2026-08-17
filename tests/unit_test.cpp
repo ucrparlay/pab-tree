@@ -119,7 +119,7 @@ protected:
 
     {
       EntrySeq tmp(wp.size());
-      Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+      tree.GetEntries(tmp);
       assert(parlay::sort(tmp) == parlay::sort(wp));
     }
 
@@ -134,7 +134,7 @@ protected:
 
       {
         EntrySeq tmp(wp.size() + wi.size());
-        Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+        tree.GetEntries(tmp);
         auto nwp = parlay::sort(parlay::append(wp, wi));
         tmp = parlay::sort(tmp);
         assert(tmp == nwp);
@@ -152,7 +152,7 @@ protected:
       }
 
       EntrySeq tmp(wp.size());
-      Tree::FlattenRec(tree.GetRoot(), parlay::make_slice(tmp));
+      tree.GetEntries(tmp);
       assert(parlay::sort(tmp) == parlay::sort(wp));
     }
 
