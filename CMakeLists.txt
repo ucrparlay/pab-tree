@@ -115,12 +115,39 @@ add_subdirectory(external/googletest)
 enable_testing()
 
 
-# NOTE: pab_tree
+# The library itself: header-only, one include root.
+include(GNUInstallDirs)
 add_library(pab_tree INTERFACE)
+add_library(pab_tree::pab_tree ALIAS pab_tree)
 set(PAB_TREE_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/include" "${pab_tree_SOURCE_DIR}/external")
 target_link_libraries(pab_tree INTERFACE parlay)
-target_include_directories(pab_tree INTERFACE $<BUILD_INTERFACE:${PAB_TREE_INCLUDE_DIR}>
+target_compile_features(pab_tree INTERFACE cxx_std_20)
+target_include_directories(pab_tree INTERFACE
+	$<BUILD_INTERFACE:${pab_tree_SOURCE_DIR}/include>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+# install(): lets a downstream project find_package(pab_tree).
+install(DIRECTORY "${pab_tree_SOURCE_DIR}/include/pab_tree"
+	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(TARGETS pab_tree EXPORT pab_treeTargets)
+install(EXPORT pab_treeTargets
+	FILE pab_treeTargets.cmake
+	NAMESPACE pab_tree::
+	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pab_tree")
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+	"${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfigVersion.cmake"
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY SameMajorVersion)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfig.cmake"
+"include(CMakeFindDependencyMacro)
+find_dependency(Parlay)
+include(\"\${CMAKE_CURRENT_LIST_DIR}/pab_treeTargets.cmake\")
+")
+install(FILES
+	"${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfig.cmake"
+	"${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfigVersion.cmake"
+	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pab_tree")
 
 # add_executable(b_ccp ${PROJECT_SOURCE_DIR}/tests/b_ccp.cpp)
 # target_link_libraries(b_ccp PUBLIC pab_tree)
