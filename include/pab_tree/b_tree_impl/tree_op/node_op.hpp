@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
+#include <iostream>
 #include <concepts>
 #include <cstddef>
 #include <numeric>
@@ -703,9 +705,19 @@ void btree<TT>::reinsert_tree_after_delete(
 {
 	node_split_pair_seq node_split_seq =
 		node_split_pair_seq::uninitialized(2 * reinsert_entries.size());
-	[[maybe_unused]] size_type new_node_n = batch_insert_recursive(
+	size_type new_node_n = batch_insert_recursive(
 		T, reinsert_entries, parlay::make_slice(node_split_seq),
 		leaf_entries_pattern, leaf_sort_pred);
+	// A non-zero result means batch_insert_recursive freed T and put the
+	// replacement children in node_split_seq for the caller to splice.
+	// There is no parent pointer here, so we cannot. Abort rather than
+	// return to a caller that will use the freed T; the assert alone
+	// vanishes under NDEBUG and leaves a use-after-free.
+	if (new_node_n != 0) [[unlikely]] {
+		std::cerr << "pab_tree: reinsert split the subtree root and "
+			     "cannot splice it; see docs/open_issues.md #1\n";
+		std::abort();
+	}
 	assert(new_node_n == 0);
 }
 
