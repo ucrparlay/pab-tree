@@ -14,6 +14,9 @@ BTree<TT>::RangeCount(TT::Box const query_box) const
 {
   RangeReportLogger logger;
   SizeT rt_size = 0;
+  if (this->root_ == nullptr) [[unlikely]] {
+    return { 0, logger };
+  }
   RangeCountRec(this->root_, query_box, rt_size, logger);
   return { rt_size, logger };
 }

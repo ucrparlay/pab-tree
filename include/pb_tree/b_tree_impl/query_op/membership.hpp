@@ -11,6 +11,9 @@ auto
 BTree<TT>::Contain(K const& k) const -> std::pair<bool, MembershipLogger>
 {
   MembershipLogger logger;
+  if (this->root_ == nullptr) [[unlikely]] {
+    return { false, logger };
+  }
   return { ContainIter(this->root_, k), logger };
 }
 

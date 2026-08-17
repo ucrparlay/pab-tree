@@ -16,7 +16,8 @@ auto
 BTree<TT>::RangeReport(TT::Box const query_box, Range&& out) const
   -> std::pair<SizeT, RangeReportLogger>
 {
-  if (query_box.first >= query_box.second) [[unlikely]] {
+  if (this->root_ == nullptr || query_box.first >= query_box.second)
+    [[unlikely]] {
     return { 0, RangeReportLogger{} };
   }
 

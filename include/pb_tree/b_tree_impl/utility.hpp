@@ -19,6 +19,9 @@ template<typename Range>
 void
 BTree<TT>::GetEntries(Range& Out)
 {
+  if (this->root_ == nullptr) [[unlikely]] {
+    return;
+  }
   this->FlattenRec<typename TT::EntrySlice, false, false>(
     this->root_,
     parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));
