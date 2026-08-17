@@ -250,19 +250,9 @@ public:
                       : static_cast<const Interior*>(T)->reinsert_size;
   }
 
-  // NOTE: build tree
-  // Keys must be distinct. Duplicates put elements on the wrong side of a
-  // split key, where no descent reaches them; debug builds assert.
-  template<typename Range>
-  void Build(Range&& In);
 
-  template<typename Range>
-  void Build_(Range In);
 
-  template<typename Range>
-  Node* BuildRecursive(Range In);
 
-  Node* AssembleInteriorLevels(TT::NodeSlice nodes, TT::SplitSlice keys);
 
   struct DefaultHybridPred
   {
@@ -279,14 +269,48 @@ public:
     }
   };
 
+  // ---- public API ----
+  // NOTE: build tree
+  // Keys must be distinct. Duplicates put elements on the wrong side of a
+  // split key, where no descent reaches them; debug builds assert.
+  template<typename Range>
+  void Build(Range&& In);
   template<typename Range>
   void BatchInsert(Range&& In);
-
   template<typename Range, typename LeafSortPred = DefaultHybridPred>
   void BatchInsert(Range&& In,
                    const TT::PatternType leaf_entries_pattern,
                    const bool sorted_input,
                    LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
+  template<typename Range>
+  void BatchDelete(Range&& In);
+  template<typename Range, typename LeafSortPred = DefaultHybridPred>
+  void BatchDelete(Range&& In,
+                   const TT::PatternType leaf_entries_pattern,
+                   const bool sorted_input,
+                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
+  void DeleteTree();
+  template<typename Range>
+  void GetEntries(Range& Out) const;
+  template<bool kCheckSize = true, bool kVerbose = true>
+  [[nodiscard]] bool Validate(Node const* T = nullptr) const;
+  // Ratio of sorted leaves to total leaves in the subtree rooted at T
+  // (defaults to the whole tree). Returns 0.0 for an empty tree.
+  double SortedLeafRatio(Node const* T = nullptr) const;
+  auto Contain(K const& k) const -> bool;
+  auto RangeCount(TT::Box query_box) const -> SizeT;
+  template<typename Range>
+  auto RangeReport(TT::Box query_box, Range&& out) const -> SizeT;
+
+  // ---- implementation ----
+private:
+  template<typename Range>
+  void Build_(Range In);
+  template<typename Range>
+  Node* BuildRecursive(Range In);
+  Node* AssembleInteriorLevels(TT::NodeSlice nodes, TT::SplitSlice keys);
+
+
 
   template<typename Range, typename LeafSortPred>
     requires std::predicate<LeafSortPred, Node*, Range>
@@ -311,14 +335,7 @@ public:
                                   Range Out,
                                   NodeSplitPairSlice node_split_slice);
 
-  template<typename Range>
-  void BatchDelete(Range&& In);
 
-  template<typename Range, typename LeafSortPred = DefaultHybridPred>
-  void BatchDelete(Range&& In,
-                   const TT::PatternType leaf_entries_pattern,
-                   const bool sorted_input,
-                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
 
   template<typename Range, typename LeafSortPred>
     requires std::predicate<LeafSortPred, Node*, Range>
@@ -491,7 +508,6 @@ public:
 
   static Node* CopyTreeRecursive(Node const* T);
 
-  void DeleteTree();
 
   template<bool granularity = true>
   static void DeleteTreeRec(Node* T);
@@ -500,8 +516,6 @@ public:
   template<typename Range, bool granularity = true, bool sorted = false>
   static void FlattenRec(Node* T, Range Out);
 
-  template<typename Range>
-  void GetEntries(Range& Out) const;
 
   template<typename Range, bool sorted = false>
   static void ExtractPointsInLeaf(Node* T, Range Out);
@@ -532,25 +546,18 @@ public:
   template<typename Leaf, typename Interior>
   int GetTreeNodesNum(Node const* T);
 
-  template<bool kCheckSize = true, bool kVerbose = true>
-  [[nodiscard]] bool Validate(Node const* T = nullptr) const;
 
   // Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at T.
   static std::pair<SizeT, SizeT> CountSortedLeaves(Node const* T);
 
-  // Ratio of sorted leaves to total leaves in the subtree rooted at T
-  // (defaults to the whole tree). Returns 0.0 for an empty tree.
-  double SortedLeafRatio(Node const* T = nullptr) const;
 
   std::tuple<bool, bool, typename TT::SizeT> CheckTreeAugAfterDelete(Node* T);
 
-  auto Contain(K const& k) const -> bool;
 
   bool ContainIter(Node const* T, K const& k) const;
 
   bool ContainRec(Node const* T, K const& k) const;
 
-  auto RangeCount(TT::Box query_box) const -> SizeT;
 
   void RangeCountLeaf(Node const* T,
                       TT::Box const& query_box,
@@ -560,8 +567,6 @@ public:
                      TT::Box const& query_box,
                      SizeT& offset) const;
 
-  template<typename Range>
-  auto RangeReport(TT::Box query_box, Range&& out) const -> SizeT;
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,
@@ -586,6 +591,7 @@ public:
                              SizeT& offset,
                              Range out) const;
 
+public:
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {
     return input_seq;
