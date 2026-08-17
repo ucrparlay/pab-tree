@@ -22,25 +22,7 @@ enforced in release too, but it is a guard, not a fix for a live defect.
 
 ---
 
-## 1. Every leaf allocation zero-fills the whole element array
-
-`dependence/tree_node.h:73`
-
-```cpp
-, elements(entry_arr())
-```
-
-`entry_arr` is `std::array<E, k_buf_ub>`, so this value-initialises all
-`k_buf_ub` entries even when the leaf holds far fewer. The review measured
-**22% of build time**.
-
-Untouched because it sits in node allocation, next to frozen code, and the
-22% is the review's number, not mine. This is the largest remaining
-performance item.
-
----
-
-## 2. `DEBUG` is an unprefixed configuration macro
+## 1. `DEBUG` is an unprefixed configuration macro
 
 7 sites: `b_batch_delete.hpp:112,178`, `b_batch_insert.hpp:89,158`,
 `node_op.hpp:152,481,646`. Set by `CMakeLists.txt`.
@@ -57,7 +39,7 @@ sorted-input assert was removed on the same day.
 
 ---
 
-## 3. Batch operations require a parlay range
+## 2. Batch operations require a parlay range
 
 `b_batch_insert.hpp:67`, `b_batch_delete.hpp:68`
 
@@ -73,7 +55,7 @@ header rather than at the call site.
 
 ---
 
-## 4. No standard container conveniences
+## 3. No standard container conveniences
 
 `b_tree.h`
 
@@ -83,7 +65,7 @@ insert or erase. Defensible for a batch-parallel design, but `empty()` and
 
 ---
 
-## 5. No RAII and no exception guarantee
+## 4. No RAII and no exception guarantee
 
 Nodes are raw pointers from `parlay::type_allocator` with manual free. A
 throwing allocation mid-insert leaves the tree in an indeterminate state and
@@ -91,7 +73,7 @@ leaks every node built so far. Structural; not attempted.
 
 ---
 
-## 6. Eleven TODO markers
+## 5. Eleven TODO markers
 
 `b_tree.h:27,136,146,468` · `tree_node.h:81,183,385,409` ·
 `box_op.h:21` · `b_batch_insert.hpp:59` · `points_op.hpp:55`
