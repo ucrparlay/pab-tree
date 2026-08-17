@@ -50,7 +50,9 @@ whose build defines it silently switches on the `get_node_box_rec`
 verification loops, an O(subtree) traversal with heap allocation per child on
 every interior update.
 
-Rename to `PABTREE_DEBUG`. This was in the plan and I did not do it.
+A `PABTREE_DEBUG` rename was planned and tried, then **reverted at your
+request** on 2026-08-17. Recorded here as a known consequence, not a pending
+task.
 
 ---
 
