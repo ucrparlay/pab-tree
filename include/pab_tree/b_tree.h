@@ -201,12 +201,13 @@ public:
 		template <typename InputNode, typename Range>
 		bool operator()(InputNode const *T, Range In) const noexcept
 		{
-			// Knuth multiplicative hash of the node and batch
-			// sizes. No address bits: they made the result
-			// depend on the heap layout, so leaf ordering
-			// changed run to run under ASLR.
+			// Knuth multiplicative hash over (node_size +
+			// batch_size); XOR in low address bits from begin/end
+			// to break correlation across call sites.
 			auto const v =
-				(static_cast<size_t>(T->size) + In.size()) * 2654435761ULL;
+				(static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
+				(reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
+				(reinterpret_cast<uintptr_t>(In.end()) >> 3);
 			return v & 1;
 		}
 	};
