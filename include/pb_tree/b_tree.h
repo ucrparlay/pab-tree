@@ -362,6 +362,8 @@ public:
 
   void PruneOutEmptyTree(Node* T);
 
+  void RebuildFromFlatten();
+
   template<typename LeafSortPred>
   void BalanceOverLeaves(Node* T,
                          const SizeT reinsert_size,

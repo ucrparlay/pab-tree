@@ -86,11 +86,19 @@ BTree<TT>::BatchDelete_(Range In,
     if (this->root_->is_leaf) {
       return;
     }
-    assert(this->root_->size == 0);
-    constexpr bool kEnableGranularity = false;
-    this->DeleteTreeRec<kEnableGranularity>(this->root_);
-    this->root_ = nullptr;
-    // t.next("delete tree ");
+    // An invalid root is not an empty one: it is invalid as soon as every
+    // child is invalid, and a leaf is invalid at any size below kBufLB. Test
+    // the entry count, or a tree still holding live entries gets freed.
+    // The old assert(root_->size == 0) here asserted exactly the wrong thing
+    // and had to go; it fires on every tree this branch now recovers.
+    if (this->root_->size == 0) {
+      constexpr bool kEnableGranularity = false;
+      this->DeleteTreeRec<kEnableGranularity>(this->root_);
+      this->root_ = nullptr;
+      // t.next("delete tree ");
+      return;
+    }
+    this->RebuildFromFlatten();
     return;
   }
 
@@ -100,10 +108,7 @@ BTree<TT>::BatchDelete_(Range In,
   if (invalid_subtree_num) {
     if (this->root_->size < TT::kBufUB &&
         !this->root_->is_leaf) { // fits in one leaf directly use leaf
-      auto tree_entries = TT::EntrySeq::uninitialized(this->root_->size);
-      FlattenRec(this->root_, parlay::make_slice(tree_entries));
-      this->DeleteTreeRec<true>(this->root_);
-      Build_(parlay::make_slice(tree_entries));
+      this->RebuildFromFlatten();
       return;
     }
     auto reinsert_entries = TT::EntrySeq::uninitialized(reinsert_entry_num);
@@ -123,6 +128,18 @@ BTree<TT>::BatchDelete_(Range In,
 
   // std::cout << this->sys_reinsert_size << " ";
   // std::cout << this->sys_balance_leaf_size << std::endl;
+}
+
+// Flatten the whole tree and rebuild it from the surviving entries.
+template<typename TT>
+void
+BTree<TT>::RebuildFromFlatten()
+{
+  auto tree_entries = TT::EntrySeq::uninitialized(this->root_->size);
+  FlattenRec(this->root_, parlay::make_slice(tree_entries));
+  this->DeleteTreeRec<true>(this->root_);
+  this->root_ = nullptr; // Build_ releases root_, which is already freed
+  Build_(parlay::make_slice(tree_entries));
 }
 
 // Returns (invalid_flag, needs_fetch, reinsert_entry_num).
