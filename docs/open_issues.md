@@ -51,46 +51,13 @@ verification loops, an O(subtree) traversal with heap allocation per child on
 every interior update.
 
 A `PABTREE_DEBUG` rename was planned and tried, then **reverted at your
-request** on 2026-08-17. Recorded here as a known consequence, not a pending
-task.
+request** on 2026-08-17. Recorded as a known consequence, not a pending task.
+The expensive block it would have guarded is smaller now: the false
+sorted-input assert was removed on the same day.
 
 ---
 
-## 3. `-DDEBUG=ON` builds abort on sorted-input insert
-
-`b_tree_impl/batch_op/b_batch_insert.hpp:89`
-
-```cpp
-assert(!sorted_input || new_node_n == 0);
-```
-
-False: `new_node_n > 0` means the root overflowed, which depends on batch size,
-not on whether the caller pre-sorted.
-
-**Kept deliberately** — your call was to leave existing asserts alone, so the
-correct check sits beside it rather than replacing it. Recorded here because
-the consequence is that the sorted-input fast path cannot be exercised in a
-debug build.
-
----
-
-## 4. `default_hybrid_pred` hashes heap addresses
-
-`b_tree.h:215`
-
-```cpp
-(reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
-(reinterpret_cast<uintptr_t>(In.end()) >> 3);
-```
-
-The default insert and delete path decides leaf sortedness from heap
-addresses, so leaf ordering varies run to run under ASLR. Query results are
-unaffected, but `sorted_leaf_ratio` and anything timing-sensitive are not
-reproducible.
-
----
-
-## 5. Batch operations require a parlay range
+## 3. Batch operations require a parlay range
 
 `b_batch_insert.hpp:67`, `b_batch_delete.hpp:68`
 
@@ -106,7 +73,7 @@ header rather than at the call site.
 
 ---
 
-## 6. No standard container conveniences
+## 4. No standard container conveniences
 
 `b_tree.h`
 
@@ -116,7 +83,7 @@ insert or erase. Defensible for a batch-parallel design, but `empty()` and
 
 ---
 
-## 7. No RAII and no exception guarantee
+## 5. No RAII and no exception guarantee
 
 Nodes are raw pointers from `parlay::type_allocator` with manual free. A
 throwing allocation mid-insert leaves the tree in an indeterminate state and
@@ -124,7 +91,7 @@ leaks every node built so far. Structural; not attempted.
 
 ---
 
-## 8. Eleven TODO markers
+## 6. Eleven TODO markers
 
 `b_tree.h:27,136,146,468` · `tree_node.h:81,183,385,409` ·
 `box_op.h:21` · `b_batch_insert.hpp:59` · `points_op.hpp:55`
