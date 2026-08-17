@@ -91,10 +91,10 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 
 	assert(std::numeric_limits<buf_size_type>::max() >= new_node_n);
 
-	// Fast path: no child split — tree_nodes/split arrays unchanged, only size
-	// differs. return_node_n_arr[i] is always 0 or >=2
-	// (generate_leaf_nodes/generate_interior_nodes always produce >=2 buckets), so
-	// new_node_n == get_node_n() iff all are 0.
+	// Fast path: no child split — tree_nodes/split arrays unchanged, only
+	// size differs. return_node_n_arr[i] is always 0 or >=2
+	// (generate_leaf_nodes/generate_interior_nodes always produce >=2
+	// buckets), so new_node_n == get_node_n() iff all are 0.
 	if (new_node_n == static_cast<size_type>(TI->get_node_n())) {
 		size_type tot = 0;
 		for (buf_size_type i = 0; i < TI->get_node_n(); i++) {
@@ -124,14 +124,14 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 		}
 	}
 
-	// NOTE: the original split will always stay
+	// the original split will always stay
 	typename Interior::split_arr new_splits;
 	buf_size_type split_idx = 0;
 	for (buf_size_type i = 0; i < TI->get_node_n(); i++) {
 		size_type st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
-		// HACK: if return_node_n_arr[i] == 0, then no new splits from this child
-		// should skip; but -1 always smaller than 0, so the loop never runs.
-		// Needs to handle the type carefully.
+		// HACK: if return_node_n_arr[i] == 0, then no new splits from
+		// this child should skip; but -1 always smaller than 0, so the
+		// loop never runs. Needs to handle the type carefully.
 		for (int j = 0; j < static_cast<int>(return_node_n_arr[i]) - 1;
 		     j++) {
 			new_splits[split_idx++] =
@@ -357,8 +357,8 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 			reinsert_flag = true;
 		}
 
-		// check if this child node contain no invalid subtree, then itself must
-		// be valid
+		// check if this child node contain no invalid subtree, then
+		// itself must be valid
 		assert(node_contain_invalid_subtree(node) == 0 ?
 			       node_is_valid(node) :
 			       true);
@@ -391,9 +391,9 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 
 	//     node,
 	//     flatten_node_slice.cut(subtree_sum[i],
-	//                                                 : subtree_sum[i + 1]),
-	//     reinsert_entries.cut(reinsert_sum[i],
-	//                                               : reinsert_sum[i + 1]),
+	//                                                 : subtree_sum[i +
+	// 1]),     reinsert_entries.cut(reinsert_sum[i],
+	// : reinsert_sum[i + 1]),
 
 	bool const next_tomb = has_tomb ? !reinsert_flag : false;
 	parlay::parallel_for(
@@ -442,10 +442,11 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 {
 	auto TI = static_cast<Interior *>(T);
 
-	// ── Phase 1: Group assignment ──────────────────────────────────────────────
-	// Each child is assigned to the nearest valid node on its right (its pivot).
-	// group_sum[pivot] accumulates the total entry count for that group.
-	// Invalid nodes right of all valid nodes are handled in the fix-up loop.
+	// ── Phase 1: Group assignment
+	// ────────────────────────────────────────────── Each child is assigned
+	// to the nearest valid node on its right (its pivot). group_sum[pivot]
+	// accumulates the total entry count for that group. Invalid nodes right
+	// of all valid nodes are handled in the fix-up loop.
 	buf_size_buf_ub_arr tree_group;
 	size_buf_ub_arr group_sum;
 	const buf_size_type rightmost_pivot_idx = [&]() -> buf_size_type {
@@ -489,16 +490,17 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 	}
 #endif // DEBUG
 
-	// ── Phase 2: Compact and redistribute ─────────────────────────────────────
-	// Results written directly into TI's arrays.
-	// Safety: tree_idx ≤ i holds throughout, so writes never clobber unread data.
+	// ── Phase 2: Compact and redistribute
+	// ───────────────────────────────────── Results written directly into
+	// TI's arrays. Safety: tree_idx ≤ i holds throughout, so writes never
+	// clobber unread data.
 	typename TT::entry_seq
 		entry_buf; // heap-allocated lazily; only if distribute fires
 	buf_size_type tree_idx = 0;
 	buf_size_type split_idx = 0;
 
-	// Validates that the last-emitted node falls inside its expected key range.
-	// Called only from assert(), so has no cost in release builds.
+	// Validates that the last-emitted node falls inside its expected key
+	// range. Called only from assert(), so has no cost in release builds.
 	[[maybe_unused]] auto quick_check = [&](buf_size_type g) -> bool {
 		const auto box = get_node_box_rec(TI->tree_nodes[tree_idx - 1]);
 		if (tree_idx == 1) {
@@ -515,8 +517,8 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		       box.second < TI->split[split_idx - 1];
 	};
 
-	// NOTE: Case A: group is a single valid node — slide its pointer/split into
-	// place.
+	// Case A: group is a single valid node — slide its pointer/split
+	// into place.
 	auto handle_single = [&](buf_size_type i,
 				 [[maybe_unused]] buf_size_type g,
 				 bool is_rightmost) {
@@ -528,8 +530,8 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		assert(quick_check(g));
 	};
 
-	// NOTE: Case B: group total fits in one leaf — merge all into the rightmost
-	// leaf.
+	// Case B: group total fits in one leaf — merge all into the
+	// rightmost leaf.
 	auto handle_merge = [&](buf_size_type i, buf_size_type j,
 				[[maybe_unused]] buf_size_type g,
 				bool is_rightmost) {
@@ -560,8 +562,9 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		assert(quick_check(g));
 	};
 
-	// NOTE: Case C: group must be redistributed — gather all entries, sort,
-	// scatter into evenly-sized buckets while reusing existing leaf node objects.
+	// Case C: group must be redistributed — gather all entries, sort,
+	// scatter into evenly-sized buckets while reusing existing leaf node
+	// objects.
 	auto handle_distribute = [&](buf_size_type i, buf_size_type j,
 				     bool is_rightmost) {
 		if (entry_buf.empty()) [[unlikely]] {
@@ -613,7 +616,8 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		}
 	};
 
-	// ── Dispatch loop ──────────────────────────────────────────────────────────
+	// ── Dispatch loop
+	// ──────────────────────────────────────────────────────────
 	for (buf_size_type i = 0; i < TI->get_node_n();) {
 		const buf_size_type g = tree_group[i];
 		const bool is_rightmost = (g == rightmost_pivot_idx);
@@ -709,8 +713,8 @@ template <typename TT> TT::Node *btree<TT>::copy_tree_recursive(Node const *T)
 {
 	if (T->is_leaf) {
 		auto const TL = static_cast<Leaf const *>(T);
-		// get_ele() returns an entry_seq, and a template argument list needs the
-		// explicit typename.
+		// get_ele() returns an entry_seq, and a template argument list
+		// needs the explicit typename.
 		return alloc_normal_leaf_node<typename TT::entry_seq, Leaf>(
 			TL->get_ele());
 	}

@@ -78,15 +78,16 @@ void btree<TT>::BatchDelete_(Range In,
 		batch_delete_recursive(this->root_, sorted_slice,
 				       leaf_entries_pattern, leaf_sort_pred);
 
-	if (invalid_flag) { // NOTE: root is invalid
+	if (invalid_flag) { // root is invalid
 		if (this->root_->is_leaf) {
 			return;
 		}
-		// An invalid root is not an empty one: it is invalid as soon as every
-		// child is invalid, and a leaf is invalid at any size below k_buf_lb. Test
-		// the entry count, or a tree still holding live entries gets freed.
-		// The old assert(root_->size == 0) here asserted exactly the wrong thing
-		// and had to go; it fires on every tree this branch now recovers.
+		// An invalid root is not an empty one: it is invalid as soon as
+		// every child is invalid, and a leaf is invalid at any size
+		// below k_buf_lb. Test the entry count, or a tree still holding
+		// live entries gets freed. The old assert(root_->size == 0)
+		// here asserted exactly the wrong thing and had to go; it fires
+		// on every tree this branch now recovers.
 		if (this->root_->size == 0) {
 			constexpr bool k_enable_granularity = false;
 			this->delete_tree_rec<k_enable_granularity>(
@@ -191,7 +192,8 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 	boolean_buf_ub_arr invalid_subtree_flag;
 	size_buf_ub_arr reinsert_entries_num;
 
-	// Hoist: same answer for every child since T's children are all at one level.
+	// Hoist: same answer for every child since T's children are all at one
+	// level.
 	const bool children_are_interior = !node_has_leaf_children(T);
 
 	buf_size_buf_ub_arr nodes_map;
@@ -209,9 +211,10 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 			invalid_subtree_flag[i] = false;
 			contain_invalid_subtree[i] = 0;
 			reinsert_entries_num[i] = 0;
-			// NOTE: if a tree node receive no deletion, we need to explicitly reset
-			// its deletion information, because the reinsertion phase needs to access
-			// the reinsert information from the tree node directly
+			// if a tree node receive no deletion, we need to
+			// explicitly reset its deletion information, because
+			// the reinsertion phase needs to access the reinsert
+			// information from the tree node directly
 			if (children_are_interior) {
 				static_cast<Interior *>(TI->tree_nodes[i])
 					->reset_deletion_flag();

@@ -36,13 +36,13 @@ template <typename EleType, uint BufferSize, typename LeafAugType,
 	  typename InteriorAugType, typename NodeType>
 class TypeTrait {
     public:
-	// NOTE: element type
+	// element type
 	using E = EleType::E;
 	using K = typename EleType::K;
 	using V = typename EleType::V;
-	using Entry = EleType; // NOTE: abstract type to access E
+	using Entry = EleType; // abstract type to access E
 
-	// NOTE: general type
+	// general type
 	using Num = Num_Comparator<K>;
 
 	using entry_seq = parlay::sequence<E>;

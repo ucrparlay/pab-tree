@@ -30,8 +30,8 @@ void btree<TT>::delete_tree_rec(Node *T)
 	} else {
 		auto TI = static_cast<Interior *>(T);
 
-		// NOTE: enable granularity control by default, if it is disabled,
-		// always delete in parallel
+		// enable granularity control by default, if it is
+		// disabled, always delete in parallel
 		parlay::parallel_for(
 			0, TI->get_node_n(),
 			[&](size_t i) { delete_tree_rec(TI->tree_nodes[i]); },

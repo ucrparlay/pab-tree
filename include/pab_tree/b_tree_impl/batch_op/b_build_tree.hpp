@@ -33,7 +33,7 @@ template <typename TT>
 template <typename Range>
 void btree<TT>::Build_(Range In)
 {
-	// Release any existing tree first; without this a second build leaks it.
+	// Release the old tree; a second build would otherwise leak it.
 	this->delete_tree();
 	auto sort_seq = parlay::sort(In, key_less);
 	// Keys must be distinct. is_sorted with <= is strict increase, so this

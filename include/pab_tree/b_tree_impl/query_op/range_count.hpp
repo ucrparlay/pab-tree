@@ -66,7 +66,8 @@ template <typename TT>
 void btree<TT>::range_count_rec(Node const *T, TT::Box const &query_box,
 				size_type &offset) const
 {
-	// Iterative descent for single-child levels (avoids O(height) call overhead).
+	// Iterative descent for single-child levels (avoids O(height) call
+	// overhead).
 	while (!T->is_leaf) {
 		auto const *TI = static_cast<Interior const *>(T);
 

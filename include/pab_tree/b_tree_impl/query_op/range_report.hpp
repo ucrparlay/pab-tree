@@ -82,8 +82,9 @@ template <typename Range>
 void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 				  size_type &offset, Range out) const
 {
-	// Iterative descent: avoids O(height) recursive-call overhead for narrow
-	// queries that fall inside a single child at each interior level.
+	// Iterative descent: avoids O(height) recursive-call overhead for
+	// narrow queries that fall inside a single child at each interior
+	// level.
 	while (!T->is_leaf) {
 		auto const *TI = static_cast<Interior const *>(T);
 		auto *const *nodes =
@@ -93,8 +94,9 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		const buf_size_type l =
 			TI->get_node_id_containing_key(query_box.first);
 
-		// Right boundary child: narrow search to [l, split_n) since r >= l,
-		// saving roughly half the binary-search work in the common case.
+		// Right boundary child: narrow search to [l, split_n) since r
+		// >= l, saving roughly half the binary-search work in the
+		// common case.
 		const buf_size_type split_n = TI->get_split_n();
 		const Split *sp_l = TI->split.data() + l;
 		const size_t rem =
@@ -120,7 +122,8 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		       TI->split[r] == query_box.second);
 
 		if (l == r) {
-			// Entire query falls in one child — keep descending without recursion.
+			// Entire query falls in one child — keep descending
+			// without recursion.
 			T = nodes[l];
 			continue;
 		}
@@ -131,7 +134,8 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		range_report_iter(nodes[l], query_box, offset, out);
 
 		// Middle children [l+1, r): fully covered by the query.
-		// Pre-compute each child's output position, then flatten in parallel.
+		// Pre-compute each child's output position, then flatten in
+		// parallel.
 		if (r > l + 1) {
 			const buf_size_type mid_n = r - l - 1;
 			size_buf_ub_arr off;
@@ -204,7 +208,7 @@ void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
 	assert(TI->validate_key_in_node(r, query_box.second) ||
 	       TI->split[r] == query_box.second);
 
-	// NOTE: visit nodes [l, r]
+	// visit nodes [l, r]
 
 	if (l == r) { // falls into one node
 		range_report_rec(TI->tree_nodes[l], query_box, offset, out);

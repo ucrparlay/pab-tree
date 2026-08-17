@@ -51,7 +51,7 @@ struct leaf_node : TypeTrait::Node {
 #endif
 		);
 
-	// NOTE: default allocator
+	// default allocator
 	leaf_node()
 		: Node{ true, static_cast<size_t>(0) }
 		, aug(AT())
@@ -66,7 +66,7 @@ struct leaf_node : TypeTrait::Node {
 	{
 	}
 
-	// NOTE: alloc a leaf with default size
+	// alloc a leaf with default size
 	template <typename Range>
 	leaf_node(Range In, alloc_normal_leaf_tag)
 		: Node{ true, static_cast<size_t>(In.size()) }
@@ -175,7 +175,8 @@ struct leaf_node : TypeTrait::Node {
 		return aug;
 	}
 
-	// TODO: should put this one in the aug as well and don't use the monostate
+	// TODO: should put this one in the aug as well and don't use the
+	// monostate
 	template <typename Range> void update_aug(Range In)
 	{
 		if constexpr (node_has_non_trivial_aug<AT>) {
@@ -193,7 +194,7 @@ struct leaf_node : TypeTrait::Node {
 	bool is_sorted;
 };
 
-// NOTE: Alloc a leaf
+// Alloc a leaf
 template <typename Range, typename Leaf>
 static Leaf *alloc_normal_leaf_node(Range In)
 {
@@ -202,7 +203,7 @@ static Leaf *alloc_normal_leaf_node(Range In)
 	return o;
 }
 
-// NOTE: Alloc a empty Leaf
+// Alloc a empty Leaf
 template <typename Range, typename Leaf> static Leaf *alloc_empty_leaf_node()
 {
 	Leaf *o = parlay::type_allocator<Leaf>::alloc();
@@ -210,7 +211,7 @@ template <typename Range, typename Leaf> static Leaf *alloc_empty_leaf_node()
 	return o;
 }
 
-// NOTE: Alloc a empty Leaf, but set the aug by hand
+// Alloc a empty Leaf, but set the aug by hand
 template <typename Range, typename Leaf>
 static Leaf *alloc_empty_leaf_node(typename Leaf::AT const &aug)
 {
@@ -219,7 +220,7 @@ static Leaf *alloc_empty_leaf_node(typename Leaf::AT const &aug)
 	return o;
 }
 
-// NOTE: multi-way node whose children # is fixed
+// multi-way node whose children # is fixed
 template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 	using TT = TypeTrait;
 	using Node = TT::Node;

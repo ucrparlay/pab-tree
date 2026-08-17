@@ -20,7 +20,7 @@
 
 namespace pab_tree
 {
-// NOTE: Basetree
+// Basetree
 template <class TypeTrait> class btree {
     public:
 	using TT = TypeTrait;
@@ -57,13 +57,13 @@ template <class TypeTrait> class btree {
 	using buf_size_type = TT::buf_size_type;
 	using size_type = TT::size_type;
 
-	// NOTE: tree structure
+	// tree structure
 	static constexpr uint_fast16_t const k_serial_build_cutoff = 512;
 
-	// NOTE: constructor and destructor
+	// constructor and destructor
 	btree() = default;
 
-	// One constructor, constrained so it cannot outrank the copy constructor.
+	// Constrained so it cannot outrank the copy constructor.
 	template <typename Range>
 		requires(!std::same_as<std::remove_cvref_t<Range>, btree>)
 	explicit btree(Range &&in)
@@ -203,8 +203,9 @@ template <class TypeTrait> class btree {
 		template <typename InputNode, typename Range>
 		bool operator()(InputNode const *T, Range In) const noexcept
 		{
-			// Knuth multiplicative hash over (node_size + batch_size); XOR in low
-			// address bits from begin/end to break correlation across call sites.
+			// Knuth multiplicative hash over (node_size +
+			// batch_size); XOR in low address bits from begin/end
+			// to break correlation across call sites.
 			auto const v =
 				(static_cast<size_t>(T->size) + In.size()) *
 					2654435761ULL ^
@@ -214,7 +215,7 @@ template <class TypeTrait> class btree {
 		}
 	};
 
-	// NOTE: build tree
+	// build tree
 	// Keys must be distinct. Duplicates put elements on the wrong side of a
 	// split key, where no descent reaches them; debug builds assert.
 	template <typename Range> void build(Range &&In);
@@ -252,7 +253,7 @@ template <class TypeTrait> class btree {
 		return Entry::get_key(a) < Entry::get_key(b);
 	};
 
-	// NOTE: helper function to decide the bucket number and range
+	// helper function to decide the bucket number and range
 	static size_type get_bkt_num(size_type const item_n)
 	{
 		return item_n / TT::k_buf_md;
@@ -336,8 +337,8 @@ template <class TypeTrait> class btree {
 			  LeafSortPred const &leaf_sort_pred);
 
 	// Returns (invalid_flag, needs_fetch, reinsert_entry_num).
-	// needs_fetch: any subtree needs fetch_invalid_subtree_nodes (not stored in
-	// node).
+	// needs_fetch: any subtree needs fetch_invalid_subtree_nodes (not
+	// stored in node).
 	template <typename LeafSortPred>
 	std::tuple<bool, bool, size_type>
 	batch_delete_recursive(Node *T, TT::const_key_slice In,
@@ -345,9 +346,9 @@ template <class TypeTrait> class btree {
 			       LeafSortPred const &leaf_sort_pred);
 
 	// Remove the invalid subtree and put it in flatten_node_slice
-	// Needs to compact the tree_nodes if find a invalid subtree and update the
-	// interior node size and valid flag after the compaction
-	// Return the total number entries in the tree that needs to rebuild
+	// Needs to compact the tree_nodes if find a invalid subtree and update
+	// the interior node size and valid flag after the compaction Return the
+	// total number entries in the tree that needs to rebuild
 	template <typename LeafSortPred>
 	void
 	fetch_invalid_subtree_nodes(Node *T, entry_slice reinsert_entries,
@@ -411,7 +412,7 @@ template <class TypeTrait> class btree {
 				 const TT::pattern_type leaf_entries_pattern,
 				 LeafSortPred const &leaf_sort_pred);
 
-	// NOTE: batch insert
+	// batch insert
 	template <typename Range, typename LeafSortPred>
 	static Node *
 	insert_points_2_leaf(Node *T, Range In,
@@ -452,7 +453,7 @@ template <class TypeTrait> class btree {
 	static void split_batch_merge(size_buf_ub_arr &split_pos_arr, Range In,
 				      TT::split_slice_const split_slice);
 
-	// NOTE: delete tree
+	// delete tree
 	// template <SupportsForceParallel Interior, bool granularity>
 	template <bool granularity>
 	inline static bool force_parallel_recursion(Interior const *T);
@@ -460,7 +461,7 @@ template <class TypeTrait> class btree {
 	static Node *copy_tree_recursive(Node const *T);
 
 	template <bool granularity = true> static void delete_tree_rec(Node *T);
-	// NOTE: utility
+	// utility
 	// TODO: better evaluate the parallel recursion function
 	template <typename Range, bool granularity = true, bool sorted = false>
 	static void flatten_rec(Node *T, Range Out);
@@ -468,7 +469,7 @@ template <class TypeTrait> class btree {
 	template <typename Range, bool sorted = false>
 	static void extract_points_in_leaf(Node *T, Range Out);
 
-	// NOTE: validations
+	// validations
 
 	static TT::Box get_node_box_rec(Node const *T);
 
@@ -494,7 +495,8 @@ template <class TypeTrait> class btree {
 	template <typename Leaf, typename Interior>
 	int get_tree_nodes_num(Node const *T);
 
-	// Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at T.
+	// Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at
+	// T.
 	static std::pair<size_type, size_type>
 	count_sorted_leaves(Node const *T);
 

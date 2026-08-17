@@ -19,7 +19,7 @@ template <typename TT>
 template <bool granularity>
 inline bool btree<TT>::force_parallel_recursion(Interior const *TI)
 {
-	// NOTE: return true -> force parallel
+	// return true -> force parallel
 	// return false -> serial
 	return (granularity && TI->size > k_serial_build_cutoff) ||
 	       (!granularity && TI->force_parallel());
@@ -66,8 +66,9 @@ void btree<TT>::flatten_rec(Node *T, Range Out)
 				TI->tree_nodes[i],
 				Out.cut(start, child_offsets[i + 1]));
 		},
-		// NOTE: In our btree when we flatten the tree, the size is always match the
-		// corresponding size, so we can use it as the granularity indicator
+		// In our btree when we flatten the tree, the size is
+		// always match the corresponding size, so we can use it as the
+		// granularity indicator
 		force_parallel_recursion<granularity>(TI) ?
 			1 :
 			Interior::TT::k_buf_ub);

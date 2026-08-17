@@ -13,8 +13,7 @@
 
 namespace pab_tree
 {
-// Returns the subtree box and whether every checked property held. The bool is
-// the reportable verdict; the asserts beside it are unchanged.
+// Returns the subtree box and whether every check passed.
 template <typename TT>
 template <bool CheckSize>
 std::pair<typename TT::Box, bool>
@@ -82,9 +81,9 @@ btree<TT>::verify_tree_property(Node const *T) const
 		[[maybe_unused]] auto node = TI->tree_nodes[i];
 		auto box = box_seq[i];
 
-		// A single child means no split keys at all, so there is nothing to
-		// compare against; split[0] would be uninitialised. node_op.hpp:143 and
-		// :612 skip the same case.
+		// A single child means no split keys at all, so there is
+		// nothing to compare against; split[0] would be uninitialised.
+		// node_op.hpp:143 and :612 skip the same case.
 		if (TI->get_node_n() == 1) {
 			return;
 		}

@@ -73,13 +73,13 @@ void btree<TT>::BatchInsert_(Range In,
 						  sorted_seq.cend());
 	}
 
-	// Keys must be distinct, in the batch and against the tree. Only the batch
-	// is checkable here.
+	// Keys must be distinct, in the batch and against the tree. Only the
+	// batch is checkable here.
 	assert(parlay::is_sorted(sorted_slice, [](E const &a, E const &b) {
 		return Entry::get_key(a) <= Entry::get_key(b);
 	}));
 
-	// NOTE: begin insert
+	// begin insert
 	node_split_pair_seq node_split_seq =
 		node_split_pair_seq::uninitialized(2 * sorted_slice.size());
 	size_type new_node_n = batch_insert_recursive(
@@ -87,9 +87,10 @@ void btree<TT>::BatchInsert_(Range In,
 		leaf_entries_pattern, leaf_sort_pred);
 
 #ifdef DEBUG
-	// The first assert is known false: new_node_n > 0 means the root overflowed,
-	// which depends on batch size, not on whether the caller pre-sorted. Kept as
-	// is; the second checks what sorted_input actually promises.
+	// The first assert is known false: new_node_n > 0 means the root
+	// overflowed, which depends on batch size, not on whether the caller
+	// pre-sorted. Kept as is; the second checks what sorted_input actually
+	// promises.
 	assert(!sorted_input || new_node_n == 0);
 	assert(!sorted_input ||
 	       parlay::is_sorted(sorted_slice, [](E const &a, E const &b) {
@@ -198,9 +199,9 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 		},
 		1);
 
-	// count only over touched children: start from get_node_n() (each contributes
-	// 1) and add the excess for children that split (return value is 0 or >=2,
-	// never 1).
+	// count only over touched children: start from get_node_n() (each
+	// contributes 1) and add the excess for children that split (return
+	// value is 0 or >=2, never 1).
 	size_type new_node_n = TI->get_node_n();
 	for (buf_size_type i = 0; i < cnt; i++) {
 		size_type split_n = new_split_node_n_arr[nodes_map[i]];

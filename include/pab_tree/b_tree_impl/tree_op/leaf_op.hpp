@@ -23,8 +23,8 @@ btree<TT>::post_process_leaf_change(Node *T, Range In,
 				    LeafSortPred const &leaf_sort_pred)
 {
 	// WARN: does not know whether the T->elements are sorted or not,
-	// so might mark it as unsorted if the leaf entries pattern is unsort/hybrid,
-	// even if the entries are actually sorted.
+	// so might mark it as unsorted if the leaf entries pattern is
+	// unsort/hybrid, even if the entries are actually sorted.
 	assert(T->is_leaf);
 	auto TL = static_cast<Leaf *>(T);
 	if (leaf_entries_pattern == TT::leaf_entries_pattern::sorted) {
