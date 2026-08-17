@@ -3,7 +3,8 @@
 
 #include "pab_tree/b_tree.h"
 
-namespace pab_tree {
+namespace pab_tree
+{
 
 // template<typename TT>
 // TT::Box
@@ -21,28 +22,25 @@ namespace pab_tree {
 //   return static_cast<Interior const*>(T)->box;
 // }
 
-template<typename TT>
-TT::Box
-btree<TT>::get_node_box_rec(Node const* T)
+template <typename TT> TT::Box btree<TT>::get_node_box_rec(Node const *T)
 {
-  if (T->is_leaf) {
-    Leaf const* TL = static_cast<Leaf const*>(T);
-    return pab_tree::get_box<TT>(TL->get_ele());
-  } else {
-    auto TI = static_cast<Interior const*>(T);
-    parlay::sequence<typename TT::Box> box_seq(TI->get_node_n());
-    parlay::parallel_for(0, TI->get_node_n(), [&](size_t i) {
-      box_seq[i] = get_node_box_rec(TI->tree_nodes[i]);
-    });
-    return pab_tree::get_box<TT>(box_seq);
-  }
+	if (T->is_leaf) {
+		Leaf const *TL = static_cast<Leaf const *>(T);
+		return pab_tree::get_box<TT>(TL->get_ele());
+	} else {
+		auto TI = static_cast<Interior const *>(T);
+		parlay::sequence<typename TT::Box> box_seq(TI->get_node_n());
+		parlay::parallel_for(0, TI->get_node_n(), [&](size_t i) {
+			box_seq[i] = get_node_box_rec(TI->tree_nodes[i]);
+		});
+		return pab_tree::get_box<TT>(box_seq);
+	}
 }
 
-template<typename TT>
-TT::Box
-btree<TT>::get_node_slice_box(typename TT::node_slice const node_slice)
+template <typename TT>
+TT::Box btree<TT>::get_node_slice_box(typename TT::node_slice const node_slice)
 {
-  return get_node_slice_box<TT>(parlay::make_slice(node_slice));
+	return get_node_slice_box<TT>(parlay::make_slice(node_slice));
 }
 
 // template<typename TT>
