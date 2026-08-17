@@ -1,5 +1,5 @@
-#ifndef PBTREE_B_TREE_IMPL_UTILITY_HPP_
-#define PBTREE_B_TREE_IMPL_UTILITY_HPP_
+#ifndef PABTREE_B_TREE_IMPL_UTILITY_HPP_
+#define PABTREE_B_TREE_IMPL_UTILITY_HPP_
 
 #include <algorithm>
 #include <cassert>
@@ -10,23 +10,23 @@
 #include <type_traits>
 #include <utility>
 
-#include "pb_tree/b_tree.h"
+#include "pab_tree/b_tree.h"
 
-namespace pb_tree {
+namespace pab_tree {
 
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::GetEntries(Range& Out) const
+btree<TT>::get_entries(Range& Out) const
 {
   if (this->root_ == nullptr) [[unlikely]] {
     return;
   }
-  this->FlattenRec<typename TT::EntrySlice, false, false>(
+  this->flatten_rec<typename TT::entry_slice, false, false>(
     this->root_,
     parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));
 }
 
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_B_TREE_IMPL_UTILITY_HPP_
+#endif // PABTREE_B_TREE_IMPL_UTILITY_HPP_

@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.15)
 #     - -I/home/ziyang/code/ParallelMultiwayOrderedSet/include/
 
 project(
-	PMOS
+	pab_tree
 	VERSION 0.1
 	DESCRIPTION "Parallel Multi-way Ordered Set"
 	HOMEPAGE_URL ""
@@ -108,42 +108,42 @@ add_subdirectory(external/parlaylib)
 
 # NOTE: clear CMAKE_MODULE_PATH to avoid finding parlay's cmake files
 list(REMOVE_ITEM CMAKE_MODULE_PATH "${PARLAY_SOURCE_DIR}/cmake")
-list(APPEND CMAKE_MODULE_PATH "${PMOS_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${pab_tree_SOURCE_DIR}/cmake")
 
 # NOTE: GoogleTest
 add_subdirectory(external/googletest)
 enable_testing()
 
 
-# NOTE: PMOS
-add_library(PMOS INTERFACE)
-set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pb_tree" "${PMOS_SOURCE_DIR}/include/" "${PMOS_SOURCE_DIR}/external")
-target_link_libraries(PMOS INTERFACE parlay)
-target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
+# NOTE: pab_tree
+add_library(pab_tree INTERFACE)
+set(PAB_TREE_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/include" "${pab_tree_SOURCE_DIR}/external")
+target_link_libraries(pab_tree INTERFACE parlay)
+target_include_directories(pab_tree INTERFACE $<BUILD_INTERFACE:${PAB_TREE_INCLUDE_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # add_executable(b_ccp ${PROJECT_SOURCE_DIR}/tests/b_ccp.cpp)
-# target_link_libraries(b_ccp PUBLIC PMOS)
+# target_link_libraries(b_ccp PUBLIC pab_tree)
 # target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 # NOTE: CPAM
 add_library(CPAM INTERFACE)
-set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/external/CPAM/include/pam")
-target_link_libraries(CPAM INTERFACE parlay PMOS)
+set(CPAM_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/external/CPAM/include/cpam" "${pab_tree_SOURCE_DIR}/external/CPAM/include/pam")
+target_link_libraries(CPAM INTERFACE parlay pab_tree)
 target_include_directories(CPAM INTERFACE ${CPAM_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
 
 # NOTE: PMA
 if(NOT APPLE)
 	add_library(PMA INTERFACE)
-	set(PMA_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
-	target_link_libraries(PMA INTERFACE parlay PMOS)
+	set(PMA_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array" "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
+	target_link_libraries(PMA INTERFACE parlay pab_tree)
 	target_include_directories(PMA INTERFACE ${PMA_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
 endif()
 
 # NOTE: TEST_FRAME
 add_library(TEST_FRAME INTERFACE)
-set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PMOS_INCLUDE_DIR})
-target_link_libraries(TEST_FRAME INTERFACE parlay PMOS)
+set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PAB_TREE_INCLUDE_DIR})
+target_link_libraries(TEST_FRAME INTERFACE parlay pab_tree)
 
 # NOTE: executables for tests
 add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
@@ -329,7 +329,7 @@ endif()
 
 
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
-# target_link_libraries(data_washer PUBLIC PMOS)
+# target_link_libraries(data_washer PUBLIC pab_tree)
 # target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 # Generate .clangd configuration from compile_commands.json

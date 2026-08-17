@@ -1,5 +1,5 @@
-#ifndef PBTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
-#define PBTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
+#ifndef PABTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
+#define PABTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
 
 #include <algorithm>
 #include <cassert>
@@ -10,25 +10,25 @@
 #include <type_traits>
 #include <utility>
 
-#include "pb_tree/b_tree.h"
+#include "pab_tree/b_tree.h"
 
-namespace pb_tree {
+namespace pab_tree {
 
 template<typename TT>
 template<bool granularity>
 inline bool
-BTree<TT>::ForceParallelRecursion(Interior const* TI)
+btree<TT>::force_parallel_recursion(Interior const* TI)
 {
   // NOTE: return true -> force parallel
   // return false -> serial
-  return (granularity && TI->size > kSerialBuildCutoff) ||
-         (!granularity && TI->ForceParallel());
+  return (granularity && TI->size > k_serial_build_cutoff) ||
+         (!granularity && TI->force_parallel());
 }
 
 template<typename TT>
 template<typename Range, bool granularity, bool sorted>
 void
-BTree<TT>::FlattenRec(Node* T, Range Out)
+btree<TT>::flatten_rec(Node* T, Range Out)
 {
   assert(T->size == Out.size());
 
@@ -37,39 +37,39 @@ BTree<TT>::FlattenRec(Node* T, Range Out)
   }
 
   if (T->is_leaf) {
-    ExtractPointsInLeaf<Range, sorted>(T, Out);
+    extract_points_in_leaf<Range, sorted>(T, Out);
     return;
   }
 
   auto TI = static_cast<Interior*>(T);
 
   assert(TI->size == std::accumulate(TI->tree_nodes.begin(),
-                                     TI->tree_nodes.begin() + TI->GetNodeN(),
+                                     TI->tree_nodes.begin() + TI->get_node_n(),
                                      static_cast<size_t>(0),
                                      [](size_t acc, Node* n) -> size_t {
                                        return acc + n->size;
                                      }));
 
-  std::array<SizeT, TT::kBufUB + 1> child_offsets;
+  std::array<size_type, TT::k_buf_ub + 1> child_offsets;
   child_offsets[0] = 0;
-  auto node_n = TI->GetNodeN();
-  for (BufSizeT i = 0; i < node_n; ++i) {
+  auto node_n = TI->get_node_n();
+  for (buf_size_type i = 0; i < node_n; ++i) {
     child_offsets[i + 1] = child_offsets[i] + TI->tree_nodes[i]->size;
   }
 
   parlay::parallel_for(
     0,
     node_n,
-    [&](BufSizeT i) {
+    [&](buf_size_type i) {
       auto start = child_offsets[i];
-      FlattenRec<Range, granularity, sorted>(
+      flatten_rec<Range, granularity, sorted>(
         TI->tree_nodes[i], Out.cut(start, child_offsets[i + 1]));
     },
     // NOTE: In our btree when we flatten the tree, the size is always match the
     // corresponding size, so we can use it as the granularity indicator
-    ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBufUB);
+    force_parallel_recursion<granularity>(TI) ? 1 : Interior::TT::k_buf_ub);
 }
 
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_
+#endif // PABTREE_B_TREE_IMPL_TREE_OP_FLATTEN_HPP_

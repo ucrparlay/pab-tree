@@ -2,7 +2,7 @@
 // 1 << 7, driven by scripts/incre_updates.sh).
 //
 // WHY THIS EXISTS.  data_generate.cpp random-shuffles the whole key set before
-// writing it (Generator::ToEntry), so slicing that file into consecutive
+// writing it (Generator::to_entry), so slicing that file into consecutive
 // batches -- which is exactly what BatchInsertByStep / BatchDeleteByStep do --
 // hands every batch a *uniform* sample of the key space no matter which
 // distribution the file was generated with.  The shape survives only globally,
@@ -665,7 +665,7 @@ ValidatePermutation(parlay::sequence<E> const& seq,
                     bool const full)
 {
   if (seq.size() != base_n) {
-    throw std::runtime_error("Validate: wrong number of entries.");
+    throw std::runtime_error("validate: wrong number of entries.");
   }
 
   auto keys = parlay::delayed_tabulate(
@@ -678,14 +678,14 @@ ValidatePermutation(parlay::sequence<E> const& seq,
   if (sum != want_sum || max != base_n - 1) {
     std::cout << "key sum " << sum << " (expected " << want_sum << "), max "
               << max << " (expected " << base_n - 1 << ")" << std::endl;
-    throw std::runtime_error("Validate: output is not a permutation.");
+    throw std::runtime_error("validate: output is not a permutation.");
   }
 
   if (full) {
     auto materialised =
       parlay::tabulate(seq.size(), [&](size_t i) -> size_t { return seq[i].key; });
     if (parlay::remove_duplicates(materialised).size() != base_n) {
-      throw std::runtime_error("Validate: output has duplicate keys.");
+      throw std::runtime_error("validate: output has duplicate keys.");
     }
   }
 

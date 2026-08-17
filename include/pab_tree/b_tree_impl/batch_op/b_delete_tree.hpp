@@ -1,34 +1,34 @@
-#ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
-#define PBTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#ifndef PABTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#define PABTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
 
 #include <parlay/range.h>
 #include <parlay/slice.h>
 #include <parlay/type_traits.h>
 
-#include "../../b_tree.h"
+#include "pab_tree/b_tree.h"
 
-namespace pb_tree {
+namespace pab_tree {
 template<typename TT>
 void
-BTree<TT>::DeleteTree()
+btree<TT>::delete_tree()
 {
   if (this->root_ == nullptr) {
     return;
   }
-  this->DeleteTreeRec(this->root_);
+  this->delete_tree_rec(this->root_);
   this->root_ = nullptr;
 }
 
 template<typename TT>
 template<bool granularity>
 void
-BTree<TT>::DeleteTreeRec(Node* T)
+btree<TT>::delete_tree_rec(Node* T)
 {
   if (T == nullptr) {
     return;
   }
   if (T->is_leaf) {
-    FreeNode<Leaf>(T);
+    free_node<Leaf>(T);
   } else {
     auto TI = static_cast<Interior*>(T);
 
@@ -36,14 +36,14 @@ BTree<TT>::DeleteTreeRec(Node* T)
     // always delete in parallel
     parlay::parallel_for(
       0,
-      TI->GetNodeN(),
-      [&](size_t i) { DeleteTreeRec(TI->tree_nodes[i]); },
+      TI->get_node_n(),
+      [&](size_t i) { delete_tree_rec(TI->tree_nodes[i]); },
       // WARN: the granularity control may not work well here
-      ForceParallelRecursion<granularity>(TI) ? 1 : Interior::TT::kBufUB);
+      force_parallel_recursion<granularity>(TI) ? 1 : Interior::TT::k_buf_ub);
 
-    FreeNode<Interior>(T);
+    free_node<Interior>(T);
   }
 }
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#endif // PABTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_

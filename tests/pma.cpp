@@ -32,12 +32,12 @@ ApplyPMA(Options const& opts, RunFunc test_func)
   using V = Wrapper::V;
   using E = Wrapper::E;
   // using EleType = Element<uint32_t, uint32_t>;
-  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+  using TypeTrait = pab_tree::btree_type_trait<Wrapper::ElementWrapper<E>,
                                          16,
                                          Wrapper::LeafAugEmpty,
                                          Wrapper::InteriorAugEmpty,
                                          8,
-                                         pb_tree::ProtoNode>;
+                                         pab_tree::proto_node>;
 
   if (opts.tree_type == 3) {
     Run<PmaWrapper<TypeTrait>>(opts, test_func);
@@ -56,9 +56,9 @@ main(int argc, char* argv[])
     []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {
       // using Tree = TreeDesc::TreeType;
       // using TT = TypeTrait;
-      // using EntrySeq = TT::EntrySeq;
-      // EntrySeq wp;
-      // EntrySeq wi;
+      // using entry_seq = TT::entry_seq;
+      // entry_seq wp;
+      // entry_seq wi;
       //
       // using PmaLeaf = uncompressed_leaf<typename TT::K, typename TT::V>;
       // using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
@@ -69,7 +69,7 @@ main(int argc, char* argv[])
       //
       // parlay::internal::timer t("PMA Batch Insert Test");
       // for (int i = 0; i < 4; i++) {
-      //   auto P = Tree::ParseInput(wp);
+      //   auto P = Tree::parse_input(wp);
       //   PmaPointer it(P.first.begin(), P.second.begin());
       //   PMA p;
       //
@@ -89,8 +89,8 @@ main(int argc, char* argv[])
       // auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
 
       // for (int i = 0; i < 4; i++) {
-      //   auto WP = Tree::ParseInput(wp).first;
-      //   auto WI = Tree::ParseInput(wi).first;
+      //   auto WP = Tree::parse_input(wp).first;
+      //   auto WI = Tree::parse_input(wi).first;
       //   PMA p;
       //   PmaPointer it(WP.begin());
       //   p.insert_batch(it, WP.size(), false);

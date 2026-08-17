@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 template<typename TypeTrait>
 struct BTreeWrapper
 {
-  using TreeType = typename pb_tree::BTree<TypeTrait>;
+  using TreeType = typename pab_tree::btree<TypeTrait>;
 };
 
 template<typename Options, typename RunFunc>
@@ -31,37 +31,37 @@ CheckOrthogonal(Options const& opts, RunFunc test_func)
   using E = Wrapper::E;
   // using EleType = Element<uint32_t, uint32_t>;
 #ifdef LEAF1
-  static constexpr uint const kBuf = 1;
+  static constexpr uint const k_buf = 1;
 #elif defined(LEAF2)
-  static constexpr uint const kBuf = 2;
+  static constexpr uint const k_buf = 2;
 #elif defined(LEAF4)
-  static constexpr uint const kBuf = 4;
+  static constexpr uint const k_buf = 4;
 #elif defined(LEAF8)
-  static constexpr uint const kBuf = 8;
+  static constexpr uint const k_buf = 8;
 #elif defined(LEAF16)
-  static constexpr uint const kBuf = 16;
+  static constexpr uint const k_buf = 16;
 #elif defined(LEAF32)
-  static constexpr uint const kBuf = 32;
+  static constexpr uint const k_buf = 32;
 #elif defined(LEAF64)
-  static constexpr uint const kBuf = 64;
+  static constexpr uint const k_buf = 64;
 #elif defined(LEAF128)
-  static constexpr uint const kBuf = 128;
+  static constexpr uint const k_buf = 128;
 #elif defined(LEAF256)
-  static constexpr uint const kBuf = 256;
+  static constexpr uint const k_buf = 256;
 #elif defined(LEAF512)
-  static constexpr uint const kBuf = 512;
+  static constexpr uint const k_buf = 512;
 #elif defined(LEAF1024)
-  static constexpr uint const kBuf = 1024;
+  static constexpr uint const k_buf = 1024;
 #else
-  static constexpr uint const kBuf = 32; // Default
+  static constexpr uint const k_buf = 32; // Default
 #endif // LEAF1
 
-  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                            kBuf,
+  using TypeTrait = pab_tree::btree_type_trait<Wrapper::ElementWrapper<E>,
+                                            k_buf,
                                             Wrapper::LeafAugEmpty,
                                             Wrapper::InteriorAugEmpty,
                                             8,
-                                            pb_tree::ProtoNode>;
+                                            pab_tree::proto_node>;
   if (opts.tree_type == 0) {
     Run<BTreeWrapper<TypeTrait>>(opts, test_func);
   }
@@ -101,40 +101,40 @@ protected:
   static void CheckCorrectness(Options opts)
   {
     using Tree = TreeDesc::TreeType;
-    using EntrySeq = typename TT::EntrySeq;
+    using entry_seq = typename TT::entry_seq;
 
     Tree tree;
     constexpr bool kTestTime = false;
-    EntrySeq wp;
-    EntrySeq wi;
+    entry_seq wp;
+    entry_seq wi;
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
     [[maybe_unused]] auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
     [[maybe_unused]] auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
     if (redirect_output) {
-      ASSERT_TRUE((tree.template Validate<true, false>()));
+      ASSERT_TRUE((tree.template validate<true, false>()));
     } else {
-      ASSERT_TRUE(tree.Validate());
+      ASSERT_TRUE(tree.validate());
     }
 
     {
-      EntrySeq tmp(wp.size());
-      tree.GetEntries(tmp);
+      entry_seq tmp(wp.size());
+      tree.get_entries(tmp);
       assert(parlay::sort(tmp) == parlay::sort(wp));
     }
 
     if (opts.tag & (1 << 0)) {
-      BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
-      ASSERT_EQ(tree.GetSize(), wp.size() + wi.size());
+      batch_insert<TT, Tree, kTestTime>(tree, wp, wi, 2);
+      ASSERT_EQ(tree.get_size(), wp.size() + wi.size());
       if (redirect_output) {
-        ASSERT_TRUE((tree.template Validate<true, false>()));
+        ASSERT_TRUE((tree.template validate<true, false>()));
       } else {
-        ASSERT_TRUE(tree.Validate());
+        ASSERT_TRUE(tree.validate());
       }
 
       {
-        EntrySeq tmp(wp.size() + wi.size());
-        tree.GetEntries(tmp);
+        entry_seq tmp(wp.size() + wi.size());
+        tree.get_entries(tmp);
         auto nwp = parlay::sort(parlay::append(wp, wi));
         tmp = parlay::sort(tmp);
         assert(tmp == nwp);
@@ -143,20 +143,20 @@ protected:
 
     if (opts.tag & (1 << 1)) {
       // WARN: must happen after the insertion
-      BatchDelete<TT, Tree, kTestTime>(tree, wp, wi, 2);
-      assert(tree.GetSize() == wp.size());
+      batch_delete<TT, Tree, kTestTime>(tree, wp, wi, 2);
+      assert(tree.get_size() == wp.size());
       if (redirect_output) {
-        ASSERT_TRUE((tree.template Validate<true, false>()));
+        ASSERT_TRUE((tree.template validate<true, false>()));
       } else {
-        ASSERT_TRUE(tree.Validate());
+        ASSERT_TRUE(tree.validate());
       }
 
-      EntrySeq tmp(wp.size());
-      tree.GetEntries(tmp);
+      entry_seq tmp(wp.size());
+      tree.get_entries(tmp);
       assert(parlay::sort(tmp) == parlay::sort(wp));
     }
 
-    EntrySeq new_wp;
+    entry_seq new_wp;
     if (opts.tag == (1 << 0)) {
       new_wp = wp;
       new_wp.append(wi);
@@ -187,11 +187,11 @@ protected:
 
     if (opts.query_type & (1 << 2)) {
       for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-        RangeCount<TT>(new_wp, tree, kRounds, kRangeQueryNum, rec_type);
+        range_count<TT>(new_wp, tree, kRounds, kRangeQueryNum, rec_type);
       }
     }
 
-    tree.DeleteTree();
+    tree.delete_tree();
   }
 
   static auto FindBaseFiles(std::string const& files_path)

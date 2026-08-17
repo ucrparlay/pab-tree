@@ -156,13 +156,13 @@ main(int argc, char** argv)
       parlay::max_element(deduped_edges, [](auto const& a, auto const& b) {
         return a.dest < b.dest;
       });
-    std::cout << "Max vertex ids: src " << max_u->src << ", dest "
+    std::cout << "max vertex ids: src " << max_u->src << ", dest "
               << max_v->dest << "\n";
     auto kv_num = parlay::histogram_by_key(
       parlay::map(deduped_edges, [](auto& e) { return e.src; }));
     auto* max_degree_vertex = parlay::max_element(
       kv_num, [](auto const& a, auto const& b) { return a.second < b.second; });
-    std::cout << "Max degree: " << max_degree_vertex->second << "\n";
+    std::cout << "max degree: " << max_degree_vertex->second << "\n";
     // Average out-degree over vertices that appear as a source: total edges
     // divided by the number of distinct source vertices.
     std::cout << "Average degree: "

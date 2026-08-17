@@ -25,11 +25,11 @@ public:
     LeafAugEmpty([[maybe_unused]] Slice In) {};
 
     template<typename Slice>
-    void UpdateAug([[maybe_unused]] Slice In)
+    void update_aug([[maybe_unused]] Slice In)
     {
     }
 
-    void Reset()
+    void reset()
     {
     }
   };
@@ -39,27 +39,27 @@ public:
     InteriorAugEmpty() = default;
 
     template<typename TreeNodes>
-    static bool Create(TreeNodes const& /*nodes*/)
+    static bool create(TreeNodes const& /*nodes*/)
     {
       return true;
     }
 
-    [[nodiscard]] static bool ForceParallel(size_t /*sz*/,
+    [[nodiscard]] static bool force_parallel(size_t /*sz*/,
                                             size_t /*granularity*/)
     {
       return true;
     }
 
-    template<typename TreeNodes, typename SplitSeq>
-    void Update(TreeNodes const& /*nodes*/, SplitSeq const& /*splits*/)
+    template<typename TreeNodes, typename split_seq>
+    void update(TreeNodes const& /*nodes*/, split_seq const& /*splits*/)
     {
     }
 
-    void Update()
+    void update()
     {
     }
 
-    void Reset()
+    void reset()
     {
     }
   };
@@ -71,12 +71,12 @@ public:
     using K = KeyType;
     using V = ValType;
 
-    K GetKey() const
+    K get_key() const
     {
       return key;
     }
 
-    V GetVal() const
+    V get_val() const
     {
       return val;
     }
@@ -136,15 +136,15 @@ public:
     using V = typename E::V;
 
     // differs from different entry, interface for pmos structure
-    static auto GetKey(E const& e)
+    static auto get_key(E const& e)
     {
-      return e.GetKey();
+      return e.get_key();
     }
-    static auto GetVal(E const& e)
+    static auto get_val(E const& e)
     {
-      return e.GetVal();
+      return e.get_val();
     }
-    static E ToEntry(K const& k, V const& v)
+    static E to_entry(K const& k, V const& v)
     {
       return E{ .key = k, .val = v };
     };

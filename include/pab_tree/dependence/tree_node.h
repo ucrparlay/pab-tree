@@ -1,8 +1,9 @@
-#ifndef PBTREE_DEPENDENCE_TREE_NODE_H_
-#define PBTREE_DEPENDENCE_TREE_NODE_H_
+#ifndef PABTREE_DEPENDENCE_TREE_NODE_H_
+#define PABTREE_DEPENDENCE_TREE_NODE_H_
 
 #include <cassert>
 
+#include <parlay/primitives.h>
 #include <parlay/slice.h>
 
 #include <algorithm>
@@ -16,25 +17,25 @@
 #include <type_traits>
 #include <variant>
 
-#include "comparator.h"
-#include "concepts.h"
-#include "dependence/binary_search.h"
-#include "dependence/box_op.h"
+#include "pab_tree/dependence/comparator.h"
+#include "pab_tree/dependence/concepts.h"
+#include "pab_tree/dependence/binary_search.h"
+#include "pab_tree/dependence/box_op.h"
 #include "parlay/utilities.h"
 
-namespace pb_tree {
+namespace pab_tree {
 
-struct AllocNormalLeafTag
+struct alloc_normal_leaf_tag
 {};
-struct AllocEmptyLeafTag
+struct alloc_empty_leaf_tag
 {};
 
-struct ProtoNode
+struct proto_node
 {
-  ProtoNode()
+  proto_node()
     : is_leaf{ false }
     , size{ 0 } {};
-  ProtoNode(bool _is_leaf, size_t _size)
+  proto_node(bool _is_leaf, size_t _size)
     : is_leaf{ _is_leaf }
     , size{ _size } {};
 
@@ -43,20 +44,20 @@ struct ProtoNode
 };
 
 template<typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
-struct LeafNode : TypeTrait::Node
+struct leaf_node : TypeTrait::Node
 {
   using TT = TypeTrait;
   using Node = TT::Node;
   using E = typename TT::E;
   using K = typename TT::K;
   using Entry = TT::Entry;
-  using EntrySeq = typename TT::EntrySeq;
-  using EntryArr = typename TT::EntryArr;
-  using AT = typename TT::LeafAug;
-  using EleAssignTagType = EleAssignTag;
+  using entry_seq = typename TT::entry_seq;
+  using entry_arr = typename TT::entry_arr;
+  using AT = typename TT::leaf_aug;
+  using ele_assign_tag_type = EleAssignTag;
 
-  static constexpr typename TT::BufSizeT kBinarySearchBase =
-    static_cast<typename TT::BufSizeT>(
+  static constexpr typename TT::buf_size_type k_binary_search_base =
+    static_cast<typename TT::buf_size_type>(
 #ifdef __cpp_lib_hardware_interference_size
       std::hardware_constructive_interference_size / sizeof(E)
 #else
@@ -65,14 +66,14 @@ struct LeafNode : TypeTrait::Node
     );
 
   // NOTE: default allocator
-  LeafNode()
+  leaf_node()
     : Node{ true, static_cast<size_t>(0) }
     , aug(AT())
     , is_sorted{ true }
   {
   }
 
-  LeafNode(AT const& _aug)
+  leaf_node(AT const& _aug)
     : Node{ true, static_cast<size_t>(0) }
     , aug(_aug)
     , is_sorted{ true }
@@ -81,15 +82,15 @@ struct LeafNode : TypeTrait::Node
 
   // NOTE: alloc a leaf with default size
   template<typename Range>
-  LeafNode(Range In, AllocNormalLeafTag)
+  leaf_node(Range In, alloc_normal_leaf_tag)
     : Node{ true, static_cast<size_t>(In.size()) }
-    , elements(EntryArr())
+    , elements(entry_arr())
     , aug(AT(In))
     , is_sorted{ true }
   {
-    assert(In.size() <= TT::kBufUB);
+    assert(In.size() <= TT::k_buf_ub);
     assert(parlay::is_sorted(
-      In, [](auto a, auto b) { return Entry::GetKey(a) < Entry::GetKey(b); }));
+      In, [](auto a, auto b) { return Entry::get_key(a) < Entry::get_key(b); }));
     // TODO: maybe double check a better way to initialize the array
     // maybe SIMD?
     std::ranges::copy_n(In.begin(), In.size(), elements.begin());
@@ -98,144 +99,127 @@ struct LeafNode : TypeTrait::Node
     // });
   }
 
-  [[nodiscard]] bool CapacityFull() const
+  [[nodiscard]] bool capacity_full() const
   {
-    return this->size >= TT::kBufUB;
+    return this->size >= TT::k_buf_ub;
   }
 
-  // return the first idx s.t. Entry::GetKey(elements[idx]) >= k
-  auto BinarySearchKey(K const& k) const
-  {
-    assert(this->is_sorted);
-    return pb_tree::BinarySearch<kBinarySearchBase>(
-      parlay::make_slice(this->elements.begin(),
-                         this->elements.begin() + this->size),
-      [k](E const e) { return Entry::GetKey(e) < k; });
-  }
-
-  // return the first idx s.t. Entry::GetKey(elements[idx]) > k
-  auto BinarySearchKeyExclusive(K const k) const
+  // return the first idx s.t. Entry::get_key(elements[idx]) >= k
+  auto binary_search_key(K const& k) const
   {
     assert(this->is_sorted);
-    return pb_tree::BinarySearch<kBinarySearchBase>(
+    return pab_tree::detail::binary_search<k_binary_search_base>(
       parlay::make_slice(this->elements.begin(),
                          this->elements.begin() + this->size),
-      [k](E const e) { return Entry::GetKey(e) <= k; });
+      [k](E const e) { return Entry::get_key(e) < k; });
   }
 
-  bool Contain(K const& k) const
+  // return the first idx s.t. Entry::get_key(elements[idx]) > k
+  auto binary_search_key_exclusive(K const k) const
+  {
+    assert(this->is_sorted);
+    return pab_tree::detail::binary_search<k_binary_search_base>(
+      parlay::make_slice(this->elements.begin(),
+                         this->elements.begin() + this->size),
+      [k](E const e) { return Entry::get_key(e) <= k; });
+  }
+
+  bool contain(K const& k) const
   {
     return this->is_sorted
              ? ([&] {
-                 auto idx = this->BinarySearchKey(k);
+                 auto idx = this->binary_search_key(k);
                  return idx < this->size &&
-                        (Entry::GetKey(this->elements[idx]) == k);
+                        (Entry::get_key(this->elements[idx]) == k);
                })()
              : (std::ranges::find_if(this->elements.begin(),
                                      this->elements.begin() + this->size,
                                      [&](E const& e) {
-                                       return Entry::GetKey(e) == k;
+                                       return Entry::get_key(e) == k;
                                      }) != this->elements.begin() + this->size);
   }
 
-  EntrySeq GetEle() const
+  entry_seq get_ele() const
   {
     // return elements.substr(0, this->size);
-    return EntrySeq(this->elements.begin(),
+    return entry_seq(this->elements.begin(),
                     this->elements.begin() + this->size);
   }
 
-  auto GetEleBeginIter()
+  auto get_ele_begin_iter()
   {
     return this->elements.begin();
   }
 
-  auto GetEleRbeginIter()
+  auto get_ele_rbegin_iter()
   {
     return this->elements.begin() + this->size - 1;
   }
 
-  auto GetEleEndIter()
+  auto get_ele_end_iter()
   {
     return this->elements.begin() + this->size;
   }
 
-  auto GetEleSlice() const
+  auto get_ele_slice() const
   {
     return parlay::make_slice(this->elements.begin(),
                               this->elements.begin() + this->size);
   }
 
-  auto const& GetEleContainer() const
+  auto const& get_ele_container() const
   {
     return this->elements;
   }
 
-  EntryArr& GetEleContainer()
+  entry_arr& get_ele_container()
   {
     return this->elements;
   }
 
-  void InitializeEleSeq()
+  void initialize_ele_seq()
   {
-    // this->elements = EntrySeq::uninitialized(TT::kBufUB);
-    this->elements = EntryArr();
+    // this->elements = entry_seq::uninitialized(TT::k_buf_ub);
+    this->elements = entry_arr();
   }
 
-  AT& GetAug() const
+  AT& get_aug() const
   {
     return aug;
   }
 
   // TODO: should put this one in the aug as well and don't use the monostate
   template<typename Range>
-  auto UpdateAug(Range In)
+  auto update_aug(Range In)
   {
-    return aug.UpdateAug(In);
+    return aug.update_aug(In);
   }
 
-  auto ResetAug()
+  auto reset_aug()
   {
-    return aug.Reset();
+    return aug.reset();
   }
 
-  EntryArr elements;
+  entry_arr elements;
   AT aug;
   bool is_sorted;
 };
 
-// template <typename NodeType, typename Range>
-// static auto GetAugByType(Range In) {
-//   if constexpr (NodeHasNonTrivialAug<typename NodeType::AT>) {
-//     return typename NodeType::AT(In);
-//   } else {
-//     return typename NodeType::AT();
-//   }
-// }
-//
-// template <typename NodeType>
-// static auto GetAugByType(Node* l, Node* r) {
-//   if constexpr (NodeHasNonTrivialAug<typename NodeType::AT>) {
-//     return typename NodeType::AT(l, r);
-//   } else {
-//     return typename NodeType::AT();
-//   }
-// }
 
 // NOTE: Alloc a leaf
 template<typename Range, typename Leaf>
 static Leaf*
-AllocNormalLeafNode(Range In)
+alloc_normal_leaf_node(Range In)
 {
   Leaf* o = parlay::type_allocator<Leaf>::alloc();
-  new (o) Leaf(In, AllocNormalLeafTag());
+  new (o) Leaf(In, alloc_normal_leaf_tag());
   return o;
 }
 
 // NOTE: Alloc a empty Leaf
 template<typename Range, typename Leaf>
 static Leaf*
-AllocEmptyLeafNode()
+alloc_empty_leaf_node()
 {
   Leaf* o = parlay::type_allocator<Leaf>::alloc();
   new (o) Leaf();
@@ -245,7 +229,7 @@ AllocEmptyLeafNode()
 // NOTE: Alloc a empty Leaf, but set the aug by hand
 template<typename Range, typename Leaf>
 static Leaf*
-AllocEmptyLeafNode(typename Leaf::AT const& aug)
+alloc_empty_leaf_node(typename Leaf::AT const& aug)
 {
   Leaf* o = parlay::type_allocator<Leaf>::alloc();
   new (o) Leaf(aug);
@@ -254,16 +238,16 @@ AllocEmptyLeafNode(typename Leaf::AT const& aug)
 
 // NOTE: multi-way node whose children # is fixed
 template<typename TypeTrait>
-struct MultiWayNode : TypeTrait::Node
+struct multi_way_node : TypeTrait::Node
 {
   using TT = TypeTrait;
   using Node = TT::Node;
-  using BufSizeT = typename TT::BufSizeT;
+  using buf_size_type = typename TT::buf_size_type;
 
-  static consteval auto GetLevels()
+  static consteval auto get_levels()
   {
-    BufSizeT a = 0;
-    auto temp = TT::kBufUB;
+    buf_size_type a = 0;
+    auto temp = TT::k_buf_ub;
     while (temp > 1) {
       temp >>= 1; // divide by 2
       a++;
@@ -271,11 +255,11 @@ struct MultiWayNode : TypeTrait::Node
     return a;
   }
 
-  using NodeArr = std::array<Node*, TT::kBufUB>;
-  using SplitArr = std::array<typename TT::Split, TT::kBufUB>;
+  using node_arr = std::array<Node*, TT::k_buf_ub>;
+  using split_arr = std::array<typename TT::Split, TT::k_buf_ub>;
 
-  static constexpr BufSizeT kBinarySearchBase =
-    static_cast<BufSizeT>(
+  static constexpr buf_size_type k_binary_search_base =
+    static_cast<buf_size_type>(
 #ifdef __cpp_lib_hardware_interference_size
       std::hardware_constructive_interference_size / sizeof(typename TT::K)
 #else
@@ -283,9 +267,9 @@ struct MultiWayNode : TypeTrait::Node
 #endif
     );
 
-  MultiWayNode(TT::NodeSeq const& _tree_nodes,
-               TT::SplitSeq const& _split,
-               TT::InteriorAug const& _aug)
+  multi_way_node(TT::node_seq const& _tree_nodes,
+               TT::split_seq const& _split,
+               TT::interior_aug const& _aug)
     : Node{ false,
             std::accumulate(
               _tree_nodes.begin(),
@@ -295,18 +279,18 @@ struct MultiWayNode : TypeTrait::Node
     , node_n(_tree_nodes.size())
     , aug(_aug)
   {
-    for (BufSizeT i = 0; i < _tree_nodes.size(); i++) {
+    for (buf_size_type i = 0; i < _tree_nodes.size(); i++) {
       tree_nodes[i] = _tree_nodes[i];
     }
-    for (BufSizeT i = 0; i < _split.size(); i++) {
+    for (buf_size_type i = 0; i < _split.size(); i++) {
       split[i] = _split[i];
     }
-    assert(this->GetNodeN() == _tree_nodes.size());
+    assert(this->get_node_n() == _tree_nodes.size());
   }
 
-  MultiWayNode(TT::NodeSlice _tree_nodes_slice,
-               TT::SplitSlice _split_slice,
-               TT::InteriorAug const& _aug)
+  multi_way_node(TT::node_slice _tree_nodes_slice,
+               TT::split_slice _split_slice,
+               TT::interior_aug const& _aug)
     : Node{ false,
             std::accumulate(
               _tree_nodes_slice.begin(),
@@ -316,87 +300,87 @@ struct MultiWayNode : TypeTrait::Node
     , node_n(_tree_nodes_slice.size())
     , aug(_aug)
   {
-    for (BufSizeT i = 0; i < _tree_nodes_slice.size(); i++) {
+    for (buf_size_type i = 0; i < _tree_nodes_slice.size(); i++) {
       tree_nodes[i] = _tree_nodes_slice[i];
     }
-    for (BufSizeT i = 0; i < _split_slice.size(); i++) {
+    for (buf_size_type i = 0; i < _split_slice.size(); i++) {
       split[i] = _split_slice[i];
     }
   }
 
-  TT::BufSizeT GetNodeN() const
+  TT::buf_size_type get_node_n() const
   {
     return node_n;
   }
 
-  TT::BufSizeT GetSplitN() const
+  TT::buf_size_type get_split_n() const
   {
     return node_n == 0 ? 0 : node_n - 1;
   }
 
-  SplitArr const& GetSplit() const
+  split_arr const& get_split() const
   {
     return split;
   }
 
-  auto GetNodeSlice() const
+  auto get_node_slice() const
   {
     return parlay::make_slice(tree_nodes.begin(),
-                              tree_nodes.begin() + GetNodeN());
+                              tree_nodes.begin() + get_node_n());
   }
 
-  auto GetSplitSlice() const
+  auto get_split_slice() const
   {
-    return parlay::make_slice(split.begin(), split.begin() + GetSplitN());
+    return parlay::make_slice(split.begin(), split.begin() + get_split_n());
   }
 
-  TT::BufSizeT GetNodeIdContainingKey(TT::K const k) const
+  TT::buf_size_type get_node_id_containing_key(TT::K const k) const
   {
     // return the first idx s.t. split[idx] > k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[2]
-    return pb_tree::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
+    return pab_tree::detail::binary_search<k_binary_search_base>(this->get_split_slice(),
                                  [&](TT::K const key) { return key <= k; });
-    // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
+    // for (buf_size_type i = 0; i < this->get_split_n(); i++) {
     //   if (split[i] > k) {
     //     return i;
     //   }
     // }
-    // return this->GetSplitN();
+    // return this->get_split_n();
   }
 
-  TT::BufSizeT GetNodeIdContainingKeyExclusive(TT::K const k) const
+  TT::buf_size_type get_node_id_containing_key_exclusive(TT::K const k) const
   {
     // return the first idx s.t. split[idx] >= k
     // i.e.: if split[1] == k, then k belongs to tree_nodes[1]
-    return pb_tree::BinarySearch<kBinarySearchBase>(this->GetSplitSlice(),
+    return pab_tree::detail::binary_search<k_binary_search_base>(this->get_split_slice(),
                                  [&](TT::K const key) { return key < k; });
-    // for (BufSizeT i = 0; i < this->GetSplitN(); i++) {
+    // for (buf_size_type i = 0; i < this->get_split_n(); i++) {
     //   if (split[i] >= k) {
     //     return i;
     //   }
     // }
-    // return this->GetSplitN();
+    // return this->get_split_n();
   }
 
-  bool ValidateKeyInNode(TT::BufSizeT node_idx, TT::K const k) const
+  bool validate_key_in_node(TT::buf_size_type node_idx, TT::K const k) const
   {
     return node_idx == 0 ? k < this->split.front()
-                         : (node_idx == this->GetSplitN()
-                              ? k >= this->split[this->GetSplitN() - 1]
+                         : (node_idx == this->get_split_n()
+                              ? k >= this->split[this->get_split_n() - 1]
                               : (k >= this->split[node_idx - 1] &&
                                  k < this->split[node_idx]));
   }
 
-  TT::BufSizeT node_n;
-  NodeArr tree_nodes;
-  SplitArr split;
-  TT::InteriorAug aug;
+  TT::buf_size_type node_n;
+  node_arr tree_nodes;
+  split_arr split;
+  TT::interior_aug aug;
 };
 
 template<typename Interior, typename TT>
 static Interior*
-AllocInteriorNode(typename TT::NodeSeq const& tree_nodes,
-                  typename TT::SplitSeq const& split)
+alloc_interior_node(typename TT::node_seq const& tree_nodes,
+                  typename TT::split_seq const& split)
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes, split);
@@ -405,20 +389,20 @@ AllocInteriorNode(typename TT::NodeSeq const& tree_nodes,
 
 template<typename Interior, typename TT>
 static Interior*
-AllocInteriorNode(typename TT::NodeSlice tree_nodes_slice,
-                  typename TT::SplitSlice split_slice)
+alloc_interior_node(typename TT::node_slice tree_nodes_slice,
+                  typename TT::split_slice split_slice)
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes_slice, split_slice);
   return o;
 }
 
-// TODO: maybe replace the NodeArr, ST, and AT with template parameters
+// TODO: maybe replace the node_arr, ST, and AT with template parameters
 template<typename Interior, typename TT>
 static Interior*
-AllocInteriorNode(typename TT::NodeSlice const& tree_nodes,
-                  typename TT::SplitSeq const& split,
-                  typename TT::InteriorAug const& aug)
+alloc_interior_node(typename TT::node_slice const& tree_nodes,
+                  typename TT::split_seq const& split,
+                  typename TT::interior_aug const& aug)
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior(tree_nodes, split, aug);
@@ -427,7 +411,7 @@ AllocInteriorNode(typename TT::NodeSlice const& tree_nodes,
 
 template<typename Interior, typename TT>
 static Interior*
-AllocInteriorNode()
+alloc_interior_node()
 {
   Interior* o = parlay::type_allocator<Interior>::alloc();
   new (o) Interior();
@@ -436,17 +420,14 @@ AllocInteriorNode()
 
 template<typename NodeType>
 static void
-FreeNode(auto T)
+free_node(auto T)
 {
   parlay::type_allocator<NodeType>::retire(static_cast<NodeType*>(T));
 }
 
-// Define some alias for concept check
-// template <typename T>
-// concept IsBinaryNode = CheckBinaryNode<T, pb_tree::BinaryNode>;
 
 // template <typename T>
-// concept IsMultiNode = CheckMultiNode<T, pb_tree::MultiNode>;
+// concept IsMultiNode = CheckMultiNode<T, pab_tree::MultiNode>;
 //
 // // TODO: may remove below from inner tree
 // template <typename T>
@@ -458,6 +439,6 @@ FreeNode(auto T)
 //                IsBox<typename T::second_type, Point>;
 // };
 
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_DEPENDENCE_TREE_NODE_H_
+#endif // PABTREE_DEPENDENCE_TREE_NODE_H_

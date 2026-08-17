@@ -5,7 +5,7 @@
 template<typename TypeTrait>
 struct BTreeWrapper
 {
-  using TreeType = typename pb_tree::BTree<TypeTrait>;
+  using TreeType = typename pab_tree::btree<TypeTrait>;
 };
 
 template<typename Options, typename RunFunc>
@@ -14,29 +14,29 @@ ApplyOrthogonal(Options const& opts, RunFunc test_func)
 {
   // using EleType = Element<uint32_t, uint32_t>;
 #ifdef LEAF1
-  static constexpr uint const kBuf = 1;
+  static constexpr uint const k_buf = 1;
 #elif defined(LEAF2)
-  static constexpr uint const kBuf = 2;
+  static constexpr uint const k_buf = 2;
 #elif defined(LEAF4)
-  static constexpr uint const kBuf = 4;
+  static constexpr uint const k_buf = 4;
 #elif defined(LEAF8)
-  static constexpr uint const kBuf = 8;
+  static constexpr uint const k_buf = 8;
 #elif defined(LEAF16)
-  static constexpr uint const kBuf = 16;
+  static constexpr uint const k_buf = 16;
 #elif defined(LEAF32)
-  static constexpr uint const kBuf = 32;
+  static constexpr uint const k_buf = 32;
 #elif defined(LEAF64)
-  static constexpr uint const kBuf = 64;
+  static constexpr uint const k_buf = 64;
 #elif defined(LEAF128)
-  static constexpr uint const kBuf = 128;
+  static constexpr uint const k_buf = 128;
 #elif defined(LEAF256)
-  static constexpr uint const kBuf = 256;
+  static constexpr uint const k_buf = 256;
 #elif defined(LEAF512)
-  static constexpr uint const kBuf = 512;
+  static constexpr uint const k_buf = 512;
 #elif defined(LEAF1024)
-  static constexpr uint const kBuf = 1024;
+  static constexpr uint const k_buf = 1024;
 #else
-  static constexpr uint const kBuf = 64; // Default
+  static constexpr uint const k_buf = 64; // Default
 #endif // LEAF1
 
 #if defined(DYNAMIC_GRAPH)
@@ -51,12 +51,12 @@ ApplyOrthogonal(Options const& opts, RunFunc test_func)
   using K [[maybe_unused]] = Wrapper::K;
   using V [[maybe_unused]] = Wrapper::V;
   using E = Wrapper::E;
-  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                         kBuf,
+  using TypeTrait = pab_tree::btree_type_trait<Wrapper::ElementWrapper<E>,
+                                         k_buf,
                                          Wrapper::LeafAugEmpty,
                                          Wrapper::InteriorAugEmpty,
                                          8,
-                                         pb_tree::ProtoNode>;
+                                         pab_tree::proto_node>;
   if (opts.tree_type == 0) {
     Run<BTreeWrapper<TypeTrait>>(opts, test_func);
   }

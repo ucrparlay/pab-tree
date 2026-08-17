@@ -102,10 +102,10 @@ main(int argc, char* argv[])
   std::filesystem::create_directory(path);
 
   auto generate = [&]<typename E>(std::string const& new_path) {
-    using EntrySeq = parlay::sequence<E>;
+    using entry_seq = parlay::sequence<E>;
     using K = typename E::K;
     std::cout << "Generating... " << std::endl;
-    EntrySeq base_seq, batch_seq;
+    entry_seq base_seq, batch_seq;
     std::tie(base_seq, batch_seq) =
       dis_type == 0
         ? Generator<E, UniformGenerator<>, UniformGenerator<>>::GenBatch(

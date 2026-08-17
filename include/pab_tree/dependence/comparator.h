@@ -1,5 +1,5 @@
-#ifndef PBTREE_DEPENDENCE_COMPARATOR_H_
-#define PBTREE_DEPENDENCE_COMPARATOR_H_
+#ifndef PABTREE_DEPENDENCE_COMPARATOR_H_
+#define PABTREE_DEPENDENCE_COMPARATOR_H_
 
 #include <algorithm>
 #include <cfloat>
@@ -8,7 +8,7 @@
 #include <iostream>
 #include <limits>
 
-namespace pb_tree {
+namespace pab_tree {
 //*----------- double precision comparision ----------------
 //* God made the integers, all else is the work of man.
 //* -- Leopold Kronecker
@@ -16,7 +16,7 @@ template<typename T>
 class Num_Comparator
 {
 public:
-  static bool Gt(T const a, T const b)
+  static bool gt(T const a, T const b)
   {
     if constexpr (std::is_floating_point_v<T>) {
       return a - b > eps;
@@ -25,7 +25,7 @@ public:
     }
   }
 
-  static bool Lt(T const a, T const b)
+  static bool lt(T const a, T const b)
   {
     if constexpr (std::is_floating_point_v<T>) {
       return a - b < -eps;
@@ -34,7 +34,7 @@ public:
     }
   }
 
-  static bool Eq(T const a, T const b)
+  static bool eq(T const a, T const b)
   {
     if constexpr (std::is_floating_point_v<T>) {
       return std::abs(a - b) < eps;
@@ -43,37 +43,37 @@ public:
     }
   }
 
-  static bool Geq(T const a, T const b)
+  static bool geq(T const a, T const b)
   {
-    return !Lt(a, b);
+    return !lt(a, b);
   }
 
-  static bool Leq(T const a, T const b)
+  static bool leq(T const a, T const b)
   {
-    return !Gt(a, b);
+    return !gt(a, b);
   }
 
-  static T Min(T const a, T const b)
+  static T min(T const a, T const b)
   {
-    return Lt(a, b) ? a : b;
+    return lt(a, b) ? a : b;
   }
 
-  static T Max(T const a, T const b)
+  static T max(T const a, T const b)
   {
-    return Gt(a, b) ? a : b;
+    return gt(a, b) ? a : b;
   }
 
-  static T Abs(T const a)
+  static T abs(T const a)
   {
-    return Lt(a, 0) ? -a : a;
+    return lt(a, 0) ? -a : a;
   }
 
-  static bool IsZero(T const a)
+  static bool is_zero(T const a)
   {
-    return Eq(a, static_cast<T>(0));
+    return eq(a, static_cast<T>(0));
   }
 
-  static T DivideTwoCeil(T const a)
+  static T divide_two_ceil(T const a)
   {
     if constexpr (std::is_floating_point_v<T>) {
       return std::ceil(a / 2.0);
@@ -96,12 +96,12 @@ public:
     }
   }
 
-  static T MaxVal()
+  static T max_val()
   {
     return std::numeric_limits<T>::max();
   }
 
-  static T MinVal()
+  static T min_val()
   {
     return std::numeric_limits<T>::lowest();
   }
@@ -110,6 +110,6 @@ private:
   static constexpr T eps = std::numeric_limits<T>::epsilon();
 };
 
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_DEPENDENCE_COMPARATOR_H_
+#endif // PABTREE_DEPENDENCE_COMPARATOR_H_

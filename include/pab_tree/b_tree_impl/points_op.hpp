@@ -1,20 +1,20 @@
-#ifndef PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
-#define PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
+#ifndef PABTREE_B_TREE_IMPL_POINTS_OP_HPP_
+#define PABTREE_B_TREE_IMPL_POINTS_OP_HPP_
 
 #include <cassert>
 
 #include <algorithm>
 #include <utility>
 
-#include "../b_tree.h"
+#include "pab_tree/b_tree.h"
 
-namespace pb_tree {
+namespace pab_tree {
 template<typename TT>
 void
-BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
+btree<TT>::partition_binary_search_rec(auto split_seq_s,
                                     // parlay::sequence<int>& split_pos_seq,
                                     auto& split_pos_seq,
-                                    EntrySlice entry_seq_s,
+                                    entry_slice entry_seq_s,
                                     size_t split_offset,
                                     size_t in_offset)
 {
@@ -25,22 +25,22 @@ BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
   if (split_seq_s.size() == 1) {
     split_pos_seq[split_offset] =
       in_offset + parlay::internal::binary_search(entry_seq_s, [&](E const e) {
-        return Entry::GetKey(e) < split_seq_s[0];
+        return Entry::get_key(e) < split_seq_s[0];
       });
     return;
   }
 
   size_t mid = split_seq_s.size() >> 1;
   size_t pos = parlay::internal::binary_search(entry_seq_s, [&](E const e) {
-    return Entry::GetKey(e) < split_seq_s[mid];
+    return Entry::get_key(e) < split_seq_s[mid];
   });
   split_pos_seq[split_offset + mid] = in_offset + pos;
-  PartitionBinarySearchRec(split_seq_s.cut(0, mid),
+  partition_binary_search_rec(split_seq_s.cut(0, mid),
                            split_pos_seq,
                            entry_seq_s.cut(0, pos),
                            split_offset,
                            in_offset);
-  PartitionBinarySearchRec(split_seq_s.cut(mid + 1, split_seq_s.size()),
+  partition_binary_search_rec(split_seq_s.cut(mid + 1, split_seq_s.size()),
                            split_pos_seq,
                            entry_seq_s.cut(pos, entry_seq_s.size()),
                            split_offset + mid + 1,
@@ -50,20 +50,20 @@ BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
+btree<TT>::split_batch_binary_search(size_buf_ub_arr& split_pos_arr,
                                   Range In,
-                                  TT::SplitSliceConst split_slice)
+                                  TT::split_slice_const split_slice)
 {
-  // PartitionBinarySearchRec(TI->GetSplitSlice(), split_pos_seq, In, 0, 0);
+  // partition_binary_search_rec(TI->get_split_slice(), split_pos_seq, In, 0, 0);
   // TODO: maybe we can decide it by skewed distribution
-  SizeT offset = 0;
-  for (BufSizeT i = 0; i < split_slice.size(); i++) {
-    SizeT pos =
+  size_type offset = 0;
+  for (buf_size_type i = 0; i < split_slice.size(); i++) {
+    size_type pos =
       parlay::internal::binary_search(In.cut(offset, In.size()), [&](auto e) {
         if constexpr (std::same_as<decltype(e), typename TT::K>) {
           return e < split_slice[i];
         } else {
-          return Entry::GetKey(e) < split_slice[i];
+          return Entry::get_key(e) < split_slice[i];
         }
       });
     offset += pos;
@@ -74,14 +74,14 @@ BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
 template<typename TT>
 template<typename Range>
 void
-BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
+btree<TT>::split_batch_merge(size_buf_ub_arr& split_pos_arr,
                            Range In,
-                           TT::SplitSliceConst split_slice)
+                           TT::split_slice_const split_slice)
 {
   assert(
     parlay::is_sorted(split_slice, [&](auto k1, auto k2) { return k1 < k2; }));
 
-  SizeT cnt = 0;
+  size_type cnt = 0;
   auto split_iter = split_slice.begin();
   auto input_iter = In.begin();
 
@@ -90,7 +90,7 @@ BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
     if constexpr (std::same_as<typename Range::value_type, typename TT::K>) {
       less = *input_iter < *split_iter;
     } else {
-      less = Entry::GetKey(*input_iter) < *split_iter;
+      less = Entry::get_key(*input_iter) < *split_iter;
     }
     if (less) {
       ++input_iter;
@@ -106,6 +106,6 @@ BTree<TT>::SplitBatchMerge(SizeBufUBArr& split_pos_arr,
   }
 }
 
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
+#endif // PABTREE_B_TREE_IMPL_POINTS_OP_HPP_

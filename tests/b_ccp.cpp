@@ -17,11 +17,11 @@ void
 CheckCorrectness(Wrapper::Options opts)
 {
   using Tree = TreeDesc::TreeType;
-  using EntrySeq = typename TT::EntrySeq;
+  using entry_seq = typename TT::entry_seq;
 
   Tree tree;
   constexpr bool kTestTime = false;
-  EntrySeq wp, wi;
+  entry_seq wp, wi;
 
   if (opts.tag & (1 << 0)) {
     auto [base_path, batch_path] = opts.ParseInsertBatchPath(opts.batch_ratio);
@@ -37,19 +37,19 @@ CheckCorrectness(Wrapper::Options opts)
     // return;
 
     BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
-    tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    tree.template validate<typename Tree::Leaf, typename Tree::Interior>();
     puts("---------------finish build insert tree---------------");
 
-    BatchInsert<TT, Tree, kTestTime>(tree, wp, wi, 2);
-    assert(tree.GetSize() == wp.size() + wi.size());
-    tree.template Validate<typename Tree::Leaf, typename Tree::Interior>();
+    batch_insert<TT, Tree, kTestTime>(tree, wp, wi, 2);
+    assert(tree.get_size() == wp.size() + wi.size());
+    tree.template validate<typename Tree::Leaf, typename Tree::Interior>();
     std::cout << "---------------finish insert----------------\n" << std::flush;
   }
 
   // if (tag &
   //     (1 << 1)) {  // NOTE: without tag & (1<<0), this will remove no points
-  //   BatchDelete<Point, Tree, kTestTime>(tree, wp, wi, 2,
-  //   batchInsertCheckRatio); tree.template Validate<typename Tree::Leaf,
+  //   batch_delete<Point, Tree, kTestTime>(tree, wp, wi, 2,
+  //   batchInsertCheckRatio); tree.template validate<typename Tree::Leaf,
   //   typename Tree::Interior,
   //                          typename Tree::SplitRuleType>();
   //   std::cout << "---------------finish delete----------------\n" <<
@@ -60,9 +60,9 @@ CheckCorrectness(Wrapper::Options opts)
   //   BatchDiff<Point, Tree, kTestTime>(tree, wp, 2, kCCPBatchDiffTotalRatio,
   //                                     kCCPBatchDiffOverlapRatio);
   //   // BatchDiff<Point, Tree, kTestTime>(tree, wp, 2, 0.5, 1.0);
-  //   tree.template Validate<typename Tree::Leaf, typename Tree::Interior,
+  //   tree.template validate<typename Tree::Leaf, typename Tree::Interior,
   //                          typename Tree::SplitRuleType>();
-  //   assert(tree.GetRoot()->size ==
+  //   assert(tree.get_root()->size ==
   //          wp.size() - static_cast<size_t>(wp.size() *
   //          kCCPBatchDiffTotalRatio *
   //                                          kCCPBatchDiffOverlapRatio));
@@ -94,9 +94,9 @@ CheckCorrectness(Wrapper::Options opts)
   //   parlay::sequence<double> const ratios = {0.001};
   //   for (auto rat : ratios) {
   //     BatchInsertByStep<Point, Tree, true>(tree, wp, rounds, rat);
-  //     std::cout << "root size: " << tree.GetRoot()->size << std::endl;
+  //     std::cout << "root size: " << tree.get_root()->size << std::endl;
   //   }
-  //   tree.template Validate<typename Tree::Leaf, typename Tree::Interior,
+  //   tree.template validate<typename Tree::Leaf, typename Tree::Interior,
   //                          typename Tree::SplitRuleType>();
   //   std::cout << "---------------finish incre build------------------\n"
   //             << std::flush;
@@ -111,7 +111,7 @@ CheckCorrectness(Wrapper::Options opts)
   //   for (auto rat : ratios) {
   //     BatchDeleteByStep<Point, Tree, true>(tree, wp, rounds, rat);
   //   }
-  //   tree.template Validate<typename Tree::Leaf, typename Tree::Interior,
+  //   tree.template validate<typename Tree::Leaf, typename Tree::Interior,
   //                          typename Tree::SplitRuleType>();
   //   std::cout << "---------------finish incre delete------------------\n"
   //             << std::flush;
@@ -121,7 +121,7 @@ CheckCorrectness(Wrapper::Options opts)
   //               wp.subseq(0, kCCPBatchQuerySize));
   // }
 
-  EntrySeq new_wp;
+  entry_seq new_wp;
   if (opts.tag == (1 << 0)) { // insert
     new_wp = wp;
     new_wp.append(wi);
@@ -164,9 +164,9 @@ CheckCorrectness(Wrapper::Options opts)
 
   // if (query_type & (1 << 1)) {  // NOTE: range count
   //   for (auto range_query_type : {0, 1, 2}) {
-  //     // Points new_wp(tree.GetRoot()->size);
+  //     // Points new_wp(tree.get_root()->size);
   //     // tree.Flatten(new_wp);
-  //     RangeCount<Point>(new_wp, tree, rounds, query_num, range_query_type,
+  //     range_count<Point>(new_wp, tree, rounds, query_num, range_query_type,
   //                       kDim);
   //   }
   //   std::cout << "--------------finish range count------------------\n"
@@ -175,7 +175,7 @@ CheckCorrectness(Wrapper::Options opts)
 
   // if (query_type & (1 << 2)) {  // NOTE: range query
   //   for (auto range_query_type : {0, 1, 2}) {
-  //     // Points new_wp(tree.GetRoot()->size);
+  //     // Points new_wp(tree.get_root()->size);
   //     // tree.Flatten(new_wp);
   //     RangeQuery<Point>(new_wp, tree, rounds, kCCPQueryNum, range_query_type,
   //                       kDim);
@@ -184,7 +184,7 @@ CheckCorrectness(Wrapper::Options opts)
   //             << std::flush;
   // }
 
-  tree.DeleteTree();
+  tree.delete_tree();
   return;
 }
 

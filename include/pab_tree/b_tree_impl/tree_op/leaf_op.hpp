@@ -1,5 +1,5 @@
-#ifndef PBTREE_B_TREE_IMPL_LEAF_OP_HPP_
-#define PBTREE_B_TREE_IMPL_LEAF_OP_HPP_
+#ifndef PABTREE_B_TREE_IMPL_LEAF_OP_HPP_
+#define PABTREE_B_TREE_IMPL_LEAF_OP_HPP_
 
 #include <algorithm>
 #include <cassert>
@@ -10,16 +10,16 @@
 #include <type_traits>
 #include <utility>
 
-#include "pb_tree/b_tree.h"
-#include "pb_tree/dependence/concepts.h"
+#include "pab_tree/b_tree.h"
+#include "pab_tree/dependence/concepts.h"
 
-namespace pb_tree {
+namespace pab_tree {
 template<typename TT>
 template<typename Range, typename LeafSortPred>
 TT::Node*
-BTree<TT>::PostProcessLeafChange(Node* T,
+btree<TT>::post_process_leaf_change(Node* T,
                                  Range In,
-                                 const TT::PatternType leaf_entries_pattern,
+                                 const TT::pattern_type leaf_entries_pattern,
                                  LeafSortPred const& leaf_sort_pred)
 {
   // WARN: does not know whether the T->elements are sorted or not,
@@ -27,14 +27,14 @@ BTree<TT>::PostProcessLeafChange(Node* T,
   // even if the entries are actually sorted.
   assert(T->is_leaf);
   auto TL = static_cast<Leaf*>(T);
-  if (leaf_entries_pattern == TT::LeafEntriesPattern::kSorted) {
-    std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
+  if (leaf_entries_pattern == TT::leaf_entries_pattern::sorted) {
+    std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter());
     TL->is_sorted = true;
-  } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kUnsorted) {
+  } else if (leaf_entries_pattern == TT::leaf_entries_pattern::unsorted) {
     TL->is_sorted = false;
-  } else if (leaf_entries_pattern == TT::LeafEntriesPattern::kHybrid) {
+  } else if (leaf_entries_pattern == TT::leaf_entries_pattern::hybrid) {
     if (leaf_sort_pred(T, In)) {
-      std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
+      std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter());
       TL->is_sorted = true;
     } else {
       TL->is_sorted = false;
@@ -48,7 +48,7 @@ BTree<TT>::PostProcessLeafChange(Node* T,
 template<typename TT>
 template<typename Range, bool sorted>
 void
-BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
+btree<TT>::extract_points_in_leaf(Node* T, Range Out)
 {
   auto TL = static_cast<Leaf*>(T);
   if constexpr (sorted) {
@@ -58,70 +58,70 @@ BTree<TT>::ExtractPointsInLeaf(Node* T, Range Out)
     }
   }
   assert(Out.size() >= TL->size);
-  std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, Out.begin());
+  std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size, Out.begin());
 }
 
 template<typename TT>
 template<typename Range, typename LeafSortPred>
 TT::Node*
-BTree<TT>::InsertPoints2Leaf(Node* T,
+btree<TT>::insert_points_2_leaf(Node* T,
                              Range In,
-                             TT::PatternType leaf_entries_pattern,
+                             TT::pattern_type leaf_entries_pattern,
                              LeafSortPred const& leaf_sort_pred)
 {
   Leaf* TL = static_cast<Leaf*>(T);
 
-  assert(T->size + In.size() <= TT::kBufUB);
-  assert(T->size == TL->GetEle().size());
+  assert(T->size + In.size() <= TT::k_buf_ub);
+  assert(T->size == TL->get_ele().size());
   if (TL->elements.size() == 0) {
     assert(TL->size == 0);
-    TL->InitializeEleSeq();
-    assert(TL->elements.size() == TT::kBufUB);
+    TL->initialize_ele_seq();
+    assert(TL->elements.size() == TT::k_buf_ub);
   }
-  // PERF: BufSizeT should be enough since total size fits within
-  std::ranges::copy_n(In.begin(), In.size(), TL->GetEleEndIter());
+  // PERF: buf_size_type should be enough since total size fits within
+  std::ranges::copy_n(In.begin(), In.size(), TL->get_ele_end_iter());
   TL->size += In.size();
-  TL->UpdateAug(
+  TL->update_aug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
 
-  return PostProcessLeafChange(T, In, leaf_entries_pattern, leaf_sort_pred);
+  return post_process_leaf_change(T, In, leaf_entries_pattern, leaf_sort_pred);
 }
 
 template<typename TT>
 template<typename Range>
-TT::SizeT
-BTree<TT>::HandlingLeafSplitOverflow(Node* T,
+TT::size_type
+btree<TT>::handling_leaf_split_overflow(Node* T,
                                      Range In,
-                                     NodeSplitPairSlice node_split_slice)
+                                     node_split_pair_slice node_split_slice)
 {
   Leaf* TL = static_cast<Leaf*>(T);
-  auto entry_seq = TT::EntrySeq::uninitialized(T->size + In.size());
+  auto entry_seq = TT::entry_seq::uninitialized(T->size + In.size());
 
   if (TL->is_sorted) {
     // In is always sorted (sorted by BatchInsert_ before descent).
     // Both halves sorted: O(n) merge instead of O(n log n) sort.
-    std::ranges::merge(TL->GetEleBeginIter(),
-                       TL->GetEleEndIter(),
+    std::ranges::merge(TL->get_ele_begin_iter(),
+                       TL->get_ele_end_iter(),
                        In.begin(),
                        In.end(),
                        entry_seq.begin(),
                        [](E const& a, E const& b) {
-                         return Entry::GetKey(a) < Entry::GetKey(b);
+                         return Entry::get_key(a) < Entry::get_key(b);
                        });
-    FreeNode<Leaf>(T);
+    free_node<Leaf>(T);
   } else {
-    std::ranges::copy_n(TL->GetEleBeginIter(), TL->size, entry_seq.begin());
+    std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size, entry_seq.begin());
     parlay::copy(
       In, parlay::make_slice(entry_seq.begin() + TL->size, entry_seq.end()));
-    FreeNode<Leaf>(T);
+    free_node<Leaf>(T);
     entry_seq = parlay::sort(entry_seq);
   }
 
-  SizeT rt_bkt_n = GenerateLeafNodes(
+  size_type rt_bkt_n = generate_leaf_nodes(
     parlay::make_slice(entry_seq),
-    GenNodesOutputHandler{
-      .set_key = [&](SizeT i, auto key) { node_split_slice[i].second = key; },
-      .set_node = [&](SizeT i,
+    gen_nodes_output_handler{
+      .set_key = [&](size_type i, auto key) { node_split_slice[i].second = key; },
+      .set_node = [&](size_type i,
                       auto node) { node_split_slice[i].first = node; } });
 
   return rt_bkt_n;
@@ -130,9 +130,9 @@ BTree<TT>::HandlingLeafSplitOverflow(Node* T,
 template<typename TT>
 template<typename LeafSortPred>
 TT::Node*
-BTree<TT>::DeletePoints4Leaf(Node* T,
-                             TT::ConstKeySlice In,
-                             const TT::PatternType leaf_entries_pattern,
+btree<TT>::delete_points_4_leaf(Node* T,
+                             TT::const_key_slice In,
+                             const TT::pattern_type leaf_entries_pattern,
                              LeafSortPred const& leaf_sort_pred)
 {
   auto TL = static_cast<Leaf*>(T);
@@ -141,16 +141,16 @@ BTree<TT>::DeletePoints4Leaf(Node* T,
   assert(parlay::all_of(In, [&](auto a) {
     return std::find_if(TL->elements.begin(),
                         TL->elements.begin() + TL->size,
-                        [&](auto const e) { return Entry::GetKey(e) == a; }) !=
+                        [&](auto const e) { return Entry::get_key(e) == a; }) !=
            TL->elements.begin() + TL->size;
   }));
 
   auto it = TL->elements.begin();
   auto end = TL->elements.begin() + TL->size;
-  BufSizeT delete_cnt = 0;
-  for (SizeT i = 0; i < In.size(); i++) {
+  buf_size_type delete_cnt = 0;
+  for (size_type i = 0; i < In.size(); i++) {
     it = std::ranges::find_if(TL->elements.begin(), end, [&](auto const& e) {
-      return Entry::GetKey(e) == In[i];
+      return Entry::get_key(e) == In[i];
     });
     if (it != end) {
       std::ranges::iter_swap(it, --end);
@@ -167,12 +167,12 @@ BTree<TT>::DeletePoints4Leaf(Node* T,
   TL->size = std::distance(TL->elements.begin(), end);
 
   assert(TL->size >= 0);
-  TL->UpdateAug(
+  TL->update_aug(
     parlay::make_slice(TL->elements.begin(), TL->elements.begin() + TL->size));
 
-  return PostProcessLeafChange(T, In, leaf_entries_pattern, leaf_sort_pred);
+  return post_process_leaf_change(T, In, leaf_entries_pattern, leaf_sort_pred);
 }
 
-} // namespace pb_tree
+} // namespace pab_tree
 
-#endif // PBTREE_B_TREE_IMPL_LEAF_OP_HPP_
+#endif // PABTREE_B_TREE_IMPL_LEAF_OP_HPP_

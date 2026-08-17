@@ -23,12 +23,12 @@ ApplyTlxBTree(Options const& opts, RunFunc test_func)
   using K = Wrapper::K;
   using V = Wrapper::V;
   using E = Wrapper::E;
-  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
+  using TypeTrait = pab_tree::btree_type_trait<Wrapper::ElementWrapper<E>,
                                             16,
                                             Wrapper::LeafAugEmpty,
                                             Wrapper::InteriorAugEmpty,
                                             8,
-                                            pb_tree::ProtoNode>;
+                                            pab_tree::proto_node>;
   Run<TlxBTreeWrapper<TypeTrait>>(opts, test_func);
 }
 

@@ -1,14 +1,14 @@
-#ifndef PBTREE_BINARY_SEARCH_H_
-#define PBTREE_BINARY_SEARCH_H_
+#ifndef PABTREE_BINARY_SEARCH_H_
+#define PABTREE_BINARY_SEARCH_H_
 
 #include <cstddef>
 
-namespace pb_tree {
+namespace pab_tree::detail {
 
 // Legacy linear-scan helpers (kept for callers outside the hot path).
 template<typename Seq, typename F>
 size_t
-LinearSearch(Seq const& I, typename Seq::value_type const& v, const F& less)
+linear_search(Seq const& I, typename Seq::value_type const& v, const F& less)
 {
   for (size_t i = 0; i < I.size(); i++) {
     if (!less(I[i], v)) {
@@ -20,7 +20,7 @@ LinearSearch(Seq const& I, typename Seq::value_type const& v, const F& less)
 
 template<typename Seq, typename F>
 size_t
-LinearSearch(Seq const& I, const F& less)
+linear_search(Seq const& I, const F& less)
 {
   for (size_t i = 0; i < I.size(); i++) {
     if (!less(I[i])) {
@@ -33,17 +33,17 @@ LinearSearch(Seq const& I, const F& less)
 // Return the index of the first element where !less(elem, v).
 //
 // Binary phase: branchless cmov-friendly ternaries narrow the range to
-// ≤ _binary_search_base elements without a single branch.
+// ≤ BinarySearchBase elements without a single branch.
 // Linear phase: branchless popcount-style scan of the remaining elements —
 // counts how many still satisfy less() rather than early-exiting, eliminating
 // branch mispredictions in the tail at the cost of a bounded number of extra
-// comparisons (≤ _binary_search_base/2 on average).
-template<size_t _binary_search_base, typename Seq, typename F>
+// comparisons (≤ BinarySearchBase/2 on average).
+template<size_t BinarySearchBase, typename Seq, typename F>
 size_t
-BinarySearch(Seq const& I, typename Seq::value_type const& v, const F& less)
+binary_search(Seq const& I, typename Seq::value_type const& v, const F& less)
 {
   size_t lo = 0, hi = I.size();
-  while (hi - lo > _binary_search_base) {
+  while (hi - lo > BinarySearchBase) {
     size_t const mid = lo + ((hi - lo) >> 1);
     bool const go = less(I[mid], v);
     lo = go ? mid + 1 : lo;
@@ -57,12 +57,12 @@ BinarySearch(Seq const& I, typename Seq::value_type const& v, const F& less)
 }
 
 // Return the index of the first element where !less(elem).
-template<size_t _binary_search_base, typename Seq, typename F>
+template<size_t BinarySearchBase, typename Seq, typename F>
 size_t
-BinarySearch(Seq const& I, const F& less)
+binary_search(Seq const& I, const F& less)
 {
   size_t lo = 0, hi = I.size();
-  while (hi - lo > _binary_search_base) {
+  while (hi - lo > BinarySearchBase) {
     size_t const mid = lo + ((hi - lo) >> 1);
     bool const go = less(I[mid]);
     lo = go ? mid + 1 : lo;
@@ -75,6 +75,6 @@ BinarySearch(Seq const& I, const F& less)
   return lo + count;
 }
 
-} // namespace pb_tree
+} // namespace pab_tree::detail
 
-#endif // PBTREE_BINARY_SEARCH_H_
+#endif // PABTREE_BINARY_SEARCH_H_

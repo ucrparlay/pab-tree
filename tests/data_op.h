@@ -279,9 +279,9 @@ template<typename E, typename BaseDisFunc, typename BatchDisFunc>
 class Generator
 {
 public:
-  using EntrySeq = parlay::sequence<E>;
+  using entry_seq = parlay::sequence<E>;
 
-  static void Validate(int batch_op,
+  static void validate(int batch_op,
                        size_t base_n,
                        size_t batch_n,
                        auto const& base_k_seq,
@@ -294,12 +294,12 @@ public:
                 << ", expected: " << (batch_op == 0 ? base_n : base_n - batch_n)
                 << std::endl;
       throw std::runtime_error(
-        "Validate: Base sequence size mismatch after remove duplicates.");
+        "validate: Base sequence size mismatch after remove duplicates.");
     }
 
     if (parlay::remove_duplicates(batch_k_seq).size() != batch_n) {
       throw std::runtime_error(
-        "Validate: Batch sequence size mismatch after remove duplicates.");
+        "validate: Batch sequence size mismatch after remove duplicates.");
     }
 
     auto base_sort_seq = parlay::sort(base_k_seq);
@@ -310,7 +310,7 @@ public:
           return it != base_sort_seq.end() && *it == key;
         })) {
       throw std::runtime_error(
-        "Validate: Insert batch has keys already in base sequence.");
+        "validate: Insert batch has keys already in base sequence.");
     } else if (batch_op == 1) {
       if (!parlay::all_of(batch_sort_seq, [&](size_t idx) {
             auto it =
@@ -318,14 +318,14 @@ public:
             return it != base_sort_seq.end() && *it == idx;
           })) {
         throw std::runtime_error(
-          "Validate: Delete batch has keys not in base sequence.");
+          "validate: Delete batch has keys not in base sequence.");
       }
     }
 
     std::cout << "Validation passed." << std::endl;
   }
 
-  static EntrySeq ToEntry(parlay::sequence<size_t> const& key_seq)
+  static entry_seq to_entry(parlay::sequence<size_t> const& key_seq)
   {
     // shuffle keys
     auto rand_seq = parlay::random_shuffle(parlay::make_slice(key_seq));
@@ -336,7 +336,7 @@ public:
         return E{ .key = rand_seq[i], .val = { i } };
       } else {
         static_assert(false,
-                      "Generator::ToEntry: Unsupported Entry value type.");
+                      "Generator::to_entry: Unsupported Entry value type.");
       }
     });
   }
@@ -379,7 +379,7 @@ public:
   }
 
   template<typename Param>
-  static std::pair<EntrySeq, EntrySeq> GenBatch(int const batch_op,
+  static std::pair<entry_seq, entry_seq> GenBatch(int const batch_op,
                                                 size_t const base_n,
                                                 size_t const batch_n,
                                                 Param const& base_param,
@@ -394,8 +394,8 @@ public:
       Discreatize(std::move(base_ran_seq), std::move(batch_ran_seq), batch_op);
     std::cout << "final base size: " << dis_base_seq.size()
               << ", batch size: " << dis_batch_seq.size() << std::endl;
-    Validate(batch_op, base_n, batch_n, dis_base_seq, dis_batch_seq);
-    return { ToEntry(dis_base_seq), ToEntry(dis_batch_seq) };
+    validate(batch_op, base_n, batch_n, dis_base_seq, dis_batch_seq);
+    return { to_entry(dis_base_seq), to_entry(dis_batch_seq) };
   }
 };
 

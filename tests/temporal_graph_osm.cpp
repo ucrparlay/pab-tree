@@ -112,7 +112,7 @@ main(int argc, char** argv)
     parlay::map(all_inserts, [&](auto& e) { return e.src; }));
   auto* max_degree_vertex = parlay::max_element(
     kv_num, [&](auto const& a, auto const& b) { return a.second < b.second; });
-  std::cout << "Max degree: " << (*max_degree_vertex).second << std::endl;
+  std::cout << "max degree: " << (*max_degree_vertex).second << std::endl;
 
   // generate batch
   using BatchSplit =
