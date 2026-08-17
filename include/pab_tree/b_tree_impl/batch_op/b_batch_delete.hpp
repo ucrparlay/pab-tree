@@ -65,8 +65,6 @@ void btree<TT>::BatchDelete_(Range In,
 	static_assert(std::same_as<typename decltype(In)::value_type,
 				   typename TT::K>);
 
-	// parlay::internal::timer t;
-
 	parlay::slice<const K *, const K *> sorted_slice{ In.begin(),
 							  In.end() };
 	typename TT::key_seq sorted_seq;
@@ -79,7 +77,6 @@ void btree<TT>::BatchDelete_(Range In,
 	auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
 		batch_delete_recursive(this->root_, sorted_slice,
 				       leaf_entries_pattern, leaf_sort_pred);
-	// t.next("remove points ");
 
 	if (invalid_flag) { // NOTE: root is invalid
 		if (this->root_->is_leaf) {
@@ -95,15 +92,11 @@ void btree<TT>::BatchDelete_(Range In,
 			this->delete_tree_rec<k_enable_granularity>(
 				this->root_);
 			this->root_ = nullptr;
-			// t.next("delete tree ");
 			return;
 		}
 		this->rebuild_from_flatten();
 		return;
 	}
-
-	// this->sys_reinsert_size = 0;
-	// this->sys_balance_leaf_size = 0;
 
 	if (invalid_subtree_num) {
 		if (this->root_->size < TT::k_buf_ub &&
@@ -125,9 +118,6 @@ void btree<TT>::BatchDelete_(Range In,
 			this->root_, parlay::make_slice(reinsert_entries),
 			has_tomb, leaf_entries_pattern, leaf_sort_pred);
 	}
-
-	// std::cout << this->sys_reinsert_size << " ";
-	// std::cout << this->sys_balance_leaf_size << std::endl;
 }
 
 // Flatten the whole tree and rebuild it from the surviving entries.
@@ -167,10 +157,8 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 			T, In, leaf_entries_pattern, leaf_sort_pred);
 		assert(new_node == T);
 		assert(new_node->size + In.size() == old_size);
-		// assert(delete_cnt == In.size());
 		// return std::make_tuple(T->size < TT::k_buf_lb,
 		//                        T->size < TT::k_buf_lb ? 1 : 0,
-		//                        T->size < TT::k_buf_lb ? T->size : 0);
 		return std::make_tuple(get_node_invalid_status(T),
 				       node_contain_invalid_subtree(T),
 				       get_node_reinsert_size(T));

@@ -81,7 +81,6 @@ btree<TT>::verify_tree_property(Node const *T) const
 				      TI->tree_nodes[i]->size;
 		[[maybe_unused]] auto node = TI->tree_nodes[i];
 		auto box = box_seq[i];
-		// assert(node->is_leaf || static_cast<Interior*>(node)->box == box);
 
 		// A single child means no split keys at all, so there is nothing to
 		// compare against; split[0] would be uninitialised. node_op.hpp:143 and
@@ -116,7 +115,6 @@ btree<TT>::verify_tree_property(Node const *T) const
 	});
 
 	// TI->size must equal the sum of the child sizes. range_count and
-	// range_report both trust this field without visiting the children;
 	// range_report derives disjoint parallel output slices from it.
 	if constexpr (CheckSize) {
 		size_t const child_sum = parlay::reduce(size_seq);
@@ -251,9 +249,7 @@ bool btree<TT>::validate(Node const *T) const
 	(void)box;
 
 	// typename TT::height_type height =
-	//   this->root_->is_leaf ? 1 : static_cast<Interior*>(this->root_)->height;
 	check_height(T);
-	// std::cerr << "Tree height validated.\n" << std::flush;
 
 	if constexpr (Verbose) {
 		std::cerr << "<<< end validate tree\n" << std::flush;

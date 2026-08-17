@@ -442,8 +442,6 @@ template <class TypeTrait> class btree {
 			     LeafSortPred const &leaf_sort_pred);
 
 	// template <typename Leaf, typename RT>
-	// static RT DiffPoints4Leaf(Node* T, Slice In);
-	//
 
 	template <typename Range>
 	static void
@@ -477,8 +475,6 @@ template <class TypeTrait> class btree {
 	static TT::Box get_node_slice_box(TT::node_slice node_slice);
 
 	static TT::Box get_node_slice_box(TT::const_node_slice node_slice);
-
-	// static TT::Box GetNodeBox(Node const* T);
 
 	// Returns {subtree box, all checked properties held}.
 	template <bool CheckSize = true>

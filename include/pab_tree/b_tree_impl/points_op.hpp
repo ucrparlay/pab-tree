@@ -52,7 +52,6 @@ void btree<TT>::split_batch_binary_search(size_buf_ub_arr &split_pos_arr,
 					  Range In,
 					  TT::split_slice_const split_slice)
 {
-	// partition_binary_search_rec(TI->get_split_slice(), split_pos_seq, In, 0, 0);
 	// TODO: maybe we can decide it by skewed distribution
 	size_type offset = 0;
 	for (buf_size_type i = 0; i < split_slice.size(); i++) {

@@ -20,6 +20,36 @@ concept is_pab_tree = requires(T t) {
 	{ t.pab_tree_tag() } -> std::same_as<void>;
 };
 
+// What a user's element adaptor must provide. E is the stored entry, K the key
+// it is ordered by, V the payload.
+template <typename T>
+concept entry_type =
+	requires(typename T::E e, typename T::K k, typename T::V v) {
+		typename T::E;
+		typename T::K;
+		typename T::V;
+		{ T::get_key(e) } -> std::convertible_to<typename T::K>;
+		{ T::get_val(e) } -> std::convertible_to<typename T::V>;
+		{ T::to_entry(k, v) } -> std::convertible_to<typename T::E>;
+		{ k < k } -> std::convertible_to<bool>;
+	};
+
+// What a leaf augmentation must provide. Called with the leaf's entries.
+template <typename A, typename Slice>
+concept leaf_augmentation =
+	std::default_initializable<A> && std::constructible_from<A, Slice> &&
+	requires(A a, Slice s) { a.update_aug(s); };
+
+// What an interior augmentation must provide. update() is called with the
+// node's children and split keys.
+template <typename A, typename Nodes, typename Splits>
+concept interior_augmentation =
+	std::default_initializable<A> &&
+	requires(A a, Nodes const &n, Splits const &s, size_t sz) {
+		a.update(n, s);
+		{ A::force_parallel(sz, sz) } -> std::convertible_to<bool>;
+	};
+
 } // namespace pab_tree
 
 #endif // PABTREE_DEPENDENCE_CONCEPTS_H_

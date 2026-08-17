@@ -152,12 +152,8 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 		split_batch_merge(split_pos_seq, In, TI->get_split_slice());
 	}
 
-	// if (In.size() < TT::k_split_factor * TI->get_split_n()) {
-	//   split_batch_merge(split_pos_seq, In, TI->get_split_slice());
 	//   // SplitBatchSieve(split_pos_seq, In, TI->get_split_slice());
 	// } else {
-	//   split_batch_binary_search(split_pos_seq, In, TI->get_split_slice());
-	// }
 #ifdef DEBUG
 	for (int i = 1; i < TI->get_split_n(); i++) {
 		assert(parlay::all_of(
@@ -200,7 +196,6 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 					node_split_slice.cut(2 * l, 2 * r),
 					leaf_entries_pattern, leaf_sort_pred);
 		},
-		// In.size() > 2048 ? 1 : cnt);
 		1);
 
 	// count only over touched children: start from get_node_n() (each contributes

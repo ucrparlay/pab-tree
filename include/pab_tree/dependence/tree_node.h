@@ -81,8 +81,6 @@ struct leaf_node : TypeTrait::Node {
 		// TODO: maybe double check a better way to initialize the array
 		// maybe SIMD?
 		std::ranges::copy_n(In.begin(), In.size(), elements.begin());
-		// std::ranges::for_each(In, [&, i = 0](auto&& x) mutable {
-		//   parlay::assign_dispatch(elements[i++], x, EleAssignTag());
 		// });
 	}
 
@@ -132,7 +130,6 @@ struct leaf_node : TypeTrait::Node {
 
 	entry_seq get_ele() const
 	{
-		// return elements.substr(0, this->size);
 		return entry_seq(this->elements.begin(),
 				 this->elements.begin() + this->size);
 	}
@@ -170,7 +167,6 @@ struct leaf_node : TypeTrait::Node {
 
 	void initialize_ele_seq()
 	{
-		// this->elements = entry_seq::uninitialized(TT::k_buf_ub);
 		this->elements = entry_arr();
 	}
 
@@ -329,12 +325,6 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			this->get_split_slice(),
 			[&](TT::K const key) { return key <= k; });
-		// for (buf_size_type i = 0; i < this->get_split_n(); i++) {
-		//   if (split[i] > k) {
-		//     return i;
-		//   }
-		// }
-		// return this->get_split_n();
 	}
 
 	TT::buf_size_type
@@ -345,12 +335,6 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			this->get_split_slice(),
 			[&](TT::K const key) { return key < k; });
-		// for (buf_size_type i = 0; i < this->get_split_n(); i++) {
-		//   if (split[i] >= k) {
-		//     return i;
-		//   }
-		// }
-		// return this->get_split_n();
 	}
 
 	bool validate_key_in_node(TT::buf_size_type node_idx,
@@ -413,16 +397,10 @@ template <typename NodeType> static void free_node(auto T)
 }
 
 // template <typename T>
-// concept IsMultiNode = CheckMultiNode<T, pab_tree::MultiNode>;
-//
 // // TODO: may remove below from inner tree
 // template <typename T>
-// concept IsPointerToNode = CheckPointerToNode<T, Node>;
-//
 // template <typename T, typename Point>
-// concept IsNodeBox = requires {
 //   requires IsPair<T> && IsPointerToNode<typename T::first_type> &&
-//                IsBox<typename T::second_type, Point>;
 // };
 
 } // namespace pab_tree

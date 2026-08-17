@@ -90,7 +90,6 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 			TI->tree_nodes
 				.data(); // Node* const* → nodes[i] is Node*
 
-		// Left boundary child (first child overlapping query_box.first)
 		const buf_size_type l =
 			TI->get_node_id_containing_key(query_box.first);
 
@@ -206,10 +205,6 @@ void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
 	       TI->split[r] == query_box.second);
 
 	// NOTE: visit nodes [l, r]
-	// for (buf_size_type i = l; i <= r; i++) {
-	//   range_report_rec(TI->tree_nodes[i], query_box, offset, out);
-	// }
-	// return;
 
 	if (l == r) { // falls into one node
 		range_report_rec(TI->tree_nodes[l], query_box, offset, out);

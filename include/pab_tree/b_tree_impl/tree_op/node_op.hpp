@@ -157,7 +157,6 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 		}
 		auto node = TI->tree_nodes[i];
 		auto box = get_node_box_rec(TI->tree_nodes[i]);
-		// assert(node->is_leaf || box == GetNodeBox(node));
 		if (i == 0) {
 			assert(box.second < TI->split[0]);
 		} else if (i == TI->get_node_n() - 1) {
@@ -274,7 +273,6 @@ btree<TT>::batch_delete_update_interior_size(
 		(T != this->root_ ?
 			 (TI->get_node_n() - invalid_tree_n) >= TT::k_buf_lb :
 			 (TI->get_node_n() - invalid_tree_n) > 0);
-	// TI->box = get_node_slice_box(TI->get_node_slice());
 	TI->contain_invalid_subtree = TI->valid ? contain_invalid : true;
 	TI->reinsert_size = TI->valid ? reinsert_entries_n : TI->size;
 	return std::make_tuple(get_node_invalid_status(T),
@@ -391,19 +389,11 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 			reinsert_sum[i - 1] + get_node_reinsert_size(node);
 	}
 
-	// for (buf_size_type i = 0; i < invalid_idx; i++) {
-	//   auto node = invalid_subtree[i];
-	//
-	//   remove_entries_num[i] = fetch_invalid_subtree_nodes(
 	//     node,
 	//     flatten_node_slice.cut(subtree_sum[i],
-	//                            i == invalid_idx - 1 ? flatten_node_slice.size()
 	//                                                 : subtree_sum[i + 1]),
 	//     reinsert_entries.cut(reinsert_sum[i],
-	//                          i == invalid_idx - 1 ? reinsert_entries.size()
 	//                                               : reinsert_sum[i + 1]),
-	//     next_tomb);
-	// }
 
 	bool const next_tomb = has_tomb ? !reinsert_flag : false;
 	parlay::parallel_for(
@@ -428,7 +418,6 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 		[](size_type sum, Node *node) { return sum + node->size; });
 	TI->update_aug();
 	if (reinsert_flag && has_tomb) {
-		// TI->size -= total_remove_entries_n;
 		assert(parlay::none_of(reinsert_entries, [](auto entry) {
 			return Entry::get_val(entry) == 0;
 		}));
@@ -451,8 +440,6 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 				    const TT::pattern_type leaf_entries_pattern,
 				    LeafSortPred const &leaf_sort_pred)
 {
-	// this->sys_balance_leaf_size += reinsert_size;
-
 	auto TI = static_cast<Interior *>(T);
 
 	// ── Phase 1: Group assignment ──────────────────────────────────────────────
@@ -710,8 +697,6 @@ void btree<TT>::reinsert_tree_after_delete(
 	TT::pattern_type leaf_entries_pattern,
 	LeafSortPred const &leaf_sort_pred)
 {
-	// this->sys_reinsert_size += reinsert_entries.size();
-
 	node_split_pair_seq node_split_seq =
 		node_split_pair_seq::uninitialized(2 * reinsert_entries.size());
 	[[maybe_unused]] size_type new_node_n = batch_insert_recursive(

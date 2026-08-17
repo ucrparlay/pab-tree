@@ -8,19 +8,7 @@ namespace pab_tree
 
 // template<typename TT>
 // TT::Box
-// btree<TT>::GetNodeBox(Node const* T)
-// {
-//   if (T->is_leaf) {
-//     auto TL = static_cast<Leaf const*>(T);
-//     if (TL->is_sorted) {
 //       return typename TT::Box(Entry::get_key(*TL->get_ele_begin_iter()),
-//                               Entry::get_key(*TL->get_ele_rbegin_iter()));
-//     }
-//     return pab_tree::get_box<TT>(TL->get_ele());
-//   }
-//
-//   return static_cast<Interior const*>(T)->box;
-// }
 
 template <typename TT> TT::Box btree<TT>::get_node_box_rec(Node const *T)
 {
@@ -45,14 +33,6 @@ TT::Box btree<TT>::get_node_slice_box(typename TT::node_slice const node_slice)
 
 // template<typename TT>
 // TT::Box
-// btree<TT>::get_node_slice_box(typename TT::const_node_slice node_slice)
-// {
-//   auto box = get_empty_box<TT>();
-//   for (auto node : node_slice) {
-//     box = pab_tree::get_box<TT>(box, GetNodeBox(node));
-//   }
-//   return box;
-// }
 } // namespace pab_tree
 
 #endif // PABTREE_B_TREE_IMPL_B_BOX_OP_HPP_

@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "pab_tree/dependence/comparator.h"
+#include "pab_tree/dependence/concepts.h"
 #include "pab_tree/dependence/node_base.h"
 #include "parlay/sequence.h"
 #include "parlay/slice.h"
@@ -16,7 +17,6 @@ template <class EleType> struct ele_wrapper : EleType {
 	using E = typename EleType::E;
 	using K = typename EleType::K;
 	using V = typename EleType::V;
-	// using Entry = std::tuple<KeyType, ValType>;
 
 	static auto get_key(E const e)
 	{
@@ -77,7 +77,7 @@ class TypeTrait {
 	};
 };
 
-template <typename EleType, uint BufferSize,
+template <entry_type EleType, uint BufferSize,
 	  typename LeafAugType = empty_leaf_aug,
 	  typename InteriorAugType = empty_interior_aug,
 	  typename NodeType = proto_node>
@@ -97,7 +97,6 @@ class btree_type_trait
 
 	using height_type = uint_fast8_t;
 	using size_type = uint_fast32_t;
-	// using buf_size_type = int;
 	using buf_size_type = std::conditional_t<
 		(BufferSize * k_buf_ub_fac > 65535U), uint_fast32_t,
 		std::conditional_t<(BufferSize * k_buf_ub_fac > 255U),
