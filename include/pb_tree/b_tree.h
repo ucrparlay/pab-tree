@@ -198,6 +198,56 @@ public:
   using Leaf = LeafNode<TT, parlay::move_assign_tag>;
   using Interior = BTreeInteriorNode;
 
+  // ---- public API ----
+  struct DefaultHybridPred
+  {
+    template<typename InputNode, typename Range>
+    bool operator()(InputNode const* T, Range In) const noexcept
+    {
+      // Knuth multiplicative hash over (node_size + batch_size); XOR in low
+      // address bits from begin/end to break correlation across call sites.
+      auto const v =
+        (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
+        (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
+        (reinterpret_cast<uintptr_t>(In.end()) >> 3);
+      return v & 1;
+    }
+  };
+
+  // NOTE: build tree
+  // Keys must be distinct. Duplicates put elements on the wrong side of a
+  // split key, where no descent reaches them; debug builds assert.
+  template<typename Range>
+  void Build(Range&& In);
+  template<typename Range>
+  void BatchInsert(Range&& In);
+  template<typename Range, typename LeafSortPred = DefaultHybridPred>
+  void BatchInsert(Range&& In,
+                   const TT::PatternType leaf_entries_pattern,
+                   const bool sorted_input,
+                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
+  template<typename Range>
+  void BatchDelete(Range&& In);
+  template<typename Range, typename LeafSortPred = DefaultHybridPred>
+  void BatchDelete(Range&& In,
+                   const TT::PatternType leaf_entries_pattern,
+                   const bool sorted_input,
+                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
+  void DeleteTree();
+  template<typename Range>
+  void GetEntries(Range& Out) const;
+  template<bool kCheckSize = true, bool kVerbose = true>
+  [[nodiscard]] bool Validate(Node const* T = nullptr) const;
+  // Ratio of sorted leaves to total leaves in the subtree rooted at T
+  // (defaults to the whole tree). Returns 0.0 for an empty tree.
+  double SortedLeafRatio(Node const* T = nullptr) const;
+  auto Contain(K const& k) const -> bool;
+  auto RangeCount(TT::Box query_box) const -> SizeT;
+  template<typename Range>
+  auto RangeReport(TT::Box query_box, Range&& out) const -> SizeT;
+
+  // ---- implementation ----
+private:
   // NOTE: helper function to decide the bucket number and range
   static SizeT GetBktNum(SizeT const item_n)
   {
@@ -254,56 +304,7 @@ public:
 
 
 
-  struct DefaultHybridPred
-  {
-    template<typename InputNode, typename Range>
-    bool operator()(InputNode const* T, Range In) const noexcept
-    {
-      // Knuth multiplicative hash over (node_size + batch_size); XOR in low
-      // address bits from begin/end to break correlation across call sites.
-      auto const v =
-        (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
-        (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
-        (reinterpret_cast<uintptr_t>(In.end()) >> 3);
-      return v & 1;
-    }
-  };
 
-  // ---- public API ----
-  // NOTE: build tree
-  // Keys must be distinct. Duplicates put elements on the wrong side of a
-  // split key, where no descent reaches them; debug builds assert.
-  template<typename Range>
-  void Build(Range&& In);
-  template<typename Range>
-  void BatchInsert(Range&& In);
-  template<typename Range, typename LeafSortPred = DefaultHybridPred>
-  void BatchInsert(Range&& In,
-                   const TT::PatternType leaf_entries_pattern,
-                   const bool sorted_input,
-                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
-  template<typename Range>
-  void BatchDelete(Range&& In);
-  template<typename Range, typename LeafSortPred = DefaultHybridPred>
-  void BatchDelete(Range&& In,
-                   const TT::PatternType leaf_entries_pattern,
-                   const bool sorted_input,
-                   LeafSortPred const& leaf_sort_pred = DefaultHybridPred{});
-  void DeleteTree();
-  template<typename Range>
-  void GetEntries(Range& Out) const;
-  template<bool kCheckSize = true, bool kVerbose = true>
-  [[nodiscard]] bool Validate(Node const* T = nullptr) const;
-  // Ratio of sorted leaves to total leaves in the subtree rooted at T
-  // (defaults to the whole tree). Returns 0.0 for an empty tree.
-  double SortedLeafRatio(Node const* T = nullptr) const;
-  auto Contain(K const& k) const -> bool;
-  auto RangeCount(TT::Box query_box) const -> SizeT;
-  template<typename Range>
-  auto RangeReport(TT::Box query_box, Range&& out) const -> SizeT;
-
-  // ---- implementation ----
-private:
   template<typename Range>
   void Build_(Range In);
   template<typename Range>
