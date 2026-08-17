@@ -8,53 +8,21 @@ Ordered by what I would fix next. The full history is in
 `docs/findings_register.md` (all 112 findings, fixed and open) and
 `docs/code_review_2026-08.md` (the original report).
 
-**Not here:** the 57 findings the refactor fixed. See `git log 376e067..HEAD`.
+**Not here:** everything the refactor fixed. See `git log 376e067..HEAD` and
+`docs/findings_register.md`.
+
+**Resolved after the fact:** the reported use-after-free in
+`reinsert_tree_after_delete` was not one. `assert(new_node_n == 0)` states a
+real invariant: the reinserted entries came out of `T`'s own subtree, which
+already held them in at most `k_buf_ub` children, so putting them back cannot
+overflow `T`. Measured against it — a reinsert batch of 13,626 entries at
+`k_buf_ub = 8`, 1,700x capacity — and `T` never overflowed, at any leaf size.
+The check is now unconditional rather than assert-only, so the invariant is
+enforced in release too, but it is a guard, not a fix for a live defect.
 
 ---
 
-## 1. Use-after-free in `reinsert_tree_after_delete`
-
-`b_tree_impl/tree_op/node_op.hpp:706`
-
-```cpp
-[[maybe_unused]] size_type new_node_n = batch_insert_recursive(
-        T, reinsert_entries, parlay::make_slice(node_split_seq),
-        leaf_entries_pattern, leaf_sort_pred);
-assert(new_node_n == 0);
-```
-
-A non-zero `new_node_n` means the callee took the interior-split path, which
-frees `T` and writes replacement children into `node_split_seq`. The contract
-is that the caller splices them in. This one does neither: `node_split_seq` is
-a local that dies on return, and under `NDEBUG` the assert is gone. The caller
-keeps using `T`, and `T`'s parent still holds the freed pointer.
-
-The verifier confirmed it is reachable: `T` is the topmost node with an invalid
-direct child, still near `k_buf_ub` children after compaction, and the
-reinserted entries push a surviving child over its own `k_buf_ub`. Reproduced
-with 284 reinserted entries at small leaf sizes.
-
-**Why it is still open:** the fix is in `fetch_invalid_subtree_nodes`, on the
-frozen list. The correct shape is to return the count and the sequence and
-splice via `assemble_interior_levels`, exactly as `batch_insert_` does.
-
-**Status:** contained, not fixed. The check is now unconditional and aborts
-with a labelled message, so the corruption is immediate and visible in every
-build instead of silent. Committed 2026-08-17.
-
-**Tried and reverted:** rebuilding T's subtree in place so T is never freed.
-It breaks the occupancy invariant -- few entries yield a one-child interior,
-and a non-root node needs at least `k_buf_lb` children. That rule is why the
-original code hands the problem upward in the first place.
-
-**The real fix** needs `fetch_invalid_subtree_nodes` to return the split count
-and node sequence, with each frame splicing its child's replacement through
-`assemble_interior_levels`, exactly as `batch_insert_` does one level up.
-Confined to two functions, but it changes the delete recursion's signature.
-
----
-
-## 2. Every leaf allocation zero-fills the whole element array
+## 1. Every leaf allocation zero-fills the whole element array
 
 `dependence/tree_node.h:73`
 
@@ -66,13 +34,13 @@ Confined to two functions, but it changes the delete recursion's signature.
 `k_buf_ub` entries even when the leaf holds far fewer. The review measured
 **22% of build time**.
 
-Untouched because it sits in node allocation, next to frozen code, and I had
-no measurement of my own. It is the largest remaining performance item and
-worth confirming with the 0.5 gate before and after.
+Untouched because it sits in node allocation, next to frozen code, and the
+22% is the review's number, not mine. This is the largest remaining
+performance item.
 
 ---
 
-## 3. `DEBUG` is an unprefixed configuration macro
+## 2. `DEBUG` is an unprefixed configuration macro
 
 7 sites: `b_batch_delete.hpp:112,178`, `b_batch_insert.hpp:89,158`,
 `node_op.hpp:152,481,646`. Set by `CMakeLists.txt`.
@@ -86,7 +54,7 @@ Rename to `PABTREE_DEBUG`. This was in the plan and I did not do it.
 
 ---
 
-## 4. `-DDEBUG=ON` builds abort on sorted-input insert
+## 3. `-DDEBUG=ON` builds abort on sorted-input insert
 
 `b_tree_impl/batch_op/b_batch_insert.hpp:89`
 
@@ -104,7 +72,7 @@ debug build.
 
 ---
 
-## 5. `default_hybrid_pred` hashes heap addresses
+## 4. `default_hybrid_pred` hashes heap addresses
 
 `b_tree.h:215`
 
@@ -120,7 +88,7 @@ reproducible.
 
 ---
 
-## 6. Batch operations require a parlay range
+## 5. Batch operations require a parlay range
 
 `b_batch_insert.hpp:67`, `b_batch_delete.hpp:68`
 
@@ -136,7 +104,7 @@ header rather than at the call site.
 
 ---
 
-## 7. No standard container conveniences
+## 6. No standard container conveniences
 
 `b_tree.h`
 
@@ -146,7 +114,7 @@ insert or erase. Defensible for a batch-parallel design, but `empty()` and
 
 ---
 
-## 8. No RAII and no exception guarantee
+## 7. No RAII and no exception guarantee
 
 Nodes are raw pointers from `parlay::type_allocator` with manual free. A
 throwing allocation mid-insert leaves the tree in an indeterminate state and
@@ -154,7 +122,7 @@ leaks every node built so far. Structural; not attempted.
 
 ---
 
-## 9. Eleven TODO markers
+## 8. Eleven TODO markers
 
 `b_tree.h:27,136,146,468` · `tree_node.h:81,183,385,409` ·
 `box_op.h:21` · `b_batch_insert.hpp:59` · `points_op.hpp:55`
