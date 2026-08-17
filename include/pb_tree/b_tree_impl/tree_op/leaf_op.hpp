@@ -131,7 +131,7 @@ template<typename TT>
 template<typename LeafSortPred>
 TT::Node*
 BTree<TT>::DeletePoints4Leaf(Node* T,
-                             TT::KeySlice In,
+                             TT::ConstKeySlice In,
                              const TT::PatternType leaf_entries_pattern,
                              LeafSortPred const& leaf_sort_pred)
 {

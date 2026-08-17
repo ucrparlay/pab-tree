@@ -77,7 +77,7 @@ BTree<TT>::BatchDelete_(Range In,
 
   auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
     BatchDeleteRecursive(this->root_,
-                         parlay::make_slice(sorted_seq),
+                         sorted_slice,
                          leaf_entries_pattern,
                          leaf_sort_pred);
   // t.next("remove points ");
@@ -132,7 +132,7 @@ template<typename TT>
 template<typename LeafSortPred>
 std::tuple<bool, bool, typename TT::SizeT>
 BTree<TT>::BatchDeleteRecursive(Node* T,
-                                TT::KeySlice In,
+                                TT::ConstKeySlice In,
                                 const TT::PatternType leaf_entries_pattern,
                                 LeafSortPred const& leaf_sort_pred)
 {

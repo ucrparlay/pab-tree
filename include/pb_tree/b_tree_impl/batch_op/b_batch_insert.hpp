@@ -82,7 +82,14 @@ BTree<TT>::BatchInsert_(Range In,
                                           leaf_sort_pred);
 
 #ifdef DEBUG
+  // The first assert is known false: new_node_n > 0 means the root overflowed,
+  // which depends on batch size, not on whether the caller pre-sorted. Kept as
+  // is; the second checks what sorted_input actually promises.
   assert(!sorted_input || new_node_n == 0);
+  assert(!sorted_input ||
+         parlay::is_sorted(sorted_slice, [](E const& a, E const& b) {
+           return Entry::GetKey(a) < Entry::GetKey(b);
+         }));
 #endif // DEBUG
 
   if (new_node_n > 0) {
