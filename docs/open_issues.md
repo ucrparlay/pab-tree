@@ -38,7 +38,19 @@ with 284 reinserted entries at small leaf sizes.
 frozen list. The correct shape is to return the count and the sequence and
 splice via `assemble_interior_levels`, exactly as `batch_insert_` does.
 
-**Minimum:** make the check unconditional so it cannot be compiled away.
+**Status:** contained, not fixed. The check is now unconditional and aborts
+with a labelled message, so the corruption is immediate and visible in every
+build instead of silent. Committed 2026-08-17.
+
+**Tried and reverted:** rebuilding T's subtree in place so T is never freed.
+It breaks the occupancy invariant -- few entries yield a one-child interior,
+and a non-root node needs at least `k_buf_lb` children. That rule is why the
+original code hands the problem upward in the first place.
+
+**The real fix** needs `fetch_invalid_subtree_nodes` to return the split count
+and node sequence, with each frame splicing its child's replacement through
+`assemble_interior_levels`, exactly as `batch_insert_` does one level up.
+Confined to two functions, but it changes the delete recursion's signature.
 
 ---
 
