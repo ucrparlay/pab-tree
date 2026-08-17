@@ -132,19 +132,7 @@ public:
 
   using EntryArr = std::array<typename BT::E, kBufUB>;
 
-  // NOTE: block param in point sieving
-  static constexpr uint_fast8_t const kSkeletonHeight = kSkHeightVal;
-  using BucketType =
-    std::conditional_t<(kSkeletonHeight > 7), uint_fast16_t, uint_fast8_t>;
-  // using BucketType = BufSizeT; // WARN: Assume sieve one node at a time
-  // static constexpr BucketType const kPivotNum = (1 << kSkeletonHeight) - 1;
-  // static constexpr BucketType const kBucketNum = 1 << kSkeletonHeight;
-  static constexpr uint_fast8_t const kLog2Base = 10;
-  static constexpr uint_fast16_t const kBlockSize = 1 << kLog2Base;
   static constexpr uint_fast8_t const kSplitFactor = 8;
-
-  using BucketSeq = parlay::sequence<BucketType>;
-  using BallSeq = parlay::sequence<SizeT>;
 };
 
 } // namespace pb_tree

@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_HPP_
 #define PBTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_INSERT_HPP_
 
+#include <cassert>
+
 #include <algorithm>
 #include <numeric>
 

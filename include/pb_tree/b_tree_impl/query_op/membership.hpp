@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
 #define PBTREE_B_TREE_IMPL_QUERY_OP_MEMBERSHIP_HPP_
 
+#include <cassert>
+
 #include "parlay/slice.h"
 #include "pb_tree/b_tree.h"
 
@@ -33,22 +35,6 @@ BTree<TT>::ContainIter(Node const* T, K const& k) const
   return static_cast<Leaf const*>(T)->Contain(k);
 }
 
-template<typename TT>
-bool
-BTree<TT>::ContainRec(Node const* T, K const& k) const
-{
-  if (T->is_leaf) {
-    return static_cast<Leaf const*>(T)->Contain(k);
-  }
-
-  auto const* TI = static_cast<Interior const*>(T);
-  auto pos = TI->GetNodeIdContainingKey(k);
-
-  assert(pos < TI->GetNodeN());
-  assert(TI->ValidateKeyInNode(pos, k));
-
-  return ContainRec(TI->tree_nodes[pos], k);
-}
 
 } // namespace pb_tree
 

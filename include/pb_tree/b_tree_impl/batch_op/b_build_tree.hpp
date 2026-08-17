@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
 #define PBTREE_B_TREE_IMPL_BATCH_OP_B_BUILD_TREE_HPP_
 
+#include <cassert>
+
 #include <parlay/range.h>
 #include <parlay/slice.h>
 #include <parlay/type_traits.h>

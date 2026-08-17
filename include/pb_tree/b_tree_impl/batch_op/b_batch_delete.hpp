@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
 #define PBTREE_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
 
+#include <cassert>
+
 #include "../../b_tree.h"
 #include "parlay/monoid.h"
 #include "parlay/parallel.h"

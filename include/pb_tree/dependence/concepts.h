@@ -1,6 +1,8 @@
 #ifndef PBTREE_DEPENDENCE_CONCEPTS_H_
 #define PBTREE_DEPENDENCE_CONCEPTS_H_
 
+#include <cassert>
+
 #include <concepts>
 #include <type_traits>
 #include <utility>
@@ -109,12 +111,6 @@ template<typename T,
          template<typename, typename, typename> typename DynamicNodeT>
 concept CheckDynamicNode = std::
   is_base_of_v<DynamicNodeT<typename T::PT, typename T::ST, typename T::AT>, T>;
-
-// NOTE: tag aug point
-template<typename T>
-concept IsAugPoint = requires(T t) {
-  { t.AugPointTag() } -> std::same_as<void>;
-};
 
 // NOTE: tag contain bounding box
 template<typename T>

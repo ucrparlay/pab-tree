@@ -2,7 +2,16 @@
 #define PBTREE_B_TREE_H_
 
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
+#include <ostream>
+#include <tuple>
+#include <utility>
+
+#include <parlay/primitives.h>
+#include <parlay/sequence.h>
+#include <parlay/slice.h>
+#include <parlay/utilities.h>
 
 #include "dependence/box_op.h"
 #include "dependence/comparator.h"
@@ -10,15 +19,6 @@
 #include "dependence/type_trait.h"
 
 namespace pb_tree {
-// Template definition for the operator
-template<typename T1, typename T2>
-auto
-operator<<(std::ostream& os, std::pair<T1, T2> const& p) -> std::ostream&
-{
-  os << "(" << p.first << ", " << p.second << ")";
-  return os;
-}
-
 // NOTE: Basetree
 template<class TypeTrait>
 class BTree
@@ -51,15 +51,6 @@ public:
   using InputRangeT = TT::EntrySeq;
   using InputDeleteRangeT = TT::KeySeq;
 
-  // NOTE: Const variables
-  // NOTE: uint32t handle up to 4e9 at least
-  // WARN: bucket num should smaller than 1<<8 to handle type overflow
-  using BucketType = typename TT::BucketType;
-  static constexpr BucketType const kBuildDepthOnce = TT::kSkeletonHeight;
-  static constexpr BucketType const kPivotNum = TT::kPivotNum;
-  static constexpr BucketType const kBucketNum = TT::kBucketNum;
-  static constexpr uint_fast8_t const kLog2Base = TT::kLog2Base;
-  static constexpr uint_fast16_t const kBlockSize = TT::kBlockSize;
 
   using SizeBufUBArr = typename TT::SizeBufUBArr;
   using BufSizeBufUBArr = typename TT::BufSizeBufUBArr;
@@ -323,8 +314,6 @@ private:
                     const bool sorted_input,
                     LeafSortPred const& leaf_sort_pred);
 
-  template<typename Range>
-  void BatchInsertSieve(Range In);
 
   template<typename Range, typename LeafSortPred>
   SizeT BatchInsertRecursive(Node* T,
@@ -333,11 +322,6 @@ private:
                              const TT::PatternType leaf_entries_pattern,
                              LeafSortPred const& leaf_sort_pred);
 
-  template<typename Range>
-  SizeT BatchInsertSieveRecursive(Node* T,
-                                  Range In,
-                                  Range Out,
-                                  NodeSplitPairSlice node_split_slice);
 
 
 
@@ -369,12 +353,7 @@ private:
                                 const TT::PatternType leaf_entries_pattern,
                                 LeafSortPred const& leaf_sort_pred);
 
-  std::pair<Node*, Node*> SplitLeaf(const Entry* a,
-                                    TT::BufSizeT n,
-                                    const Entry* b,
-                                    TT::BufSizeT m);
 
-  std::pair<Node*, Node*> InsertToLeafNoOverflow(Node* T, EntrySlice In);
 
   template<typename LeafSortPred>
   void ReInsertTreeAfterDelete(Node* T,
@@ -429,16 +408,6 @@ private:
                                      TT::SplitSlice key_in,
                                      OutputHandler&& output_handler);
 
-  template<typename InputNode, typename Range>
-  static bool PseudoRandomGenPattern(InputNode const* T, Range const In)
-  {
-    // Knuth multiplicative hash over (node_size + batch_size); XOR in low
-    // address bits from begin/end to break correlation across call sites.
-    auto const v = (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
-                   (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
-                   (reinterpret_cast<uintptr_t>(In.end()) >> 3);
-    return v & 1;
-  }
 
   template<typename Range, typename LeafSortPred>
   static TT::Node* PostProcessLeafChange(
@@ -488,23 +457,13 @@ private:
                                      Range In,
                                      TT::SplitSliceConst split_slice);
 
-  template<typename Range>
-  static void SplitBatchSieve(SizeBufUBArr& split_pos_arr,
-                              Range In,
-                              TT::SplitSliceConst split_slice);
 
   template<typename Range>
   static void SplitBatchMerge(SizeBufUBArr& split_pos_arr,
                               Range In,
                               TT::SplitSliceConst split_slice);
 
-  template<typename T>
-  static inline BufSizeT RetriveTag(T e, TT::SplitSliceConst split_slice);
 
-  template<typename Range>
-  static TT::BallSeq SeievePoints(Range A,
-                                  Range B,
-                                  TT::SplitSliceConst split_seq);
   // NOTE: delete tree
   // template <SupportsForceParallel Interior, bool granularity>
   template<bool granularity>
@@ -560,7 +519,6 @@ private:
 
   bool ContainIter(Node const* T, K const& k) const;
 
-  bool ContainRec(Node const* T, K const& k) const;
 
 
   void RangeCountLeaf(Node const* T,
@@ -645,7 +603,6 @@ private:
 #include "b_tree_impl/b_box_op.hpp"
 #include "b_tree_impl/batch_op/b_batch_delete.hpp"
 #include "b_tree_impl/batch_op/b_batch_insert.hpp"
-// #include "b_tree_impl/batch_op/b_batch_insert_sieve.hpp"
 #include "b_tree_impl/batch_op/b_build_tree.hpp"
 #include "b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "b_tree_impl/points_op.hpp"

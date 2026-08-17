@@ -2,7 +2,7 @@
 #define PBTREE_DEPENDENCE_BOX_OP_HPP_
 
 #include "dependence/type_trait.h"
-#include "utility"
+#include <utility>
 
 namespace pb_tree {
 template<typename TT>

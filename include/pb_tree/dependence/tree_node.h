@@ -1,6 +1,8 @@
 #ifndef PBTREE_DEPENDENCE_TREE_NODE_H_
 #define PBTREE_DEPENDENCE_TREE_NODE_H_
 
+#include <cassert>
+
 #include <parlay/slice.h>
 
 #include <algorithm>
@@ -14,7 +16,6 @@
 #include <type_traits>
 #include <variant>
 
-#include "basic_point.h"
 #include "comparator.h"
 #include "concepts.h"
 #include "dependence/binary_search.h"

@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_VALIDATION_HPP_
 #define PBTREE_B_TREE_IMPL_VALIDATION_HPP_
 
+#include <cassert>
+
 #include <parlay/parallel.h>
 
 #include <concepts>

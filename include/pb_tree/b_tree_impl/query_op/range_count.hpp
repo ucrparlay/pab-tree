@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
 #define PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_COUNT_HPP_
 
+#include <cassert>
+
 #include "dependence/binary_search.h"
 #include "parlay/slice.h"
 #include "pb_tree/b_tree.h"

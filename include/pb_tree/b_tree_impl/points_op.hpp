@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
 #define PBTREE_B_TREE_IMPL_POINTS_OP_HPP_
 
+#include <cassert>
+
 #include <algorithm>
 #include <utility>
 
@@ -46,72 +48,6 @@ BTree<TT>::PartitionBinarySearchRec(auto split_seq_s,
 }
 
 template<typename TT>
-template<typename T>
-typename TT::BufSizeT
-BTree<TT>::RetriveTag(T const e, TT::SplitSliceConst split_slice)
-{
-  return parlay::internal::binary_search(split_slice, [&](K const key) {
-    if constexpr (std::same_as<decltype(e), typename TT::K>) {
-      return key < e;
-    } else {
-      return key <= Entry::GetKey(e);
-    }
-  });
-}
-
-// NOTE: seieve Points from range A to range B, using the skeleton tags. The
-// sums is the number of elemenets within each bucket, the tags_num is the total
-// number of buckets in the skeleton
-template<typename TT>
-template<typename Range>
-typename TT::BallSeq
-BTree<TT>::SeievePoints(Range A, Range B, TT::SplitSliceConst split_seq)
-{
-  size_t n = A.size();
-  size_t num_block = (n + kBlockSize - 1) >> kLog2Base;
-  typename TT::BucketType tags_num = split_seq.size() + 1;
-  parlay::sequence<parlay::sequence<SizeT>> offset(
-    num_block, parlay::sequence<SizeT>(tags_num));
-  assert(offset.size() == num_block && offset[0].size() == tags_num &&
-         offset[0][0] == 0);
-  parlay::parallel_for(0, num_block, [&](size_t i) {
-    for (size_t j = i << kLog2Base; j < std::min((i + 1) << kLog2Base, n);
-         j++) {
-      auto k = RetriveTag(A[j], split_seq);
-      offset[i][k]++;
-    }
-  });
-
-  auto sums = typename TT::BallSeq(tags_num);
-  for (size_t i = 0; i < num_block; i++) {
-    auto t = offset[i];
-    offset[i] = sums;
-    for (BucketType j = 0; j < tags_num; ++j) {
-      sums[j] += t[j];
-    }
-  }
-
-  parlay::parallel_for(0, num_block, [&](size_t i) {
-    auto v = parlay::sequence<SizeT>::uninitialized(tags_num);
-    size_t tot = 0;
-    size_t s_offset = 0;
-    for (BucketType k = 0; k < tags_num - 1; ++k) {
-      v[k] = tot + offset[i][k];
-      tot += sums[k];
-      s_offset += offset[i][k];
-    }
-    v[tags_num - 1] = tot + ((i << kLog2Base) - s_offset);
-    for (size_t j = i << kLog2Base; j < std::min((i + 1) << kLog2Base, n);
-         j++) {
-      auto k = RetriveTag(A[j], split_seq);
-      B[v[k]++] = A[j];
-    }
-  });
-
-  return sums;
-}
-
-template<typename TT>
 template<typename Range>
 void
 BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
@@ -132,45 +68,6 @@ BTree<TT>::SplitBatchBinarySearch(SizeBufUBArr& split_pos_arr,
       });
     offset += pos;
     split_pos_arr[i] = offset;
-  }
-}
-
-template<typename TT>
-template<typename Range>
-void
-BTree<TT>::SplitBatchSieve(SizeBufUBArr& split_pos_arr,
-                           Range In,
-                           TT::SplitSliceConst split_slice)
-{
-  SizeT n = In.size();
-  SizeT num_block = (n + kBlockSize - 1) >> kLog2Base;
-  BufSizeT bkt_n = split_slice.size() + 1;
-  parlay::sequence<SizeBufUBArr> offset(num_block, SizeBufUBArr{ 0 });
-  assert(offset.size() == num_block && bkt_n < offset[0].size() &&
-         offset[0][0] == 0);
-  parlay::parallel_for(0, num_block, [&](SizeT i) {
-    for (SizeT j = i << kLog2Base; j < std::min((i + 1) << kLog2Base, n); j++) {
-      auto k = RetriveTag(In[j], split_slice);
-      offset[i][k]++;
-    }
-  });
-
-  SizeBufUBArr sums{ 0 };
-  for (SizeT i = 0; i < num_block; i++) {
-    auto t = offset[i];
-    offset[i] = sums;
-    for (BufSizeT j = 0; j < bkt_n; ++j) {
-      sums[j] += t[j];
-    }
-  }
-
-  auto num = std::accumulate(sums.begin(), sums.begin() + bkt_n, 0);
-  assert(std::accumulate(sums.begin(), sums.begin() + bkt_n, 0) == In.size());
-
-  SizeT cnt = 0;
-  for (BufSizeT i = 0; i < split_slice.size(); i++) {
-    cnt += sums[i];
-    split_pos_arr[i] = cnt;
   }
 }
 

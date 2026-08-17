@@ -1,6 +1,8 @@
 #ifndef PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
 #define PBTREE_B_TREE_IMPL_QUERY_OP_RANGE_REPORT_HPP_
 
+#include <cassert>
+
 #include <algorithm>
 
 #include "dependence/binary_search.h"
