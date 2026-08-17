@@ -243,6 +243,9 @@ public:
   double SortedLeafRatio(Node const* T = nullptr) const;
   auto Contain(K const& k) const -> bool;
   auto RangeCount(TT::Box query_box) const -> SizeT;
+  // Writes the entries in [first, second) into out and returns how many.
+  // PRECONDITION: out holds at least RangeCount(query_box) entries. A
+  // smaller out overruns; debug builds assert.
   template<typename Range>
   auto RangeReport(TT::Box query_box, Range&& out) const -> SizeT;
 

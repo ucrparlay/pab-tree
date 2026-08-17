@@ -55,6 +55,7 @@ BTree<TT>::RangeReportLeaf(Node const* T,
     }
     const auto r = l + static_cast<decltype(l)>(lo + cnt);
     assert(l <= r && r <= TL->size);
+    assert(offset + (r - l) <= out.size() && "out is too small; size it with RangeCount");
     std::copy_n(TL->elements.begin() + l, r - l, out.begin() + offset);
     offset += r - l;
     return;
@@ -64,6 +65,7 @@ BTree<TT>::RangeReportLeaf(Node const* T,
   for (BufSizeT i = 0; i < static_cast<BufSizeT>(TL->size); i++) {
     auto const k = Entry::GetKey(TL->elements[i]);
     if (k >= query_box.first && k < query_box.second) {
+      assert(offset < out.size() && "out is too small; size it with RangeCount");
       out[offset++] = TL->elements[i];
     }
   }
@@ -131,6 +133,7 @@ BTree<TT>::RangeReportIter(Node const* T,
       for (BufSizeT k = 0; k < mid_n; ++k) {
         off[k + 1] = off[k] + nodes[l + 1 + k]->size;
       }
+      assert(off[mid_n] <= out.size() && "out is too small; size it with RangeCount");
       offset = off[mid_n];
       parlay::parallel_for(
         0,
@@ -161,6 +164,7 @@ BTree<TT>::RangeReportFlattenRec(Node const* T,
 {
   if (T->is_leaf) {
     auto const* TL = static_cast<Leaf const*>(T);
+    assert(offset + TL->size <= out.size() && "out is too small; size it with RangeCount");
     std::copy_n(TL->elements.begin(), TL->size, out.begin() + offset);
     offset += TL->size;
     return;
