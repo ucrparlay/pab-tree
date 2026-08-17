@@ -2,6 +2,8 @@
 #define PABTREE_B_TREE_IMPL_BATCH_OP_B_Batch_DELETE_HPP_
 
 #include <cassert>
+#include <iterator>
+#include <memory>
 
 #include "pab_tree/b_tree.h"
 #include "parlay/monoid.h"
@@ -64,10 +66,18 @@ void btree<TT>::BatchDelete_(Range In,
 	static_assert(
 		std::same_as<typename decltype(In)::value_type, typename TT::K>);
 
-	parlay::slice<const K *, const K *> sorted_slice{ In.begin(), In.end() };
+	// Accept any random-access range, as batch_insert does.
 	typename TT::key_seq sorted_seq;
+	parlay::slice<const K *, const K *> sorted_slice{ nullptr, nullptr };
 	if (!sorted_input) {
 		sorted_seq = parlay::sort(In);
+		sorted_slice =
+			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
+	} else if constexpr (std::contiguous_iterator<decltype(std::begin(In))>) {
+		sorted_slice = { std::to_address(std::begin(In)),
+						 std::to_address(std::end(In)) };
+	} else {
+		sorted_seq = parlay::to_sequence(In);
 		sorted_slice =
 			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	}

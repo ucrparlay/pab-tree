@@ -4,6 +4,8 @@
 #include <cassert>
 
 #include <algorithm>
+#include <iterator>
+#include <memory>
 #include <numeric>
 
 #include "pab_tree/b_tree.h"
@@ -63,10 +65,19 @@ void btree<TT>::BatchInsert_(Range In,
 		return Build_(In); // Build_ releases the old tree
 	}
 
-	parlay::slice<const E *, const E *> sorted_slice{ In.begin(), In.end() };
+	// Accept any random-access range. A contiguous one is borrowed as is;
+	// anything else is materialised, which is also what the sort does.
 	typename TT::entry_seq sorted_seq;
+	parlay::slice<const E *, const E *> sorted_slice{ nullptr, nullptr };
 	if (!sorted_input) {
 		sorted_seq = parlay::sort(In, key_less);
+		sorted_slice =
+			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
+	} else if constexpr (std::contiguous_iterator<decltype(std::begin(In))>) {
+		sorted_slice = { std::to_address(std::begin(In)),
+						 std::to_address(std::end(In)) };
+	} else {
+		sorted_seq = parlay::to_sequence(In);
 		sorted_slice =
 			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	}
