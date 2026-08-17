@@ -94,7 +94,9 @@ Plan: `docs/refactor_plan_2026-08.md`.
   `comparator.h:90` trailing comment) — the rest are long comment blocks.
 - **Order**: delete → rename → restyle → reformat, as separate commits.
   Reformat commit goes in `.git-blame-ignore-revs`.
-- **Comments**: short and factual. No blocks, no jargon.
+- **Comments**: short and concise. One or two lines, never a paragraph. No
+  jargon. State the fact; add detail only if it is very important. Same for
+  commit messages.
 - **Do not change**: the algorithm implementations, existing asserts (adding
   new ones is fine), the submodules, or `external/baselines/`.
 - **Gate**: `unit_test` after each mechanical pass. It runs here — data is at

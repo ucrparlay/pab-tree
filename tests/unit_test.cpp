@@ -216,23 +216,33 @@ protected:
   static void RunTest(std::string const& file_path,
                       std::string const& distribution)
   {
+    // These must outlive argv: std::to_string returns a temporary, so calling
+    // .c_str() on it inline leaves every pointer dangling.
+    std::string const s_summary = std::to_string(kSummary);
+    std::string const s_dim = std::to_string(kDim);
+    std::string const s_tag = std::to_string(kTag);
+    std::string const s_rounds = std::to_string(kRounds);
+    std::string const s_tree_type = std::to_string(kTreeType);
+    std::string const s_query_type = std::to_string(kQueryType);
+    std::string const s_batch_ratio = std::to_string(kBatchRatio);
+
     std::vector<char const*> argv = { "unit_test",
                                       "-p",
                                       file_path.c_str(),
                                       "-s",
-                                      std::to_string(kSummary).c_str(),
+                                      s_summary.c_str(),
                                       "-d",
-                                      std::to_string(kDim).c_str(),
+                                      s_dim.c_str(),
                                       "-t",
-                                      std::to_string(kTag).c_str(),
+                                      s_tag.c_str(),
                                       "-r",
-                                      std::to_string(kRounds).c_str(),
+                                      s_rounds.c_str(),
                                       "-T",
-                                      std::to_string(kTreeType).c_str(),
+                                      s_tree_type.c_str(),
                                       "-q",
-                                      std::to_string(kQueryType).c_str(),
+                                      s_query_type.c_str(),
                                       "-b",
-                                      std::to_string(kBatchRatio).c_str(),
+                                      s_batch_ratio.c_str(),
                                       "-D",
                                       distribution.c_str() };
 

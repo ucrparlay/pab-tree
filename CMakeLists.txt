@@ -178,6 +178,9 @@ endif()
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
 target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
 target_include_directories(unit_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+# Undo the build type's -DNDEBUG so asserts run. Not -DDEBUG=ON, which also
+# enables the slow GetNodeBoxRec checks.
+target_compile_options(unit_test PRIVATE -UNDEBUG)
 add_test(NAME UnitTest COMMAND unit_test)
 # ctest -R BCCPTest -V
 
