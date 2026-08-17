@@ -389,13 +389,6 @@ template <typename NodeType> static void free_node(auto T)
 	parlay::type_allocator<NodeType>::retire(static_cast<NodeType *>(T));
 }
 
-// template <typename T>
-// // TODO: may remove below from inner tree
-// template <typename T>
-// template <typename T, typename Point>
-//   requires IsPair<T> && IsPointerToNode<typename T::first_type> &&
-// };
-
 } // namespace pab_tree
 
 #endif // PABTREE_DEPENDENCE_TREE_NODE_H_

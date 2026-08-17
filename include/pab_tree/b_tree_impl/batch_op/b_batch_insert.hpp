@@ -57,7 +57,7 @@ void btree<TT>::BatchInsert_(Range In,
 							 const bool sorted_input,
 							 LeafSortPred const &leaf_sort_pred)
 {
-	if (this->root_ == nullptr) { // TODO: may check using explicity tag
+	if (this->root_ == nullptr) {
 		return Build_(In);
 	}
 

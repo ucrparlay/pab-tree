@@ -135,7 +135,7 @@ public:
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
 		{
-		} // TODO:finish AT
+		}
 
 		btree_interior_node(TT::node_slice _tree_nodes_slice,
 							TT::split_slice _split_slice)
@@ -145,7 +145,7 @@ public:
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
 		{
-		} // TODO:finish AT
+		}
 
 		btree_interior_node(TT::node_seq const &_tree_nodes,
 							TT::split_seq const &_split,

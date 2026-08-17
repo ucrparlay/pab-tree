@@ -33,13 +33,28 @@ Structural; not attempted.
 
 ---
 
-## 2. Eleven TODO markers
+## 2. Five TODO markers and one HACK
 
-`b_tree.h:27,136,146,468` · `tree_node.h:81,183,385,409` ·
-`box_op.h:21` · `b_batch_insert.hpp:59` · `points_op.hpp:55`
+`b_tree.h:32,718` · `tree_node.h:178,369` · `points_op.hpp:53` ·
+`node_op.hpp:126`
 
-Two are `// TODO:finish AT` on the interior constructors, which the
-augmentation work has now largely answered. The rest are notes to yourself.
+Design notes, not defects. Five ideas someone had — whether the ~25 `using`
+re-exports in `btree` are needed, tuning when `flatten_rec` goes parallel,
+picking the batch-split strategy from input skew, moving `update_aug` into the
+aug type, and templating the alloc helpers.
+
+The `HACK` at `node_op.hpp:126` is load-bearing and should stay. It marks the
+`static_cast<int>` that keeps `return_node_n_arr[i] - 1` from wrapping when the
+count is 0, since `buf_size_type` is unsigned. The code is right; the comment
+is what keeps it right.
+
+Cleared: the two `TODO:finish AT` on the interior constructors (every
+allocation site calls `update_aug()` on the next line), a commented-out block
+in `tree_node.h`, "this can be parallelized" in `box_op.h` (every caller passes
+at most `k_buf_ub` entries), and an explicit-tag note in `b_batch_insert.hpp`.
+
+Also dead, and left in place: the 3-arg `alloc_interior_node(nodes, split,
+aug)` and the matching `btree_interior_node` constructor have no callers.
 
 ---
 

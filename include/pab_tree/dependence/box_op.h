@@ -18,7 +18,7 @@ TT::Box get_box(typename TT::Box const &a, typename TT::Box const &b)
 							TT::Num::max(a.second, b.second));
 }
 
-// TODO: this can be parallelized (needs to define the min/max of a box)
+// Sequential on purpose: every caller passes at most k_buf_ub entries.
 template <typename TT> TT::Box get_box(typename TT::const_entry_slice ele_slice)
 {
 	if (ele_slice.size() == 0) {
