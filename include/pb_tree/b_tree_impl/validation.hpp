@@ -74,6 +74,13 @@ BTree<TT>::VerifyTreeProperty(Node const* T) const
     auto box = box_seq[i];
     // assert(node->is_leaf || static_cast<Interior*>(node)->box == box);
 
+    // A single child means no split keys at all, so there is nothing to
+    // compare against; split[0] would be uninitialised. node_op.hpp:143 and
+    // :612 skip the same case.
+    if (TI->GetNodeN() == 1) {
+      return;
+    }
+
     if (i == 0) {
       assert(box.second < TI->split[0]);
       ok_seq[i] = ok_seq[i] && box.second < TI->split[0];
