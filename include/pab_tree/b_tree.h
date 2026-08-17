@@ -152,9 +152,14 @@ template <class TypeTrait> class btree {
 		{
 		}
 
-		auto update_aug()
+		// Gated so an empty augmentation compiles to nothing.
+		void update_aug()
 		{
-			return this->aug.update();
+			if constexpr (node_has_non_trivial_aug<
+					      typename TT::interior_aug>) {
+				this->aug.update(this->get_node_slice(),
+						 this->get_split_slice());
+			}
 		}
 
 		void set_parallel_flag(bool const flag)

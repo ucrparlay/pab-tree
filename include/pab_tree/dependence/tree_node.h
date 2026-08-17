@@ -191,9 +191,11 @@ struct leaf_node : TypeTrait::Node {
 	}
 
 	// TODO: should put this one in the aug as well and don't use the monostate
-	template <typename Range> auto update_aug(Range In)
+	template <typename Range> void update_aug(Range In)
 	{
-		return aug.update_aug(In);
+		if constexpr (node_has_non_trivial_aug<AT>) {
+			aug.update_aug(In);
+		}
 	}
 
 	auto reset_aug()

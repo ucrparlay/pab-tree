@@ -82,7 +82,9 @@ TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
 			key_in, [&](TT::K a, TT::K b) { return a < b; }));
 	}
 
-	return alloc_interior_node<Interior, TT>(node_in, key_in);
+	auto *node = alloc_interior_node<Interior, TT>(node_in, key_in);
+	node->update_aug();
+	return node;
 }
 
 template <typename TT>

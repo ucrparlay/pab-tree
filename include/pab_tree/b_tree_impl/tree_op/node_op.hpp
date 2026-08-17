@@ -70,9 +70,10 @@ TT::size_type btree<TT>::generate_interior_nodes(TT::node_slice node_in,
 					  key_in.size() :
 					  get_bkt_end_idx(i, bkt_n, item_n) - 1;
 
-		output_handler.set_node(i, alloc_interior_node<Interior, TT>(
-						   node_in.cut(node_l, node_r),
-						   key_in.cut(key_l, key_r)));
+		auto *node = alloc_interior_node<Interior, TT>(
+			node_in.cut(node_l, node_r), key_in.cut(key_l, key_r));
+		node->update_aug();
+		output_handler.set_node(i, node);
 	});
 	return bkt_n;
 }
@@ -268,6 +269,7 @@ btree<TT>::batch_delete_update_interior_size(
 		reinsert_entries_n += reinsert_entries_num_arr[i];
 	}
 	TI->size = tot_entry_sz;
+	TI->update_aug();
 	TI->valid =
 		(T != this->root_ ?
 			 (TI->get_node_n() - invalid_tree_n) >= TT::k_buf_lb :
@@ -424,6 +426,7 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 		TI->tree_nodes.begin() + TI->get_node_n(),
 		static_cast<size_type>(0),
 		[](size_type sum, Node *node) { return sum + node->size; });
+	TI->update_aug();
 	if (reinsert_flag && has_tomb) {
 		// TI->size -= total_remove_entries_n;
 		assert(parlay::none_of(reinsert_entries, [](auto entry) {
@@ -560,6 +563,9 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 			parlay::make_slice(dest->get_ele_begin_iter(),
 					   dest->get_ele_end_iter()),
 			leaf_entries_pattern, leaf_sort_pred);
+		static_cast<Leaf *>(updated_dest)
+			->update_aug(static_cast<Leaf *>(updated_dest)
+					     ->get_ele_slice());
 		TI->tree_nodes[tree_idx++] = updated_dest;
 		if (!is_rightmost) {
 			TI->split[split_idx++] = TI->split[j - 1];
@@ -604,6 +610,7 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 			std::copy_n(sp, bkt_size, leaf->get_ele_begin_iter());
 			sp += bkt_size;
 			leaf->size = bkt_size;
+			leaf->update_aug(leaf->get_ele_slice());
 			leaf->is_sorted = true;
 			TI->tree_nodes[tree_idx++] = leaf;
 			if (k < bkt_n - 1) {
@@ -642,6 +649,7 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 
 	assert(tree_idx == split_idx + 1);
 	TI->node_n = tree_idx;
+	TI->update_aug();
 	TI->reset_deletion_flag();
 
 #ifdef DEBUG
@@ -692,6 +700,7 @@ template <typename TT> void btree<TT>::prune_out_empty_tree(Node *T)
 	}
 
 	TI->node_n = tree_node_idx;
+	TI->update_aug();
 }
 
 template <typename TT>
@@ -730,7 +739,9 @@ template <typename TT> TT::Node *btree<TT>::copy_tree_recursive(Node const *T)
 	auto const split_slice = TI->get_split_slice();
 	typename TT::split_seq new_splits(split_slice.begin(),
 					  split_slice.end());
-	return alloc_interior_node<Interior, TT>(new_nodes, new_splits);
+	auto *node = alloc_interior_node<Interior, TT>(new_nodes, new_splits);
+	node->update_aug();
+	return node;
 }
 
 } // namespace pab_tree
