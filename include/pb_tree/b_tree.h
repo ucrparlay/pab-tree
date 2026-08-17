@@ -630,22 +630,6 @@ public:
 
 private:
   Node* root_ = nullptr;
-  parlay::internal::timer insert_leaf_timer;
-  parlay::internal::timer lower_bound_timer;
-  parlay::internal::timer merge_timer;
-  parlay::internal::timer recurse_timer;
-
-  double insert_leaf_time = 0.0;
-  double lower_bound_time = 0.0;
-  double merge_time = 0.0;
-  double recurse_time = 0.0;
-
-  int vis_leaf_num = 0;
-  int vis_inter_num = 0;
-
-  std::atomic<size_t> max_reinsert_batch_size = 0;
-  std::atomic<size_t> sys_reinsert_size = 0;
-  std::atomic<size_t> sys_balance_leaf_size = 0;
 };
 
 } // namespace pb_tree
