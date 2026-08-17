@@ -74,16 +74,12 @@ public:
   // NOTE: constructor and destructor
   BTree() = default;
 
+  // One constructor, constrained so it cannot outrank the copy constructor.
   template<typename Range>
-  BTree(Range in)
+    requires(!std::same_as<std::remove_cvref_t<Range>, BTree>)
+  explicit BTree(Range&& in)
   {
-    this->Build(in);
-  }
-
-  template<typename Range>
-  BTree(Range const& in)
-  {
-    this->Build(in);
+    this->Build(std::forward<Range>(in));
   }
 
   // copy constructor
@@ -490,7 +486,7 @@ public:
   template<bool granularity>
   inline static bool ForceParallelRecursion(Interior const* T);
 
-  Node* CopyTreeRecursive(Node* T);
+  static Node* CopyTreeRecursive(Node const* T);
 
   void DeleteTree();
 
