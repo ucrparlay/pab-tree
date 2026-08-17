@@ -8,13 +8,12 @@ namespace pb_tree {
 
 template<typename TT>
 auto
-BTree<TT>::Contain(K const& k) const -> std::pair<bool, MembershipLogger>
+BTree<TT>::Contain(K const& k) const -> bool
 {
-  MembershipLogger logger;
   if (this->root_ == nullptr) [[unlikely]] {
-    return { false, logger };
+    return false;
   }
-  return { ContainIter(this->root_, k), logger };
+  return ContainIter(this->root_, k);
 }
 
 // Iterative tree descent: avoids O(height) recursive call overhead.

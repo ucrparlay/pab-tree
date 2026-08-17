@@ -6,7 +6,6 @@
 
 #include "dependence/box_op.h"
 #include "dependence/comparator.h"
-#include "dependence/loggers.h"
 #include "dependence/tree_node.h"
 #include "dependence/type_trait.h"
 
@@ -545,14 +544,13 @@ public:
 
   std::tuple<bool, bool, typename TT::SizeT> CheckTreeAugAfterDelete(Node* T);
 
-  auto Contain(K const& k) const -> std::pair<bool, MembershipLogger>;
+  auto Contain(K const& k) const -> bool;
 
   bool ContainIter(Node const* T, K const& k) const;
 
   bool ContainRec(Node const* T, K const& k) const;
 
-  auto RangeCount(TT::Box query_box) const
-    -> std::pair<SizeT, RangeReportLogger>;
+  auto RangeCount(TT::Box query_box) const -> SizeT;
 
   void RangeCountLeaf(Node const* T,
                       TT::Box const& query_box,
@@ -560,12 +558,10 @@ public:
 
   void RangeCountRec(Node const* T,
                      TT::Box const& query_box,
-                     SizeT& offset,
-                     RangeReportLogger& logger) const;
+                     SizeT& offset) const;
 
   template<typename Range>
-  auto RangeReport(TT::Box query_box, Range&& out) const
-    -> std::pair<SizeT, RangeReportLogger>;
+  auto RangeReport(TT::Box query_box, Range&& out) const -> SizeT;
 
   template<typename Range>
   void RangeReportLeaf(Node const* T,
@@ -577,21 +573,18 @@ public:
   void RangeReportIter(Node const* T,
                        TT::Box const& query_box,
                        SizeT& offset,
-                       Range out,
-                       RangeReportLogger& logger) const;
+                       Range out) const;
 
   template<typename Range>
   void RangeReportRec(Node const* T,
                       TT::Box const& query_box,
                       SizeT& offset,
-                      Range out,
-                      RangeReportLogger& logger) const;
+                      Range out) const;
 
   template<typename Range>
   void RangeReportFlattenRec(Node const* T,
                              SizeT& offset,
-                             Range out,
-                             RangeReportLogger& logger) const;
+                             Range out) const;
 
   static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
   {

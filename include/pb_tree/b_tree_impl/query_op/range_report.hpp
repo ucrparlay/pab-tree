@@ -14,18 +14,17 @@ template<typename TT>
 template<typename Range>
 auto
 BTree<TT>::RangeReport(TT::Box const query_box, Range&& out) const
-  -> std::pair<SizeT, RangeReportLogger>
+  -> SizeT
 {
   if (this->root_ == nullptr || query_box.first >= query_box.second)
     [[unlikely]] {
-    return { 0, RangeReportLogger{} };
+    return 0;
   }
 
-  RangeReportLogger logger;
   SizeT rt_size = 0;
   RangeReportIter(
-    this->root_, query_box, rt_size, parlay::make_slice(out), logger);
-  return { rt_size, logger };
+    this->root_, query_box, rt_size, parlay::make_slice(out));
+  return rt_size;
 }
 
 template<typename TT>
@@ -76,13 +75,11 @@ void
 BTree<TT>::RangeReportIter(Node const* T,
                            TT::Box const& query_box,
                            SizeT& offset,
-                           Range out,
-                           RangeReportLogger& logger) const
+                           Range out) const
 {
   // Iterative descent: avoids O(height) recursive-call overhead for narrow
   // queries that fall inside a single child at each interior level.
   while (!T->is_leaf) {
-    logger.vis_interior_num++;
     auto const* TI = static_cast<Interior const*>(T);
     auto* const* nodes =
       TI->tree_nodes.data(); // Node* const* → nodes[i] is Node*
@@ -123,7 +120,7 @@ BTree<TT>::RangeReportIter(Node const* T,
     // Query spans children [l, r].
 
     // Left boundary: partially covered, recurse.
-    RangeReportIter(nodes[l], query_box, offset, out, logger);
+    RangeReportIter(nodes[l], query_box, offset, out);
 
     // Middle children [l+1, r): fully covered by the query.
     // Pre-compute each child's output position, then flatten in parallel.
@@ -146,27 +143,23 @@ BTree<TT>::RangeReportIter(Node const* T,
     }
 
     // Right boundary: partially covered, recurse.
-    RangeReportIter(nodes[r], query_box, offset, out, logger);
+    RangeReportIter(nodes[r], query_box, offset, out);
     return;
   }
 
   // T is a leaf.
-  logger.vis_leaf_num++;
   RangeReportLeaf(T, query_box, offset, out);
 }
 
-// Sequential full-subtree flatten used when only a logger-tracked path is
-// needed (kept for callers that pass a RangeReportLogger).
+// Sequential full-subtree flatten.
 template<typename TT>
 template<typename Range>
 void
 BTree<TT>::RangeReportFlattenRec(Node const* T,
                                  SizeT& offset,
-                                 Range out,
-                                 RangeReportLogger& logger) const
+                                 Range out) const
 {
   if (T->is_leaf) {
-    logger.flatten_node_num++;
     auto const* TL = static_cast<Leaf const*>(T);
     std::copy_n(TL->elements.begin(), TL->size, out.begin() + offset);
     offset += TL->size;
@@ -176,7 +169,7 @@ BTree<TT>::RangeReportFlattenRec(Node const* T,
   auto const* TI = static_cast<Interior const*>(T);
   const BufSizeT node_n = TI->GetNodeN();
   for (BufSizeT i = 0; i < node_n; i++) {
-    RangeReportFlattenRec(TI->tree_nodes[i], offset, out, logger);
+    RangeReportFlattenRec(TI->tree_nodes[i], offset, out);
   }
 }
 
@@ -186,16 +179,13 @@ void
 BTree<TT>::RangeReportRec(Node const* T,
                           TT::Box const& query_box,
                           SizeT& offset,
-                          Range out,
-                          RangeReportLogger& logger) const
+                          Range out) const
 {
   if (T->is_leaf) {
-    logger.vis_leaf_num++;
     RangeReportLeaf(T, query_box, offset, out);
     return;
   }
 
-  logger.vis_interior_num++;
   auto const* TI = static_cast<Interior const*>(T);
   auto l = TI->GetNodeIdContainingKey(query_box.first);
   auto r = TI->GetNodeIdContainingKeyExclusive(query_box.second);
@@ -208,17 +198,17 @@ BTree<TT>::RangeReportRec(Node const* T,
 
   // NOTE: visit nodes [l, r]
   // for (BufSizeT i = l; i <= r; i++) {
-  //   RangeReportRec(TI->tree_nodes[i], query_box, offset, out, logger);
+  //   RangeReportRec(TI->tree_nodes[i], query_box, offset, out);
   // }
   // return;
 
   if (l == r) { // falls into one node
-    RangeReportRec(TI->tree_nodes[l], query_box, offset, out, logger);
+    RangeReportRec(TI->tree_nodes[l], query_box, offset, out);
     return;
   }
 
-  RangeReportRec(TI->tree_nodes[l], query_box, offset, out, logger);
-  RangeReportRec(TI->tree_nodes[r], query_box, offset, out, logger);
+  RangeReportRec(TI->tree_nodes[l], query_box, offset, out);
+  RangeReportRec(TI->tree_nodes[r], query_box, offset, out);
 
   if (r > l + 1) {
     for (BufSizeT i = l + 1; i < r; i++) {

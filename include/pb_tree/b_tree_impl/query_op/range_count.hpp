@@ -10,15 +10,14 @@ namespace pb_tree {
 template<typename TT>
 auto
 BTree<TT>::RangeCount(TT::Box const query_box) const
-  -> std::pair<SizeT, RangeReportLogger>
+  -> SizeT
 {
-  RangeReportLogger logger;
   SizeT rt_size = 0;
   if (this->root_ == nullptr) [[unlikely]] {
-    return { 0, logger };
+    return 0;
   }
-  RangeCountRec(this->root_, query_box, rt_size, logger);
-  return { rt_size, logger };
+  RangeCountRec(this->root_, query_box, rt_size);
+  return rt_size;
 }
 
 template<typename TT>
@@ -63,12 +62,10 @@ template<typename TT>
 void
 BTree<TT>::RangeCountRec(Node const* T,
                          TT::Box const& query_box,
-                         SizeT& offset,
-                         RangeReportLogger& logger) const
+                         SizeT& offset) const
 {
   // Iterative descent for single-child levels (avoids O(height) call overhead).
   while (!T->is_leaf) {
-    logger.vis_interior_num++;
     auto const* TI = static_cast<Interior const*>(T);
 
     // Left boundary child
@@ -102,18 +99,17 @@ BTree<TT>::RangeCountRec(Node const* T,
       continue;
     }
 
-    RangeCountRec(TI->tree_nodes[l], query_box, offset, logger);
+    RangeCountRec(TI->tree_nodes[l], query_box, offset);
 
     // Middle children: just sum their sizes (no traversal needed).
     for (BufSizeT i = l + 1; i < r; i++) {
       offset += TI->tree_nodes[i]->size;
     }
 
-    RangeCountRec(TI->tree_nodes[r], query_box, offset, logger);
+    RangeCountRec(TI->tree_nodes[r], query_box, offset);
     return;
   }
 
-  logger.vis_leaf_num++;
   RangeCountLeaf(T, query_box, offset);
 }
 

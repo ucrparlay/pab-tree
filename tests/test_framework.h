@@ -449,7 +449,7 @@ TestLeafRandom(Tree& pkd,
     // membership
     t.reset(), t.start();
     parlay::parallel_for(0, query_size, [&](size_t j) {
-      auto [contain, logger] = pkd.Contain(Tree::Entry::GetKey(query_ele[j]));
+      auto contain = pkd.Contain(Tree::Entry::GetKey(query_ele[j]));
       member_res[j] = contain;
     });
     t.stop();
@@ -590,7 +590,7 @@ TestLeafRandomDynamicGraph(Tree& pkd,
       // NOTE: test membership query
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(query_points[j]);
+        auto contain = pkd.Contain(query_points[j]);
         membership_res[j] = contain;
       });
       t.stop();
@@ -672,7 +672,7 @@ RangeCount(auto const& wp,
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         // parlay::parallel_for(0, 1, [&](size_t i) {
-        auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
+        [[maybe_unused]] auto size = pkd.RangeCount(query_box_seq[i].first);
         kdknn[i] = size;
         [[maybe_unused]] int output_size = query_box_seq[i].second;
         assert(std::cmp_equal(kdknn[i], output_size));
@@ -724,7 +724,7 @@ RangeQuery(auto const& wp,
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         // parlay::parallel_for(0, 1, [&](size_t i) {
-        [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
+        [[maybe_unused]] auto size = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
         kdknn[i] = size;
         [[maybe_unused]] size_t output_size = query_box_seq[i].second.size();
@@ -838,11 +838,9 @@ Membership(Tree const& pkd, auto const& query_ele, int kRounds, auto& res)
         query_num,
         [&](size_t i) {
           // for (int i = 0; i < query_num; i++) {
-          auto [contain, logger] = pkd.Contain(Entry::GetKey(query_ele[i]));
+          auto contain = pkd.Contain(Entry::GetKey(query_ele[i]));
 
           res[i] = contain;
-          // vis_leaf[i] = logger.vis_leaf_num;
-          // vis_inter[i] = logger.vis_interior_num;
           // }
         },
         1);
@@ -876,9 +874,7 @@ RangeCountFix(Tree& pkd,
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         // for (int i = 0; i < rec_num; i++) {
-        auto [size, logger] = pkd.RangeCount(query_box_seq[i].first);
-        vis_leaf[i] = logger.vis_leaf_num;
-        vis_inter[i] = logger.vis_interior_num;
+        [[maybe_unused]] auto size = pkd.RangeCount(query_box_seq[i].first);
       });
     },
     [&]() {});
@@ -918,10 +914,8 @@ RangeQueryFix(Tree& pkd,
     [&]() {
       parlay::parallel_for(0, rec_num, [&](size_t i) {
         // for (int i = 0; i < rec_num; i++) {
-        [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
+        [[maybe_unused]] auto size = pkd.RangeReport(
           query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
-        vis_leaf[i] = logger.vis_leaf_num;
-        vis_inter[i] = logger.vis_interior_num;
         // std::cout << size << " " << query_box_seq[i].second << std::endl;
         // if (size != query_box_seq[i].second) {
         //   std::cout << "wrong: bounding box: " <<
@@ -977,7 +971,7 @@ RangeQuerySerialWithLog(Tree& pkd,
   for (int i = 0; i < rec_num; i++) {
     parlay::internal::timer t;
     t.reset(), t.start();
-    [[maybe_unused]] auto [size, logger] = pkd.RangeReport(query_box_seq[i].first,
+    [[maybe_unused]] auto size = pkd.RangeReport(query_box_seq[i].first,
                                           Out.cut(offset[i], offset[i + 1]));
     t.stop();
     std::cout << rec_type << " " << query_box_seq[i].second << " "
@@ -1098,7 +1092,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       // NOTE: test membership query
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(query_points[j]);
+        auto contain = pkd.Contain(query_points[j]);
         member_res[j] = contain;
       });
       t.stop();
@@ -1117,7 +1111,7 @@ InsertOsmByTime(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
 
       t.reset(), t.start();
       parlay::parallel_for(0, kOSMRangeQueryNum, [&](size_t i) {
-        [[maybe_unused]] auto [size, logger] = pkd.RangeReport(
+        [[maybe_unused]] auto size = pkd.RangeReport(
           query_box_seq[i].first, range_res.cut(offset[i], offset[i + 1]));
       });
       t.stop();
@@ -1273,7 +1267,7 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       // NOTE: test membership query
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(membership_query_keys[j]);
+        auto contain = pkd.Contain(membership_query_keys[j]);
         membership_res[j] = contain;
       });
       t.stop();
@@ -1285,15 +1279,13 @@ TestTemporalSignal(const parlay::sequence<typename TT::EntrySeq>& node_by_time,
       // source vertices selected from the sorted edge list.
       t.reset(), t.start();
       parlay::parallel_for(0, range_query_box_seq.size(), [&](size_t j) {
-        auto [size, logger] =
-          pkd.RangeReport(range_query_box_seq[j],
+        [[maybe_unused]] auto size = pkd.RangeReport(range_query_box_seq[j],
                           range_report_res.cut(range_query_offset[j],
                                                range_query_offset[j + 1]));
         range_query_output_size[j] = size;
       });
       // for (size_t j = 0; j < range_query_box_seq.size(); j++) {
-      //   auto [size, logger] =
-      //     pkd.RangeReport(range_query_box_seq[j],
+      //   auto size = //     pkd.RangeReport(range_query_box_seq[j],
       //                     range_report_res.cut(range_query_offset[j],
       //                                          range_query_offset[j + 1]));
       //   range_query_output_size[j] = size;
@@ -1499,7 +1491,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
       // NOTE: test membership query
       t.reset(), t.start();
       parlay::parallel_for(0, member_query_n, [&](size_t j) {
-        auto [contain, logger] = pkd.Contain(membership_query_keys[j]);
+        auto contain = pkd.Contain(membership_query_keys[j]);
         membership_res[j] = contain;
       });
       t.stop();
@@ -1508,8 +1500,7 @@ TestDynamicGraph(const auto& insert_batch_seq,
       // NOTE: range report query
       t.reset(), t.start();
       parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
-        auto [size, logger] =
-          pkd.RangeReport(box_seq[j],
+        [[maybe_unused]] auto size = pkd.RangeReport(box_seq[j],
                           range_report_output.cut(range_query_offset[j],
                                                   range_query_offset[j + 1]));
         size_seq[j] = size;
