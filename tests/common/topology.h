@@ -167,9 +167,8 @@ template <typename point> struct simplex {
 			for (int i = 0; i < 3; i++)
 				if (t->vtx[mod3(i + o)] != NULL)
 					cout << t->vtx[mod3(i + o)]->id << " ("
-					     << t->vtx[mod3(i + o)]->pt.x << ","
-					     << t->vtx[mod3(i + o)]->pt.y
-					     << ") ";
+						 << t->vtx[mod3(i + o)]->pt.x << ","
+						 << t->vtx[mod3(i + o)]->pt.y << ") ";
 				else
 					cout << "NULL ";
 			cout << endl;
@@ -213,23 +212,21 @@ template <typename point> struct simplex {
 	{
 		if (boundary || t == NULL)
 			return 0;
-		return inCircle(t->vtx[0]->pt, t->vtx[1]->pt, t->vtx[2]->pt,
-				v->pt);
+		return inCircle(t->vtx[0]->pt, t->vtx[1]->pt, t->vtx[2]->pt, v->pt);
 	}
 
 	// the angle facing the across edge
 	double farAngle()
 	{
 		return angle(t->vtx[mod3(o + 1)]->pt, t->vtx[o]->pt,
-			     t->vtx[mod3(o + 2)]->pt);
+					 t->vtx[mod3(o + 2)]->pt);
 	}
 
 	bool outside(vtx_t *v)
 	{
 		if (boundary || t == NULL)
 			return 0;
-		return counterClockwise(t->vtx[mod3(o + 2)]->pt, v->pt,
-					t->vtx[o]->pt);
+		return counterClockwise(t->vtx[mod3(o + 2)]->pt, v->pt, t->vtx[o]->pt);
 	}
 
 	// flips two triangles and adjusts neighboring triangles

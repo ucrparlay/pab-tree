@@ -22,7 +22,7 @@ namespace pab_tree
 {
 // Basetree
 template <class TypeTrait> class btree {
-    public:
+public:
 	using TT = TypeTrait;
 	// TODO: Do we really need to define these types again?
 
@@ -74,8 +74,7 @@ template <class TypeTrait> class btree {
 	// copy constructor
 	// copy @other
 	btree(const btree &other)
-		: root_(other.root_ ? this->copy_tree_recursive(other.root_) :
-				      nullptr)
+		: root_(other.root_ ? this->copy_tree_recursive(other.root_) : nullptr)
 	{
 	}
 
@@ -88,9 +87,8 @@ template <class TypeTrait> class btree {
 		}
 
 		this->delete_tree(); // delete current tree
-		this->root_ = other.root_ ?
-				      this->copy_tree_recursive(other.root_) :
-				      nullptr;
+		this->root_ =
+			other.root_ ? this->copy_tree_recursive(other.root_) : nullptr;
 		return *this;
 	}
 
@@ -126,9 +124,8 @@ template <class TypeTrait> class btree {
 		using BaseNode = multi_way_node<TT>;
 
 		btree_interior_node(TT::node_seq const &_tree_nodes,
-				    TT::split_seq const &_split)
-			: BaseNode(_tree_nodes, _split,
-				   typename TT::interior_aug())
+							TT::split_seq const &_split)
+			: BaseNode(_tree_nodes, _split, typename TT::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
@@ -136,9 +133,9 @@ template <class TypeTrait> class btree {
 		} // TODO:finish AT
 
 		btree_interior_node(TT::node_slice _tree_nodes_slice,
-				    TT::split_slice _split_slice)
+							TT::split_slice _split_slice)
 			: BaseNode(_tree_nodes_slice, _split_slice,
-				   typename TT::interior_aug())
+					   typename TT::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
@@ -146,8 +143,8 @@ template <class TypeTrait> class btree {
 		} // TODO:finish AT
 
 		btree_interior_node(TT::node_seq const &_tree_nodes,
-				    TT::split_seq const &_split,
-				    TT::interior_aug const &_aug)
+							TT::split_seq const &_split,
+							TT::interior_aug const &_aug)
 			: BaseNode(_tree_nodes, _split, _aug)
 			, valid(true)
 			, contain_invalid_subtree(0)
@@ -158,10 +155,9 @@ template <class TypeTrait> class btree {
 		// Gated so an empty augmentation compiles to nothing.
 		void update_aug()
 		{
-			if constexpr (node_has_non_trivial_aug<
-					      typename TT::interior_aug>) {
+			if constexpr (node_has_non_trivial_aug<typename TT::interior_aug>) {
 				this->aug.update(this->get_node_slice(),
-						 this->get_split_slice());
+								 this->get_split_slice());
 			}
 		}
 
@@ -182,8 +178,7 @@ template <class TypeTrait> class btree {
 
 		[[nodiscard]] auto force_parallel() const -> bool
 		{
-			return this->aug.force_parallel(this->size,
-							k_serial_build_cutoff);
+			return this->aug.force_parallel(this->size, k_serial_build_cutoff);
 		}
 
 		void reset_deletion_flag()
@@ -210,8 +205,7 @@ template <class TypeTrait> class btree {
 			// batch_size); XOR in low address bits from begin/end
 			// to break correlation across call sites.
 			auto const v =
-				(static_cast<size_t>(T->size) + In.size()) *
-					2654435761ULL ^
+				(static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
 				(reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
 				(reinterpret_cast<uintptr_t>(In.end()) >> 3);
 			return v & 1;
@@ -224,16 +218,16 @@ template <class TypeTrait> class btree {
 	template <typename Range> void build(Range &&In);
 	template <typename Range> void batch_insert(Range &&In);
 	template <typename Range, typename LeafSortPred = default_hybrid_pred>
-	void batch_insert(
-		Range &&In, const TT::pattern_type leaf_entries_pattern,
-		const bool sorted_input,
-		LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
+	void
+	batch_insert(Range &&In, const TT::pattern_type leaf_entries_pattern,
+				 const bool sorted_input,
+				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 	template <typename Range> void batch_delete(Range &&In);
 	template <typename Range, typename LeafSortPred = default_hybrid_pred>
-	void batch_delete(
-		Range &&In, const TT::pattern_type leaf_entries_pattern,
-		const bool sorted_input,
-		LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
+	void
+	batch_delete(Range &&In, const TT::pattern_type leaf_entries_pattern,
+				 const bool sorted_input,
+				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 	void delete_tree();
 	template <typename Range> void get_entries(Range &Out) const;
 	template <bool CheckSize = true, bool Verbose = true>
@@ -250,7 +244,7 @@ template <class TypeTrait> class btree {
 	auto range_report(TT::Box query_box, Range &&out) const -> size_type;
 
 	// ---- implementation ----
-    private:
+private:
 	// Order by key. Element types are not required to define operator<.
 	static constexpr auto key_less = [](E const &a, E const &b) {
 		return Entry::get_key(a) < Entry::get_key(b);
@@ -262,16 +256,14 @@ template <class TypeTrait> class btree {
 		return item_n / TT::k_buf_md;
 	}
 
-	static size_type get_bkt_st_idx(size_type const i,
-					size_type const bkt_n,
-					size_type const n)
+	static size_type get_bkt_st_idx(size_type const i, size_type const bkt_n,
+									size_type const n)
 	{
 		return (static_cast<size_t>(n) * i) / bkt_n;
 	};
 
-	static size_type get_bkt_end_idx(size_type const i,
-					 size_type const bkt_n,
-					 size_type const n)
+	static size_type get_bkt_end_idx(size_type const i, size_type const bkt_n,
+									 size_type const n)
 	{
 		return (static_cast<size_t>(n) * (i + 1)) / bkt_n;
 	};
@@ -279,10 +271,9 @@ template <class TypeTrait> class btree {
 	// PARA: return whether a node is invalid
 	static bool node_has_leaf_children(const Node *T)
 	{
-		return T->is_leaf ? false :
-				    static_cast<const Interior *>(T)
-					    ->tree_nodes[0]
-					    ->is_leaf;
+		return T->is_leaf ?
+				   false :
+				   static_cast<const Interior *>(T)->tree_nodes[0]->is_leaf;
 	}
 
 	static bool self_balance_node(const Node *T, const bool tomb)
@@ -293,7 +284,7 @@ template <class TypeTrait> class btree {
 	static bool get_node_invalid_status(const Node *T)
 	{
 		return T->is_leaf ? (T->size < TT::k_buf_lb) :
-				    (!static_cast<const Interior *>(T)->valid);
+							(!static_cast<const Interior *>(T)->valid);
 	}
 
 	static bool node_is_valid(const Node *T)
@@ -303,41 +294,39 @@ template <class TypeTrait> class btree {
 
 	static bool node_contain_invalid_subtree(const Node *T)
 	{
-		return T->is_leaf ? (T->size < TT::k_buf_lb ? true : false) :
-				    static_cast<const Interior *>(T)
-					    ->contain_invalid_subtree;
+		return T->is_leaf ?
+				   (T->size < TT::k_buf_lb ? true : false) :
+				   static_cast<const Interior *>(T)->contain_invalid_subtree;
 	}
 
 	static size_type get_node_reinsert_size(const Node *T)
 	{
-		return T->is_leaf ?
-			       (T->size < TT::k_buf_lb ? T->size : 0) :
-			       static_cast<const Interior *>(T)->reinsert_size;
+		return T->is_leaf ? (T->size < TT::k_buf_lb ? T->size : 0) :
+							static_cast<const Interior *>(T)->reinsert_size;
 	}
 
 	template <typename Range> void Build_(Range In);
 	template <typename Range> Node *build_recursive(Range In);
-	Node *assemble_interior_levels(TT::node_slice nodes,
-				       TT::split_slice keys);
+	Node *assemble_interior_levels(TT::node_slice nodes, TT::split_slice keys);
 
 	template <typename Range, typename LeafSortPred>
 		requires std::predicate<LeafSortPred, Node *, Range>
 	void BatchInsert_(Range In, const TT::pattern_type leaf_entries_pattern,
-			  const bool sorted_input,
-			  LeafSortPred const &leaf_sort_pred);
+					  const bool sorted_input,
+					  LeafSortPred const &leaf_sort_pred);
 
 	template <typename Range, typename LeafSortPred>
 	size_type
 	batch_insert_recursive(Node *T, Range In,
-			       node_split_pair_slice node_split_slice,
-			       const TT::pattern_type leaf_entries_pattern,
-			       LeafSortPred const &leaf_sort_pred);
+						   node_split_pair_slice node_split_slice,
+						   const TT::pattern_type leaf_entries_pattern,
+						   LeafSortPred const &leaf_sort_pred);
 
 	template <typename Range, typename LeafSortPred>
 		requires std::predicate<LeafSortPred, Node *, Range>
 	void BatchDelete_(Range In, const TT::pattern_type leaf_entries_pattern,
-			  const bool sorted_input,
-			  LeafSortPred const &leaf_sort_pred);
+					  const bool sorted_input,
+					  LeafSortPred const &leaf_sort_pred);
 
 	// Returns (invalid_flag, needs_fetch, reinsert_entry_num).
 	// needs_fetch: any subtree needs fetch_invalid_subtree_nodes (not
@@ -345,8 +334,8 @@ template <class TypeTrait> class btree {
 	template <typename LeafSortPred>
 	std::tuple<bool, bool, size_type>
 	batch_delete_recursive(Node *T, TT::const_key_slice In,
-			       const TT::pattern_type leaf_entries_pattern,
-			       LeafSortPred const &leaf_sort_pred);
+						   const TT::pattern_type leaf_entries_pattern,
+						   LeafSortPred const &leaf_sort_pred);
 
 	// Remove the invalid subtree and put it in flatten_node_slice
 	// Needs to compact the tree_nodes if find a invalid subtree and update
@@ -355,15 +344,14 @@ template <class TypeTrait> class btree {
 	template <typename LeafSortPred>
 	void
 	fetch_invalid_subtree_nodes(Node *T, entry_slice reinsert_entries,
-				    bool has_tomb,
-				    const TT::pattern_type leaf_entries_pattern,
-				    LeafSortPred const &leaf_sort_pred);
+								bool has_tomb,
+								const TT::pattern_type leaf_entries_pattern,
+								LeafSortPred const &leaf_sort_pred);
 
 	template <typename LeafSortPred>
-	void
-	reinsert_tree_after_delete(Node *T, entry_slice reinsert_entries,
-				   const TT::pattern_type leaf_entries_pattern,
-				   LeafSortPred const &leaf_sort_pred);
+	void reinsert_tree_after_delete(Node *T, entry_slice reinsert_entries,
+									const TT::pattern_type leaf_entries_pattern,
+									LeafSortPred const &leaf_sort_pred);
 
 	void prune_out_empty_tree(Node *T);
 
@@ -371,8 +359,8 @@ template <class TypeTrait> class btree {
 
 	template <typename LeafSortPred>
 	void balance_over_leaves(Node *T, const size_type reinsert_size,
-				 const TT::pattern_type leaf_entries_pattern,
-				 LeafSortPred const &leaf_sort_pred);
+							 const TT::pattern_type leaf_entries_pattern,
+							 LeafSortPred const &leaf_sort_pred);
 
 	static Node *batch_insert_update_interior(
 		Node *T, node_split_pair_slice node_split_slice,
@@ -386,12 +374,11 @@ template <class TypeTrait> class btree {
 
 	// PARA: return bucket_num
 	static size_type generate_leaf_nodes(TT::entry_slice key_in,
-					     TT::split_slice key_out,
-					     TT::node_slice node_out);
+										 TT::split_slice key_out,
+										 TT::node_slice node_out);
 
-	static size_type
-	generate_leaf_nodes(TT::entry_slice key_in,
-			    node_split_pair_slice node_split_out);
+	static size_type generate_leaf_nodes(TT::entry_slice key_in,
+										 node_split_pair_slice node_split_out);
 
 	// PARA: return bucket_num
 	template <typename KeyFunc, typename NodeFunc>
@@ -402,37 +389,36 @@ template <class TypeTrait> class btree {
 
 	template <typename OutputHandler>
 	static size_type generate_leaf_nodes(TT::entry_slice key_in,
-					     OutputHandler &&output_handler);
+										 OutputHandler &&output_handler);
 
 	template <typename OutputHandler>
-	static size_type
-	generate_interior_nodes(TT::node_slice node_in, TT::split_slice key_in,
-				OutputHandler &&output_handler);
+	static size_type generate_interior_nodes(TT::node_slice node_in,
+											 TT::split_slice key_in,
+											 OutputHandler &&output_handler);
 
 	template <typename Range, typename LeafSortPred>
 	static TT::Node *
 	post_process_leaf_change(Node *T, Range In,
-				 const TT::pattern_type leaf_entries_pattern,
-				 LeafSortPred const &leaf_sort_pred);
+							 const TT::pattern_type leaf_entries_pattern,
+							 LeafSortPred const &leaf_sort_pred);
 
 	// batch insert
 	template <typename Range, typename LeafSortPred>
 	static Node *
 	insert_points_2_leaf(Node *T, Range In,
-			     const TT::pattern_type leaf_entries_pattern,
-			     LeafSortPred const &leaf_sort_pred);
+						 const TT::pattern_type leaf_entries_pattern,
+						 LeafSortPred const &leaf_sort_pred);
 
 	static void
 	partition_binary_search_rec(auto split_seq_s,
-				    // parlay::sequence<int>& split_pos_seq,
-				    auto &split_pos_seq,
-				    entry_slice entry_seq_s,
-				    size_t split_offset, size_t In_offset);
+								// parlay::sequence<int>& split_pos_seq,
+								auto &split_pos_seq, entry_slice entry_seq_s,
+								size_t split_offset, size_t In_offset);
 
 	template <typename Range>
 	static size_type
 	handling_leaf_split_overflow(Node *T, Range In,
-				     node_split_pair_slice node_split_slice);
+								 node_split_pair_slice node_split_slice);
 
 	static size_type handling_interior_split_overflow(
 		Node *T, node_split_pair_slice node_split_slice,
@@ -442,19 +428,19 @@ template <class TypeTrait> class btree {
 	template <typename LeafSortPred>
 	static TT::Node *
 	delete_points_4_leaf(Node *T, TT::const_key_slice In,
-			     const TT::pattern_type leaf_entries_pattern,
-			     LeafSortPred const &leaf_sort_pred);
+						 const TT::pattern_type leaf_entries_pattern,
+						 LeafSortPred const &leaf_sort_pred);
 
 	// template <typename Leaf, typename RT>
 
 	template <typename Range>
-	static void
-	split_batch_binary_search(size_buf_ub_arr &split_pos_arr, Range In,
-				  TT::split_slice_const split_slice);
+	static void split_batch_binary_search(size_buf_ub_arr &split_pos_arr,
+										  Range In,
+										  TT::split_slice_const split_slice);
 
 	template <typename Range>
 	static void split_batch_merge(size_buf_ub_arr &split_pos_arr, Range In,
-				      TT::split_slice_const split_slice);
+								  TT::split_slice_const split_slice);
 
 	// delete tree
 	// template <SupportsForceParallel Interior, bool granularity>
@@ -482,26 +468,23 @@ template <class TypeTrait> class btree {
 
 	// Returns {subtree box, all checked properties held}.
 	template <bool CheckSize = true>
-	std::pair<typename TT::Box, bool>
-	verify_tree_property(Node const *T) const;
+	std::pair<typename TT::Box, bool> verify_tree_property(Node const *T) const;
 
 	bool verify_unoverlapped_tree(Node const *T,
-				      TT::node_slice node_slice) const;
+								  TT::node_slice node_slice) const;
 
 	TT::height_type check_height(Node const *T) const;
 
 	bool check_contain_node(Node const *T, Node const *P) const;
 
-	template <typename Leaf, typename Interior>
-	int get_height(Node const *T);
+	template <typename Leaf, typename Interior> int get_height(Node const *T);
 
 	template <typename Leaf, typename Interior>
 	int get_tree_nodes_num(Node const *T);
 
 	// Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at
 	// T.
-	static std::pair<size_type, size_type>
-	count_sorted_leaves(Node const *T);
+	static std::pair<size_type, size_type> count_sorted_leaves(Node const *T);
 
 	std::tuple<bool, bool, typename TT::size_type>
 	check_tree_aug_after_delete(Node *T);
@@ -509,30 +492,29 @@ template <class TypeTrait> class btree {
 	bool contain_iter(Node const *T, K const &k) const;
 
 	void range_count_leaf(Node const *T, TT::Box const &query_box,
-			      size_type &offset) const;
+						  size_type &offset) const;
 
 	void range_count_rec(Node const *T, TT::Box const &query_box,
-			     size_type &offset) const;
+						 size_type &offset) const;
 
 	template <typename Range>
 	void range_report_leaf(Node const *T, TT::Box const &query_box,
-			       size_type &offset, Range out) const;
+						   size_type &offset, Range out) const;
 
 	template <typename Range>
 	void range_report_iter(Node const *T, TT::Box const &query_box,
-			       size_type &offset, Range out) const;
+						   size_type &offset, Range out) const;
 
 	template <typename Range>
 	void range_report_rec(Node const *T, TT::Box const &query_box,
-			      size_type &offset, Range out) const;
+						  size_type &offset, Range out) const;
 
 	template <typename Range>
 	void range_report_flatten_rec(Node const *T, size_type &offset,
-				      Range out) const;
+								  Range out) const;
 
-    public:
-	static auto parse_input(TT::entry_seq const &input_seq)
-		-> input_range_type
+public:
+	static auto parse_input(TT::entry_seq const &input_seq) -> input_range_type
 	{
 		return input_seq;
 	}
@@ -541,7 +523,7 @@ template <class TypeTrait> class btree {
 		-> input_delete_range_type
 	{
 		return parlay::map(input_seq,
-				   [&](auto e) { return Entry::get_key(e); });
+						   [&](auto e) { return Entry::get_key(e); });
 	}
 
 	Node *get_root()
@@ -573,7 +555,7 @@ template <class TypeTrait> class btree {
 	{
 	}
 
-    private:
+private:
 	Node *root_ = nullptr;
 };
 

@@ -53,8 +53,7 @@ template <class intV> void xToString(char *s, edge<intV> a)
 
 template <class intV, class Weight> int xToStringLen(wghEdge<intV, Weight> a)
 {
-	return xToStringLen(a.u) + xToStringLen(a.v) + xToStringLen(a.weight) +
-	       2;
+	return xToStringLen(a.u) + xToStringLen(a.v) + xToStringLen(a.weight) + 2;
 }
 
 template <class intV, class Weight>
@@ -163,8 +162,7 @@ template <class intV> edgeArray<intV> readEdgeArrayFromFile(char *fname)
 
 	auto mon = parlay::make_monoid(
 		[&](edge<intV> a, edge<intV> b) {
-			return edge<intV>(std::max(a.u, b.u),
-					  std::max(a.v, b.v));
+			return edge<intV>(std::max(a.u, b.u), std::max(a.v, b.v));
 		},
 		edge<intV>(0, 0));
 	auto r = parlay::reduce(E, mon);
@@ -186,7 +184,7 @@ wghEdgeArray<intV, Weight> readWghEdgeArrayFromFile(char *fname)
 	long n = (W.size() - 1) / 3;
 	auto E = parlay::tabulate(n, [&](size_t i) -> WE {
 		return WE(atol(W[3 * i + 1]), atol(W[3 * i + 2]),
-			  (Weight)atof(W[3 * i + 3]));
+				  (Weight)atof(W[3 * i + 3]));
 	});
 
 	auto mon = parlay::make_monoid(
@@ -196,8 +194,7 @@ wghEdgeArray<intV, Weight> readWghEdgeArrayFromFile(char *fname)
 		WE(0, 0, 0));
 	auto r = parlay::reduce(E, mon);
 
-	return wghEdgeArray<intV, Weight>(std::move(E),
-					  max<intV>(r.u, r.v) + 1);
+	return wghEdgeArray<intV, Weight>(std::move(E), max<intV>(r.u, r.v) + 1);
 }
 
 template <class intV, class intE = intV>
@@ -206,8 +203,7 @@ graph<intV, intE> readGraphFromFile(char *fname)
 	auto W = get_tokens(fname);
 	string header(W[0].begin(), W[0].end());
 	if (header != AdjGraphHeader) {
-		cout << "Bad input file: missing header: " << AdjGraphHeader
-		     << endl;
+		cout << "Bad input file: missing header: " << AdjGraphHeader << endl;
 		abort();
 	}
 
@@ -217,7 +213,7 @@ graph<intV, intE> readGraphFromFile(char *fname)
 	long m = parlay::chars_to_long(W[2]);
 	if (W.size() != n + m + 3) {
 		cout << "Bad input file: length = " << W.size()
-		     << " n+m+3 = " << n + m + 3 << endl;
+			 << " n+m+3 = " << n + m + 3 << endl;
 		abort();
 	}
 
@@ -316,29 +312,27 @@ wghGraph<intV, Weight, intE> readWghGraphFromFile(char *fname)
 	long m = atol(W[2]);
 	if (W.size() != n + 2 * m + 3) {
 		cout << "Bad input file: length = " << W.size()
-		     << " n + 2*m + 3 = " << n + 2 * m + 3 << endl;
+			 << " n + 2*m + 3 = " << n + 2 * m + 3 << endl;
 		abort();
 	}
 
 	// tags on m at the end (so n+1 total offsets)
-	auto offsets = parlay::tabulate(n + 1, [&](size_t i) -> intE {
-		return (i == n) ? m : atol(W[i + 3]);
-	});
+	auto offsets = parlay::tabulate(
+		n + 1, [&](size_t i) -> intE { return (i == n) ? m : atol(W[i + 3]); });
 	auto edges = parlay::tabulate(
 		m, [&](size_t i) -> intV { return atol(W[n + i + 3]); });
-	auto weights = parlay::tabulate(m, [&](size_t i) -> Weight {
-		return (Weight)atof(W[n + i + 3 + m]);
-	});
+	auto weights = parlay::tabulate(
+		m, [&](size_t i) -> Weight { return (Weight)atof(W[n + i + 3 + m]); });
 
-	return wghGraph<intV, Weight, intE>(
-		std::move(offsets), std::move(edges), std::move(weights), n);
+	return wghGraph<intV, Weight, intE>(std::move(offsets), std::move(edges),
+										std::move(weights), n);
 }
 
 // The following two are used by the graph generators to write out in either
 // format and either with reordering or not
 template <class intV, class intE>
 void writeGraphFromAdj(graph<intV, intE> const &G, char *fname, bool adjArray,
-		       bool ordered)
+					   bool ordered)
 {
 	if (adjArray)
 		if (ordered)
@@ -358,10 +352,10 @@ void writeGraphFromAdj(graph<intV, intE> const &G, char *fname, bool adjArray,
 
 template <class intV, class intE = intV>
 void writeGraphFromEdges(edgeArray<intV> &EA, char *fname, bool adjArray,
-			 bool ordered)
+						 bool ordered)
 {
-	writeGraphFromAdj(graphFromEdges<intV, intE>(EA, adjArray), fname,
-			  adjArray, ordered);
+	writeGraphFromAdj(graphFromEdges<intV, intE>(EA, adjArray), fname, adjArray,
+					  ordered);
 }
 
 // void errorOut(const char* s) {

@@ -67,10 +67,10 @@ struct hashEdges {
 	int cmp(kType s1, kType s2)
 	{
 		return ((s1.first > s2.first)	? 1 :
-			(s1.first < s2.first)	? -1 :
-			(s1.second > s2.second) ? 1 :
-			(s1.second < s2.second) ? -1 :
-						  0);
+				(s1.first < s2.first)	? -1 :
+				(s1.second > s2.second) ? 1 :
+				(s1.second < s2.second) ? -1 :
+										  0);
 	}
 	bool cas(eType *p, eType o, eType n)
 	{
@@ -104,9 +104,8 @@ topology_from_triangles(triangles<point> &Tri, size_t extra_points = 0)
 	EdgeTable ET = makeEdgeTable(m * 6);
 	parallel_for(0, m, [&](size_t i) {
 		for (int j = 0; j < 3; j++) {
-			E[i * 3 + j] = edge(
-				index_pair(Tri.T[i][j], Tri.T[i][(j + 1) % 3]),
-				&Triangs[i]);
+			E[i * 3 + j] = edge(index_pair(Tri.T[i][j], Tri.T[i][(j + 1) % 3]),
+								&Triangs[i]);
 			ET.insert(&E[i * 3 + j]);
 			Triangs[i].vtx[(j + 2) % 3] = &V[Tri.T[i][j]];
 		}
@@ -146,36 +145,26 @@ bool check_delaunay(sequence<triang_t> &Triangles, size_t boundary_size)
 			for (int j = 0; j < 3; j++) {
 				simplex_t a = t.across();
 				if (a.valid()) {
-					vertex_t *v =
-						a.rotClockwise().firstVertex();
+					vertex_t *v = a.rotClockwise().firstVertex();
 
 					// Check that the neighbor is outside the triangle
 					if (!t.outside(v)) {
-						double vz = triAreaNormalized(
-							t.t->vtx[(t.o + 2) % 3]
-								->pt,
-							v->pt,
-							t.t->vtx[t.o]->pt);
+						double vz =
+							triAreaNormalized(t.t->vtx[(t.o + 2) % 3]->pt,
+											  v->pt, t.t->vtx[t.o]->pt);
 						// allow for small error
 						if (vz < -1e-10)
-							pbbs::write_min(
-								&insideOutError,
-								i,
-								less<size_t>());
+							pbbs::write_min(&insideOutError, i, less<size_t>());
 					}
 
 					// Check that the neighbor is not in circumcircle of the triangle
 					if (t.inCirc(v)) {
-						double vz = inCircleNormalized(
-							t.t->vtx[0]->pt,
-							t.t->vtx[1]->pt,
-							t.t->vtx[2]->pt, v->pt);
+						double vz =
+							inCircleNormalized(t.t->vtx[0]->pt, t.t->vtx[1]->pt,
+											   t.t->vtx[2]->pt, v->pt);
 						// allow for small error
 						if (vz > 1e-10)
-							pbbs::write_min(
-								&inCircleError,
-								i,
-								less<size_t>());
+							pbbs::write_min(&inCircleError, i, less<size_t>());
 					}
 				} else
 					boundary_count[i]++;
@@ -189,12 +178,11 @@ bool check_delaunay(sequence<triang_t> &Triangles, size_t boundary_size)
 
 	if (insideOutError < n) {
 		cout << "delaunayCheck: neighbor inside triangle at triangle "
-		     << inCircleError << endl;
+			 << inCircleError << endl;
 		return 1;
 	}
 	if (inCircleError < n) {
-		cout << "In Circle Violation at triangle " << inCircleError
-		     << endl;
+		cout << "In Circle Violation at triangle " << inCircleError << endl;
 		return 1;
 	}
 

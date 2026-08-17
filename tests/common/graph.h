@@ -180,27 +180,26 @@ template <class intV = DefaultIntV, class intE = intV> struct graph {
 
 	void addDegrees()
 	{
-		degrees = parlay::tabulate(n, [&](size_t i) -> intV {
-			return offsets[i + 1] - offsets[i];
-		});
+		degrees = parlay::tabulate(
+			n, [&](size_t i) -> intV { return offsets[i + 1] - offsets[i]; });
 	}
 
 	MVT operator[](size_t const i)
 	{
-		return MVT(edges.data() + offsets[i],
-			   (degrees.size() == 0) ? offsets[i + 1] - offsets[i] :
-						   degrees[i]);
+		return MVT(edges.data() + offsets[i], (degrees.size() == 0) ?
+												  offsets[i + 1] - offsets[i] :
+												  degrees[i]);
 	}
 
 	const VT operator[](size_t const i) const
 	{
-		return VT(edges.data() + offsets[i],
-			  (degrees.size() == 0) ? offsets[i + 1] - offsets[i] :
-						  degrees[i]);
+		return VT(edges.data() + offsets[i], (degrees.size() == 0) ?
+												 offsets[i + 1] - offsets[i] :
+												 degrees[i]);
 	}
 
 	graph(parlay::sequence<intE> offsets_, parlay::sequence<intV> edges_,
-	      size_t n)
+		  size_t n)
 		: offsets(std::move(offsets_))
 		, edges(std::move(edges_))
 		, n(n)
@@ -230,7 +229,7 @@ struct wghVertex {
 };
 
 template <class intV = DefaultIntV, class Weight = DefaultWeight,
-	  class intE = intV>
+		  class intE = intV>
 struct wghGraph {
 	using VT = wghVertex<intV, Weight>;
 	using W = Weight;
@@ -256,13 +255,12 @@ struct wghGraph {
 	}
 	VT operator[](size_t const i)
 	{
-		return VT(edges.begin() + offsets[i],
-			  weights.begin() + offsets[i],
-			  offsets[i + 1] - offsets[i]);
+		return VT(edges.begin() + offsets[i], weights.begin() + offsets[i],
+				  offsets[i + 1] - offsets[i]);
 	}
 
 	wghGraph(parlay::sequence<intE> offsets_, parlay::sequence<intV> edges_,
-		 parlay::sequence<Weight> weights_, size_t n)
+			 parlay::sequence<Weight> weights_, size_t n)
 		: offsets(std::move(offsets_))
 		, edges(std::move(edges_))
 		, weights(std::move(weights_))
@@ -270,8 +268,7 @@ struct wghGraph {
 		, m(edges.size())
 	{
 		if (offsets.size() != n + 1 || weights.size() != edges.size()) {
-			std::cout << "error in weighted graph constructor"
-				  << std::endl;
+			std::cout << "error in weighted graph constructor" << std::endl;
 		}
 	}
 };

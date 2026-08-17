@@ -24,8 +24,7 @@ void btree<TT>::get_entries(Range &Out) const
 	}
 	this->flatten_rec<typename TT::entry_slice, false, false>(
 		this->root_,
-		parlay::make_slice(Out.begin(),
-				   Out.begin() + this->root_->size));
+		parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));
 }
 
 } // namespace pab_tree

@@ -19,27 +19,26 @@ void btree<TT>::batch_delete(Range &&In)
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
-					parlay::range_reference_type_t<Range>>);
+								parlay::range_reference_type_t<Range>>);
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 
 	constexpr auto leaf_entries_pattern = TT::leaf_entries_pattern::hybrid;
 	constexpr bool sorted_input = false;
-	BatchDelete_(A, leaf_entries_pattern, sorted_input,
-		     default_hybrid_pred{});
+	BatchDelete_(A, leaf_entries_pattern, sorted_input, default_hybrid_pred{});
 }
 
 template <typename TT>
 template <typename Range, typename LeafSortPred>
 void btree<TT>::batch_delete(Range &&In,
-			     const TT::pattern_type leaf_entries_pattern,
-			     const bool sorted_input,
-			     LeafSortPred const &leaf_sort_pred)
+							 const TT::pattern_type leaf_entries_pattern,
+							 const bool sorted_input,
+							 LeafSortPred const &leaf_sort_pred)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
-					parlay::range_reference_type_t<Range>>);
+								parlay::range_reference_type_t<Range>>);
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 
@@ -50,9 +49,9 @@ template <typename TT>
 template <typename Range, typename LeafSortPred>
 	requires std::predicate<LeafSortPred, typename btree<TT>::Node *, Range>
 void btree<TT>::BatchDelete_(Range In,
-			     const TT::pattern_type leaf_entries_pattern,
-			     const bool sorted_input,
-			     LeafSortPred const &leaf_sort_pred)
+							 const TT::pattern_type leaf_entries_pattern,
+							 const bool sorted_input,
+							 LeafSortPred const &leaf_sort_pred)
 {
 	if (this->root_ == nullptr) {
 		return;
@@ -62,21 +61,20 @@ void btree<TT>::BatchDelete_(Range In,
 		return;
 	}
 
-	static_assert(std::same_as<typename decltype(In)::value_type,
-				   typename TT::K>);
+	static_assert(
+		std::same_as<typename decltype(In)::value_type, typename TT::K>);
 
-	parlay::slice<const K *, const K *> sorted_slice{ In.begin(),
-							  In.end() };
+	parlay::slice<const K *, const K *> sorted_slice{ In.begin(), In.end() };
 	typename TT::key_seq sorted_seq;
 	if (!sorted_input) {
 		sorted_seq = parlay::sort(In);
-		sorted_slice = parlay::make_slice(sorted_seq.cbegin(),
-						  sorted_seq.cend());
+		sorted_slice =
+			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	}
 
 	auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
-		batch_delete_recursive(this->root_, sorted_slice,
-				       leaf_entries_pattern, leaf_sort_pred);
+		batch_delete_recursive(this->root_, sorted_slice, leaf_entries_pattern,
+							   leaf_sort_pred);
 
 	if (invalid_flag) { // root is invalid
 		if (this->root_->is_leaf) {
@@ -90,8 +88,7 @@ void btree<TT>::BatchDelete_(Range In,
 		// on every tree this branch now recovers.
 		if (this->root_->size == 0) {
 			constexpr bool k_enable_granularity = false;
-			this->delete_tree_rec<k_enable_granularity>(
-				this->root_);
+			this->delete_tree_rec<k_enable_granularity>(this->root_);
 			this->root_ = nullptr;
 			return;
 		}
@@ -101,8 +98,7 @@ void btree<TT>::BatchDelete_(Range In,
 
 	if (invalid_subtree_num) {
 		if (this->root_->size < TT::k_buf_ub &&
-		    !this->root_
-			     ->is_leaf) { // fits in one leaf directly use leaf
+			!this->root_->is_leaf) { // fits in one leaf directly use leaf
 			this->rebuild_from_flatten();
 			return;
 		}
@@ -116,8 +112,8 @@ void btree<TT>::BatchDelete_(Range In,
 
 		const bool has_tomb = true;
 		fetch_invalid_subtree_nodes(
-			this->root_, parlay::make_slice(reinsert_entries),
-			has_tomb, leaf_entries_pattern, leaf_sort_pred);
+			this->root_, parlay::make_slice(reinsert_entries), has_tomb,
+			leaf_entries_pattern, leaf_sort_pred);
 	}
 }
 
@@ -138,39 +134,37 @@ template <typename TT>
 template <typename LeafSortPred>
 std::tuple<bool, bool, typename TT::size_type>
 btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
-				  const TT::pattern_type leaf_entries_pattern,
-				  LeafSortPred const &leaf_sort_pred)
+								  const TT::pattern_type leaf_entries_pattern,
+								  LeafSortPred const &leaf_sort_pred)
 {
 	if (In.size() == 0) {
 		// stop here, than all subtree is valid
 		if (!T->is_leaf) {
 			static_cast<Interior *>(T)->reset_deletion_flag();
 		}
-		assert(node_is_valid(T) &&
-		       node_contain_invalid_subtree(T) == 0 &&
-		       get_node_reinsert_size(T) == 0);
+		assert(node_is_valid(T) && node_contain_invalid_subtree(T) == 0 &&
+			   get_node_reinsert_size(T) == 0);
 		return std::make_tuple(false, 0, 0);
 	}
 
 	if (T->is_leaf) {
 		[[maybe_unused]] auto old_size = T->size;
-		[[maybe_unused]] auto new_node = delete_points_4_leaf(
-			T, In, leaf_entries_pattern, leaf_sort_pred);
+		[[maybe_unused]] auto new_node =
+			delete_points_4_leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
 		assert(new_node == T);
 		assert(new_node->size + In.size() == old_size);
 		// return std::make_tuple(T->size < TT::k_buf_lb,
 		//                        T->size < TT::k_buf_lb ? 1 : 0,
 		return std::make_tuple(get_node_invalid_status(T),
-				       node_contain_invalid_subtree(T),
-				       get_node_reinsert_size(T));
+							   node_contain_invalid_subtree(T),
+							   get_node_reinsert_size(T));
 	}
 
 	auto TI = static_cast<Interior *>(T);
 
 	size_buf_ub_arr split_pos_seq;
 	if (In.size() > TT::k_split_factor * TI->get_split_n()) {
-		split_batch_binary_search(split_pos_seq, In,
-					  TI->get_split_slice());
+		split_batch_binary_search(split_pos_seq, In, TI->get_split_slice());
 	} else {
 		split_batch_merge(split_pos_seq, In, TI->get_split_slice());
 	}
@@ -180,10 +174,8 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 	// i.e., less than the split value
 	for (int i = 1; i < TI->get_split_n(); i++) {
 		assert(parlay::all_of(
-			In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
-			[&](K const k) {
-				return k >= TI->split[i - 1] &&
-				       k < TI->split[i];
+			In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](K const k) {
+				return k >= TI->split[i - 1] && k < TI->split[i];
 			}));
 	}
 #endif // DEBUG
@@ -201,8 +193,8 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 	buf_size_type cnt = 0;
 	for (buf_size_type i = 0; i < TI->get_node_n(); i++) {
 		size_type l = (i == 0 ? 0 : split_pos_seq[i - 1]);
-		size_type r = (i == TI->get_node_n() - 1 ? In.size() :
-							   split_pos_seq[i]);
+		size_type r =
+			(i == TI->get_node_n() - 1 ? In.size() : split_pos_seq[i]);
 		if (l != r) {
 			touched_l[cnt] = l;
 			touched_r[cnt] = r;
@@ -226,18 +218,16 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 		0, cnt,
 		[&](buf_size_type i) {
 			std::tie(invalid_subtree_flag[nodes_map[i]],
-				 contain_invalid_subtree[nodes_map[i]],
-				 reinsert_entries_num[nodes_map[i]]) =
-				batch_delete_recursive(
-					TI->tree_nodes[nodes_map[i]],
-					In.cut(touched_l[i], touched_r[i]),
-					leaf_entries_pattern, leaf_sort_pred);
+					 contain_invalid_subtree[nodes_map[i]],
+					 reinsert_entries_num[nodes_map[i]]) =
+				batch_delete_recursive(TI->tree_nodes[nodes_map[i]],
+									   In.cut(touched_l[i], touched_r[i]),
+									   leaf_entries_pattern, leaf_sort_pred);
 		},
 		1);
 
-	return batch_delete_update_interior_size(T, contain_invalid_subtree,
-						 invalid_subtree_flag,
-						 reinsert_entries_num);
+	return batch_delete_update_interior_size(
+		T, contain_invalid_subtree, invalid_subtree_flag, reinsert_entries_num);
 }
 
 } // namespace pab_tree

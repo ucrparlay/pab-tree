@@ -14,7 +14,7 @@ namespace pab_tree
 //* God made the integers, all else is the work of man.
 //* -- Leopold Kronecker
 template <typename T> class Num_Comparator {
-    public:
+public:
 	static bool gt(T const a, T const b)
 	{
 		if constexpr (std::is_floating_point_v<T>) {
@@ -67,7 +67,7 @@ template <typename T> class Num_Comparator {
 		return std::numeric_limits<T>::lowest();
 	}
 
-    private:
+private:
 	static constexpr T eps = std::numeric_limits<T>::epsilon();
 };
 

@@ -23,7 +23,7 @@ void btree<TT>::build(Range &&In)
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
-					parlay::range_reference_type_t<Range>>);
+								parlay::range_reference_type_t<Range>>);
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 	Build_(A);
@@ -47,7 +47,7 @@ void btree<TT>::Build_(Range In)
 
 template <typename TT>
 TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
-					      TT::split_slice keys)
+											  TT::split_slice keys)
 {
 	auto aux_node_seq = TT::node_seq::uninitialized(nodes.size());
 	auto aux_key_seq = TT::key_seq::uninitialized(keys.size());
@@ -69,15 +69,12 @@ TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
 		size_type interior_bkt_n = generate_interior_nodes(
 			node_in, key_in,
 			gen_nodes_output_handler{
-				.set_key = [&](size_type i,
-					       auto key) { key_out[i] = key; },
-				.set_node =
-					[&](size_type i, auto node) {
-						node_out[i] = node;
-					} });
+				.set_key = [&](size_type i, auto key) { key_out[i] = key; },
+				.set_node = [&](size_type i,
+								auto node) { node_out[i] = node; } });
 		swap_key_node(interior_bkt_n);
-		assert(parlay::is_sorted(
-			key_in, [&](TT::K a, TT::K b) { return a < b; }));
+		assert(
+			parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
 	}
 
 	auto *node = alloc_interior_node<Interior, TT>(node_in, key_in);
@@ -98,25 +95,22 @@ TT::Node *btree<TT>::build_recursive(Range In)
 	}
 
 	size_type estimated_bkt_n = (In.size() / TT::k_buf_md) + 1;
-	auto node_seq =
-		parlay::sequence<Node *>::uninitialized(estimated_bkt_n);
-	auto key_seq = parlay::sequence<typename TT::K>::uninitialized(
-		estimated_bkt_n);
+	auto node_seq = parlay::sequence<Node *>::uninitialized(estimated_bkt_n);
+	auto key_seq =
+		parlay::sequence<typename TT::K>::uninitialized(estimated_bkt_n);
 	auto node_out = parlay::make_slice(node_seq);
 	auto key_out = parlay::make_slice(key_seq);
 
 	size_type bkt_n = generate_leaf_nodes(
 		In,
 		gen_nodes_output_handler{
-			.set_key = [&](size_type i,
-				       auto key) { key_out[i] = key; },
-			.set_node = [&](size_type i,
-					auto node) { node_out[i] = node; } });
+			.set_key = [&](size_type i, auto key) { key_out[i] = key; },
+			.set_node = [&](size_type i, auto node) { node_out[i] = node; } });
 	assert(parlay::is_sorted(key_out.cut(0, bkt_n - 1),
-				 [&](TT::K a, TT::K b) { return a < b; }));
+							 [&](TT::K a, TT::K b) { return a < b; }));
 
 	this->root_ = assemble_interior_levels(node_out.cut(0, bkt_n),
-					       key_out.cut(0, bkt_n - 1));
+										   key_out.cut(0, bkt_n - 1));
 	return this->root_;
 }
 

@@ -54,14 +54,13 @@ int main(int argc, char *argv[])
 	uint64_t const n = std::stoull(W[0]);
 	uint64_t const dim = std::stoull(W[1]);
 	if (W.size() - 2 != n * dim) {
-		std::cerr << "Token count mismatch: header says " << n << " x "
-			  << dim << " = " << n * dim << ", file has "
-			  << W.size() - 2 << " tokens." << std::endl;
+		std::cerr << "Token count mismatch: header says " << n << " x " << dim
+				  << " = " << n * dim << ", file has " << W.size() - 2
+				  << " tokens." << std::endl;
 		return 1;
 	}
 
-	std::cout << "Parsing " << n << " entries with dim " << dim
-		  << std::endl;
+	std::cout << "Parsing " << n << " entries with dim " << dim << std::endl;
 	auto payload = parlay::tabulate(n * dim, [&](size_t i) -> uint64_t {
 		return std::strtoull(W[2 + i], nullptr, 10);
 	});

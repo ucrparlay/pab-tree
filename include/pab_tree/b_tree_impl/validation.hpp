@@ -27,24 +27,20 @@ btree<TT>::verify_tree_property(Node const *T) const
 		Leaf const *TL = static_cast<Leaf const *>(T);
 		bool ok = true;
 		if constexpr (CheckSize) {
-			assert(T == this->root_ ||
-			       (TL->get_ele().size() >= TT::k_buf_lb &&
-				TL->get_ele().size() <= TT::k_buf_ub));
-			ok = ok &&
-			     (T == this->root_ || (TL->size >= TT::k_buf_lb &&
-						   TL->size <= TT::k_buf_ub));
+			assert(T == this->root_ || (TL->get_ele().size() >= TT::k_buf_lb &&
+										TL->get_ele().size() <= TT::k_buf_ub));
+			ok = ok && (T == this->root_ ||
+						(TL->size >= TT::k_buf_lb && TL->size <= TT::k_buf_ub));
 		}
 		assert(!TL->is_sorted ||
-		       parlay::is_sorted(TL->get_ele(), [&](auto const &e1,
-							    auto const &e2) {
-			       return Entry::get_key(e1) < Entry::get_key(e2);
-		       }));
-		ok = ok &&
-		     (!TL->is_sorted ||
-		      parlay::is_sorted(TL->get_ele_slice(),
-					[&](auto const &e1, auto const &e2) {
-						return Entry::get_key(e1) <
-						       Entry::get_key(e2);
+			   parlay::is_sorted(
+				   TL->get_ele(), [&](auto const &e1, auto const &e2) {
+					   return Entry::get_key(e1) < Entry::get_key(e2);
+				   }));
+		ok = ok && (!TL->is_sorted ||
+					parlay::is_sorted(TL->get_ele_slice(), [&](auto const &e1,
+															   auto const &e2) {
+						return Entry::get_key(e1) < Entry::get_key(e2);
 					}));
 		return { pab_tree::get_box<TT>(TL->get_ele_slice()), ok };
 	}
@@ -53,18 +49,17 @@ btree<TT>::verify_tree_property(Node const *T) const
 
 	// ensure the split number is 1 less than the child number
 	assert(T == this->root_ || (TI->get_node_n() >= TT::k_buf_lb &&
-				    TI->get_node_n() <= TT::k_buf_ub));
+								TI->get_node_n() <= TT::k_buf_ub));
 
 	// ensure the split is increasing
 	assert(parlay::is_sorted(TI->get_split_slice(),
-				 [&](TT::K a, TT::K b) { return a < b; }));
+							 [&](TT::K a, TT::K b) { return a < b; }));
 
-	bool node_ok =
-		(T == this->root_ || (TI->get_node_n() >= TT::k_buf_lb &&
-				      TI->get_node_n() <= TT::k_buf_ub)) &&
-		TI->get_node_n() > 0 &&
-		parlay::is_sorted(TI->get_split_slice(),
-				  [&](TT::K a, TT::K b) { return a < b; });
+	bool node_ok = (T == this->root_ || (TI->get_node_n() >= TT::k_buf_lb &&
+										 TI->get_node_n() <= TT::k_buf_ub)) &&
+				   TI->get_node_n() > 0 &&
+				   parlay::is_sorted(TI->get_split_slice(),
+									 [&](TT::K a, TT::K b) { return a < b; });
 
 	// check the box of each child node falls within the split between
 	parlay::sequence<typename TT::Box> box_seq(TI->get_node_n());
@@ -75,9 +70,8 @@ btree<TT>::verify_tree_property(Node const *T) const
 			verify_tree_property<CheckSize>(TI->tree_nodes[i]);
 		box_seq[i] = child_box;
 		ok_seq[i] = child_ok && TI->tree_nodes[i] != nullptr;
-		size_seq[i] = TI->tree_nodes[i] == nullptr ?
-				      0 :
-				      TI->tree_nodes[i]->size;
+		size_seq[i] =
+			TI->tree_nodes[i] == nullptr ? 0 : TI->tree_nodes[i]->size;
 		[[maybe_unused]] auto node = TI->tree_nodes[i];
 		auto box = box_seq[i];
 
@@ -95,21 +89,16 @@ btree<TT>::verify_tree_property(Node const *T) const
 			assert(box.first >= TI->split[i - 1]);
 			ok_seq[i] = ok_seq[i] && box.first >= TI->split[i - 1];
 		} else {
-			if (box.first < TI->split[i - 1] ||
-			    box.second >= TI->split[i]) {
-				std::cout << "validate: box outside split"
-					  << std::endl;
-				std::cout << "Box: [" << box.first << ", "
-					  << box.second << "], Splits: ["
-					  << TI->split[i - 1] << ", "
-					  << TI->split[i] << "]" << std::endl;
+			if (box.first < TI->split[i - 1] || box.second >= TI->split[i]) {
+				std::cout << "validate: box outside split" << std::endl;
+				std::cout << "Box: [" << box.first << ", " << box.second
+						  << "], Splits: [" << TI->split[i - 1] << ", "
+						  << TI->split[i] << "]" << std::endl;
 				assert(false);
 			}
-			assert(box.first >= TI->split[i - 1] &&
-			       box.second < TI->split[i]);
-			ok_seq[i] = ok_seq[i] &&
-				    box.first >= TI->split[i - 1] &&
-				    box.second < TI->split[i];
+			assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
+			ok_seq[i] = ok_seq[i] && box.first >= TI->split[i - 1] &&
+						box.second < TI->split[i];
 		}
 	});
 
@@ -118,9 +107,8 @@ btree<TT>::verify_tree_property(Node const *T) const
 	if constexpr (CheckSize) {
 		size_t const child_sum = parlay::reduce(size_seq);
 		if (child_sum != TI->size) {
-			std::cout << "Validation failed: interior size "
-				  << TI->size << " != sum of children "
-				  << child_sum << std::endl;
+			std::cout << "Validation failed: interior size " << TI->size
+					  << " != sum of children " << child_sum << std::endl;
 			node_ok = false;
 		}
 	}
@@ -133,7 +121,7 @@ btree<TT>::verify_tree_property(Node const *T) const
 
 template <typename TT>
 bool btree<TT>::verify_unoverlapped_tree(Node const *T,
-					 TT::node_slice node_slice) const
+										 TT::node_slice node_slice) const
 {
 	int cnt = 0;
 	for (int i = 0; i < node_slice.size(); i++) {
@@ -165,9 +153,8 @@ bool btree<TT>::check_contain_node(Node const *T, Node const *P) const
 
 	return parlay::reduce(
 		parlay::make_slice(contain_arr.begin(),
-				   contain_arr.begin() + TI->get_node_n()),
-		parlay::binary_op([&](bool a, bool b) { return a | b; },
-				  bool()));
+						   contain_arr.begin() + TI->get_node_n()),
+		parlay::binary_op([&](bool a, bool b) { return a | b; }, bool()));
 }
 
 template <typename TT>
@@ -184,8 +171,7 @@ TT::height_type btree<TT>::check_height(Node const *T) const
 		heights[i] = check_height(TI->tree_nodes[i]);
 	});
 
-	assert(parlay::all_of(heights,
-			      [&](auto h) { return h == heights[0]; }));
+	assert(parlay::all_of(heights, [&](auto h) { return h == heights[0]; }));
 
 	return heights[0] + 1;
 }
@@ -262,8 +248,7 @@ btree<TT>::count_sorted_leaves(Node const *T)
 {
 	if (T->is_leaf) {
 		Leaf const *TL = static_cast<Leaf const *>(T);
-		return { TL->is_sorted ? size_type(1) : size_type(0),
-			 size_type(1) };
+		return { TL->is_sorted ? size_type(1) : size_type(0), size_type(1) };
 	}
 
 	auto const *TI = static_cast<Interior const *>(T);
@@ -273,16 +258,15 @@ btree<TT>::count_sorted_leaves(Node const *T)
 		counts[i] = count_sorted_leaves(TI->tree_nodes[i]);
 	});
 
-	return parlay::reduce(
-		counts, parlay::binary_op(
-				[](std::pair<size_type, size_type> a,
-				   std::pair<size_type, size_type> b) {
-					return std::pair<size_type, size_type>{
-						a.first + b.first,
-						a.second + b.second
-					};
-				},
-				std::pair<size_type, size_type>{ 0, 0 }));
+	return parlay::reduce(counts,
+						  parlay::binary_op(
+							  [](std::pair<size_type, size_type> a,
+								 std::pair<size_type, size_type> b) {
+								  return std::pair<size_type, size_type>{
+									  a.first + b.first, a.second + b.second
+								  };
+							  },
+							  std::pair<size_type, size_type>{ 0, 0 }));
 }
 
 template <typename TT> double btree<TT>::sorted_leaf_ratio(Node const *T) const
@@ -295,9 +279,9 @@ template <typename TT> double btree<TT>::sorted_leaf_ratio(Node const *T) const
 	}
 
 	auto const [sorted_n, total_n] = count_sorted_leaves(T);
-	return total_n == 0 ? 0.0 :
-			      static_cast<double>(sorted_n) /
-				      static_cast<double>(total_n);
+	return total_n == 0 ?
+			   0.0 :
+			   static_cast<double>(sorted_n) / static_cast<double>(total_n);
 }
 
 template <typename TT>
@@ -305,16 +289,14 @@ std::tuple<bool, bool, typename TT::size_type>
 btree<TT>::check_tree_aug_after_delete(Node *T)
 {
 	if (T->is_leaf) {
-		return { get_node_invalid_status(T),
-			 node_contain_invalid_subtree(T),
-			 get_node_reinsert_size(T) };
+		return { get_node_invalid_status(T), node_contain_invalid_subtree(T),
+				 get_node_reinsert_size(T) };
 	}
 
 	auto TI = static_cast<Interior *>(T);
 	auto node_n = TI->get_node_n();
 	parlay::sequence<int> invalid_seq(node_n);
-	parlay::sequence<typename TT::size_type> invalid_subtree_num_seq(
-		node_n);
+	parlay::sequence<typename TT::size_type> invalid_subtree_num_seq(node_n);
 	parlay::sequence<typename TT::size_type> reinsert_size_seq(node_n);
 	parlay::parallel_for(0, node_n, [&](size_t i) {
 		auto [invalid, invalid_subtree_num, reinsert_size] =
@@ -331,13 +313,11 @@ btree<TT>::check_tree_aug_after_delete(Node *T)
 	if (T == this->root_) {
 		assert(TI->valid == ((TI->get_node_n() - sum_invalid) > 0));
 	} else {
-		assert(TI->valid ==
-		       ((TI->get_node_n() - sum_invalid) >= TT::k_buf_lb));
+		assert(TI->valid == ((TI->get_node_n() - sum_invalid) >= TT::k_buf_lb));
 	}
 
 	if (node_is_valid(T)) {
-		assert(sum_invalid_subtree_num ==
-		       node_contain_invalid_subtree(T));
+		assert(sum_invalid_subtree_num == node_contain_invalid_subtree(T));
 		assert(sum_reinsert_size == get_node_reinsert_size(T));
 	} else {
 		assert(node_contain_invalid_subtree(T) == 1);
@@ -345,8 +325,8 @@ btree<TT>::check_tree_aug_after_delete(Node *T)
 	}
 
 	return { get_node_invalid_status(T),
-		 node_is_valid(T) ? sum_invalid_subtree_num : 1,
-		 node_is_valid(T) ? sum_reinsert_size : TI->size };
+			 node_is_valid(T) ? sum_invalid_subtree_num : 1,
+			 node_is_valid(T) ? sum_reinsert_size : TI->size };
 }
 
 } // namespace pab_tree

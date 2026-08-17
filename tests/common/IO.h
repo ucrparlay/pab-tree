@@ -194,8 +194,7 @@ void writeSeqToStream(ofstream &os, parlay::sequence<T> const &A)
 	while (offset < n) {
 		// Generates a string for a sequence of size at most bsize
 		// and then wrties it to the output stream
-		charstring S =
-			seqToString(A.cut(offset, min(offset + bsize, n)));
+		charstring S = seqToString(A.cut(offset, min(offset + bsize, n)));
 		os.write(S.begin(), S.size() - 1);
 		offset += bsize;
 	}
@@ -203,7 +202,7 @@ void writeSeqToStream(ofstream &os, parlay::sequence<T> const &A)
 
 template <class T>
 int writeSeqToFile(string header, parlay::sequence<T> const &A,
-		   char const *fileName)
+				   char const *fileName)
 {
 	auto a = A[0];
 	// xToStringLena(a);
@@ -220,7 +219,7 @@ int writeSeqToFile(string header, parlay::sequence<T> const &A,
 
 template <class T1, class T2>
 int write2SeqToFile(string header, parlay::sequence<T1> const &A,
-		    parlay::sequence<T2> const &B, char const *fileName)
+					parlay::sequence<T2> const &B, char const *fileName)
 {
 	ofstream file(fileName, ios::out | ios::binary);
 	if (!file.is_open()) {
@@ -278,9 +277,8 @@ template <class T> parlay::sequence<T> readIntSeqFromFile(char const *fileName)
 		abort();
 	}
 	long n = W.size() - 1;
-	auto A = parlay::tabulate(n, [&](long i) -> T {
-		return parlay::chars_to_long(W[i + 1]);
-	});
+	auto A = parlay::tabulate(
+		n, [&](long i) -> T { return parlay::chars_to_long(W[i + 1]); });
 	return A;
 }
 }; // namespace benchIO

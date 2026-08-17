@@ -180,12 +180,11 @@ struct GraphHeader {
 			return;
 		}
 
-		in.read(reinterpret_cast<char *>(&num_vertices),
-			sizeof(num_vertices));
+		in.read(reinterpret_cast<char *>(&num_vertices), sizeof(num_vertices));
 		in.read(reinterpret_cast<char *>(&num_unique_edges),
-			sizeof(num_unique_edges));
+				sizeof(num_unique_edges));
 		in.read(reinterpret_cast<char *>(&total_updates),
-			sizeof(total_updates));
+				sizeof(total_updates));
 
 		uint8_t signal;
 		in.read(reinterpret_cast<char *>(&signal), sizeof(uint8_t));
@@ -209,19 +208,17 @@ struct GraphHeader {
 	void print() const
 	{
 		std::cout << "Number of vertices: " << num_vertices << "\n";
-		std::cout << "Number of unique edges: " << num_unique_edges
-			  << "\n";
+		std::cout << "Number of unique edges: " << num_unique_edges << "\n";
 		std::cout << "Total updates: " << total_updates << "\n";
-		std::cout << "Signal graph: "
-			  << (if_signal_graph ? "true" : "false") << "\n";
-		std::cout << "Vertex ID type: "
-			  << data_type_to_string(vertex_id_type) << "\n";
-		std::cout << "Timestamp type: "
-			  << data_type_to_string(timestamp_type) << "\n";
-		std::cout << "Directed: " << (if_directed ? "true" : "false")
-			  << "\n";
+		std::cout << "Signal graph: " << (if_signal_graph ? "true" : "false")
+				  << "\n";
+		std::cout << "Vertex ID type: " << data_type_to_string(vertex_id_type)
+				  << "\n";
+		std::cout << "Timestamp type: " << data_type_to_string(timestamp_type)
+				  << "\n";
+		std::cout << "Directed: " << (if_directed ? "true" : "false") << "\n";
 		std::cout << "Weight type: " << data_type_to_string(weight_type)
-			  << "\n";
+				  << "\n";
 	}
 	static constexpr uint64_t header_size_in_bytes = 32;
 	// round up the header size to 32 bytes for future proofing and alignment
@@ -234,8 +231,7 @@ class InputGraph {
 	void *mapped = nullptr;
 	bool valid;
 	size_t filesize = -1;
-	static constexpr uint64_t header_size =
-		GraphHeader::header_size_in_bytes;
+	static constexpr uint64_t header_size = GraphHeader::header_size_in_bytes;
 	static constexpr uint64_t src_offset = 0;
 
 	uint64_t row_size;
@@ -256,19 +252,15 @@ class InputGraph {
 		return result;
 	}
 
-    public:
+public:
 	InputGraph(const std::string &filename)
 	{
 		header = GraphHeader(filename);
 		row_size = get_row_size();
-		dest_offset =
-			src_offset + data_type_to_size(header.vertex_id_type);
-		ts_offset =
-			dest_offset + data_type_to_size(header.vertex_id_type);
-		weight_offset =
-			ts_offset + data_type_to_size(header.timestamp_type);
-		info_offset =
-			weight_offset + data_type_to_size(header.weight_type);
+		dest_offset = src_offset + data_type_to_size(header.vertex_id_type);
+		ts_offset = dest_offset + data_type_to_size(header.vertex_id_type);
+		weight_offset = ts_offset + data_type_to_size(header.timestamp_type);
+		info_offset = weight_offset + data_type_to_size(header.weight_type);
 
 		int fd = open(filename.c_str(), O_RDONLY);
 		if (fd == -1) {
@@ -296,33 +288,28 @@ class InputGraph {
 	template <typename type = void> uint64_t get_row_src(uint64_t i)
 	{
 		if constexpr (std::is_same_v<type, uint32_t>) {
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				src_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + src_offset);
 		}
 
 		switch (header.vertex_id_type) {
 		case DataType::UINT8:
-			return *reinterpret_cast<uint8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				src_offset);
+			return *reinterpret_cast<uint8_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + src_offset);
 		case DataType::UINT16:
-			return *reinterpret_cast<uint16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				src_offset);
+			return *reinterpret_cast<uint16_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + src_offset);
 		case DataType::UINT32:
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				src_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + src_offset);
 		case DataType::UINT64:
-			return *reinterpret_cast<uint64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				src_offset);
+			return *reinterpret_cast<uint64_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + src_offset);
 		case DataType::NONE:
 		case DataType::INT8:
 		case DataType::INT16:
@@ -337,33 +324,28 @@ class InputGraph {
 	template <typename type = void> uint64_t get_row_dest(uint64_t i)
 	{
 		if constexpr (std::is_same_v<type, uint32_t>) {
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				dest_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + dest_offset);
 		}
 
 		switch (header.vertex_id_type) {
 		case DataType::UINT8:
-			return *reinterpret_cast<uint8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				dest_offset);
+			return *reinterpret_cast<uint8_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + dest_offset);
 		case DataType::UINT16:
-			return *reinterpret_cast<uint16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				dest_offset);
+			return *reinterpret_cast<uint16_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + dest_offset);
 		case DataType::UINT32:
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				dest_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + dest_offset);
 		case DataType::UINT64:
-			return *reinterpret_cast<uint64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				dest_offset);
+			return *reinterpret_cast<uint64_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + dest_offset);
 		case DataType::NONE:
 		case DataType::INT8:
 		case DataType::INT16:
@@ -379,63 +361,52 @@ class InputGraph {
 	int64_t get_row_timestamp_integral(uint64_t i)
 	{
 		if constexpr (std::is_same_v<type, uint32_t>) {
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		}
 
 		switch (header.vertex_id_type) {
 		case DataType::UINT8:
-			return *reinterpret_cast<uint8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint8_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::UINT16:
-			return *reinterpret_cast<uint16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint16_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		case DataType::UINT32:
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		case DataType::UINT64:
-			return *reinterpret_cast<uint64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint64_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		case DataType::INT8:
-			return *reinterpret_cast<int8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int8_t *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + ts_offset);
 		case DataType::INT16:
-			return *reinterpret_cast<int16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int16_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::INT32:
-			return *reinterpret_cast<int32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int32_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::INT64:
-			return *reinterpret_cast<int64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int64_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::FLOAT32:
-			return *reinterpret_cast<float *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<float *>(static_cast<char *>(mapped) +
+											  header.header_size_in_bytes +
+											  row_size * i + ts_offset);
 		case DataType::FLOAT64:
-			return *reinterpret_cast<double *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<double *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + ts_offset);
 		case DataType::NONE:
 			return i;
 		}
@@ -444,55 +415,45 @@ class InputGraph {
 	{
 		switch (header.vertex_id_type) {
 		case DataType::UINT8:
-			return *reinterpret_cast<uint8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint8_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::UINT16:
-			return *reinterpret_cast<uint16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint16_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		case DataType::UINT32:
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		case DataType::UINT64:
-			return *reinterpret_cast<uint64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<uint64_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + ts_offset);
 		case DataType::INT8:
-			return *reinterpret_cast<int8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int8_t *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + ts_offset);
 		case DataType::INT16:
-			return *reinterpret_cast<int16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int16_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::INT32:
-			return *reinterpret_cast<int32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int32_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::INT64:
-			return *reinterpret_cast<int64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<int64_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + ts_offset);
 		case DataType::FLOAT32:
-			return *reinterpret_cast<float *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<float *>(static_cast<char *>(mapped) +
+											  header.header_size_in_bytes +
+											  row_size * i + ts_offset);
 		case DataType::FLOAT64:
-			return *reinterpret_cast<double *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				ts_offset);
+			return *reinterpret_cast<double *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + ts_offset);
 		case DataType::NONE:
 			return i;
 		}
@@ -501,55 +462,45 @@ class InputGraph {
 	{
 		switch (header.vertex_id_type) {
 		case DataType::UINT8:
-			return *reinterpret_cast<uint8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint8_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::UINT16:
-			return *reinterpret_cast<uint16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint16_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + weight_offset);
 		case DataType::UINT32:
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + weight_offset);
 		case DataType::UINT64:
-			return *reinterpret_cast<uint64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint64_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + weight_offset);
 		case DataType::INT8:
-			return *reinterpret_cast<int8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int8_t *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + weight_offset);
 		case DataType::INT16:
-			return *reinterpret_cast<int16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int16_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::INT32:
-			return *reinterpret_cast<int32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int32_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::INT64:
-			return *reinterpret_cast<int64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int64_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::FLOAT32:
-			return *reinterpret_cast<float *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<float *>(static_cast<char *>(mapped) +
+											  header.header_size_in_bytes +
+											  row_size * i + weight_offset);
 		case DataType::FLOAT64:
-			return *reinterpret_cast<double *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<double *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + weight_offset);
 		case DataType::NONE:
 			return 1;
 		}
@@ -558,55 +509,45 @@ class InputGraph {
 	{
 		switch (header.vertex_id_type) {
 		case DataType::UINT8:
-			return *reinterpret_cast<uint8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint8_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::UINT16:
-			return *reinterpret_cast<uint16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint16_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + weight_offset);
 		case DataType::UINT32:
-			return *reinterpret_cast<uint32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint32_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + weight_offset);
 		case DataType::UINT64:
-			return *reinterpret_cast<uint64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<uint64_t *>(static_cast<char *>(mapped) +
+												 header.header_size_in_bytes +
+												 row_size * i + weight_offset);
 		case DataType::INT8:
-			return *reinterpret_cast<int8_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int8_t *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + weight_offset);
 		case DataType::INT16:
-			return *reinterpret_cast<int16_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int16_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::INT32:
-			return *reinterpret_cast<int32_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int32_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::INT64:
-			return *reinterpret_cast<int64_t *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<int64_t *>(static_cast<char *>(mapped) +
+												header.header_size_in_bytes +
+												row_size * i + weight_offset);
 		case DataType::FLOAT32:
-			return *reinterpret_cast<float *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<float *>(static_cast<char *>(mapped) +
+											  header.header_size_in_bytes +
+											  row_size * i + weight_offset);
 		case DataType::FLOAT64:
-			return *reinterpret_cast<double *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				weight_offset);
+			return *reinterpret_cast<double *>(static_cast<char *>(mapped) +
+											   header.header_size_in_bytes +
+											   row_size * i + weight_offset);
 		case DataType::NONE:
 			return 1;
 		}
@@ -616,10 +557,9 @@ class InputGraph {
 		if (header.if_signal_graph) {
 			return UpdateInfo::INSERT;
 		} else {
-			return *reinterpret_cast<UpdateInfo *>(
-				static_cast<char *>(mapped) +
-				header.header_size_in_bytes + row_size * i +
-				info_offset);
+			return *reinterpret_cast<UpdateInfo *>(static_cast<char *>(mapped) +
+												   header.header_size_in_bytes +
+												   row_size * i + info_offset);
 		}
 	}
 	~InputGraph()
@@ -639,20 +579,16 @@ class InputGraph {
 			std::cout << get_row_src(i) << ", ";
 			std::cout << get_row_dest(i) << ", ";
 			if (data_type_is_integer(header.timestamp_type)) {
-				std::cout << get_row_timestamp_integral(i)
-					  << ", ";
+				std::cout << get_row_timestamp_integral(i) << ", ";
 			} else {
-				std::cout << get_row_timestamp_floating_point(i)
-					  << ", ";
+				std::cout << get_row_timestamp_floating_point(i) << ", ";
 			}
 			if (data_type_is_integer(header.weight_type)) {
 				std::cout << get_row_weight_integral(i) << ", ";
 			} else {
-				std::cout << get_row_weight_floating_point(i)
-					  << ", ";
+				std::cout << get_row_weight_floating_point(i) << ", ";
 			}
-			std::cout << update_info_to_string(get_row_info(i))
-				  << "\n";
+			std::cout << update_info_to_string(get_row_info(i)) << "\n";
 		}
 	}
 	uint64_t num_vertices() const
@@ -694,21 +630,19 @@ static std::pair<
 	parlay::sequence<std::tuple<node_type, node_type, timestamp_type>>,
 	node_type>
 get_unweighted_graph_edges_signal(const std::string &filename, bool shuffle,
-				  int64_t max_edges_to_read)
+								  int64_t max_edges_to_read)
 {
 	IO::InputGraph graph(filename);
 	uint64_t total_updates = graph.total_updates();
 	if (max_edges_to_read > 0 && max_edges_to_read < total_updates) {
 		total_updates = max_edges_to_read;
 	}
-	parlay::sequence<std::tuple<node_type, node_type, timestamp_type>>
-		edges = parlay::tabulate(total_updates, [&](size_t i) {
-			return std::make_tuple<node_type, node_type,
-					       timestamp_type>(
+	parlay::sequence<std::tuple<node_type, node_type, timestamp_type>> edges =
+		parlay::tabulate(total_updates, [&](size_t i) {
+			return std::make_tuple<node_type, node_type, timestamp_type>(
 				graph.get_row_src<node_type>(i),
 				graph.get_row_dest<node_type>(i),
-				graph.get_row_timestamp_integral<
-					timestamp_type>(i));
+				graph.get_row_timestamp_integral<timestamp_type>(i));
 		});
 	parlay::integer_sort_inplace(
 		edges, [](auto const &t1) { return std::get<2>(t1); });
@@ -745,52 +679,47 @@ turn_signal_into_windowed(
 		signal_edges,
 		[](std::tuple<node_type, node_type, timestamp_type> &edges) {
 			return std::make_pair(
-				std::make_pair(std::get<0>(edges),
-					       std::get<1>(edges)),
+				std::make_pair(std::get<0>(edges), std::get<1>(edges)),
 				std::get<2>(edges));
 		});
 	auto groups = parlay::group_by_key(pairs);
-	auto output_2d = parlay::map(
-		groups, [window_size, end_time](auto &key_sequence_pair) {
+	auto output_2d =
+		parlay::map(groups, [window_size, end_time](auto &key_sequence_pair) {
 			auto &[key, sequence] = key_sequence_pair;
 			auto [src, dest] = key;
 			parlay::integer_sort_inplace(sequence);
-			parlay::sequence<std::tuple<node_type, node_type,
-						    UpdateInfo, timestamp_type>>
+			parlay::sequence<
+				std::tuple<node_type, node_type, UpdateInfo, timestamp_type>>
 				updates_for_edge;
-			updates_for_edge.emplace_back(
-				src, dest, UpdateInfo::INSERT, sequence[0]);
+			updates_for_edge.emplace_back(src, dest, UpdateInfo::INSERT,
+										  sequence[0]);
 			timestamp_type last_insert = sequence[0];
 			for (size_t i = 1; i < sequence.size(); i++) {
 				if (last_insert + window_size >= sequence[i]) {
 					last_insert = sequence[i];
 				} else {
-					updates_for_edge.emplace_back(
-						src, dest, UpdateInfo::DELETE,
-						last_insert + window_size);
-					updates_for_edge.emplace_back(
-						src, dest, UpdateInfo::INSERT,
-						sequence[i]);
+					updates_for_edge.emplace_back(src, dest, UpdateInfo::DELETE,
+												  last_insert + window_size);
+					updates_for_edge.emplace_back(src, dest, UpdateInfo::INSERT,
+												  sequence[i]);
 					last_insert = sequence[i];
 				}
 			}
 			if (last_insert + window_size < end_time)
-				updates_for_edge.emplace_back(
-					src, dest, UpdateInfo::DELETE,
-					last_insert + window_size);
+				updates_for_edge.emplace_back(src, dest, UpdateInfo::DELETE,
+											  last_insert + window_size);
 			return updates_for_edge;
 		});
-	return parlay::integer_sort(
-		parlay::flatten(output_2d),
-		[](auto const &t1) { return std::get<3>(t1); });
+	return parlay::integer_sort(parlay::flatten(output_2d),
+								[](auto const &t1) { return std::get<3>(t1); });
 }
 
 template <typename node_type, typename timestamp_type>
 static std::pair<parlay::sequence<std::tuple<node_type, node_type, UpdateInfo,
-					     timestamp_type>>,
-		 node_type>
+											 timestamp_type>>,
+				 node_type>
 get_unweighted_graph_edges(const std::string &filename, bool shuffle,
-			   int64_t max_edges_to_read)
+						   int64_t max_edges_to_read)
 {
 	IO::InputGraph graph(filename);
 	uint64_t total_updates = graph.total_updates();
@@ -800,21 +729,18 @@ get_unweighted_graph_edges(const std::string &filename, bool shuffle,
 
 	auto edges = parlay::tabulate(
 		total_updates,
-		[&](uint64_t i) -> std::tuple<node_type, node_type, UpdateInfo,
-					      timestamp_type> {
+		[&](uint64_t i)
+			-> std::tuple<node_type, node_type, UpdateInfo, timestamp_type> {
 			if (graph.get_row_src<node_type>(i) <
-			    graph.get_row_dest<node_type>(i)) {
+				graph.get_row_dest<node_type>(i)) {
 				return { graph.get_row_src<node_type>(i),
-					 graph.get_row_dest<node_type>(i),
-					 graph.get_row_info(i),
-					 graph.get_row_timestamp_integral<
-						 timestamp_type>(i) };
+						 graph.get_row_dest<node_type>(i),
+						 graph.get_row_info(i),
+						 graph.get_row_timestamp_integral<timestamp_type>(i) };
 			} else {
 				return { graph.get_row_dest<node_type>(i),
-					 graph.get_row_src<node_type>(i),
-					 graph.get_row_info(i),
-					 graph.get_row_timestamp_integral<
-						 timestamp_type>(i) };
+						 graph.get_row_src<node_type>(i), graph.get_row_info(i),
+						 graph.get_row_timestamp_integral<timestamp_type>(i) };
 			}
 		});
 
@@ -826,13 +752,11 @@ get_unweighted_graph_edges(const std::string &filename, bool shuffle,
 		std::get<3>(edges[1]), std::get<3>(edges.back()));
 
 	auto pairs = parlay::delayed_map(
-		edges, [](std::tuple<node_type, node_type, UpdateInfo,
-				     timestamp_type> &edges) {
+		edges, [](std::tuple<node_type, node_type, UpdateInfo, timestamp_type>
+					  &edges) {
 			return std::make_pair(
-				std::make_pair(std::get<0>(edges),
-					       std::get<1>(edges)),
-				std::make_pair(std::get<3>(edges),
-					       std::get<2>(edges)));
+				std::make_pair(std::get<0>(edges), std::get<1>(edges)),
+				std::make_pair(std::get<3>(edges), std::get<2>(edges)));
 		});
 	auto groups = parlay::group_by_key(pairs);
 	auto output_2d = parlay::tabulate(groups.size(), [&](size_t i) {
@@ -841,14 +765,13 @@ get_unweighted_graph_edges(const std::string &filename, bool shuffle,
 		auto [src, dest] = key;
 		parlay::integer_sort_inplace(
 			sequence, [](auto const &a) { return std::get<0>(a); });
-		parlay::sequence<std::tuple<node_type, node_type, UpdateInfo,
-					    timestamp_type>>
+		parlay::sequence<
+			std::tuple<node_type, node_type, UpdateInfo, timestamp_type>>
 			updates_for_edge;
 		UpdateInfo last_operation = UpdateInfo::DELETE;
 		for (auto &[ts, op] : sequence) {
 			if (op != last_operation) {
-				updates_for_edge.emplace_back(src, dest, op,
-							      ts);
+				updates_for_edge.emplace_back(src, dest, op, ts);
 				last_operation = op;
 			}
 		}
@@ -857,8 +780,7 @@ get_unweighted_graph_edges(const std::string &filename, bool shuffle,
 				ts = dis(r);
 			}
 			parlay::integer_sort_inplace(
-				updates_for_edge,
-				[](auto const &a) { return std::get<3>(a); });
+				updates_for_edge, [](auto const &a) { return std::get<3>(a); });
 			auto next_op = UpdateInfo::INSERT;
 			for (auto &[s, d, op, ts] : updates_for_edge) {
 				op = next_op;
@@ -872,9 +794,9 @@ get_unweighted_graph_edges(const std::string &filename, bool shuffle,
 		return updates_for_edge;
 	});
 
-	edges = parlay::integer_sort(
-		parlay::flatten(output_2d),
-		[](auto const &t1) { return std::get<3>(t1); });
+	edges =
+		parlay::integer_sort(parlay::flatten(output_2d),
+							 [](auto const &t1) { return std::get<3>(t1); });
 	return { edges, graph.num_vertices() };
 }
 

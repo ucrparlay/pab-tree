@@ -36,9 +36,8 @@ void btree<TT>::delete_tree_rec(Node *T)
 			0, TI->get_node_n(),
 			[&](size_t i) { delete_tree_rec(TI->tree_nodes[i]); },
 			// WARN: the granularity control may not work well here
-			force_parallel_recursion<granularity>(TI) ?
-				1 :
-				Interior::TT::k_buf_ub);
+			force_parallel_recursion<granularity>(TI) ? 1 :
+														Interior::TT::k_buf_ub);
 
 		free_node<Interior>(T);
 	}

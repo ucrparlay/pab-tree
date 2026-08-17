@@ -69,9 +69,8 @@ template <class intV> edgeArray<intV> makeSymmetric(edgeArray<intV> const &A)
 {
 	parlay::sequence<edge<intV>> EF =
 		parlay::filter(A.E, [&](edge<intV> e) { return e.u != e.v; });
-	auto FE = parlay::delayed_seq<edge<intV>>(EF.size(), [&](size_t i) {
-		return edge<intV>(EF[i].v, EF[i].u);
-	});
+	auto FE = parlay::delayed_seq<edge<intV>>(
+		EF.size(), [&](size_t i) { return edge<intV>(EF[i].v, EF[i].u); });
 	return remDuplicates(
 		edgeArray<intV>(parlay::append(EF, FE), A.numRows, A.numCols));
 }
@@ -96,14 +95,12 @@ graph<intV, intE> graphFromEdges(edgeArray<intV> const &EA, bool makeSym)
 		parlay::make_slice(A.E), getu, n);
 	std::tie(offsets, nn) = parlay::scan(
 		parlay::delayed_seq<intE>(
-			n + 1,
-			[&](size_t i) { return (i == n) ? 0 : counts[i]; }),
+			n + 1, [&](size_t i) { return (i == n) ? 0 : counts[i]; }),
 		parlay::addm<intE>());
 
 	return graph<intV, intE>(
 		std::move(offsets),
-		parlay::tabulate(m, [&](size_t i) -> intV { return E[i].v; }),
-		n);
+		parlay::tabulate(m, [&](size_t i) -> intV { return E[i].v; }), n);
 }
 
 template <class intV, class Weight, class intE = intV>
@@ -123,15 +120,13 @@ wghGraphFromEdges(wghEdgeArray<intV, Weight> const &A)
 		parlay::make_slice(A.E), getu, n);
 	std::tie(offsets, nn) = parlay::scan(
 		parlay::delayed_seq<intE>(
-			n + 1,
-			[&](size_t i) { return (i == n) ? 0 : counts[i]; }),
+			n + 1, [&](size_t i) { return (i == n) ? 0 : counts[i]; }),
 		parlay::addm<intE>());
 
 	return wghGraph<intV, Weight, intE>(
 		std::move(offsets),
 		parlay::tabulate(m, [&](size_t i) -> intV { return E[i].v; }),
-		parlay::tabulate(
-			m, [&](size_t i) -> Weight { return E[i].weight; }),
+		parlay::tabulate(m, [&](size_t i) -> Weight { return E[i].weight; }),
 		n);
 }
 
@@ -157,9 +152,8 @@ template <class intV, class intE, class Vtx>
 parlay::sequence<intE> getOffsets(parlay::sequence<Vtx> const &V)
 {
 	size_t n = V.size();
-	auto degrees = parlay::delayed_seq<intE>(n + 1, [&](size_t i) -> intE {
-		return (i == n) ? 0 : V[i].degree;
-	});
+	auto degrees = parlay::delayed_seq<intE>(
+		n + 1, [&](size_t i) -> intE { return (i == n) ? 0 : V[i].degree; });
 	auto x = parlay::scan(degrees, parlay::addm<intE>());
 	return x.first;
 }
@@ -169,9 +163,8 @@ template <class intV, class intE>
 graph<intV, intE> packGraph(graph<intV, intE> const &G)
 {
 	size_t n = G.numVertices();
-	auto degrees = parlay::delayed_seq<intE>(n + 1, [&](size_t i) -> intE {
-		return (i == n) ? 0 : G[i].degree;
-	});
+	auto degrees = parlay::delayed_seq<intE>(
+		n + 1, [&](size_t i) -> intE { return (i == n) ? 0 : G[i].degree; });
 	// calculate new offsets
 	auto sr = parlay::scan(degrees, parlay::addm<intE>());
 	// allocate new edge array
@@ -190,7 +183,7 @@ graph<intV, intE> packGraph(graph<intV, intE> const &G)
 template <class intV, class intE>
 graph<intV, intE>
 graphReorder(graph<intV, intE> const &Gr,
-	     parlay::sequence<intV> const &I = parlay::sequence<intV>(0))
+			 parlay::sequence<intV> const &I = parlay::sequence<intV>(0))
 {
 	intV n = Gr.numVertices();
 	intV m = Gr.numEdges();
@@ -223,27 +216,26 @@ int graphCheckConsistency(graph<intV, intE> const &Gr)
 	size_t n = Gr.numVertices();
 	size_t m = Gr.numEdges();
 	size_t edgecount = parlay::reduce(
-		parlay::delayed_seq<size_t>(
-			n, [&](size_t i) { return Gr[i].degree; }),
+		parlay::delayed_seq<size_t>(n, [&](size_t i) { return Gr[i].degree; }),
 		parlay::addm<size_t>());
 	if (m != edgecount) {
 		cout << "bad edge count in graphCheckConsistency: m = " << m
-		     << " sum of degrees = " << edgecount << endl;
+			 << " sum of degrees = " << edgecount << endl;
 		return 1;
 	}
 	size_t error_loc = parlay::reduce(
-		parlay::delayed_seq<size_t>(
-			n,
-			[&](size_t i) {
-				for (size_t j = 0; j < Gr[i].degree; j++)
-					if (Gr[i].Neighbors[j] >= n)
-						return i;
-				return n;
-			}),
+		parlay::delayed_seq<size_t>(n,
+									[&](size_t i) {
+										for (size_t j = 0; j < Gr[i].degree;
+											 j++)
+											if (Gr[i].Neighbors[j] >= n)
+												return i;
+										return n;
+									}),
 		parlay::minm<size_t>());
 	if (error_loc < n) {
 		cout << "edge out of range in graphCheckConsistency: at i = "
-		     << error_loc << endl;
+			 << error_loc << endl;
 		return 1;
 	}
 }

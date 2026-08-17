@@ -3,7 +3,7 @@
 #include "data_op.h"
 
 parlay::sequence<double> ParseParam(std::string const &input,
-				    double defaultValue = 1.0)
+									double defaultValue = 1.0)
 {
 	if (input.empty()) {
 		return {};
@@ -17,8 +17,7 @@ parlay::sequence<double> ParseParam(std::string const &input,
 		try {
 			result.push_back(std::stod(token));
 		} catch (...) {
-			std::cerr << "Error parsing value: " << token
-				  << std::endl;
+			std::cerr << "Error parsing value: " << token << std::endl;
 			return {};
 		}
 		start = end + 1;
@@ -39,11 +38,10 @@ parlay::sequence<double> ParseParam(std::string const &input,
 
 int main(int argc, char *argv[])
 {
-	commandLine P(
-		argc, argv,
-		"[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
-		"<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
-		"<_insertFile>] [-s <kSummary>]");
+	commandLine P(argc, argv,
+				  "[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
+				  "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
+				  "<_insertFile>] [-s <kSummary>]");
 	std::string path;
 	int base_n, batch_n, val_n, file_n, dis_type, batch_op;
 	std::string base_param, batch_param;
@@ -69,8 +67,8 @@ int main(int argc, char *argv[])
 	parlay::sequence<double> base_param_seq = ParseParam(base_param, 1.0);
 
 	std::cout << "base_n: " << base_n << " batch_n: " << batch_n
-		  << " pts_dim: " << val_n << " file_num: " << file_n
-		  << " distribution_type: " << dis_type << " batch_param: ";
+			  << " pts_dim: " << val_n << " file_num: " << file_n
+			  << " distribution_type: " << dis_type << " batch_param: ";
 	for (auto const &p : batch_param_seq)
 		std::cout << p << " ";
 	std::cout << " base_param: ";
@@ -84,9 +82,9 @@ int main(int argc, char *argv[])
 
 	// NOTE: ../kdtree/uni/
 	path += std::string(dis_type == 0 ? "uni/" :
-			    dis_type == 1 ? "exp/" :
-			    dis_type == 2 ? "norm/" :
-					    "dual_norm/");
+						dis_type == 1 ? "exp/" :
+						dis_type == 2 ? "norm/" :
+										"dual_norm/");
 	std::filesystem::create_directory(path);
 
 	// NOTE: ../kdtree/uni/1000000_1/
@@ -108,28 +106,21 @@ int main(int argc, char *argv[])
 		entry_seq base_seq, batch_seq;
 		std::tie(base_seq, batch_seq) =
 			dis_type == 0 ?
-				Generator<E, UniformGenerator<>,
-					  UniformGenerator<>>::
-					GenBatch(batch_op, base_n, batch_n,
-						 base_param_seq,
-						 batch_param_seq) :
+				Generator<E, UniformGenerator<>, UniformGenerator<>>::GenBatch(
+					batch_op, base_n, batch_n, base_param_seq,
+					batch_param_seq) :
 			dis_type == 1 ?
 				Generator<E, UniformGenerator<>,
-					  ExponentialGenerator<>>::
-					GenBatch(batch_op, base_n, batch_n,
-						 base_param_seq,
-						 batch_param_seq) :
+						  ExponentialGenerator<>>::GenBatch(batch_op, base_n,
+															batch_n,
+															base_param_seq,
+															batch_param_seq) :
 			dis_type == 2 ?
-				Generator<E, UniformGenerator<>,
-					  NormalGenerator<>>::
-					GenBatch(batch_op, base_n, batch_n,
-						 base_param_seq,
-						 batch_param_seq) :
-				Generator<E, NormalGenerator<>,
-					  NormalGenerator<>>::
-					GenBatch(batch_op, base_n, batch_n,
-						 base_param_seq,
-						 batch_param_seq);
+				Generator<E, UniformGenerator<>, NormalGenerator<>>::GenBatch(
+					batch_op, base_n, batch_n, base_param_seq,
+					batch_param_seq) :
+				Generator<E, NormalGenerator<>, NormalGenerator<>>::GenBatch(
+					batch_op, base_n, batch_n, base_param_seq, batch_param_seq);
 		std::cout << "Writing... " << std::endl;
 		if (binary) {
 			PrintToBinaryFile(new_path + ".base.bin", base_seq);
@@ -145,8 +136,7 @@ int main(int argc, char *argv[])
 		std::cout << newpath << std::endl;
 		rand_seed = i;
 		if (val_n == 1) {
-			generate.
-			operator()<Wrapper<Axis, std::tuple<Axis>>::Element<
+			generate.operator()<Wrapper<Axis, std::tuple<Axis>>::Element<
 				Axis, std::tuple<Axis>>>(newpath);
 		}
 		// else if (pts_dim == 3) {

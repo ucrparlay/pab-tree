@@ -49,8 +49,7 @@ struct commandLine {
 
 	void badArgument()
 	{
-		std::cout << "usage: " << argv[0] << " " << comLine
-			  << std::endl;
+		std::cout << "usage: " << argv[0] << " " << comLine << std::endl;
 		exit(0);
 	}
 
@@ -68,8 +67,7 @@ struct commandLine {
 	{
 		if (argc < 3)
 			badArgument();
-		return std::pair<char *, char *>(argv[argc - 2],
-						 argv[argc - 1]);
+		return std::pair<char *, char *>(argv[argc - 2], argv[argc - 1]);
 	}
 
 	std::pair<size_t, char *> sizeAndFileName()
@@ -77,7 +75,7 @@ struct commandLine {
 		if (argc < 3)
 			badArgument();
 		return std::pair<size_t, char *>(std::atoi(argv[argc - 2]),
-						 (char *)argv[argc - 1]);
+										 (char *)argv[argc - 1]);
 	}
 
 	bool getOption(std::string option)

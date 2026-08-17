@@ -180,11 +180,11 @@ using charseq_slice = parlay::slice<charSeq const *, charSeq const *>;
 // specialized parsing functions
 template <typename T, typename Range>
 inline typename std::enable_if<std::is_same<T, double>::value,
-			       sequence<double>>::type
+							   sequence<double>>::type
 parseElements(Range const &S)
 {
 	return tabulate(S.size(),
-			[&](long i) -> double { return read_double(S[i]); });
+					[&](long i) -> double { return read_double(S[i]); });
 }
 
 template <typename T, typename Range>
@@ -192,63 +192,62 @@ inline typename std::enable_if<std::is_same<T, int>::value, sequence<int>>::type
 parseElements(Range const &S)
 {
 	return tabulate(S.size(),
-			[&](long i) -> int { return (int)read_long(S[i]); });
+					[&](long i) -> int { return (int)read_long(S[i]); });
 }
 
 template <typename T, typename Range>
-inline typename std::enable_if<std::is_same<T, long>::value,
-			       sequence<long>>::type
-parseElements(Range const &S)
+inline
+	typename std::enable_if<std::is_same<T, long>::value, sequence<long>>::type
+	parseElements(Range const &S)
 {
 	return tabulate(S.size(),
-			[&](long i) -> long { return (long)read_long(S[i]); });
+					[&](long i) -> long { return (long)read_long(S[i]); });
 }
 
 template <typename T, typename Range>
-inline typename std::enable_if<std::is_same<T, uint>::value,
-			       sequence<uint>>::type
-parseElements(Range const &S)
+inline
+	typename std::enable_if<std::is_same<T, uint>::value, sequence<uint>>::type
+	parseElements(Range const &S)
 {
 	return tabulate(S.size(),
-			[&](long i) -> uint { return (uint)read_long(S[i]); });
+					[&](long i) -> uint { return (uint)read_long(S[i]); });
 }
 
 template <typename T, typename Range>
 inline typename std::enable_if<std::is_same<T, intPair>::value,
-			       sequence<intPair>>::type
+							   sequence<intPair>>::type
 parseElements(Range const &S)
 {
 	return tabulate((S.size()) / 2, [&](long i) -> intPair {
 		return std::make_pair((int)read_long(S[2 * i]),
-				      (int)read_long(S[2 * i + 1]));
+							  (int)read_long(S[2 * i + 1]));
 	});
 }
 
 template <typename T, typename Range>
 inline typename std::enable_if<std::is_same<T, uintPair>::value,
-			       sequence<uintPair>>::type
+							   sequence<uintPair>>::type
 parseElements(Range const &S)
 {
 	return tabulate((S.size()) / 2, [&](long i) -> uintPair {
 		return std::make_pair((uint)read_long(S[2 * i]),
-				      (uint)read_long(S[2 * i + 1]));
+							  (uint)read_long(S[2 * i + 1]));
 	});
 }
 
 template <typename T, typename Range>
 inline typename std::enable_if<std::is_same<T, doublePair>::value,
-			       sequence<doublePair>>::type
+							   sequence<doublePair>>::type
 parseElements(Range const &S)
 {
 	return tabulate((S.size()) / 2, [&](long i) -> doublePair {
-		return std::make_pair(read_double(S[2 * i]),
-				      read_double(S[2 * i + 1]));
+		return std::make_pair(read_double(S[2 * i]), read_double(S[2 * i + 1]));
 	});
 }
 
 template <typename T, typename Range>
 inline typename std::enable_if<std::is_same<T, charSeq>::value,
-			       sequence<charSeq>>::type
+							   sequence<charSeq>>::type
 parseElements(Range const &S)
 {
 	return parlay::to_sequence(S);
@@ -265,7 +264,7 @@ template <typename T, typename CharRange> void check_header(CharRange &S)
 	string type_str = seqHeader(dataType(a));
 	if (header != type_str) {
 		cout << "bad header: expected " << type_str << " got " << header
-		     << endl;
+			 << endl;
 		abort();
 	}
 }

@@ -11,20 +11,20 @@ inline bool atomic_compare_and_swap(ET *a, ET oldval, ET newval)
 		uint8_t r_oval, r_nval;
 		std::memcpy(&r_oval, &oldval, sizeof(ET));
 		std::memcpy(&r_nval, &newval, sizeof(ET));
-		return __sync_bool_compare_and_swap(
-			reinterpret_cast<uint8_t *>(a), r_oval, r_nval);
+		return __sync_bool_compare_and_swap(reinterpret_cast<uint8_t *>(a),
+											r_oval, r_nval);
 	} else if (sizeof(ET) == 4) {
 		uint32_t r_oval, r_nval;
 		std::memcpy(&r_oval, &oldval, sizeof(ET));
 		std::memcpy(&r_nval, &newval, sizeof(ET));
-		return __sync_bool_compare_and_swap(
-			reinterpret_cast<uint32_t *>(a), r_oval, r_nval);
+		return __sync_bool_compare_and_swap(reinterpret_cast<uint32_t *>(a),
+											r_oval, r_nval);
 	} else { // if (sizeof(ET) == 8) {
 		uint64_t r_oval, r_nval;
 		std::memcpy(&r_oval, &oldval, sizeof(ET));
 		std::memcpy(&r_nval, &newval, sizeof(ET));
-		return __sync_bool_compare_and_swap(
-			reinterpret_cast<uint64_t *>(a), r_oval, r_nval);
+		return __sync_bool_compare_and_swap(reinterpret_cast<uint64_t *>(a),
+											r_oval, r_nval);
 	}
 }
 
@@ -76,8 +76,7 @@ inline bool write_min(std::atomic<ET> *a, ET b, F less)
 	bool r = 0;
 	do
 		c = a->load();
-	while (less(b, c) &&
-	       !(r = std::atomic_compare_exchange_strong(a, &c, b)));
+	while (less(b, c) && !(r = std::atomic_compare_exchange_strong(a, &c, b)));
 	return r;
 }
 
@@ -98,8 +97,7 @@ inline bool write_max(std::atomic<ET> *a, ET b, F less)
 	bool r = 0;
 	do
 		c = a->load();
-	while (less(c, b) &&
-	       !(r = std::atomic_compare_exchange_strong(a, &c, b)));
+	while (less(c, b) && !(r = std::atomic_compare_exchange_strong(a, &c, b)));
 	return r;
 }
 } // namespace pbbs

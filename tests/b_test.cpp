@@ -50,8 +50,7 @@ static void ApplyOrthogonal(Options const &opts, RunFunc test_func)
 	using E = Wrapper::E;
 	using TypeTrait = pab_tree::btree_type_trait<
 		Wrapper::ElementWrapper<E>, k_buf, Wrapper::LeafAugEmpty,
-		Wrapper::InteriorAugEmpty,
-		pab_tree::proto_node>;
+		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
 	if (opts.tree_type == 0) {
 		Run<BTreeWrapper<TypeTrait>>(opts, test_func);
 	}

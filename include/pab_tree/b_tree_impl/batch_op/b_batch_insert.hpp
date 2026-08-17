@@ -21,27 +21,26 @@ void btree<TT>::batch_insert(Range &&In)
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
-					parlay::range_reference_type_t<Range>>);
+								parlay::range_reference_type_t<Range>>);
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 
 	constexpr auto leaf_entries_pattern = TT::leaf_entries_pattern::hybrid;
 	constexpr bool sorted_input = false;
-	BatchInsert_(A, leaf_entries_pattern, sorted_input,
-		     default_hybrid_pred{});
+	BatchInsert_(A, leaf_entries_pattern, sorted_input, default_hybrid_pred{});
 }
 
 template <typename TT>
 template <typename Range, typename LeafSortPred>
 void btree<TT>::batch_insert(Range &&In,
-			     const TT::pattern_type leaf_entries_pattern,
-			     const bool sorted_input,
-			     LeafSortPred const &leaf_sort_pred)
+							 const TT::pattern_type leaf_entries_pattern,
+							 const bool sorted_input,
+							 LeafSortPred const &leaf_sort_pred)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
 		std::is_constructible_v<parlay::range_value_type_t<Range>,
-					parlay::range_reference_type_t<Range>>);
+								parlay::range_reference_type_t<Range>>);
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 
@@ -52,9 +51,9 @@ template <typename TT>
 template <typename Range, typename LeafSortPred>
 	requires std::predicate<LeafSortPred, typename btree<TT>::Node *, Range>
 void btree<TT>::BatchInsert_(Range In,
-			     const TT::pattern_type leaf_entries_pattern,
-			     const bool sorted_input,
-			     LeafSortPred const &leaf_sort_pred)
+							 const TT::pattern_type leaf_entries_pattern,
+							 const bool sorted_input,
+							 LeafSortPred const &leaf_sort_pred)
 {
 	if (this->root_ == nullptr) { // TODO: may check using explicity tag
 		return Build_(In);
@@ -64,13 +63,12 @@ void btree<TT>::BatchInsert_(Range In,
 		return Build_(In); // Build_ releases the old tree
 	}
 
-	parlay::slice<const E *, const E *> sorted_slice{ In.begin(),
-							  In.end() };
+	parlay::slice<const E *, const E *> sorted_slice{ In.begin(), In.end() };
 	typename TT::entry_seq sorted_seq;
 	if (!sorted_input) {
 		sorted_seq = parlay::sort(In, key_less);
-		sorted_slice = parlay::make_slice(sorted_seq.cbegin(),
-						  sorted_seq.cend());
+		sorted_slice =
+			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	}
 
 	// Keys must be distinct, in the batch and against the tree. Only the
@@ -93,24 +91,22 @@ void btree<TT>::BatchInsert_(Range In,
 	// promises.
 	assert(!sorted_input || new_node_n == 0);
 	assert(!sorted_input ||
-	       parlay::is_sorted(sorted_slice, [](E const &a, E const &b) {
-		       return Entry::get_key(a) < Entry::get_key(b);
-	       }));
+		   parlay::is_sorted(sorted_slice, [](E const &a, E const &b) {
+			   return Entry::get_key(a) < Entry::get_key(b);
+		   }));
 #endif // DEBUG
 
 	if (new_node_n > 0) {
-		auto updated_node_seq =
-			parlay::tabulate(new_node_n, [&](size_type i) {
-				return node_split_seq[i].first;
-			});
+		auto updated_node_seq = parlay::tabulate(
+			new_node_n, [&](size_type i) { return node_split_seq[i].first; });
 		auto updated_split_seq =
 			parlay::tabulate(new_node_n - 1, [&](size_type i) {
 				return node_split_seq[i].second;
 			});
 
-		this->root_ = assemble_interior_levels(
-			parlay::make_slice(updated_node_seq),
-			parlay::make_slice(updated_split_seq));
+		this->root_ =
+			assemble_interior_levels(parlay::make_slice(updated_node_seq),
+									 parlay::make_slice(updated_split_seq));
 	}
 }
 
@@ -118,9 +114,9 @@ template <typename TT>
 template <typename Range, typename LeafSortPred>
 TT::size_type
 btree<TT>::batch_insert_recursive(Node *T, Range In,
-				  node_split_pair_slice node_split_slice,
-				  const TT::pattern_type leaf_entries_pattern,
-				  LeafSortPred const &leaf_sort_pred)
+								  node_split_pair_slice node_split_slice,
+								  const TT::pattern_type leaf_entries_pattern,
+								  LeafSortPred const &leaf_sort_pred)
 {
 	assert(2 * In.size() == node_split_slice.size());
 
@@ -132,10 +128,8 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	if (T->is_leaf) {
 		Leaf *TL = static_cast<Leaf *>(T);
 		if (TL->size + n <= TT::k_buf_ub) {
-			[[maybe_unused]] Node *updated_node =
-				insert_points_2_leaf(T, In,
-						     leaf_entries_pattern,
-						     leaf_sort_pred);
+			[[maybe_unused]] Node *updated_node = insert_points_2_leaf(
+				T, In, leaf_entries_pattern, leaf_sort_pred);
 			assert(updated_node == T);
 			return 0;
 		}
@@ -147,8 +141,7 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	size_buf_ub_arr split_pos_seq;
 	assert(TI->get_node_n() > 0);
 	if (In.size() > TT::k_split_factor * TI->get_split_n()) {
-		split_batch_binary_search(split_pos_seq, In,
-					  TI->get_split_slice());
+		split_batch_binary_search(split_pos_seq, In, TI->get_split_slice());
 	} else {
 		split_batch_merge(split_pos_seq, In, TI->get_split_slice());
 	}
@@ -158,10 +151,9 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 #ifdef DEBUG
 	for (int i = 1; i < TI->get_split_n(); i++) {
 		assert(parlay::all_of(
-			In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
-			[&](E const e) {
+			In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](E const e) {
 				return Entry::get_key(e) >= TI->split[i - 1] &&
-				       Entry::get_key(e) < TI->split[i];
+					   Entry::get_key(e) < TI->split[i];
 			}));
 	}
 #endif // DEBUG
@@ -171,31 +163,26 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	buf_size_type cnt = 0;
 	for (buf_size_type i = 0; i < TI->get_node_n(); i++) {
 		size_type l = (i == 0 ? 0 : split_pos_seq[i - 1]);
-		size_type r =
-			(i == TI->get_node_n() - 1 ? n : split_pos_seq[i]);
+		size_type r = (i == TI->get_node_n() - 1 ? n : split_pos_seq[i]);
 		if (l != r) {
 			nodes_map[cnt++] = i;
 		} else {
-			new_split_node_n_arr[i] =
-				0; // i-th child remains the same
+			new_split_node_n_arr[i] = 0; // i-th child remains the same
 		}
 	}
 
 	parlay::parallel_for(
 		0, cnt,
 		[&](buf_size_type i) {
-			size_type l = nodes_map[i] == 0 ?
-					      0 :
-					      split_pos_seq[nodes_map[i] - 1];
+			size_type l =
+				nodes_map[i] == 0 ? 0 : split_pos_seq[nodes_map[i] - 1];
 			size_type r = nodes_map[i] == TI->get_node_n() - 1 ?
-					      n :
-					      split_pos_seq[nodes_map[i]];
-			new_split_node_n_arr[nodes_map[i]] =
-				batch_insert_recursive(
-					TI->tree_nodes[nodes_map[i]],
-					In.cut(l, r),
-					node_split_slice.cut(2 * l, 2 * r),
-					leaf_entries_pattern, leaf_sort_pred);
+							  n :
+							  split_pos_seq[nodes_map[i]];
+			new_split_node_n_arr[nodes_map[i]] = batch_insert_recursive(
+				TI->tree_nodes[nodes_map[i]], In.cut(l, r),
+				node_split_slice.cut(2 * l, 2 * r), leaf_entries_pattern,
+				leaf_sort_pred);
 		},
 		1);
 
@@ -213,16 +200,14 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	// the interior node can be updated without split
 	if (new_node_n <= TT::k_buf_ub) {
 		[[maybe_unused]] Node *new_inter_node =
-			batch_insert_update_interior(T, node_split_slice,
-						     split_pos_seq, new_node_n,
-						     new_split_node_n_arr);
+			batch_insert_update_interior(T, node_split_slice, split_pos_seq,
+										 new_node_n, new_split_node_n_arr);
 		return 0;
 	}
 
 	// handle interior node split overflow
-	return handling_interior_split_overflow(T, node_split_slice,
-						split_pos_seq, new_node_n,
-						new_split_node_n_arr);
+	return handling_interior_split_overflow(T, node_split_slice, split_pos_seq,
+											new_node_n, new_split_node_n_arr);
 }
 
 } // namespace pab_tree

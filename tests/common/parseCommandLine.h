@@ -75,7 +75,7 @@ struct commandLine {
 		if (argc < 3)
 			badArgument();
 		return pair<int, char *>(std::atoi(argv[argc - 2]),
-					 (char *)argv[argc - 1]);
+								 (char *)argv[argc - 1]);
 	}
 
 	bool getOption(string option)

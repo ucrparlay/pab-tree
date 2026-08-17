@@ -63,8 +63,7 @@ parlay::sequence<double> ParseParam(std::string const &input)
 		try {
 			result.push_back(std::stod(token));
 		} catch (...) {
-			std::cerr << "Error parsing value: " << token
-				  << std::endl;
+			std::cerr << "Error parsing value: " << token << std::endl;
 			return {};
 		}
 		start = end + 1;
@@ -83,7 +82,7 @@ parlay::sequence<double> ParseParam(std::string const &input)
 }
 
 inline double ParamOr(parlay::sequence<double> const &param, size_t i,
-		      double fallback)
+					  double fallback)
 {
 	return i < param.size() ? param[i] : fallback;
 }
@@ -94,8 +93,8 @@ inline double ParamOr(parlay::sequence<double> const &param, size_t i,
 // which also makes the shape automatically "truncated to [0,1)" rather than
 // wrapped or piled onto the end buckets.
 inline double TargetDensity(int const dis_type,
-			    parlay::sequence<double> const &param,
-			    double const x)
+							parlay::sequence<double> const &param,
+							double const x)
 {
 	// NOTE: seg is flat like uniform -- everything that makes it a segment lives
 	// in WindowSize, which restricts the draw to the leading `mult * m` ranks.
@@ -126,7 +125,7 @@ inline double TargetDensity(int const dis_type,
 	double const z1 = (x - m1) / d1;
 	double const z2 = (x - m2) / d2;
 	return (0.5 * std::exp(-0.5 * z1 * z1) / d1) +
-	       (0.5 * std::exp(-0.5 * z2 * z2) / d2);
+		   (0.5 * std::exp(-0.5 * z2 * z2) / d2);
 }
 
 // NOTE: an upper bound on the density over [0, 1), used as the rejection
@@ -134,30 +133,27 @@ inline double TargetDensity(int const dis_type,
 // locations, then given headroom: over-estimating only costs a few wasted
 // draws, under-estimating would clip the peak and silently flatten the shape.
 inline double TargetDensityBound(int const dis_type,
-				 parlay::sequence<double> const &param)
+								 parlay::sequence<double> const &param)
 {
 	double m = 0.0;
 	static constexpr int kGrid = 4096;
 	for (int i = 0; i <= kGrid; i++) {
-		m = std::max(m,
-			     TargetDensity(dis_type, param, double(i) / kGrid));
+		m = std::max(m, TargetDensity(dis_type, param, double(i) / kGrid));
 	}
 	// NOTE: a narrow peak can fall between grid points, so probe the modes too.
 	if (dis_type == kDisExponential) {
 		m = std::max(m, TargetDensity(dis_type, param, 0.0));
 	} else if (dis_type == kDisNormal) {
-		m = std::max(m, TargetDensity(dis_type, param,
-					      std::clamp(ParamOr(param, 0, 0.5),
-							 0.0, 1.0)));
+		m = std::max(
+			m, TargetDensity(dis_type, param,
+							 std::clamp(ParamOr(param, 0, 0.5), 0.0, 1.0)));
 	} else if (dis_type == kDisDualNormal) {
-		m = std::max(m,
-			     TargetDensity(dis_type, param,
-					   std::clamp(ParamOr(param, 0, 0.25),
-						      0.0, 1.0)));
-		m = std::max(m,
-			     TargetDensity(dis_type, param,
-					   std::clamp(ParamOr(param, 2, 0.75),
-						      0.0, 1.0)));
+		m = std::max(
+			m, TargetDensity(dis_type, param,
+							 std::clamp(ParamOr(param, 0, 0.25), 0.0, 1.0)));
+		m = std::max(
+			m, TargetDensity(dis_type, param,
+							 std::clamp(ParamOr(param, 2, 0.75), 0.0, 1.0)));
 	}
 	return m * 1.05;
 }
@@ -179,8 +175,8 @@ inline double TargetDensityBound(int const dis_type,
 // pool and behaves exactly as before.  A centred window would work for
 // norm/dual_norm but is a different change.
 inline size_t WindowSize(int const dis_type,
-			 parlay::sequence<double> const &param,
-			 size_t const pool_n, size_t const want)
+						 parlay::sequence<double> const &param,
+						 size_t const pool_n, size_t const want)
 {
 	// NOTE: seg IS its window -- the batch is drawn uniformly from the leading
 	// `mult * want` surviving keys and nothing else is ever a candidate, so this
@@ -189,9 +185,8 @@ inline size_t WindowSize(int const dis_type,
 	if (dis_type == kDisSeg) {
 		double const mult = std::max(1.0, ParamOr(param, 0, 2.0));
 		double const wide = mult * static_cast<double>(want);
-		return wide >= static_cast<double>(pool_n) ?
-			       pool_n :
-			       static_cast<size_t>(wide);
+		return wide >= static_cast<double>(pool_n) ? pool_n :
+													 static_cast<size_t>(wide);
 	}
 
 	if (dis_type != kDisExponential) {
@@ -243,10 +238,10 @@ inline size_t WindowSize(int const dis_type,
 // `pool_n` stays the denominator for the density position, so the shape is the
 // same whether or not the tail is skipped.
 parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
-					size_t const want, int const dis_type,
-					parlay::sequence<double> const &param,
-					size_t const seed,
-					size_t &clamped_total)
+										size_t const want, int const dis_type,
+										parlay::sequence<double> const &param,
+										size_t const seed,
+										size_t &clamped_total)
 {
 	static constexpr int kMaxSolveIters = 24;
 
@@ -257,7 +252,7 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 
 	auto const w = parlay::delayed_tabulate(win_n, [&](size_t i) {
 		return TargetDensity(dis_type, param,
-				     (static_cast<double>(i) + 0.5) / pool_n);
+							 (static_cast<double>(i) + 0.5) / pool_n);
 	});
 
 	// ---------------------------------------------------------------- sparse
@@ -286,14 +281,13 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 		double acc = 0.0;
 		for (int i = 0; i < kProbe; i++) {
 			acc += TargetDensity(dis_type, param,
-					     (double(i) + 0.5) / kProbe *
-						     (double(win_n) / pool_n));
+								 (double(i) + 0.5) / kProbe *
+									 (double(win_n) / pool_n));
 		}
 		double const mean_w = acc / kProbe;
 		double const peak_pi =
 			mean_w > 0.0 ?
-				(want * bound) /
-					(static_cast<double>(win_n) * mean_w) :
+				(want * bound) / (static_cast<double>(win_n) * mean_w) :
 				1.0;
 		double const accept = bound > 0.0 ? mean_w / bound : 0.0;
 
@@ -304,48 +298,36 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 			auto flags = parlay::sequence<bool>(win_n, false);
 			size_t got_sparse = 0;
 			for (int attempt = 0; attempt < 32 && got_sparse < want;
-			     attempt++) {
+				 attempt++) {
 				size_t const need = want - got_sparse;
 				size_t const draw_n =
-					static_cast<size_t>((need / accept) *
-							    1.3) +
-					64;
-				parlay::random_generator g(seed + 5077 +
-							   (attempt * 6151ULL));
-				auto const cand = parlay::tabulate(
-					draw_n, [&](size_t j) -> size_t {
+					static_cast<size_t>((need / accept) * 1.3) + 64;
+				parlay::random_generator g(seed + 5077 + (attempt * 6151ULL));
+				auto const cand =
+					parlay::tabulate(draw_n, [&](size_t j) -> size_t {
 						auto r = g[j];
-						return std::
-							uniform_int_distribution<
-								size_t>(
-								0,
-								win_n - 1)(r);
+						return std::uniform_int_distribution<size_t>(
+							0, win_n - 1)(r);
 					});
-				auto const keep = parlay::tabulate(
-					draw_n, [&](size_t j) -> bool {
+				auto const keep =
+					parlay::tabulate(draw_n, [&](size_t j) -> bool {
 						size_t const v = cand[j];
 						if (flags[v]) {
 							return false;
 						}
 						auto r = g[draw_n + j];
-						return std::uniform_real_distribution<
-							       double>(0.0,
-								       1.0)(r) <
-						       (TargetDensity(
-								dis_type, param,
-								(static_cast<
-									 double>(
-									 v) +
-								 0.5) / pool_n) /
-							bound);
+						return std::uniform_real_distribution<double>(0.0,
+																	  1.0)(r) <
+							   (TargetDensity(dis_type, param,
+											  (static_cast<double>(v) + 0.5) /
+												  pool_n) /
+								bound);
 					});
-				auto const fresh = parlay::remove_duplicates(
-					parlay::pack(cand, keep));
-				size_t const take =
-					std::min(need, fresh.size());
-				parlay::parallel_for(0, take, [&](size_t j) {
-					flags[fresh[j]] = true;
-				});
+				auto const fresh =
+					parlay::remove_duplicates(parlay::pack(cand, keep));
+				size_t const take = std::min(need, fresh.size());
+				parlay::parallel_for(0, take,
+									 [&](size_t j) { flags[fresh[j]] = true; });
 				got_sparse += take;
 			}
 			if (got_sparse == want) {
@@ -372,30 +354,22 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 					win_n,
 					[&](size_t i) {
 						double const v = w[i];
-						return v >= t ?
-							       std::make_pair(
-								       size_t(1),
-								       0.0) :
-							       std::make_pair(
-								       size_t(0),
-								       v);
+						return v >= t ? std::make_pair(size_t(1), 0.0) :
+										std::make_pair(size_t(0), v);
 					}),
 				parlay::make_monoid(
 					[](auto const &a, auto const &b) {
-						return std::make_pair(
-							a.first + b.first,
-							a.second + b.second);
+						return std::make_pair(a.first + b.first,
+											  a.second + b.second);
 					},
 					std::make_pair(size_t(0), 0.0)));
 
-			if (acc.first >=
-			    want) { // degenerate: back off and retry
+			if (acc.first >= want) { // degenerate: back off and retry
 				t *= 2.0;
 				continue;
 			}
 			double const t_next =
-				acc.second /
-				(dwant - static_cast<double>(acc.first));
+				acc.second / (dwant - static_cast<double>(acc.first));
 			if (!(t_next < t) || t_next <= 0.0) {
 				clamped_total += acc.first;
 				break;
@@ -421,7 +395,7 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 	auto flags = parlay::tabulate(win_n, [&, t](size_t i) -> bool {
 		auto r = gen[i];
 		return std::uniform_real_distribution<double>(0.0, 1.0)(r) <
-		       std::min(1.0, w[i] / t);
+			   std::min(1.0, w[i] / t);
 	});
 
 	// NOTE: independent flips mean the count lands near `want`, not on it -- off
@@ -433,8 +407,7 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 	// below the scatter this whole change exists to restore.
 	size_t const got = parlay::reduce(
 		parlay::delayed_tabulate(
-			win_n,
-			[&](size_t i) -> size_t { return flags[i] ? 1 : 0; }),
+			win_n, [&](size_t i) -> size_t { return flags[i] ? 1 : 0; }),
 		parlay::addm<size_t>());
 
 	// NOTE: `d` distinct positions in [0, span), drawn without materialising the
@@ -442,18 +415,13 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 	// and shuffle a win_n-sized index array.
 	auto draw_positions = [&](size_t span, size_t d, size_t salt) {
 		parlay::sequence<size_t> out;
-		for (int attempt = 0; attempt < 16 && out.size() < d;
-		     attempt++) {
-			parlay::random_generator g(seed + salt +
-						   (attempt * 7919ULL));
-			auto cand = parlay::tabulate(
-				(2 * d) + 64, [&](size_t j) -> size_t {
-					auto r = g[j];
-					return std::uniform_int_distribution<
-						size_t>(0, span - 1)(r);
-				});
-			out = parlay::remove_duplicates(
-				parlay::append(out, cand));
+		for (int attempt = 0; attempt < 16 && out.size() < d; attempt++) {
+			parlay::random_generator g(seed + salt + (attempt * 7919ULL));
+			auto cand = parlay::tabulate((2 * d) + 64, [&](size_t j) -> size_t {
+				auto r = g[j];
+				return std::uniform_int_distribution<size_t>(0, span - 1)(r);
+			});
+			out = parlay::remove_duplicates(parlay::append(out, cand));
 		}
 		return out.subseq(0, std::min(d, out.size()));
 	};
@@ -461,9 +429,8 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 	if (got > want) {
 		auto const sel = parlay::pack(parlay::iota(win_n), flags);
 		auto const drop = draw_positions(sel.size(), got - want, 1);
-		parlay::parallel_for(0, drop.size(), [&](size_t j) {
-			flags[sel[drop[j]]] = false;
-		});
+		parlay::parallel_for(0, drop.size(),
+							 [&](size_t j) { flags[sel[drop[j]]] = false; });
 	} else if (got < want) {
 		// NOTE: the additions have to follow the target density, NOT be spread
 		// uniformly over the free ranks.  Uniform top-up is invisible when the
@@ -479,41 +446,34 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 			// entries per batch to save a handful of collisions.  Dedupe the accepted
 			// set instead, which is ~`need` elements.
 			size_t const draw_n = (64 * need) + 64;
-			parlay::random_generator g(seed + 991 +
-						   (attempt * 7717ULL));
-			auto const cand = parlay::tabulate(
-				draw_n, [&](size_t j) -> size_t {
-					auto r = g[j];
-					return std::uniform_int_distribution<
-						size_t>(0, win_n - 1)(r);
-				});
-			auto const keep =
-				parlay::tabulate(draw_n, [&](size_t j) -> bool {
-					size_t const v = cand[j];
-					if (flags[v]) {
-						return false;
-					}
-					auto r = g[draw_n + j];
-					return std::uniform_real_distribution<
-						       double>(0.0, 1.0)(r) <
-					       (w[v] / max_all);
-				});
-			auto const fresh = parlay::remove_duplicates(
-				parlay::pack(cand, keep));
-			size_t const take = std::min(need, fresh.size());
-			parlay::parallel_for(0, take, [&](size_t j) {
-				flags[fresh[j]] = true;
+			parlay::random_generator g(seed + 991 + (attempt * 7717ULL));
+			auto const cand = parlay::tabulate(draw_n, [&](size_t j) -> size_t {
+				auto r = g[j];
+				return std::uniform_int_distribution<size_t>(0, win_n - 1)(r);
 			});
+			auto const keep = parlay::tabulate(draw_n, [&](size_t j) -> bool {
+				size_t const v = cand[j];
+				if (flags[v]) {
+					return false;
+				}
+				auto r = g[draw_n + j];
+				return std::uniform_real_distribution<double>(0.0, 1.0)(r) <
+					   (w[v] / max_all);
+			});
+			auto const fresh =
+				parlay::remove_duplicates(parlay::pack(cand, keep));
+			size_t const take = std::min(need, fresh.size());
+			parlay::parallel_for(0, take,
+								 [&](size_t j) { flags[fresh[j]] = true; });
 			need -= take;
 		}
 		// NOTE: last resort if the shaped draw could not fill it (only reachable
 		// when the density is degenerate); correctness of the batch size wins.
 		if (need > 0) {
-			auto const free_ranks = parlay::pack(
-				parlay::iota(win_n),
-				parlay::delayed_tabulate(win_n, [&](size_t i) {
-					return !flags[i];
-				}));
+			auto const free_ranks =
+				parlay::pack(parlay::iota(win_n),
+							 parlay::delayed_tabulate(
+								 win_n, [&](size_t i) { return !flags[i]; }));
 			parlay::parallel_for(
 				0, std::min(need, free_ranks.size()),
 				[&](size_t j) { flags[free_ranks[j]] = true; });
@@ -528,7 +488,7 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 template <typename E>
 parlay::sequence<E>
 GenIncrementalBatches(size_t const base_n, size_t const batch_n,
-		      int const dis_type, parlay::sequence<double> const &param)
+					  int const dis_type, parlay::sequence<double> const &param)
 {
 	using K = typename E::K;
 
@@ -536,30 +496,24 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 
 	size_t const batch_num = (base_n + batch_n - 1) / batch_n;
 	size_t const report_every = std::max<size_t>(batch_num / 10, 1);
-	size_t const seed0 =
-		(static_cast<size_t>(rand_seed) + 1) * 1'000'003ULL;
+	size_t const seed0 = (static_cast<size_t>(rand_seed) + 1) * 1'000'003ULL;
 
 	std::cout << "batches: " << batch_num << " x " << batch_n << std::endl;
 
 	auto report = [&](size_t b, size_t pool_n, size_t win_n) {
 		size_t const beg = b * batch_n;
 		size_t const cnt = std::min(batch_n, base_n - beg);
-		auto keys =
-			parlay::delayed_tabulate(cnt, [&](size_t i) -> size_t {
-				return out[beg + i].key;
-			});
-		auto const key_lo =
-			parlay::reduce(keys, parlay::minm<size_t>());
-		auto const key_hi =
-			parlay::reduce(keys, parlay::maxm<size_t>());
-		auto const mean = static_cast<double>(parlay::reduce(
-					  keys, parlay::addm<size_t>())) /
-				  static_cast<double>(cnt);
-		std::cout << "  batch " << b << ": pool " << pool_n
-			  << ", window " << win_n << ", keys [" << key_lo
-			  << ", " << key_hi << "], mean "
-			  << mean / static_cast<double>(base_n)
-			  << " of the key space" << std::endl;
+		auto keys = parlay::delayed_tabulate(
+			cnt, [&](size_t i) -> size_t { return out[beg + i].key; });
+		auto const key_lo = parlay::reduce(keys, parlay::minm<size_t>());
+		auto const key_hi = parlay::reduce(keys, parlay::maxm<size_t>());
+		auto const mean =
+			static_cast<double>(parlay::reduce(keys, parlay::addm<size_t>())) /
+			static_cast<double>(cnt);
+		std::cout << "  batch " << b << ": pool " << pool_n << ", window "
+				  << win_n << ", keys [" << key_lo << ", " << key_hi
+				  << "], mean " << mean / static_cast<double>(base_n)
+				  << " of the key space" << std::endl;
 	};
 
 	// NOTE: uniform has a closed form -- one global shuffle IS the whole
@@ -574,22 +528,19 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 	// without it every -file_num instance would come out identical.
 	if (dis_type == kDisUniform) {
 		auto const perm = parlay::random_shuffle(
-			parlay::tabulate(base_n,
-					 [](size_t i) -> size_t { return i; }),
+			parlay::tabulate(base_n, [](size_t i) -> size_t { return i; }),
 			parlay::random(seed0));
 		parlay::parallel_for(0, base_n, [&](size_t i) {
-			out[i] = E{ .key = static_cast<K>(perm[i]),
-				    .val = { i } };
+			out[i] = E{ .key = static_cast<K>(perm[i]), .val = { i } };
 		});
 		for (size_t b = 0; b < batch_num; b++) {
 			if (b % report_every == 0 || b + 1 == batch_num) {
 				report(b, base_n - (b * batch_n), 0);
 			}
 		}
-		std::cout
-			<< "pool-work: " << static_cast<double>(base_n)
-			<< " (uniform closed form -- one shuffle, no per-batch carve)"
-			<< std::endl;
+		std::cout << "pool-work: " << static_cast<double>(base_n)
+				  << " (uniform closed form -- one shuffle, no per-batch carve)"
+				  << std::endl;
 		return out;
 	}
 
@@ -597,8 +548,7 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 	// means the same thing before and after keys are removed.  The buffer is
 	// allocated once at full size and never reallocated; the live pool is the
 	// suffix [lo, base_n), so ranks are offsets from `lo`.
-	auto pool =
-		parlay::tabulate(base_n, [](size_t i) -> size_t { return i; });
+	auto pool = parlay::tabulate(base_n, [](size_t i) -> size_t { return i; });
 	size_t lo = 0;
 	// NOTE: the live pool is [lo, lo + live_n).  The windowed compaction leaves it
 	// a SUFFIX (lo advances), the unwindowed one leaves it a PREFIX (lo resets),
@@ -615,7 +565,7 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 	// that sustains >100, and that gap was where it went.
 	parlay::sequence<size_t> pool_alt;
 	bool const needs_alt = (dis_type != kDisExponential &&
-				dis_type != kDisSeg && dis_type != kDisUniform);
+							dis_type != kDisSeg && dis_type != kDisUniform);
 	if (needs_alt) {
 		pool_alt = parlay::sequence<size_t>::uninitialized(base_n);
 	}
@@ -628,7 +578,7 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 
 		auto const flags =
 			SelectBatchFlags(win_n, pool_n, want, dis_type, param,
-					 seed0 + (b * 64ULL), clamped_total);
+							 seed0 + (b * 64ULL), clamped_total);
 		auto picked = parlay::pack(parlay::iota(win_n), flags);
 
 		// NOTE: order *within* a batch carries no meaning, and a batch handed to
@@ -639,9 +589,9 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 		auto batch_rank = parlay::random_shuffle(
 			picked, parlay::random(seed0 + (b * 64ULL) + 33));
 		parlay::parallel_for(0, batch_rank.size(), [&](size_t i) {
-			out[written + i] = E{ .key = static_cast<K>(
-						      pool[lo + batch_rank[i]]),
-					      .val = { written + i } };
+			out[written + i] =
+				E{ .key = static_cast<K>(pool[lo + batch_rank[i]]),
+				   .val = { written + i } };
 		});
 
 		size_t const took = batch_rank.size();
@@ -658,15 +608,13 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 			// against the window's end, which makes the new live pool the suffix
 			// [lo + took, base_n) -- contiguous, still in key order, tail never
 			// moved.  That is what turns the per-batch cost into O(win_n).
-			auto const survivors = parlay::pack(
-				pool.cut(lo, lo + win_n),
-				parlay::delayed_tabulate(win_n, [&](size_t i) {
-					return !flags[i];
-				}));
-			parlay::parallel_for(
-				0, survivors.size(), [&](size_t i) {
-					pool[lo + took + i] = survivors[i];
-				});
+			auto const survivors =
+				parlay::pack(pool.cut(lo, lo + win_n),
+							 parlay::delayed_tabulate(
+								 win_n, [&](size_t i) { return !flags[i]; }));
+			parlay::parallel_for(0, survivors.size(), [&](size_t i) {
+				pool[lo + took + i] = survivors[i];
+			});
 			lo += took;
 			live_n -= took;
 		} else {
@@ -682,10 +630,8 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 			// j's destination overlaps run j-1's SOURCE, so an in-place version would
 			// have to run sequentially.
 			parlay::parallel_for(0, took + 1, [&](size_t j) {
-				size_t const beg =
-					(j == 0) ? 0 : picked[j - 1] + 1;
-				size_t const end =
-					(j == took) ? pool_n : picked[j];
+				size_t const beg = (j == 0) ? 0 : picked[j - 1] + 1;
+				size_t const end = (j == took) ? pool_n : picked[j];
 				for (size_t i = beg; i < end; i++) {
 					pool_alt[i - j] = pool[lo + i];
 				}
@@ -699,21 +645,18 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 	{
 		// NOTE: total pool-work is what the runtime tracks; the ratio shows how much
 		// the front-window cut off (1.0x = no saving, i.e. every shape but exp).
-		double const full = static_cast<double>(base_n) *
-				    static_cast<double>(batch_num) / 2.0;
-		std::cout << "pool-work: " << static_cast<double>(win_total)
-			  << " vs " << full << " unwindowed ("
-			  << (full /
-			      std::max(1.0, static_cast<double>(win_total)))
-			  << "x saved)" << std::endl;
+		double const full =
+			static_cast<double>(base_n) * static_cast<double>(batch_num) / 2.0;
+		std::cout << "pool-work: " << static_cast<double>(win_total) << " vs "
+				  << full << " unwindowed ("
+				  << (full / std::max(1.0, static_cast<double>(win_total)))
+				  << "x saved)" << std::endl;
 	}
 
 	if (clamped_total != 0) {
 		std::cout
-			<< "NOTE: " << clamped_total
-			<< " rank-slots across the run were "
-			<< "capped at probability 1 ("
-			<< (100.0 * clamped_total / base_n)
+			<< "NOTE: " << clamped_total << " rank-slots across the run were "
+			<< "capped at probability 1 (" << (100.0 * clamped_total / base_n)
 			<< "% of base_n) -- the shape asked for more than 100% of the "
 			   "keys there, so those batches are the sharpest possible "
 			   "rather than the requested shape"
@@ -729,7 +672,7 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 // distinctness check, which costs a hash pass over the whole key space.
 template <typename E>
 void ValidatePermutation(parlay::sequence<E> const &seq, size_t const base_n,
-			 bool const full)
+						 bool const full)
 {
 	if (seq.size() != base_n) {
 		throw std::runtime_error("validate: wrong number of entries.");
@@ -740,24 +683,19 @@ void ValidatePermutation(parlay::sequence<E> const &seq, size_t const base_n,
 	auto const sum = parlay::reduce(keys, parlay::addm<size_t>());
 	auto const max = parlay::reduce(keys, parlay::maxm<size_t>());
 	size_t const want_sum = base_n % 2 == 0 ? (base_n / 2) * (base_n - 1) :
-						  base_n * ((base_n - 1) / 2);
+											  base_n * ((base_n - 1) / 2);
 
 	if (sum != want_sum || max != base_n - 1) {
-		std::cout << "key sum " << sum << " (expected " << want_sum
-			  << "), max " << max << " (expected " << base_n - 1
-			  << ")" << std::endl;
-		throw std::runtime_error(
-			"validate: output is not a permutation.");
+		std::cout << "key sum " << sum << " (expected " << want_sum << "), max "
+				  << max << " (expected " << base_n - 1 << ")" << std::endl;
+		throw std::runtime_error("validate: output is not a permutation.");
 	}
 
 	if (full) {
-		auto materialised =
-			parlay::tabulate(seq.size(), [&](size_t i) -> size_t {
-				return seq[i].key;
-			});
+		auto materialised = parlay::tabulate(
+			seq.size(), [&](size_t i) -> size_t { return seq[i].key; });
 		if (parlay::remove_duplicates(materialised).size() != base_n) {
-			throw std::runtime_error(
-				"validate: output has duplicate keys.");
+			throw std::runtime_error("validate: output has duplicate keys.");
 		}
 	}
 
@@ -796,9 +734,9 @@ void ValidatePermutation(parlay::sequence<E> const &seq, size_t const base_n,
 int main(int argc, char *argv[])
 {
 	commandLine P(argc, argv,
-		      "[-path <dir>] [-base_n <n>] [-batch_n <n>] [-val_n 1] "
-		      "[-file_num <n>] [-dis {0,1,2,3,4}] [-batch_op {0,1}] "
-		      "[-binary {0,1}] [-batch_param <csv>] [-validate {0,1}]");
+				  "[-path <dir>] [-base_n <n>] [-batch_n <n>] [-val_n 1] "
+				  "[-file_num <n>] [-dis {0,1,2,3,4}] [-batch_op {0,1}] "
+				  "[-binary {0,1}] [-batch_param <csv>] [-validate {0,1}]");
 
 	// NOTE: the std::string overloads, not the char* ones -- getOptionValue
 	// returns a null pointer when the flag is absent and std::string(nullptr) is
@@ -837,10 +775,10 @@ int main(int argc, char *argv[])
 		ParseParam(P.getOptionValue("-batch_param", ""));
 
 	std::cout << "base_n: " << base_n << " batch_n: " << batch_n
-		  << " val_n: " << val_n << " file_num: " << file_n
-		  << " distribution_type: " << dis_type
-		  << " batch_op: " << (batch_op == 0 ? "ins" : "del")
-		  << " batch_param: ";
+			  << " val_n: " << val_n << " file_num: " << file_n
+			  << " distribution_type: " << dis_type
+			  << " batch_op: " << (batch_op == 0 ? "ins" : "del")
+			  << " batch_param: ";
 	for (auto const &p : batch_param_seq) {
 		std::cout << p << " ";
 	}
@@ -856,33 +794,29 @@ int main(int argc, char *argv[])
 	// half exact, which is the half the benchmark's query state is built from.
 	if (dis_type == kDisExponential) {
 		double const demand = static_cast<double>(batch_n) *
-				      ParamOr(batch_param_seq, 0, 10.0) /
-				      static_cast<double>(base_n);
-		std::cout << "front-key probability at the start (demand): "
-			  << demand << " -- exactly on-shape for the first "
-			  << (100.0 * std::max(0.0, 1.0 - demand))
-			  << "% of the run" << std::endl;
+							  ParamOr(batch_param_seq, 0, 10.0) /
+							  static_cast<double>(base_n);
+		std::cout << "front-key probability at the start (demand): " << demand
+				  << " -- exactly on-shape for the first "
+				  << (100.0 * std::max(0.0, 1.0 - demand)) << "% of the run"
+				  << std::endl;
 		if (demand > 0.5) {
 			std::cout
 				<< "WARNING: demand > 0.5, so the shape degrades before the "
 				   "half-way point. lambda <= "
 				<< 0.5 * static_cast<double>(base_n) /
 					   static_cast<double>(batch_n)
-				<< " keeps the whole first half exact."
-				<< std::endl;
+				<< " keeps the whole first half exact." << std::endl;
 		}
 	}
 
 	if (dis_type == kDisSeg) {
-		double const mult =
-			std::max(1.0, ParamOr(batch_param_seq, 0, 2.0));
-		std::cout
-			<< "segment width: " << mult << " x batch_n = "
-			<< static_cast<size_t>(mult *
-					       static_cast<double>(batch_n))
-			<< " keys; each batch takes " << (100.0 / mult)
-			<< "% of its window, and the window advances by batch_n"
-			<< std::endl;
+		double const mult = std::max(1.0, ParamOr(batch_param_seq, 0, 2.0));
+		std::cout << "segment width: " << mult << " x batch_n = "
+				  << static_cast<size_t>(mult * static_cast<double>(batch_n))
+				  << " keys; each batch takes " << (100.0 / mult)
+				  << "% of its window, and the window advances by batch_n"
+				  << std::endl;
 		if (mult < 1.0001) {
 			std::cout
 				<< "NOTE: mult == 1 means every batch is exactly the leading "
@@ -895,11 +829,11 @@ int main(int argc, char *argv[])
 	path += std::string(*path.rbegin() == '/' ? "" : "/");
 	std::filesystem::create_directories(path);
 
-	path += std::string(dis_type == kDisUniform	? "uni/" :
-			    dis_type == kDisExponential ? "exp/" :
-			    dis_type == kDisNormal	? "norm/" :
-			    dis_type == kDisSeg		? "seg/" :
-							  "dual_norm/");
+	path += std::string(dis_type == kDisUniform		? "uni/" :
+						dis_type == kDisExponential ? "exp/" :
+						dis_type == kDisNormal		? "norm/" :
+						dis_type == kDisSeg			? "seg/" :
+													  "dual_norm/");
 	std::filesystem::create_directories(path);
 
 	path += toString(base_n) + "_" + toString(val_n) + "/";
@@ -920,18 +854,16 @@ int main(int argc, char *argv[])
 	std::string const stem = ".batch";
 	std::string const ext = binary ? ".bin" : ".in";
 
-	using E = Wrapper<Axis, std::tuple<Axis>>::Element<Axis,
-							   std::tuple<Axis>>;
+	using E = Wrapper<Axis, std::tuple<Axis>>::Element<Axis, std::tuple<Axis>>;
 
 	for (int i = 0; i < file_n; i++) {
-		std::string const out_path =
-			path + toString(i + 1) + stem + ext;
+		std::string const out_path = path + toString(i + 1) + stem + ext;
 		std::cout << out_path << std::endl;
 		rand_seed = i;
 
 		std::cout << "Generating... " << std::endl;
-		auto const seq = GenIncrementalBatches<E>(
-			base_n, batch_n, dis_type, batch_param_seq);
+		auto const seq = GenIncrementalBatches<E>(base_n, batch_n, dis_type,
+												  batch_param_seq);
 
 		ValidatePermutation(seq, base_n, validate);
 

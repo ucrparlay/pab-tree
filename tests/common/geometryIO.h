@@ -94,11 +94,10 @@ template <class Point, class Seq> parlay::sequence<Point> parsePoints(Seq W)
 	using coord = typename Point::coord;
 	int d = Point::dim;
 	size_t n = W.size() / d;
-	auto a = parlay::tabulate(
-		d * n, [&](size_t i) -> coord { return atof(W[i]); });
-	auto points = parlay::tabulate(n, [&](size_t i) -> Point {
-		return Point(a.cut(d * i, d * (i + 1)));
-	});
+	auto a =
+		parlay::tabulate(d * n, [&](size_t i) -> coord { return atof(W[i]); });
+	auto points = parlay::tabulate(
+		n, [&](size_t i) -> Point { return Point(a.cut(d * i, d * (i + 1))); });
 	return points;
 }
 
@@ -170,8 +169,8 @@ triangles<pointT> readTrianglesFromFile(char const *fname, int offset)
 	parlay::sequence<pointT> Pts = parsePoints<pointT>(pts_slice);
 	auto Tri = parlay::tabulate(m, [&](size_t i) -> tri {
 		return { (int)atol(tri_slice[3 * i]) - offset,
-			 (int)atol(tri_slice[3 * i + 1]) - offset,
-			 (int)atol(tri_slice[3 * i + 2]) - offset };
+				 (int)atol(tri_slice[3 * i + 1]) - offset,
+				 (int)atol(tri_slice[3 * i + 2]) - offset };
 	});
 	return triangles<pointT>(Pts, Tri);
 }

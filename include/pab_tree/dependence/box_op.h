@@ -15,7 +15,7 @@ template <typename TT>
 TT::Box get_box(typename TT::Box const &a, typename TT::Box const &b)
 {
 	return typename TT::Box(TT::Num::min(a.first, b.first),
-				TT::Num::max(a.second, b.second));
+							TT::Num::max(a.second, b.second));
 }
 
 // TODO: this can be parallelized (needs to define the min/max of a box)
@@ -25,7 +25,7 @@ template <typename TT> TT::Box get_box(typename TT::const_entry_slice ele_slice)
 		return get_empty_box<TT>();
 	}
 	auto box = std::make_pair(TT::Entry::get_key(ele_slice[0]),
-				  TT::Entry::get_key(ele_slice[0]));
+							  TT::Entry::get_key(ele_slice[0]));
 	for (typename TT::buf_size_type i = 1; i < ele_slice.size(); i++) {
 		auto key = TT::Entry::get_key(ele_slice[i]);
 		box.first = TT::Num::min(box.first, key);

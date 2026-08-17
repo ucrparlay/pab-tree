@@ -13,13 +13,11 @@ template <typename InputPoint> void RoundDataAndShift(commandLine &P)
 
 	std::cout << input_path << std::endl;
 	std::cout << output_suffix << std::endl;
-	using OutputPoint =
-		AugPoint<int64_t, InputPoint::GetDim(), Wrapper::AugId>;
+	using OutputPoint = AugPoint<int64_t, InputPoint::GetDim(), Wrapper::AugId>;
 	using Laundy = DataLaundry<InputPoint, OutputPoint>;
 
 	std::cout << "Input: " << input_path << std::endl;
-	output_path =
-		input_path.substr(0, input_path.rfind('.')) + output_suffix;
+	output_path = input_path.substr(0, input_path.rfind('.')) + output_suffix;
 	std::cout << "Output: " << output_path << std::endl;
 
 	parlay::sequence<InputPoint> wp;
@@ -57,13 +55,11 @@ template <typename InputPoint> void SortByCoord(commandLine &P)
 	pts_dim = P.getOptionIntValue("-d", 2);
 	sort_dim = P.getOptionIntValue("-sort_dim", 0);
 
-	using OutputPoint =
-		AugPoint<int64_t, InputPoint::GetDim(), Wrapper::AugId>;
+	using OutputPoint = AugPoint<int64_t, InputPoint::GetDim(), Wrapper::AugId>;
 	using Laundy = DataLaundry<InputPoint, OutputPoint>;
 
 	std::cout << "Input: " << input_path << std::endl;
-	output_path =
-		input_path.substr(0, input_path.rfind('.')) + output_suffix;
+	output_path = input_path.substr(0, input_path.rfind('.')) + output_suffix;
 	std::cout << "Output: " << output_path << std::endl;
 
 	parlay::sequence<InputPoint> wp;
@@ -79,11 +75,10 @@ template <typename InputPoint> void SortByCoord(commandLine &P)
 
 int main(int argc, char *argv[])
 {
-	commandLine P(
-		argc, argv,
-		"[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
-		"<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
-		"<_insertFile>] [-s <kSummary>] [-u <usage>]");
+	commandLine P(argc, argv,
+				  "[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
+				  "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
+				  "<_insertFile>] [-s <kSummary>] [-u <usage>]");
 	int coord_type = P.getOptionIntValue("-coord_type", 0);
 	int pts_dim = P.getOptionIntValue("-d", 2);
 	int usage = P.getOptionIntValue("-usage", 0);
@@ -98,26 +93,26 @@ int main(int argc, char *argv[])
 
 	auto generate_with_coord_type = [&]<typename CoordType>() {
 		if (pts_dim == 2) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 2, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 2, Wrapper::AugId>>();
 		} else if (pts_dim == 3) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 3, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 3, Wrapper::AugId>>();
 		} else if (pts_dim == 5) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 5, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 5, Wrapper::AugId>>();
 		} else if (pts_dim == 7) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 7, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 7, Wrapper::AugId>>();
 		} else if (pts_dim == 9) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 9, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 9, Wrapper::AugId>>();
 		} else if (pts_dim == 12) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 12, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 12, Wrapper::AugId>>();
 		} else if (pts_dim == 16) {
-			apply.template operator()<
-				psi::AugPoint<CoordType, 16, Wrapper::AugId>>();
+			apply.template
+			operator()<psi::AugPoint<CoordType, 16, Wrapper::AugId>>();
 		} else {
 			throw std::runtime_error("Invalid dimension");
 		}
@@ -130,7 +125,7 @@ int main(int argc, char *argv[])
 		generate_with_coord_type.template operator()<double>();
 	} else {
 		throw std::runtime_error("Invalid coordinate type: " +
-					 std::to_string(coord_type));
+								 std::to_string(coord_type));
 	}
 
 	return 0;

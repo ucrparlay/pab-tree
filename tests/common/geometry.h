@@ -16,7 +16,7 @@ using namespace std;
 template <class Coord> class point3d;
 
 template <class Coord> class vector3d {
-    public:
+public:
 	using coord = Coord;
 	using vector = vector3d;
 	using point = point3d<coord>;
@@ -67,8 +67,7 @@ template <class Coord> class vector3d {
 	}
 	vector cross(vector v)
 	{
-		return vector(y * v.z - z * v.y, z * v.x - x * v.z,
-			      x * v.y - y * v.x);
+		return vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
 	}
 	coord maxDim()
 	{
@@ -76,8 +75,8 @@ template <class Coord> class vector3d {
 	}
 	void print()
 	{
-		cout << std::setprecision(10) << ":(" << x << "," << y << ","
-		     << z << "):";
+		cout << std::setprecision(10) << ":(" << x << "," << y << "," << z
+			 << "):";
 	}
 	coord Length(void)
 	{
@@ -91,7 +90,7 @@ template <class Coord> class vector3d {
 };
 
 template <class Coord> class point3d {
-    public:
+public:
 	using coord = Coord;
 	using vector = vector3d<coord>;
 	using point = point3d;
@@ -175,8 +174,8 @@ template <class Coord> class point3d {
 	bool outOfBox(point pt, coord hsize)
 	{
 		return ((x - hsize > pt.x) || (x + hsize < pt.x) ||
-			(y - hsize > pt.y) || (y + hsize < pt.y) ||
-			(z - hsize > pt.z) || (z + hsize < pt.z));
+				(y - hsize > pt.y) || (y + hsize < pt.y) ||
+				(z - hsize > pt.z) || (z + hsize < pt.z));
 	}
 	static int const dim = 3;
 };
@@ -201,7 +200,7 @@ template <class coord> inline vector3d<coord>::vector3d(point3d<coord> p)
 template <class Coord> class point2d;
 
 template <class Coord> class vector2d {
-    public:
+public:
 	using coord = Coord;
 	using point = point2d<coord>;
 	using vector = vector2d;
@@ -282,7 +281,7 @@ static std::ostream &operator<<(std::ostream &os, point3d<coord> const v)
 }
 
 template <class Coord> class point2d {
-    public:
+public:
 	using coord = Coord;
 	using vector = vector2d<coord>;
 	using point = point2d;
@@ -352,7 +351,7 @@ template <class Coord> class point2d {
 	bool outOfBox(point pt, coord hsize)
 	{
 		return ((x - hsize > pt.x) || (x + hsize < pt.x) ||
-			(y - hsize > pt.y) || (y + hsize < pt.y));
+				(y - hsize > pt.y) || (y + hsize < pt.y));
 	}
 	static int const dim = 2;
 };
@@ -394,7 +393,7 @@ inline coord triArea(point2d<coord> a, point2d<coord> b, point2d<coord> c)
 
 template <class coord>
 inline coord triAreaNormalized(point2d<coord> a, point2d<coord> b,
-			       point2d<coord> c)
+							   point2d<coord> c)
 {
 	return triArea(a, b, c) / ((b - a).Length() * (c - a).Length());
 }
@@ -402,7 +401,7 @@ inline coord triAreaNormalized(point2d<coord> a, point2d<coord> b,
 // Returns TRUE if the points a, b, c are in a counterclockise order
 template <class coord>
 inline bool counterClockwise(point2d<coord> a, point2d<coord> b,
-			     point2d<coord> c)
+							 point2d<coord> c)
 {
 	return (b - a).cross(c - a) > 0.0;
 }
@@ -418,7 +417,7 @@ template <class coord> inline vector3d<coord> onParabola(vector2d<coord> v)
 //   and does a plane side test (tet volume > 0 test)
 template <class coord>
 inline bool inCircle(point2d<coord> a, point2d<coord> b, point2d<coord> c,
-		     point2d<coord> d)
+					 point2d<coord> d)
 {
 	vector3d<coord> ad = onParabola(a - d);
 	vector3d<coord> bd = onParabola(b - d);
@@ -430,13 +429,12 @@ inline bool inCircle(point2d<coord> a, point2d<coord> b, point2d<coord> c,
 // positive numbers are on the inside, and 0 is at the boundary
 template <class coord>
 inline double inCircleNormalized(point2d<coord> a, point2d<coord> b,
-				 point2d<coord> c, point2d<coord> d)
+								 point2d<coord> c, point2d<coord> d)
 {
 	vector3d<coord> ad = onParabola(a - d);
 	vector3d<coord> bd = onParabola(b - d);
 	vector3d<coord> cd = onParabola(c - d);
-	return (ad.cross(bd)).dot(cd) /
-	       (ad.Length() * bd.Length() * cd.Length());
+	return (ad.cross(bd)).dot(cd) / (ad.Length() * bd.Length() * cd.Length());
 }
 
 // *************************************************************
@@ -493,7 +491,7 @@ inline coord angle(point2d<coord> a, point2d<coord> b, point2d<coord> c)
 
 template <class coord>
 inline coord minAngleCheck(point2d<coord> a, point2d<coord> b, point2d<coord> c,
-			   coord angle)
+						   coord angle)
 {
 	vector2d<coord> ba = (b - a);
 	vector2d<coord> ca = (c - a);
@@ -503,19 +501,18 @@ inline coord minAngleCheck(point2d<coord> a, point2d<coord> b, point2d<coord> c,
 	coord lcb = cb.Length();
 	coord pi = 3.14159;
 	coord co = cos(angle * pi / 180.);
-	return (ba.dot(ca) / (lba * lca) > co ||
-		ca.dot(cb) / (lca * lcb) > co ||
-		-ba.dot(cb) / (lba * lcb) > co);
+	return (ba.dot(ca) / (lba * lca) > co || ca.dot(cb) / (lca * lcb) > co ||
+			-ba.dot(cb) / (lba * lcb) > co);
 }
 
 template <class coord>
 inline point2d<coord> triangleCircumcenter(point2d<coord> a, point2d<coord> b,
-					   point2d<coord> c)
+										   point2d<coord> c)
 {
 	vector2d<coord> v1 = b - a;
 	vector2d<coord> v2 = c - a;
 	vector2d<coord> v11 = v1 * v2.dot(v2);
 	vector2d<coord> v22 = v2 * v1.dot(v1);
-	return a + vector2d<coord>(v22.y - v11.y, v11.x - v22.x) /
-			   (2.0 * v1.cross(v2));
+	return a +
+		   vector2d<coord>(v22.y - v11.y, v11.x - v22.x) / (2.0 * v1.cross(v2));
 }

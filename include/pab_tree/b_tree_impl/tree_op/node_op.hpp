@@ -22,7 +22,7 @@ namespace pab_tree
 template <typename TT>
 template <typename OutputHandler>
 TT::size_type btree<TT>::generate_leaf_nodes(TT::entry_slice In,
-					     OutputHandler &&output_handler)
+											 OutputHandler &&output_handler)
 {
 	size_type item_n = In.size();
 	size_type bkt_n = get_bkt_num(item_n);
@@ -31,17 +31,13 @@ TT::size_type btree<TT>::generate_leaf_nodes(TT::entry_slice In,
 	parlay::parallel_for(0, bkt_n, [&](size_type i) {
 		if (i < bkt_n - 1) {
 			output_handler.set_key(
-				i,
-				Entry::get_key(
-					In[get_bkt_end_idx(i, bkt_n, item_n)]));
+				i, Entry::get_key(In[get_bkt_end_idx(i, bkt_n, item_n)]));
 		}
 		size_type ele_l = get_bkt_st_idx(i, bkt_n, item_n);
-		size_type ele_r = (i == bkt_n - 1) ?
-					  item_n :
-					  get_bkt_end_idx(i, bkt_n, item_n);
+		size_type ele_r =
+			(i == bkt_n - 1) ? item_n : get_bkt_end_idx(i, bkt_n, item_n);
 		output_handler.set_node(
-			i, alloc_normal_leaf_node<entry_slice, Leaf>(
-				   In.cut(ele_l, ele_r)));
+			i, alloc_normal_leaf_node<entry_slice, Leaf>(In.cut(ele_l, ele_r)));
 	});
 	return bkt_n;
 }
@@ -49,8 +45,8 @@ TT::size_type btree<TT>::generate_leaf_nodes(TT::entry_slice In,
 template <typename TT>
 template <typename OutputHandler>
 TT::size_type btree<TT>::generate_interior_nodes(TT::node_slice node_in,
-						 TT::split_slice key_in,
-						 OutputHandler &&output_handler)
+												 TT::split_slice key_in,
+												 OutputHandler &&output_handler)
 {
 	size_type item_n = node_in.size();
 	size_type bkt_n = get_bkt_num(item_n);
@@ -59,18 +55,16 @@ TT::size_type btree<TT>::generate_interior_nodes(TT::node_slice node_in,
 	parlay::parallel_for(0, bkt_n, [&](size_type i) {
 		if (i < bkt_n - 1) {
 			output_handler.set_key(
-				i,
-				key_in[get_bkt_end_idx(i, bkt_n, item_n) - 1]);
+				i, key_in[get_bkt_end_idx(i, bkt_n, item_n) - 1]);
 		}
 
 		size_type node_l = get_bkt_st_idx(i, bkt_n, item_n);
-		size_type node_r = (i == bkt_n - 1) ?
-					   item_n :
-					   get_bkt_end_idx(i, bkt_n, item_n);
+		size_type node_r =
+			(i == bkt_n - 1) ? item_n : get_bkt_end_idx(i, bkt_n, item_n);
 		size_type key_l = get_bkt_st_idx(i, bkt_n, item_n);
 		size_type key_r = (i == bkt_n - 1) ?
-					  key_in.size() :
-					  get_bkt_end_idx(i, bkt_n, item_n) - 1;
+							  key_in.size() :
+							  get_bkt_end_idx(i, bkt_n, item_n) - 1;
 
 		auto *node = alloc_interior_node<Interior, TT>(
 			node_in.cut(node_l, node_r), key_in.cut(key_l, key_r));
@@ -117,10 +111,8 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 			tot_entry_sz += new_nodes[node_idx - 1]->size;
 		} else {
 			size_type st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
-			for (buf_size_type j = 0; j < return_node_n_arr[i];
-			     j++) {
-				new_nodes[node_idx++] =
-					node_split_slice[st + j].first;
+			for (buf_size_type j = 0; j < return_node_n_arr[i]; j++) {
+				new_nodes[node_idx++] = node_split_slice[st + j].first;
 				tot_entry_sz += new_nodes[node_idx - 1]->size;
 			}
 		}
@@ -134,10 +126,8 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 		// HACK: if return_node_n_arr[i] == 0, then no new splits from
 		// this child should skip; but -1 always smaller than 0, so the
 		// loop never runs. Needs to handle the type carefully.
-		for (int j = 0; j < static_cast<int>(return_node_n_arr[i]) - 1;
-		     j++) {
-			new_splits[split_idx++] =
-				node_split_slice[st + j].second;
+		for (int j = 0; j < static_cast<int>(return_node_n_arr[i]) - 1; j++) {
+			new_splits[split_idx++] = node_split_slice[st + j].second;
 		}
 		if (i < TI->get_node_n() - 1) {
 			new_splits[split_idx++] = TI->split[i];
@@ -164,8 +154,7 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 		} else if (i == TI->get_node_n() - 1) {
 			assert(box.first >= TI->split[TI->get_split_n() - 1]);
 		} else {
-			assert(box.first >= TI->split[i - 1] &&
-			       box.second < TI->split[i]);
+			assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
 		}
 	}
 #endif // DEBUG
@@ -195,11 +184,9 @@ TT::size_type btree<TT>::handling_interior_split_overflow(
 		} else {
 			size_type st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
 
-			parlay::parallel_for(
-				0, return_node_n_arr[i], [&](size_type j) {
-					flatten_node_seq[node_idx + j] =
-						node_split_slice[st + j].first;
-				});
+			parlay::parallel_for(0, return_node_n_arr[i], [&](size_type j) {
+				flatten_node_seq[node_idx + j] = node_split_slice[st + j].first;
+			});
 			node_idx += return_node_n_arr[i];
 		}
 	}
@@ -210,25 +197,23 @@ TT::size_type btree<TT>::handling_interior_split_overflow(
 		if (return_node_n_arr[i] > 0) {
 			size_type st = 2 * (i == 0 ? 0 : split_pos_arr[i - 1]);
 			assert(return_node_n_arr[i] > 0 ||
-			       static_cast<int>(return_node_n_arr[i]) - 1 < 0);
+				   static_cast<int>(return_node_n_arr[i]) - 1 < 0);
 
-			parlay::parallel_for(
-				0, static_cast<int>(return_node_n_arr[i]) - 1,
-				[&](size_type j) {
-					flatten_split_seq[split_idx + j] =
-						node_split_slice[st + j].second;
-				});
+			parlay::parallel_for(0, static_cast<int>(return_node_n_arr[i]) - 1,
+								 [&](size_type j) {
+									 flatten_split_seq[split_idx + j] =
+										 node_split_slice[st + j].second;
+								 });
 			split_idx += return_node_n_arr[i] - 1;
 		}
-		if (i <
-		    TI->get_node_n() - 1) { // skip the new splits for last node
+		if (i < TI->get_node_n() - 1) { // skip the new splits for last node
 			flatten_split_seq[split_idx++] = TI->split[i];
 		}
 	}
 
 	assert(node_idx == split_idx + 1);
 	assert(parlay::is_sorted(flatten_split_seq,
-				 [&](TT::K a, TT::K b) { return a < b; }));
+							 [&](TT::K a, TT::K b) { return a < b; }));
 
 	// launch rebuild
 	free_node<Interior>(T);
@@ -236,14 +221,10 @@ TT::size_type btree<TT>::handling_interior_split_overflow(
 		parlay::make_slice(flatten_node_seq),
 		parlay::make_slice(flatten_split_seq),
 		gen_nodes_output_handler{
-			.set_key =
-				[&](size_type i, auto key) {
-					node_split_slice[i].second = key;
-				},
-			.set_node =
-				[&](size_type i, auto node) {
-					node_split_slice[i].first = node;
-				} });
+			.set_key = [&](size_type i,
+						   auto key) { node_split_slice[i].second = key; },
+			.set_node = [&](size_type i,
+							auto node) { node_split_slice[i].first = node; } });
 
 	return rt_bkt_n;
 }
@@ -271,15 +252,14 @@ btree<TT>::batch_delete_update_interior_size(
 	}
 	TI->size = tot_entry_sz;
 	TI->update_aug();
-	TI->valid =
-		(T != this->root_ ?
-			 (TI->get_node_n() - invalid_tree_n) >= TT::k_buf_lb :
-			 (TI->get_node_n() - invalid_tree_n) > 0);
+	TI->valid = (T != this->root_ ?
+					 (TI->get_node_n() - invalid_tree_n) >= TT::k_buf_lb :
+					 (TI->get_node_n() - invalid_tree_n) > 0);
 	TI->contain_invalid_subtree = TI->valid ? contain_invalid : true;
 	TI->reinsert_size = TI->valid ? reinsert_entries_n : TI->size;
 	return std::make_tuple(get_node_invalid_status(T),
-			       node_contain_invalid_subtree(T),
-			       get_node_reinsert_size(T));
+						   node_contain_invalid_subtree(T),
+						   get_node_reinsert_size(T));
 }
 
 template <typename TT>
@@ -292,15 +272,14 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 	constexpr bool k_sort_reinsert_entries = true;
 	assert(reinsert_entries.size() == get_node_reinsert_size(T));
 
-	if (get_node_invalid_status(
-		    T)) { // every invalid tree should be flatten
+	if (get_node_invalid_status(T)) { // every invalid tree should be flatten
 		assert(reinsert_entries.size() == T->size);
 		assert(has_tomb == false);
 
 		[[maybe_unused]] auto size = T->size;
 		assert(T != nullptr);
-		flatten_rec<decltype(reinsert_entries), false,
-			    k_sort_reinsert_entries>(T, reinsert_entries);
+		flatten_rec<decltype(reinsert_entries), false, k_sort_reinsert_entries>(
+			T, reinsert_entries);
 		delete_tree_rec<false>(T);
 		return;
 	}
@@ -322,10 +301,9 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 	}
 
 	if (self_balance_node(T,
-			      has_tomb)) { // reach a node can be self balanced
+						  has_tomb)) { // reach a node can be self balanced
 		assert(node_is_valid(T));
-		if (get_node_reinsert_size(T) ==
-		    0) { // just contain empty trees
+		if (get_node_reinsert_size(T) == 0) { // just contain empty trees
 			assert(node_contain_invalid_subtree(T));
 			prune_out_empty_tree(T);
 			TI->reset_deletion_flag();
@@ -333,7 +311,7 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 		}
 
 		balance_over_leaves(T, TI->reinsert_size, leaf_entries_pattern,
-				    leaf_sort_pred);
+							leaf_sort_pred);
 		TI->reset_deletion_flag();
 		return;
 	}
@@ -361,12 +339,9 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 
 		// check if this child node contain no invalid subtree, then
 		// itself must be valid
-		assert(node_contain_invalid_subtree(node) == 0 ?
-			       node_is_valid(node) :
-			       true);
-		assert(node_is_valid(node) ?
-			       1 :
-			       node_contain_invalid_subtree(node));
+		assert(node_contain_invalid_subtree(node) == 0 ? node_is_valid(node) :
+														 true);
+		assert(node_is_valid(node) ? 1 : node_contain_invalid_subtree(node));
 
 		if (node_is_valid(node)) {
 			const bool has_split = i < TI->get_split_n();
@@ -387,8 +362,7 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 	reinsert_sum[0] = 0;
 	for (buf_size_type i = 1; i < invalid_idx; i++) {
 		auto node = invalid_subtree[i - 1];
-		reinsert_sum[i] =
-			reinsert_sum[i - 1] + get_node_reinsert_size(node);
+		reinsert_sum[i] = reinsert_sum[i - 1] + get_node_reinsert_size(node);
 	}
 
 	//     node,
@@ -403,19 +377,16 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 		[&](buf_size_type i) {
 			fetch_invalid_subtree_nodes(
 				invalid_subtree[i],
-				reinsert_entries.cut(
-					reinsert_sum[i],
-					i == invalid_idx - 1 ?
-						reinsert_entries.size() :
-						reinsert_sum[i + 1]),
-				next_tomb, leaf_entries_pattern,
-				leaf_sort_pred);
+				reinsert_entries.cut(reinsert_sum[i],
+									 i == invalid_idx - 1 ?
+										 reinsert_entries.size() :
+										 reinsert_sum[i + 1]),
+				next_tomb, leaf_entries_pattern, leaf_sort_pred);
 		},
 		1);
 
 	TI->size = std::accumulate(
-		TI->tree_nodes.begin(),
-		TI->tree_nodes.begin() + TI->get_node_n(),
+		TI->tree_nodes.begin(), TI->tree_nodes.begin() + TI->get_node_n(),
 		static_cast<size_type>(0),
 		[](size_type sum, Node *node) { return sum + node->size; });
 	TI->update_aug();
@@ -425,11 +396,10 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 		}));
 		assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
 			return Entry::get_key(a) < Entry::get_key(b) &&
-			       Entry::get_key(a) != Entry::get_key(b);
+				   Entry::get_key(a) != Entry::get_key(b);
 		}));
-		reinsert_tree_after_delete(T, reinsert_entries,
-					   leaf_entries_pattern,
-					   leaf_sort_pred);
+		reinsert_tree_after_delete(T, reinsert_entries, leaf_entries_pattern,
+								   leaf_sort_pred);
 	}
 
 	assert((this->validate<true, false>(T)));
@@ -439,8 +409,8 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 template <typename TT>
 template <typename LeafSortPred>
 void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
-				    const TT::pattern_type leaf_entries_pattern,
-				    LeafSortPred const &leaf_sort_pred)
+									const TT::pattern_type leaf_entries_pattern,
+									LeafSortPred const &leaf_sort_pred)
 {
 	auto TI = static_cast<Interior *>(T);
 
@@ -484,8 +454,7 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 	for (buf_size_type i = 0; i < TI->get_node_n(); ++i) {
 		if (get_node_invalid_status(TI->tree_nodes[i])) {
 			assert(tree_group[i] ==
-			       tree_group[i == TI->get_node_n() - 1 ? i - 1 :
-								      i + 1]);
+				   tree_group[i == TI->get_node_n() - 1 ? i - 1 : i + 1]);
 		} else {
 			assert(tree_group[i] == i);
 		}
@@ -506,8 +475,7 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 	[[maybe_unused]] auto quick_check = [&](buf_size_type g) -> bool {
 		const auto box = get_node_box_rec(TI->tree_nodes[tree_idx - 1]);
 		if (tree_idx == 1) {
-			if (split_idx ==
-			    0) { // one tree node for the entire array
+			if (split_idx == 0) { // one tree node for the entire array
 				return true;
 			}
 			return box.second < TI->split[split_idx - 1];
@@ -516,14 +484,13 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 			return box.first >= TI->split[split_idx - 1];
 		}
 		return box.first >= TI->split[split_idx - 2] &&
-		       box.second < TI->split[split_idx - 1];
+			   box.second < TI->split[split_idx - 1];
 	};
 
 	// Case A: group is a single valid node — slide its pointer/split
 	// into place.
-	auto handle_single = [&](buf_size_type i,
-				 [[maybe_unused]] buf_size_type g,
-				 bool is_rightmost) {
+	auto handle_single = [&](buf_size_type i, [[maybe_unused]] buf_size_type g,
+							 bool is_rightmost) {
 		assert(node_is_valid(TI->tree_nodes[i]));
 		TI->tree_nodes[tree_idx++] = TI->tree_nodes[i];
 		if (!is_rightmost) {
@@ -535,28 +502,25 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 	// Case B: group total fits in one leaf — merge all into the
 	// rightmost leaf.
 	auto handle_merge = [&](buf_size_type i, buf_size_type j,
-				[[maybe_unused]] buf_size_type g,
-				bool is_rightmost) {
+							[[maybe_unused]] buf_size_type g,
+							bool is_rightmost) {
 		auto *dest = static_cast<Leaf *>(TI->tree_nodes[j - 1]);
 		assert(node_is_valid(dest) || is_rightmost);
 		auto *dst = dest->get_ele_end_iter();
 		for (buf_size_type k = i; k < j - 1; ++k) {
 			auto *leaf = static_cast<Leaf *>(TI->tree_nodes[k]);
 			assert(get_node_invalid_status(leaf) || is_rightmost);
-			dst = std::copy_n(leaf->get_ele_begin_iter(),
-					  leaf->size, dst);
+			dst = std::copy_n(leaf->get_ele_begin_iter(), leaf->size, dst);
 			free_node<Leaf>(leaf);
 		}
-		dest->size = static_cast<size_type>(dst -
-						    dest->get_ele_begin_iter());
+		dest->size = static_cast<size_type>(dst - dest->get_ele_begin_iter());
 		auto updated_dest = post_process_leaf_change(
 			dest,
 			parlay::make_slice(dest->get_ele_begin_iter(),
-					   dest->get_ele_end_iter()),
+							   dest->get_ele_end_iter()),
 			leaf_entries_pattern, leaf_sort_pred);
 		static_cast<Leaf *>(updated_dest)
-			->update_aug(static_cast<Leaf *>(updated_dest)
-					     ->get_ele_slice());
+			->update_aug(static_cast<Leaf *>(updated_dest)->get_ele_slice());
 		TI->tree_nodes[tree_idx++] = updated_dest;
 		if (!is_rightmost) {
 			TI->split[split_idx++] = TI->split[j - 1];
@@ -568,25 +532,23 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 	// scatter into evenly-sized buckets while reusing existing leaf node
 	// objects.
 	auto handle_distribute = [&](buf_size_type i, buf_size_type j,
-				     bool is_rightmost) {
+								 bool is_rightmost) {
 		if (entry_buf.empty()) [[unlikely]] {
-			entry_buf = TT::entry_seq::uninitialized(reinsert_size +
-								 TT::k_buf_ub);
+			entry_buf =
+				TT::entry_seq::uninitialized(reinsert_size + TT::k_buf_ub);
 		}
 
 		auto *ep = entry_buf.begin();
 		for (buf_size_type k = i; k < j; ++k) {
 			auto *leaf = static_cast<Leaf *>(TI->tree_nodes[k]);
-			ep = std::copy_n(leaf->get_ele_begin_iter(), leaf->size,
-					 ep);
+			ep = std::copy_n(leaf->get_ele_begin_iter(), leaf->size, ep);
 		}
-		const auto item_n =
-			static_cast<size_type>(ep - entry_buf.begin());
+		const auto item_n = static_cast<size_type>(ep - entry_buf.begin());
 
 		std::sort(entry_buf.begin(), entry_buf.begin() + item_n,
-			  [](auto const &a, auto const &b) {
-				  return Entry::get_key(a) < Entry::get_key(b);
-			  });
+				  [](auto const &a, auto const &b) {
+					  return Entry::get_key(a) < Entry::get_key(b);
+				  });
 
 		const buf_size_type bkt_n = get_bkt_num(item_n);
 		assert(bkt_n <= j - i);
@@ -594,9 +556,7 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		size_type ele_l = 0;
 		for (buf_size_type k = 0; k < bkt_n; ++k) {
 			const size_type ele_r =
-				(k == bkt_n - 1) ?
-					item_n :
-					get_bkt_end_idx(k, bkt_n, item_n);
+				(k == bkt_n - 1) ? item_n : get_bkt_end_idx(k, bkt_n, item_n);
 			const size_type bkt_size = ele_r - ele_l;
 			auto *leaf = static_cast<Leaf *>(TI->tree_nodes[i + k]);
 			std::copy_n(sp, bkt_size, leaf->get_ele_begin_iter());
@@ -657,8 +617,7 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		} else if (i == TI->get_node_n() - 1) {
 			assert(box.first >= TI->split[TI->get_split_n() - 1]);
 		} else {
-			assert(box.first >= TI->split[i - 1] &&
-			       box.second < TI->split[i]);
+			assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
 		}
 	}
 #endif // DEBUG
@@ -674,8 +633,7 @@ template <typename TT> void btree<TT>::prune_out_empty_tree(Node *T)
 	for (buf_size_type i = 0; i < TI->get_node_n(); ++i) {
 		auto node = TI->tree_nodes[i];
 
-		assert(node_is_valid(node) ||
-		       get_node_reinsert_size(node) == 0);
+		assert(node_is_valid(node) || get_node_reinsert_size(node) == 0);
 		if (node_is_valid(node)) {
 			const bool has_split = i < TI->get_split_n();
 			if (i != tree_node_idx) {
@@ -700,8 +658,7 @@ template <typename TT>
 template <typename LeafSortPred>
 void btree<TT>::reinsert_tree_after_delete(
 	Node *T, entry_slice reinsert_entries,
-	TT::pattern_type leaf_entries_pattern,
-	LeafSortPred const &leaf_sort_pred)
+	TT::pattern_type leaf_entries_pattern, LeafSortPred const &leaf_sort_pred)
 {
 	node_split_pair_seq node_split_seq =
 		node_split_pair_seq::uninitialized(2 * reinsert_entries.size());
@@ -715,7 +672,7 @@ void btree<TT>::reinsert_tree_after_delete(
 	// vanishes under NDEBUG and leaves a use-after-free.
 	if (new_node_n != 0) [[unlikely]] {
 		std::cerr << "pab_tree: reinsert split the subtree root and "
-			     "cannot splice it; see docs/open_issues.md #1\n";
+					 "cannot splice it; see docs/open_issues.md #1\n";
 		std::abort();
 	}
 	assert(new_node_n == 0);
@@ -738,8 +695,7 @@ template <typename TT> TT::Node *btree<TT>::copy_tree_recursive(Node const *T)
 	// get_split_slice() is const here, so use the sequence overload. Both
 	// template parameters are in non-deduced positions.
 	auto const split_slice = TI->get_split_slice();
-	typename TT::split_seq new_splits(split_slice.begin(),
-					  split_slice.end());
+	typename TT::split_seq new_splits(split_slice.begin(), split_slice.end());
 	auto *node = alloc_interior_node<Interior, TT>(new_nodes, new_splits);
 	node->update_aug();
 	return node;

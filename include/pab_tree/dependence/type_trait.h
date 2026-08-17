@@ -33,9 +33,9 @@ template <class EleType> struct ele_wrapper : EleType {
 };
 
 template <typename EleType, uint BufferSize, typename LeafAugType,
-	  typename InteriorAugType, typename NodeType>
+		  typename InteriorAugType, typename NodeType>
 class TypeTrait {
-    public:
+public:
 	// element type
 	using E = EleType::E;
 	using K = typename EleType::K;
@@ -78,15 +78,15 @@ class TypeTrait {
 };
 
 template <entry_type EleType, uint BufferSize,
-	  typename LeafAugType = empty_leaf_aug,
-	  typename InteriorAugType = empty_interior_aug,
-	  typename NodeType = proto_node>
+		  typename LeafAugType = empty_leaf_aug,
+		  typename InteriorAugType = empty_interior_aug,
+		  typename NodeType = proto_node>
 class btree_type_trait
 	: public TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-			   InteriorAugType, NodeType> {
-    public:
+					   InteriorAugType, NodeType> {
+public:
 	using BT = TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-			     InteriorAugType, NodeType>;
+						 InteriorAugType, NodeType>;
 	using Split = BT::K;
 	using split_seq = parlay::sequence<Split>;
 	using split_slice = parlay::slice<Split *, Split *>;
@@ -99,8 +99,8 @@ class btree_type_trait
 	using size_type = uint_fast32_t;
 	using buf_size_type = std::conditional_t<
 		(BufferSize * k_buf_ub_fac > 65535U), uint_fast32_t,
-		std::conditional_t<(BufferSize * k_buf_ub_fac > 255U),
-				   uint_fast16_t, uint_fast8_t>>;
+		std::conditional_t<(BufferSize * k_buf_ub_fac > 255U), uint_fast16_t,
+						   uint_fast8_t>>;
 	static constexpr buf_size_type k_buf = BufferSize;
 	static constexpr buf_size_type k_buf_lb = BufferSize;
 	static constexpr buf_size_type k_buf_md = k_buf_md_fac * BufferSize;

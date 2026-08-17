@@ -27,10 +27,8 @@ void CheckCorrectness(Wrapper::Options opts)
 			opts.ParseInsertBatchPath(opts.batch_ratio);
 		std::cout << "base path: " << base_path << "\n";
 		std::cout << "batch path: " << batch_path << "\n";
-		auto [n, d] =
-			read_points<typename TT::E>(base_path.c_str(), wp, 0);
-		auto [n2, d2] =
-			read_points<typename TT::E>(batch_path.c_str(), wi, n);
+		auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
+		auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
 		// parlay::sort_inplace(
 		//     wp, [](auto const& a, auto const& b) { return a.key < b.key; });
 		// for (int i = 0; i < 10 && i < wp.size(); i++) {
@@ -39,16 +37,14 @@ void CheckCorrectness(Wrapper::Options opts)
 		// return;
 
 		BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
-		tree.template validate<typename Tree::Leaf,
-				       typename Tree::Interior>();
+		tree.template validate<typename Tree::Leaf, typename Tree::Interior>();
 		puts("---------------finish build insert tree---------------");
 
 		batch_insert<TT, Tree, kTestTime>(tree, wp, wi, 2);
 		assert(tree.get_size() == wp.size() + wi.size());
-		tree.template validate<typename Tree::Leaf,
-				       typename Tree::Interior>();
+		tree.template validate<typename Tree::Leaf, typename Tree::Interior>();
 		std::cout << "---------------finish insert----------------\n"
-			  << std::flush;
+				  << std::flush;
 	}
 
 	// if (tag &
@@ -160,14 +156,12 @@ void CheckCorrectness(Wrapper::Options opts)
 	if (opts.query_type & (1 << 0)) { // NOTE: membership
 		size_t batch_size =
 			static_cast<size_t>(wp.size() * kBatchInsertCheckRatio);
-		auto query_ele =
-			parlay::random_shuffle(new_wp).subseq(0, batch_size);
+		auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
 		auto res = parlay::sequence<bool>(query_ele.size(), false);
 		Membership<TT>(tree, query_ele, opts.rounds, res);
 		assert(parlay::all_of(res, [&](auto r) { return r == true; }));
-		std::cout
-			<< "\n--------------finish membership------------------\n"
-			<< std::flush;
+		std::cout << "\n--------------finish membership------------------\n"
+				  << std::flush;
 	}
 
 	// if (query_type & (1 << 1)) {  // NOTE: range count
@@ -202,7 +196,7 @@ int main(int argc, char *argv[])
 	Wrapper::Options opts(params);
 
 	auto run = [&]<typename TreeWrapper, typename TypeTrait>(
-			   Wrapper::Options opts) -> void {
+				   Wrapper::Options opts) -> void {
 		// NOTE: run the test
 		CheckCorrectness<TypeTrait, TreeWrapper>(opts);
 	};

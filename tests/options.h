@@ -8,8 +8,7 @@ struct Options {
 	Options(commandLine &params)
 	{
 		this->val_n = params.getOptionIntValue("-d", 1);
-		this->input_file_path =
-			std::string(params.getOptionValue("-p"));
+		this->input_file_path = std::string(params.getOptionValue("-p"));
 		this->tag = params.getOptionIntValue("-t", 1);
 		this->rounds = params.getOptionIntValue("-r", 3);
 		this->query_type = params.getOptionIntValue("-q", 0);
@@ -23,10 +22,8 @@ struct Options {
 	void PrintOptions() const
 	{
 		std::cout << "InputFile: "
-			  << std::filesystem::path(input_file_path)
-				     .filename()
-				     .string()
-			  << "; ";
+				  << std::filesystem::path(input_file_path).filename().string()
+				  << "; ";
 		std::cout << "Dis: " << this->dis_type << "; ";
 	}
 
@@ -41,7 +38,7 @@ struct Options {
 			pivot = posIns;
 		}
 		if (posDel != std::string::npos &&
-		    (pivot == std::string::npos || posDel < pivot)) {
+			(pivot == std::string::npos || posDel < pivot)) {
 			pivot = posDel;
 		}
 
@@ -56,13 +53,12 @@ struct Options {
 		// filename part
 		size_t lastSlash = path.find_last_of('/');
 		std::string filename = (lastSlash == std::string::npos) ?
-					       path :
-					       path.substr(lastSlash + 1);
+								   path :
+								   path.substr(lastSlash + 1);
 		// strip extensions
 		auto strip_suffix = [](std::string &s, std::string const &suf) {
 			if (s.size() >= suf.size() &&
-			    s.compare(s.size() - suf.size(), suf.size(), suf) ==
-				    0) {
+				s.compare(s.size() - suf.size(), suf.size(), suf) == 0) {
 				s.erase(s.size() - suf.size());
 			}
 		};
@@ -92,12 +88,11 @@ struct Options {
 		// PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
 		// PARA: dir_pre: ../kdtree/uni/1000000_1/
 		// PARA: file_pre: 1
-		auto [dir_prefix, file_prefix] =
-			ExtractPrefixes(this->input_file_path);
+		auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
 		std::string base_path =
 			dir_prefix + "ins/" +
-			std::to_string(static_cast<size_t>(1 / batch_ratio)) +
-			"/" + file_prefix + ".base" + InputExtension();
+			std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
+			file_prefix + ".base" + InputExtension();
 
 		std::string batch_path = base_path;
 		batch_path.replace(batch_path.find(".base."), 6, ".batch.");
@@ -108,12 +103,11 @@ struct Options {
 		-> std::pair<std::string, std::string>
 	{
 		// NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
-		auto [dir_prefix, file_prefix] =
-			ExtractPrefixes(this->input_file_path);
+		auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
 		std::string base_path =
 			dir_prefix + "del/" +
-			std::to_string(static_cast<size_t>(1 / batch_ratio)) +
-			"/" + file_prefix + ".base" + InputExtension();
+			std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
+			file_prefix + ".base" + InputExtension();
 
 		std::string batch_path = base_path;
 		batch_path.replace(batch_path.find(".base."), 6, ".batch.");
@@ -125,8 +119,7 @@ struct Options {
 	{
 		std::cout << "Options: " << std::endl;
 		std::cout << "val_n: " << val_n << std::endl;
-		std::cout << "input_file_path: " << input_file_path
-			  << std::endl;
+		std::cout << "input_file_path: " << input_file_path << std::endl;
 		std::cout << "tag: " << tag << std::endl;
 		std::cout << "rounds: " << rounds << std::endl;
 		std::cout << "query_type: " << query_type << std::endl;

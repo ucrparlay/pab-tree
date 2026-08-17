@@ -118,11 +118,9 @@ auto GenRectangles(int rec_num, int const type, auto const &WP)
 	} else {
 		if (type == 0) { //* small bracket
 			range.first = 1;
-			range.second = static_cast<size_t>(
-				std::sqrt(std::sqrt(1.0 * n)));
+			range.second = static_cast<size_t>(std::sqrt(std::sqrt(1.0 * n)));
 		} else if (type == 1) { //* medium bracket
-			range.second = static_cast<size_t>(
-				std::sqrt(std::sqrt(1.0 * n)));
+			range.second = static_cast<size_t>(std::sqrt(std::sqrt(1.0 * n)));
 			range.second = static_cast<size_t>(std::sqrt(1.0 * n));
 		} else if (type == 2) { //* large bracket
 			range.second = static_cast<size_t>(std::sqrt(1.0 * n));
@@ -161,9 +159,9 @@ auto GenRectangles(int rec_num, int const type, auto const &WP)
 }
 
 template <typename TypeTrait, typename Tree, bool kTestTime = true,
-	  int kPrint = 1, int kOutputRatio = 1>
+		  int kPrint = 1, int kOutputRatio = 1>
 void BuildTree(typename TypeTrait::entry_seq const &WP, int const &rounds,
-	       Tree &pkd)
+			   Tree &pkd)
 {
 	using TT [[maybe_unused]] = TypeTrait;
 	using entry_seq [[maybe_unused]] = typename TT::entry_seq;
@@ -175,8 +173,7 @@ void BuildTree(typename TypeTrait::entry_seq const &WP, int const &rounds,
 	// size_t n = 100;
 	// entry_seq wp = entry_seq::uninitialized(n);
 	auto const wp = Tree::parse_input(WP);
-	auto const partial_wp =
-		Tree::parse_input(WP.subseq(0, n / kOutputRatio));
+	auto const partial_wp = Tree::parse_input(WP.subseq(0, n / kOutputRatio));
 
 	if constexpr (kTestTime) {
 		pkd.delete_tree();
@@ -198,9 +195,9 @@ void BuildTree(typename TypeTrait::entry_seq const &WP, int const &rounds,
 }
 
 template <typename TypeTrait, typename Tree, bool kTestTime = true,
-	  bool kSerial = false>
+		  bool kSerial = false>
 void batch_insert(Tree &pkd, typename TypeTrait::entry_seq const &WP,
-		  typename TypeTrait::entry_seq const &WI, int const rounds)
+				  typename TypeTrait::entry_seq const &WI, int const rounds)
 {
 	auto const wp = Tree::parse_input(WP);
 	auto const wi = Tree::parse_input(WI);
@@ -210,14 +207,12 @@ void batch_insert(Tree &pkd, typename TypeTrait::entry_seq const &WP,
 		pkd.delete_tree();
 		double aveInsert = time_loop(
 			rounds, loop_late, [&]() { pkd.build(wp); },
-			[&]() { pkd.batch_insert(wi); },
-			[&]() { pkd.delete_tree(); });
+			[&]() { pkd.batch_insert(wi); }, [&]() { pkd.delete_tree(); });
 		std::cout << aveInsert << " " << std::flush;
 		// std::cout << ratio << " " << aveInsert << " " << std::endl;
 		BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
 	} else { // NOTE: insert the points from previous tree
-		std::cout << "Insert " << wi.size() << " elements\n"
-			  << std::flush;
+		std::cout << "Insert " << wi.size() << " elements\n" << std::flush;
 		pkd.batch_insert(wi);
 		std::cout << "finish ccp insert" << std::endl;
 	}
@@ -228,7 +223,7 @@ struct StepUpdateLogger {
 	double t;
 
 	friend std::ostream &operator<<(std::ostream &os,
-					StepUpdateLogger const &log)
+									StepUpdateLogger const &log)
 	{
 		os << "(" << log.id << ", " << log.t << ")";
 		return os;
@@ -237,7 +232,7 @@ struct StepUpdateLogger {
 
 template <typename TT, typename Tree, bool kInsert>
 void BatchInsertByStep(Tree &pkd, auto const &WP, double const insert_ratio,
-		       int const rounds)
+					   int const rounds)
 {
 	auto wp = WP;
 	size_t n = wp.size();
@@ -252,8 +247,8 @@ void BatchInsertByStep(Tree &pkd, auto const &WP, double const insert_ratio,
 
 	auto prepare_func = [&]() {
 		insert_batch_seq = parlay::tabulate(slice_num, [&](size_t i) {
-			return Tree::parse_input(wp.subseq(
-				i * step, std::min((i + 1) * step, n)));
+			return Tree::parse_input(
+				wp.subseq(i * step, std::min((i + 1) * step, n)));
 		});
 	};
 	auto incre_build = [&](size_t const batch_num) {
@@ -264,8 +259,7 @@ void BatchInsertByStep(Tree &pkd, auto const &WP, double const insert_ratio,
 
 	double ave_time = time_loop(
 		rounds, 0.01, [&]() { prepare_func(); },
-		[&]() { incre_build(slice_num); },
-		[&]() { pkd.delete_tree(); });
+		[&]() { incre_build(slice_num); }, [&]() { pkd.delete_tree(); });
 
 	std::cout << ave_time << " " << std::flush;
 
@@ -283,25 +277,24 @@ void BatchInsertByStep(Tree &pkd, auto const &WP, double const insert_ratio,
 // untimed init phase of time_loop.
 template <typename TT, typename Tree, bool kDelete>
 void BatchDeleteByStep(Tree &pkd, auto const &WP, double const delete_ratio,
-		       int const rounds)
+					   int const rounds)
 {
 	size_t const n = WP.size();
-	auto const step = std::max<size_t>(
-		static_cast<size_t>(delete_ratio * n), size_t(1));
+	auto const step =
+		std::max<size_t>(static_cast<size_t>(delete_ratio * n), size_t(1));
 	size_t const slice_num = (n / step) + (n % step != 0);
 
 	// NOTE: build does not consume its input, so parse it once and reuse it for
 	// every round.
 	auto const build_input = Tree::parse_input(WP);
-	parlay::sequence<typename Tree::input_delete_range_type>
-		delete_batch_seq;
+	parlay::sequence<typename Tree::input_delete_range_type> delete_batch_seq;
 
 	// NOTE: batch_delete may consume/permute its input, and every timed run has to
 	// start from a freshly built tree holding all of WP.
 	auto prepare_func = [&]() {
 		delete_batch_seq = parlay::tabulate(slice_num, [&](size_t i) {
-			return Tree::parse_delete_input(WP.subseq(
-				i * step, std::min((i + 1) * step, n)));
+			return Tree::parse_delete_input(
+				WP.subseq(i * step, std::min((i + 1) * step, n)));
 		});
 		pkd.delete_tree();
 		pkd.build(build_input);
@@ -316,8 +309,7 @@ void BatchDeleteByStep(Tree &pkd, auto const &WP, double const delete_ratio,
 
 	double ave_time = time_loop(
 		rounds, 0.01, [&]() { prepare_func(); },
-		[&]() { incre_delete(slice_num); },
-		[&]() { pkd.delete_tree(); });
+		[&]() { incre_delete(slice_num); }, [&]() { pkd.delete_tree(); });
 
 	std::cout << ave_time << " " << std::flush;
 
@@ -339,10 +331,10 @@ struct PBTreeLeafSortPred {
 	template <typename InputNode, typename Range>
 	bool operator()(InputNode const *T, Range In) const noexcept
 	{
-		auto const v = (static_cast<size_t>(T->size) + In.size()) *
-				       2654435761ULL ^
-			       (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
-			       (reinterpret_cast<uintptr_t>(In.end()) >> 3);
+		auto const v =
+			(static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
+			(reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
+			(reinterpret_cast<uintptr_t>(In.end()) >> 3);
 
 		// - _randomness = 0: 0–99 ≥ 0 → always true → always sort
 		// - _randomness = 100: 0–99 ≥ 100 → always false → never sort
@@ -355,27 +347,25 @@ struct PBTreeLeafSortPred {
 template <typename TypeTrait, typename Tree>
 	requires(!pab_tree::is_pab_tree<Tree>)
 void TestLeafRandom(Tree &, auto const &, auto const &, auto const &, int const,
-		    int const, int const)
+					int const, int const)
 {
 }
 
 template <typename TypeTrait, typename Tree>
 	requires pab_tree::is_pab_tree<Tree>
 void TestLeafRandom(Tree &pkd, auto const &WP, auto const &insert_batch_seq,
-		    auto const &delete_batch_seq, int const time_period_num,
-		    int const rounds, int const ratio)
+					auto const &delete_batch_seq, int const time_period_num,
+					int const rounds, int const ratio)
 {
 	using TT [[maybe_unused]] = TypeTrait;
 	auto const wp = Tree::parse_input(WP);
 
-	auto const query_size =
-		static_cast<size_t>(wp.size() * kMemberQueryRatio);
+	auto const query_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
 	auto query_ele = wp.subseq(0, query_size);
 	auto query_ele_step = query_size / time_period_num;
 	for (int i = 0; i < time_period_num; i++) {
 		parlay::parallel_for(0, query_ele_step, [&](size_t j) {
-			query_ele[(i * query_ele_step) + j] =
-				insert_batch_seq[i][j];
+			query_ele[(i * query_ele_step) + j] = insert_batch_seq[i][j];
 		});
 	}
 	auto member_res = parlay::sequence<bool>(query_ele.size(), true);
@@ -396,16 +386,14 @@ void TestLeafRandom(Tree &pkd, auto const &WP, auto const &insert_batch_seq,
 
 		for (int i = 0; i < time_period_num; i++) {
 			t.reset(), t.start();
-			pkd.batch_delete(delete_batch_seq[i],
-					 leaf_entries_pattern, sorted_input,
-					 PBTreeLeafSortPred(ratio));
+			pkd.batch_delete(delete_batch_seq[i], leaf_entries_pattern,
+							 sorted_input, PBTreeLeafSortPred(ratio));
 			t.stop();
 			delete_time[i] += t.total_time();
 
 			t.reset(), t.start();
-			pkd.batch_insert(insert_batch_seq[i],
-					 leaf_entries_pattern, sorted_input,
-					 PBTreeLeafSortPred(ratio));
+			pkd.batch_insert(insert_batch_seq[i], leaf_entries_pattern,
+							 sorted_input, PBTreeLeafSortPred(ratio));
 			t.stop();
 			insert_time[i] += t.total_time();
 		}
@@ -416,39 +404,35 @@ void TestLeafRandom(Tree &pkd, auto const &WP, auto const &insert_batch_seq,
 		// membership
 		t.reset(), t.start();
 		parlay::parallel_for(0, query_size, [&](size_t j) {
-			auto contain =
-				pkd.contain(Tree::Entry::get_key(query_ele[j]));
+			auto contain = pkd.contain(Tree::Entry::get_key(query_ele[j]));
 			member_res[j] = contain;
 		});
 		t.stop();
 		member_query_time += t.total_time();
 	}
 
-	auto insert_ave =
-		parlay::reduce(insert_time) / (rounds * time_period_num);
-	auto delete_ave =
-		parlay::reduce(delete_time) / (rounds * time_period_num);
+	auto insert_ave = parlay::reduce(insert_time) / (rounds * time_period_num);
+	auto delete_ave = parlay::reduce(delete_time) / (rounds * time_period_num);
 	auto member_query_ave = member_query_time / rounds;
 	auto sorted_leaf_ratio_ave = sorted_leaf_ratio / rounds;
 
 	std::cout << ratio << " " << insert_ave << " " << delete_ave << " "
-		  << member_query_ave << " " << sorted_leaf_ratio_ave
-		  << std::endl;
+			  << member_query_ave << " " << sorted_leaf_ratio_ave << std::endl;
 }
 
 template <typename TypeTrait, typename Tree>
 	requires(!pab_tree::is_pab_tree<Tree>)
 void TestLeafRandomDynamicGraph(Tree &, auto const &, auto const &, auto &,
-				int const, int const, int const)
+								int const, int const, int const)
 {
 }
 
 template <typename TypeTrait, typename Tree>
 	requires pab_tree::is_pab_tree<Tree>
 void TestLeafRandomDynamicGraph(Tree &pkd, auto const &insert_batch_seq,
-				auto const &delete_batch_seq,
-				auto &membership_res, int const time_period_num,
-				int const rounds, int const ratio)
+								auto const &delete_batch_seq,
+								auto &membership_res, int const time_period_num,
+								int const rounds, int const ratio)
 {
 	using TT [[maybe_unused]] = TypeTrait;
 	pkd.delete_tree();
@@ -470,35 +454,32 @@ void TestLeafRandomDynamicGraph(Tree &pkd, auto const &insert_batch_seq,
 	// source vertex occurs (its out-degree) and build a (vertex, occurrence)
 	// sequence, highest occurrence first. The top vertices are used as the
 	// keys for the range queries.
-	auto edge_list =
-		parlay::tabulate(random_osm_records.size(), [&](size_t i) {
-			auto key = TT::Entry::get_key(random_osm_records[i]);
-			uint64_t u = key >> 32;
-			uint64_t v = key & 0xffffffff;
-			return std::make_pair(u, v);
-		});
+	auto edge_list = parlay::tabulate(random_osm_records.size(), [&](size_t i) {
+		auto key = TT::Entry::get_key(random_osm_records[i]);
+		uint64_t u = key >> 32;
+		uint64_t v = key & 0xffffffff;
+		return std::make_pair(u, v);
+	});
 	auto range_query_vertex_occurrence = parlay::histogram_by_key(
 		parlay::map(edge_list, [](auto const &e) { return e.first; }));
-	parlay::sort_inplace(range_query_vertex_occurrence,
-			     [](auto const &a, auto const &b) {
-				     return a.second > b.second;
-			     });
+	parlay::sort_inplace(
+		range_query_vertex_occurrence,
+		[](auto const &a, auto const &b) { return a.second > b.second; });
 	range_query_vertex_occurrence = range_query_vertex_occurrence.subseq(
 		0, std::min(range_query_vertex_occurrence.size(),
-			    static_cast<size_t>(kDynamicGraphRangeNum)));
-	auto [range_query_offset, tot_range_size] = parlay::scan(
-		parlay::map(range_query_vertex_occurrence,
-			    [](auto const &p) { return p.second; }),
-		parlay::addm<size_t>());
+					static_cast<size_t>(kDynamicGraphRangeNum)));
+	auto [range_query_offset, tot_range_size] =
+		parlay::scan(parlay::map(range_query_vertex_occurrence,
+								 [](auto const &p) { return p.second; }),
+					 parlay::addm<size_t>());
 	range_query_offset.push_back(tot_range_size);
 	auto range_report_output = typename TT::entry_seq(tot_range_size);
 
-	auto box_seq = parlay::tabulate(
-		range_query_vertex_occurrence.size(), [&](size_t i) {
+	auto box_seq =
+		parlay::tabulate(range_query_vertex_occurrence.size(), [&](size_t i) {
 			uint64_t u = range_query_vertex_occurrence[i].first;
-			return std::make_pair(
-				static_cast<uint64_t>(u << 32),
-				static_cast<uint64_t>((u + 1) << 32));
+			return std::make_pair(static_cast<uint64_t>(u << 32),
+								  static_cast<uint64_t>((u + 1) << 32));
 		});
 	parlay::sequence<size_t> size_seq(box_seq.size(), 0);
 
@@ -523,8 +504,7 @@ void TestLeafRandomDynamicGraph(Tree &pkd, auto const &insert_batch_seq,
 		auto const &insert_entry = wi;
 		auto const &delete_entry = wd;
 		if (rounds == 1) {
-			for (int batch_id = 0; batch_id < time_period_num;
-			     batch_id++) {
+			for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
 				insert_time[batch_id] = 0.0;
 				delete_time[batch_id] = 0.0;
 				member_query_time[batch_id] = 0.0;
@@ -532,23 +512,20 @@ void TestLeafRandomDynamicGraph(Tree &pkd, auto const &insert_batch_seq,
 		}
 
 		// running the osm
-		constexpr auto leaf_entries_pattern =
-			TT::leaf_entries_pattern::hybrid;
+		constexpr auto leaf_entries_pattern = TT::leaf_entries_pattern::hybrid;
 		constexpr bool sorted_input = false;
 		parlay::internal::timer t;
 		pkd.delete_tree();
 		for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
 			t.reset(), t.start();
-			pkd.batch_insert(insert_entry[batch_id],
-					 leaf_entries_pattern, sorted_input,
-					 PBTreeLeafSortPred(ratio));
+			pkd.batch_insert(insert_entry[batch_id], leaf_entries_pattern,
+							 sorted_input, PBTreeLeafSortPred(ratio));
 			t.stop();
 			insert_time[batch_id] = t.total_time();
 
 			t.reset(), t.start();
-			pkd.batch_delete(delete_entry[batch_id],
-					 leaf_entries_pattern, sorted_input,
-					 PBTreeLeafSortPred(ratio));
+			pkd.batch_delete(delete_entry[batch_id], leaf_entries_pattern,
+							 sorted_input, PBTreeLeafSortPred(ratio));
 			t.stop();
 			delete_time[batch_id] = t.total_time();
 
@@ -581,14 +558,13 @@ void TestLeafRandomDynamicGraph(Tree &pkd, auto const &insert_batch_seq,
 	sorted_leaf_ratio_ave /= denom;
 
 	std::cout << ratio << " " << insert_ave << " " << delete_ave << " "
-		  << member_query_ave << " " << sorted_leaf_ratio_ave
-		  << std::endl;
+			  << member_query_ave << " " << sorted_leaf_ratio_ave << std::endl;
 }
 
 template <typename TypeTrait, typename Tree, bool kTestTime = true,
-	  bool kSerial = false>
+		  bool kSerial = false>
 void batch_delete(Tree &pkd, typename TypeTrait::entry_seq const &WP,
-		  typename TypeTrait::entry_seq const &WI, int const rounds)
+				  typename TypeTrait::entry_seq const &WI, int const rounds)
 {
 	auto const wp = Tree::parse_input(WP);
 	auto const wi = Tree::parse_delete_input(WI);
@@ -598,8 +574,7 @@ void batch_delete(Tree &pkd, typename TypeTrait::entry_seq const &WP,
 		pkd.delete_tree();
 		double aveInsert = time_loop(
 			rounds, loop_late, [&]() { pkd.build(wp); },
-			[&]() { pkd.batch_delete(wi); },
-			[&]() { pkd.delete_tree(); });
+			[&]() { pkd.batch_delete(wi); }, [&]() { pkd.delete_tree(); });
 		std::cout << aveInsert << " " << std::flush;
 		// std::cout << ratio << " " << aveInsert << " " << std::endl;
 		BuildTree<TypeTrait, Tree, false>(WP, rounds, pkd);
@@ -612,7 +587,7 @@ void batch_delete(Tree &pkd, typename TypeTrait::entry_seq const &WP,
 
 template <typename TT, typename Tree>
 void range_count(auto const &wp, Tree const &pkd, int const kRounds,
-		 int const rec_num, int const rec_type)
+				 int const rec_num, int const rec_type)
 {
 	using entry_seq [[maybe_unused]] = typename TT::entry_seq;
 
@@ -628,21 +603,20 @@ void range_count(auto const &wp, Tree const &pkd, int const kRounds,
 				[[maybe_unused]] auto size =
 					pkd.range_count(query_box_seq[i].first);
 				kdknn[i] = size;
-				[[maybe_unused]] int output_size =
-					query_box_seq[i].second;
+				[[maybe_unused]] int output_size = query_box_seq[i].second;
 				assert(std::cmp_equal(kdknn[i], output_size));
 			});
 		},
 		[&]() {});
 
 	std::cout << "check range count: " << rec_num << " " << rec_type << " "
-		  << max_size << std::endl;
+			  << max_size << std::endl;
 	for (int i = 0; i < rec_num; i++) {
 		int output_size = query_box_seq[i].second;
 		if (std::cmp_not_equal(kdknn[i], output_size)) {
 			std::cout << kdknn[i] << " " << output_size << " "
-				  << query_box_seq[i].first.first
-				  << query_box_seq[i].first.second << std::endl;
+					  << query_box_seq[i].first.first
+					  << query_box_seq[i].first.second << std::endl;
 		}
 		assert(std::cmp_equal(kdknn[i], output_size));
 	}
@@ -653,7 +627,7 @@ void range_count(auto const &wp, Tree const &pkd, int const kRounds,
 // NOTE: run range query and check the correct
 template <typename TT, typename Tree>
 void RangeQuery(auto const &wp, Tree const &pkd, int const kRounds,
-		int const rec_num, int const rec_type)
+				int const rec_num, int const rec_type)
 {
 	using entry_seq = typename TT::entry_seq;
 
@@ -662,9 +636,7 @@ void RangeQuery(auto const &wp, Tree const &pkd, int const kRounds,
 	auto [offset, tot_size] = parlay::scan(
 		parlay::delayed_tabulate(
 			rec_num,
-			[&](size_t i) -> size_t {
-				return query_box_seq[i].second.size();
-			}),
+			[&](size_t i) -> size_t { return query_box_seq[i].second.size(); }),
 		parlay::addm<size_t>());
 	offset.push_back(tot_size);
 	entry_seq Out(tot_size);
@@ -676,51 +648,45 @@ void RangeQuery(auto const &wp, Tree const &pkd, int const kRounds,
 			parlay::parallel_for(0, rec_num, [&](size_t i) {
 				// parlay::parallel_for(0, 1, [&](size_t i) {
 				[[maybe_unused]] auto size = pkd.range_report(
-					query_box_seq[i].first,
-					Out.cut(offset[i], offset[i + 1]));
+					query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
 				kdknn[i] = size;
 				[[maybe_unused]] size_t output_size =
 					query_box_seq[i].second.size();
 				assert(std::cmp_equal(kdknn[i], size) &&
-				       Out.size() >= output_size);
+					   Out.size() >= output_size);
 			});
 		},
 		[&]() {});
 
 	std::cout << "check range query: " << rec_num << " " << rec_type << " "
-		  << max_size << std::endl;
+			  << max_size << std::endl;
 	for (int i = 0; i < rec_num; i++) {
 		int output_size = query_box_seq[i].second.size();
 		if (std::cmp_not_equal(kdknn[i], output_size)) {
 			std::cout << kdknn[i] << " " << output_size << " "
-				  << query_box_seq[i].first.first
-				  << query_box_seq[i].first.second << std::endl;
+					  << query_box_seq[i].first.first
+					  << query_box_seq[i].first.second << std::endl;
 		}
 		assert(std::cmp_equal(kdknn[i], output_size));
 		// std::cout << kdknn[i] << " " << output_size << " "
 		//     << query_box_seq[i].first.first << query_box_seq[i].first.second
 		//     << std::endl;
 		parlay::sort_inplace(Out.cut(offset[i], offset[i + 1]),
-				     [&](auto const &a, auto const &b) {
-					     return TT::Entry::get_key(a) <
-						    TT::Entry::get_key(b);
-				     });
-		parlay::sort_inplace(query_box_seq[i].second,
-				     [&](auto const &a, auto const &b) {
-					     return TT::Entry::get_key(a) <
-						    TT::Entry::get_key(b);
-				     });
+							 [&](auto const &a, auto const &b) {
+								 return TT::Entry::get_key(a) <
+										TT::Entry::get_key(b);
+							 });
+		parlay::sort_inplace(
+			query_box_seq[i].second, [&](auto const &a, auto const &b) {
+				return TT::Entry::get_key(a) < TT::Entry::get_key(b);
+			});
 		parlay::parallel_for(0, output_size, [&](size_t j) {
-			if (Out[offset[i] + j] !=
-			    query_box_seq[i].second.at(j)) {
+			if (Out[offset[i] + j] != query_box_seq[i].second.at(j)) {
 				std::cout << "wrong: bounding box: "
-					  << query_box_seq[i].first.first << " "
-					  << query_box_seq[i].first.second
-					  << std::endl;
-				std::cout << "------ " << Out[offset[i] + j]
-					  << " "
-					  << query_box_seq[i].second.at(j)
-					  << std::endl;
+						  << query_box_seq[i].first.first << " "
+						  << query_box_seq[i].first.second << std::endl;
+				std::cout << "------ " << Out[offset[i] + j] << " "
+						  << query_box_seq[i].second.at(j) << std::endl;
 				assert(false);
 			}
 		});
@@ -795,8 +761,7 @@ void Membership(Tree const &pkd, auto const &query_ele, int kRounds, auto &res)
 				0, query_num,
 				[&](size_t i) {
 					// for (int i = 0; i < query_num; i++) {
-					auto contain = pkd.contain(
-						Entry::get_key(query_ele[i]));
+					auto contain = pkd.contain(Entry::get_key(query_ele[i]));
 
 					res[i] = contain;
 					// }
@@ -811,7 +776,7 @@ void Membership(Tree const &pkd, auto const &query_ele, int kRounds, auto &res)
 
 template <typename TT, typename Tree>
 void RangeCountFix(Tree &pkd, [[maybe_unused]] int const &rounds, int rec_num,
-		   auto const &query_box_seq)
+				   auto const &query_box_seq)
 {
 	// auto [query_box_seq, max_size] =
 	//     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
@@ -839,18 +804,18 @@ void RangeCountFix(Tree &pkd, [[maybe_unused]] int const &rounds, int rec_num,
 
 template <typename TT, typename Tree>
 void RangeQueryFix(Tree &pkd, [[maybe_unused]] int const &rounds, auto &Out,
-		   int rec_num, auto const &query_box_seq)
+				   int rec_num, auto const &query_box_seq)
 {
 	// auto [query_box_seq, max_size] =
 	//     gen_rectangles<Point, Tree, false>(rec_num, rec_type, WP, DIM);
 	parlay::sequence<size_t> vis_leaf(rec_num), vis_inter(rec_num);
 
-	auto [offset, tot_size] = parlay::scan(
-		parlay::tabulate(rec_num,
-				 [&](size_t i) -> size_t {
-					 return query_box_seq[i].second;
-				 }),
-		parlay::addm<size_t>());
+	auto [offset, tot_size] =
+		parlay::scan(parlay::tabulate(rec_num,
+									  [&](size_t i) -> size_t {
+										  return query_box_seq[i].second;
+									  }),
+					 parlay::addm<size_t>());
 	offset.push_back(tot_size);
 	Out.resize(tot_size);
 
@@ -865,8 +830,7 @@ void RangeQueryFix(Tree &pkd, [[maybe_unused]] int const &rounds, auto &Out,
 			parlay::parallel_for(0, rec_num, [&](size_t i) {
 				// for (int i = 0; i < rec_num; i++) {
 				[[maybe_unused]] auto size = pkd.range_report(
-					query_box_seq[i].first,
-					Out.cut(offset[i], offset[i + 1]));
+					query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
 				// std::cout << size << " " << query_box_seq[i].second << std::endl;
 				// if (size != query_box_seq[i].second) {
 				//   std::cout << "wrong: bounding box: " <<
@@ -905,14 +869,13 @@ void RangeQueryFix(Tree &pkd, [[maybe_unused]] int const &rounds, auto &Out,
 
 template <typename TT, typename Tree>
 void RangeQuerySerialWithLog(Tree &pkd, [[maybe_unused]] int const &rounds,
-			     auto &Out, const int rec_num, const int rec_type,
-			     auto const &query_box_seq)
+							 auto &Out, const int rec_num, const int rec_type,
+							 auto const &query_box_seq)
 {
 	auto [offset, tot_size] = parlay::scan(
-		parlay::delayed_tabulate(rec_num,
-					 [&](size_t i) -> size_t {
-						 return query_box_seq[i].second;
-					 }),
+		parlay::delayed_tabulate(
+			rec_num,
+			[&](size_t i) -> size_t { return query_box_seq[i].second; }),
 		parlay::addm<size_t>());
 	offset.push_back(tot_size);
 	Out.resize(tot_size);
@@ -920,12 +883,11 @@ void RangeQuerySerialWithLog(Tree &pkd, [[maybe_unused]] int const &rounds,
 	for (int i = 0; i < rec_num; i++) {
 		parlay::internal::timer t;
 		t.reset(), t.start();
-		[[maybe_unused]] auto size =
-			pkd.range_report(query_box_seq[i].first,
-					 Out.cut(offset[i], offset[i + 1]));
+		[[maybe_unused]] auto size = pkd.range_report(
+			query_box_seq[i].first, Out.cut(offset[i], offset[i + 1]));
 		t.stop();
 		std::cout << rec_type << " " << query_box_seq[i].second << " "
-			  << std::scientific << t.total_time() << std::endl;
+				  << std::scientific << t.total_time() << std::endl;
 	}
 
 	return;
@@ -934,8 +896,8 @@ void RangeQuerySerialWithLog(Tree &pkd, [[maybe_unused]] int const &rounds,
 template <typename TT, typename Tree>
 void InsertOsmByTime(
 	const parlay::sequence<typename TT::entry_seq> &node_by_time, Tree &pkd,
-	const int rounds, const int sliding_window_len,
-	const size_t member_query_n, auto &member_res, auto &range_res)
+	const int rounds, const int sliding_window_len, const size_t member_query_n,
+	auto &member_res, auto &range_res)
 {
 	pkd.delete_tree();
 	const int time_period_num = node_by_time.size();
@@ -961,8 +923,7 @@ void InsertOsmByTime(
 
 		if (node_by_time[i].size() < step) {
 			std::cout << "not enough points in time period " << i
-				  << " for member query, need " << step
-				  << std::endl;
+					  << " for member query, need " << step << std::endl;
 			return;
 		}
 		parlay::parallel_for(0, step, [&](size_t j) {
@@ -977,8 +938,7 @@ void InsertOsmByTime(
 		if (i < sliding_window_len) {
 			batch_in_tree.emplace_back(0, i + 1);
 		} else {
-			batch_in_tree.emplace_back(i - sliding_window_len,
-						   i + 1);
+			batch_in_tree.emplace_back(i - sliding_window_len, i + 1);
 		}
 	}
 	auto box_seq_by_year =
@@ -986,11 +946,10 @@ void InsertOsmByTime(
 			bool constexpr kSavePoint = false;
 			bool constexpr kFixSize = false;
 			auto wp = parlay::flatten(node_by_time.cut(
-				batch_in_tree[batch_id].first,
-				batch_in_tree[batch_id].second));
+				batch_in_tree[batch_id].first, batch_in_tree[batch_id].second));
 			// return query box seq and max size
-			return GenRectangles<TT, kSavePoint, kFixSize>(
-				kOSMRangeQueryNum, kOSMRecType, wp);
+			return GenRectangles<TT, kSavePoint, kFixSize>(kOSMRangeQueryNum,
+														   kOSMRecType, wp);
 		});
 
 	parlay::sequence<double> insert_time(time_period_num, 0.0);
@@ -1022,22 +981,17 @@ void InsertOsmByTime(
 			insert_time[batch_id] += t.total_time();
 			current_tree_size += node_by_time[batch_id].size();
 #ifdef DEBUG
-			std::cerr << " insert batch: " << batch_id
-				  << std::flush;
+			std::cerr << " insert batch: " << batch_id << std::flush;
 			pkd.validate();
 #endif // DEBUG
 
 			if (batch_id >= sliding_window_len) {
 				t.reset(), t.start();
-				pkd.batch_delete(
-					delete_entry[batch_id -
-						     sliding_window_len]);
+				pkd.batch_delete(delete_entry[batch_id - sliding_window_len]);
 				t.stop();
 				delete_time[batch_id] += t.total_time();
 				current_tree_size -=
-					node_by_time[batch_id -
-						     sliding_window_len]
-						.size();
+					node_by_time[batch_id - sliding_window_len].size();
 #ifdef DEBUG
 				// std::cerr << " delete batch: " << batch_id - sliding_window_len
 				//           << std::flush;
@@ -1060,58 +1014,51 @@ void InsertOsmByTime(
 			// NOTE: range query
 			auto query_box_seq = box_seq_by_year[batch_id].first;
 			auto [offset, tot_size] = parlay::scan(
-				parlay::tabulate(
-					kOSMRangeQueryNum,
-					[&](size_t i) -> size_t {
-						return query_box_seq[i].second;
-					}),
+				parlay::tabulate(kOSMRangeQueryNum,
+								 [&](size_t i) -> size_t {
+									 return query_box_seq[i].second;
+								 }),
 				parlay::addm<size_t>());
 			offset.push_back(tot_size);
 			range_res.resize(tot_size);
 
 			t.reset(), t.start();
-			parlay::parallel_for(
-				0, kOSMRangeQueryNum, [&](size_t i) {
-					[[maybe_unused]] auto size =
-						pkd.range_report(
-							query_box_seq[i].first,
-							range_res.cut(
-								offset[i],
-								offset[i + 1]));
-				});
+			parlay::parallel_for(0, kOSMRangeQueryNum, [&](size_t i) {
+				[[maybe_unused]] auto size =
+					pkd.range_report(query_box_seq[i].first,
+									 range_res.cut(offset[i], offset[i + 1]));
+			});
 			t.stop();
 			range_query_time[batch_id] += t.total_time();
 		}
 	}
 
 	std::cout << std::right << " "
-		  << "insert_n"
-		  << " "
-		  << "delete_n"
-		  << " "
-		  << "tree_n"
-		  << " "
-		  << "insert_t(s)"
-		  << " "
-		  << "delete_t(s)"
-		  << " "
-		  << "member_query_t(s)"
-		  << " "
-		  << "range_query_t(s)" << std::endl;
+			  << "insert_n"
+			  << " "
+			  << "delete_n"
+			  << " "
+			  << "tree_n"
+			  << " "
+			  << "insert_t(s)"
+			  << " "
+			  << "delete_t(s)"
+			  << " "
+			  << "member_query_t(s)"
+			  << " "
+			  << "range_query_t(s)" << std::endl;
 	for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
 		size_t const delete_n =
 			batch_id >= sliding_window_len ?
-				node_by_time[batch_id - sliding_window_len]
-					.size() :
+				node_by_time[batch_id - sliding_window_len].size() :
 				0;
-		std::cout << std::right << " " << node_by_time[batch_id].size()
-			  << " " << delete_n << " " << tree_size[batch_id]
-			  << " " << std::fixed << std::setprecision(6)
-			  << insert_time[batch_id] / (rounds - 1) << " "
-			  << delete_time[batch_id] / (rounds - 1) << " "
-			  << member_query_time[batch_id] / (rounds - 1) << " "
-			  << range_query_time[batch_id] / (rounds - 1)
-			  << std::endl;
+		std::cout << std::right << " " << node_by_time[batch_id].size() << " "
+				  << delete_n << " " << tree_size[batch_id] << " " << std::fixed
+				  << std::setprecision(6)
+				  << insert_time[batch_id] / (rounds - 1) << " "
+				  << delete_time[batch_id] / (rounds - 1) << " "
+				  << member_query_time[batch_id] / (rounds - 1) << " "
+				  << range_query_time[batch_id] / (rounds - 1) << std::endl;
 	}
 }
 
@@ -1132,19 +1079,17 @@ template <typename Range> double GeometricMean(Range const &v)
 // NOTE: sum (total) of a numeric range across all batches.
 template <typename Range> double Total(Range const &v)
 {
-	return parlay::reduce(parlay::delayed_map(
-		v, [](auto x) { return static_cast<double>(x); }));
+	return parlay::reduce(
+		parlay::delayed_map(v, [](auto x) { return static_cast<double>(x); }));
 }
 
 template <typename TT, typename Tree>
 void TestTemporalSignal(
 	const parlay::sequence<typename TT::entry_seq> &node_by_time, Tree &pkd,
-	const int rounds, const int sliding_window_len,
-	const size_t member_query_n, auto &membership_res,
-	auto &range_report_res, auto &flatten_seq,
+	const int rounds, const int sliding_window_len, const size_t member_query_n,
+	auto &membership_res, auto &range_report_res, auto &flatten_seq,
 	auto const &membership_query_keys,
-	auto const &range_query_vertex_occurrence,
-	auto const &range_query_offset)
+	auto const &range_query_vertex_occurrence, auto const &range_query_offset)
 {
 	pkd.delete_tree();
 	const int time_period_num = node_by_time.size();
@@ -1164,15 +1109,13 @@ void TestTemporalSignal(
 
 	// NOTE: generate the range query box
 	auto const range_query_num = range_query_vertex_occurrence.size();
-	auto range_query_box_seq =
-		parlay::tabulate(range_query_num, [&](size_t i) {
-			uint64_t u = range_query_vertex_occurrence[i].first;
-			return std::make_pair(
-				static_cast<uint64_t>(u << 32),
-				static_cast<uint64_t>((u + 1) << 32));
-		});
-	parlay::sequence<size_t> range_query_output_size(
-		range_query_box_seq.size(), 0);
+	auto range_query_box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
+		uint64_t u = range_query_vertex_occurrence[i].first;
+		return std::make_pair(static_cast<uint64_t>(u << 32),
+							  static_cast<uint64_t>((u + 1) << 32));
+	});
+	parlay::sequence<size_t> range_query_output_size(range_query_box_seq.size(),
+													 0);
 
 	// std::cout << "begin insert osm by time" << std::endl;
 
@@ -1207,22 +1150,17 @@ void TestTemporalSignal(
 			insert_time[batch_id] += t.total_time();
 			current_tree_size += node_by_time[batch_id].size();
 #ifdef DEBUG
-			std::cerr << " insert batch: " << batch_id
-				  << std::flush;
+			std::cerr << " insert batch: " << batch_id << std::flush;
 			pkd.validate();
 #endif // DEBUG
 
 			if (batch_id >= sliding_window_len) {
 				t.reset(), t.start();
-				pkd.batch_delete(
-					delete_entry[batch_id -
-						     sliding_window_len]);
+				pkd.batch_delete(delete_entry[batch_id - sliding_window_len]);
 				t.stop();
 				delete_time[batch_id] += t.total_time();
 				current_tree_size -=
-					node_by_time[batch_id -
-						     sliding_window_len]
-						.size();
+					node_by_time[batch_id - sliding_window_len].size();
 #ifdef DEBUG
 				// std::cerr << " delete batch: " << batch_id - sliding_window_len
 				//           << std::flush;
@@ -1237,8 +1175,7 @@ void TestTemporalSignal(
 			// NOTE: test membership query
 			t.reset(), t.start();
 			parlay::parallel_for(0, member_query_n, [&](size_t j) {
-				auto contain =
-					pkd.contain(membership_query_keys[j]);
+				auto contain = pkd.contain(membership_query_keys[j]);
 				membership_res[j] = contain;
 			});
 			t.stop();
@@ -1249,19 +1186,13 @@ void TestTemporalSignal(
 			// NOTE: range query — probe the top-occurrence (highest out-degree)
 			// source vertices selected from the sorted edge list.
 			t.reset(), t.start();
-			parlay::parallel_for(
-				0, range_query_box_seq.size(), [&](size_t j) {
-					[[maybe_unused]] auto size =
-						pkd.range_report(
-							range_query_box_seq[j],
-							range_report_res.cut(
-								range_query_offset
-									[j],
-								range_query_offset
-									[j +
-									 1]));
-					range_query_output_size[j] = size;
-				});
+			parlay::parallel_for(0, range_query_box_seq.size(), [&](size_t j) {
+				[[maybe_unused]] auto size = pkd.range_report(
+					range_query_box_seq[j],
+					range_report_res.cut(range_query_offset[j],
+										 range_query_offset[j + 1]));
+				range_query_output_size[j] = size;
+			});
 			// for (size_t j = 0; j < range_query_box_seq.size(); j++) {
 			//   auto size = //     pkd.range_report(range_query_box_seq[j],
 			//                     range_report_res.cut(range_query_offset[j],
@@ -1287,35 +1218,34 @@ void TestTemporalSignal(
 	}
 
 	std::cout << std::right << " "
-		  << "insert_n"
-		  << " "
-		  << "delete_n"
-		  << " "
-		  << "tree_n"
-		  << " "
-		  << "insert_t(s)"
-		  << " "
-		  << "delete_t(s)"
-		  << " "
-		  << "member_query_t(s)"
-		  << " "
-		  << "range_query_t(s)"
-		  << " "
-		  << "flatten_t(s)" << std::endl;
+			  << "insert_n"
+			  << " "
+			  << "delete_n"
+			  << " "
+			  << "tree_n"
+			  << " "
+			  << "insert_t(s)"
+			  << " "
+			  << "delete_t(s)"
+			  << " "
+			  << "member_query_t(s)"
+			  << " "
+			  << "range_query_t(s)"
+			  << " "
+			  << "flatten_t(s)" << std::endl;
 	for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
 		size_t const delete_n =
 			batch_id >= sliding_window_len ?
-				node_by_time[batch_id - sliding_window_len]
-					.size() :
+				node_by_time[batch_id - sliding_window_len].size() :
 				0;
-		std::cout << std::right << " " << node_by_time[batch_id].size()
-			  << " " << delete_n << " " << tree_size[batch_id]
-			  << " " << std::fixed << std::setprecision(6)
-			  << insert_time[batch_id] / (rounds - 1) << " "
-			  << delete_time[batch_id] / (rounds - 1) << " "
-			  << member_query_time[batch_id] / (rounds - 1) << " "
-			  << range_query_time[batch_id] / (rounds - 1) << " "
-			  << flatten_time[batch_id] / (rounds - 1) << std::endl;
+		std::cout << std::right << " " << node_by_time[batch_id].size() << " "
+				  << delete_n << " " << tree_size[batch_id] << " " << std::fixed
+				  << std::setprecision(6)
+				  << insert_time[batch_id] / (rounds - 1) << " "
+				  << delete_time[batch_id] / (rounds - 1) << " "
+				  << member_query_time[batch_id] / (rounds - 1) << " "
+				  << range_query_time[batch_id] / (rounds - 1) << " "
+				  << flatten_time[batch_id] / (rounds - 1) << std::endl;
 	}
 
 	// NOTE: geometric mean of every attribute across all batches
@@ -1329,71 +1259,66 @@ void TestTemporalSignal(
 		return node_by_time[batch_id].size();
 	}) << " " << geo_col([&](size_t batch_id) {
 		return batch_id >= sliding_window_len ?
-			       node_by_time[batch_id - sliding_window_len]
-				       .size() :
-			       size_t{ 0 };
-	}) << " " << geo_col([&](size_t batch_id) {
-		return tree_size[batch_id];
-	}) << " " << std::fixed
-		  << std::setprecision(6) << geo_col([&](size_t batch_id) {
-			     return insert_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return delete_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return member_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return range_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return flatten_time[batch_id] / (rounds - 1);
-		     })
-		  << std::endl;
+				   node_by_time[batch_id - sliding_window_len].size() :
+				   size_t{ 0 };
+	}) << " " << geo_col([&](size_t batch_id) { return tree_size[batch_id]; })
+			  << " " << std::fixed << std::setprecision(6)
+			  << geo_col([&](size_t batch_id) {
+					 return insert_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return delete_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return member_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return range_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return flatten_time[batch_id] / (rounds - 1);
+				 })
+			  << std::endl;
 
 	// NOTE: sum of every attribute across all batches
 	auto const sum_col = [&](auto &&f) {
-		return Total(
-			parlay::tabulate(time_period_num, [&](size_t batch_id) {
-				return static_cast<double>(f(batch_id));
-			}));
+		return Total(parlay::tabulate(time_period_num, [&](size_t batch_id) {
+			return static_cast<double>(f(batch_id));
+		}));
 	};
 	std::cout << std::right << "# " << sum_col([&](size_t batch_id) {
 		return node_by_time[batch_id].size();
 	}) << " " << sum_col([&](size_t batch_id) {
 		return batch_id >= sliding_window_len ?
-			       node_by_time[batch_id - sliding_window_len]
-				       .size() :
-			       size_t{ 0 };
-	}) << " " << sum_col([&](size_t batch_id) {
-		return tree_size[batch_id];
-	}) << " " << std::fixed
-		  << std::setprecision(6) << sum_col([&](size_t batch_id) {
-			     return insert_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return delete_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return member_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return range_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return flatten_time[batch_id] / (rounds - 1);
-		     })
-		  << std::endl;
+				   node_by_time[batch_id - sliding_window_len].size() :
+				   size_t{ 0 };
+	}) << " " << sum_col([&](size_t batch_id) { return tree_size[batch_id]; })
+			  << " " << std::fixed << std::setprecision(6)
+			  << sum_col([&](size_t batch_id) {
+					 return insert_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return delete_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return member_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return range_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return flatten_time[batch_id] / (rounds - 1);
+				 })
+			  << std::endl;
 }
 
 template <typename TT, typename Tree>
 void TestDynamicGraph(const auto &insert_batch_seq,
-		      const auto &delete_batch_seq, Tree &pkd, const int rounds,
-		      auto &membership_res, auto &range_report_output,
-		      auto &flatten_seq, auto const &membership_query_keys,
-		      auto const &range_query_vertex_occurrence,
-		      auto const &range_query_offset)
+					  const auto &delete_batch_seq, Tree &pkd, const int rounds,
+					  auto &membership_res, auto &range_report_output,
+					  auto &flatten_seq, auto const &membership_query_keys,
+					  auto const &range_query_vertex_occurrence,
+					  auto const &range_query_offset)
 {
 	pkd.delete_tree();
 	auto time_period_num = insert_batch_seq.size();
@@ -1416,7 +1341,7 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 	auto box_seq = parlay::tabulate(range_query_num, [&](size_t i) {
 		uint64_t u = range_query_vertex_occurrence[i].first;
 		return std::make_pair(static_cast<uint64_t>(u << 32),
-				      static_cast<uint64_t>((u + 1) << 32));
+							  static_cast<uint64_t>((u + 1) << 32));
 	});
 	parlay::sequence<size_t> size_seq(box_seq.size(), 0);
 
@@ -1453,8 +1378,7 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 			current_tree_size += insert_batch_seq[batch_id].size();
 
 #ifdef DEBUG
-			std::cerr << " insert batch: " << batch_id
-				  << std::flush;
+			std::cerr << " insert batch: " << batch_id << std::flush;
 			pkd.validate();
 #endif // DEBUG
 
@@ -1465,8 +1389,7 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 			current_tree_size -= delete_batch_seq[batch_id].size();
 
 #ifdef DEBUG
-			std::cerr << " delete batch: " << batch_id
-				  << std::flush;
+			std::cerr << " delete batch: " << batch_id << std::flush;
 			pkd.validate();
 #endif // DEBUG
 
@@ -1475,8 +1398,7 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 			// NOTE: test membership query
 			t.reset(), t.start();
 			parlay::parallel_for(0, member_query_n, [&](size_t j) {
-				auto contain =
-					pkd.contain(membership_query_keys[j]);
+				auto contain = pkd.contain(membership_query_keys[j]);
 				membership_res[j] = contain;
 			});
 			t.stop();
@@ -1487,9 +1409,8 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 			parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
 				[[maybe_unused]] auto size = pkd.range_report(
 					box_seq[j],
-					range_report_output.cut(
-						range_query_offset[j],
-						range_query_offset[j + 1]));
+					range_report_output.cut(range_query_offset[j],
+											range_query_offset[j + 1]));
 				size_seq[j] = size;
 			});
 			t.stop();
@@ -1512,36 +1433,35 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 	}
 
 	std::cout << std::right << " "
-		  << "insert_n"
-		  << " "
-		  << "delete_n"
-		  << " "
-		  << "tree_n"
-		  << " "
-		  << "insert_t(s)"
-		  << " "
-		  << "delete_t(s)"
-		  << " "
-		  << "find_t(s)"
-		  << " "
-		  << "range_t(s)"
-		  << " "
-		  << "flatten_t(s)" << std::endl;
+			  << "insert_n"
+			  << " "
+			  << "delete_n"
+			  << " "
+			  << "tree_n"
+			  << " "
+			  << "insert_t(s)"
+			  << " "
+			  << "delete_t(s)"
+			  << " "
+			  << "find_t(s)"
+			  << " "
+			  << "range_t(s)"
+			  << " "
+			  << "flatten_t(s)" << std::endl;
 	for (int batch_id = 0; batch_id < time_period_num; batch_id++) {
 		// size_t const delete_n =
 		//   batch_id >= sliding_window_len
 		//     ? node_by_time[batch_id - sliding_window_len].size()
 		//     : 0;
-		std::cout << std::right << " "
-			  << insert_batch_seq[batch_id].size() << " "
-			  << delete_batch_seq[batch_id].size() << " "
-			  << tree_size[batch_id] << " " << std::fixed
-			  << std::setprecision(6)
-			  << insert_time[batch_id] / (rounds - 1) << " "
-			  << delete_time[batch_id] / (rounds - 1) << " "
-			  << member_query_time[batch_id] / (rounds - 1) << " "
-			  << range_query_time[batch_id] / (rounds - 1) << " "
-			  << flatten_time[batch_id] / (rounds - 1) << std::endl;
+		std::cout << std::right << " " << insert_batch_seq[batch_id].size()
+				  << " " << delete_batch_seq[batch_id].size() << " "
+				  << tree_size[batch_id] << " " << std::fixed
+				  << std::setprecision(6)
+				  << insert_time[batch_id] / (rounds - 1) << " "
+				  << delete_time[batch_id] / (rounds - 1) << " "
+				  << member_query_time[batch_id] / (rounds - 1) << " "
+				  << range_query_time[batch_id] / (rounds - 1) << " "
+				  << flatten_time[batch_id] / (rounds - 1) << std::endl;
 	}
 
 	// NOTE: geometric mean of every attribute across all batches
@@ -1555,61 +1475,58 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 		return insert_batch_seq[batch_id].size();
 	}) << " " << geo_col([&](size_t batch_id) {
 		return delete_batch_seq[batch_id].size();
-	}) << " " << geo_col([&](size_t batch_id) {
-		return tree_size[batch_id];
-	}) << " " << std::fixed
-		  << std::setprecision(6) << geo_col([&](size_t batch_id) {
-			     return insert_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return delete_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return member_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return range_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << geo_col([&](size_t batch_id) {
-			     return flatten_time[batch_id] / (rounds - 1);
-		     })
-		  << std::endl;
+	}) << " " << geo_col([&](size_t batch_id) { return tree_size[batch_id]; })
+			  << " " << std::fixed << std::setprecision(6)
+			  << geo_col([&](size_t batch_id) {
+					 return insert_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return delete_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return member_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return range_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << geo_col([&](size_t batch_id) {
+					 return flatten_time[batch_id] / (rounds - 1);
+				 })
+			  << std::endl;
 
 	// NOTE: sum of every attribute across all batches
 	auto const sum_col = [&](auto &&f) {
-		return Total(
-			parlay::tabulate(time_period_num, [&](size_t batch_id) {
-				return static_cast<double>(f(batch_id));
-			}));
+		return Total(parlay::tabulate(time_period_num, [&](size_t batch_id) {
+			return static_cast<double>(f(batch_id));
+		}));
 	};
 	std::cout << std::right << "# " << sum_col([&](size_t batch_id) {
 		return insert_batch_seq[batch_id].size();
 	}) << " " << sum_col([&](size_t batch_id) {
 		return delete_batch_seq[batch_id].size();
-	}) << " " << sum_col([&](size_t batch_id) {
-		return tree_size[batch_id];
-	}) << " " << std::fixed
-		  << std::setprecision(6) << sum_col([&](size_t batch_id) {
-			     return insert_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return delete_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return member_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return range_query_time[batch_id] / (rounds - 1);
-		     })
-		  << " " << sum_col([&](size_t batch_id) {
-			     return flatten_time[batch_id] / (rounds - 1);
-		     })
-		  << std::endl;
+	}) << " " << sum_col([&](size_t batch_id) { return tree_size[batch_id]; })
+			  << " " << std::fixed << std::setprecision(6)
+			  << sum_col([&](size_t batch_id) {
+					 return insert_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return delete_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return member_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return range_query_time[batch_id] / (rounds - 1);
+				 })
+			  << " " << sum_col([&](size_t batch_id) {
+					 return flatten_time[batch_id] / (rounds - 1);
+				 })
+			  << std::endl;
 }
 
 template <typename E, int kInputType = 0>
 auto ReadEntriesText(char const *iFile, parlay::sequence<E> &wp,
-		     size_t offset = 0) -> std::pair<size_t, int>
+					 size_t offset = 0) -> std::pair<size_t, int>
 {
 	using K [[maybe_unused]] = E::K;
 	using V [[maybe_unused]] = E::V;
@@ -1658,7 +1575,7 @@ auto ReadEntriesText(char const *iFile, parlay::sequence<E> &wp,
 // returns (N, dim)).
 template <typename E, int kInputType = 0>
 auto ReadEntriesBinary(char const *iFile, parlay::sequence<E> &wp,
-		       size_t offset = 0) -> std::pair<size_t, int>
+					   size_t offset = 0) -> std::pair<size_t, int>
 {
 	auto const [N, raw_dim, data] = ReadBinaryEntries(iFile);
 	int dim = static_cast<int>(raw_dim);
@@ -1694,10 +1611,9 @@ auto ReadEntries(char const *iFile, parlay::sequence<E> &wp, size_t offset = 0)
 	-> std::pair<size_t, int>
 {
 	std::string_view const path(iFile);
-	auto const res =
-		path.ends_with(".bin") ?
-			ReadEntriesBinary<E, kInputType>(iFile, wp, offset) :
-			ReadEntriesText<E, kInputType>(iFile, wp, offset);
+	auto const res = path.ends_with(".bin") ?
+						 ReadEntriesBinary<E, kInputType>(iFile, wp, offset) :
+						 ReadEntriesText<E, kInputType>(iFile, wp, offset);
 
 	// NOTE: manual sanity check of the read
 	// size_t const head = std::min<size_t>(wp.size(), 5);
@@ -1714,21 +1630,18 @@ auto ReadEntries(char const *iFile, parlay::sequence<E> &wp, size_t offset = 0)
 	// std::cout << std::endl;
 
 	auto dedup = parlay::remove_duplicates_ordered(
-		wp,
-		[&](auto const &a, auto const &b) { return a.key < b.key; });
+		wp, [&](auto const &a, auto const &b) { return a.key < b.key; });
 	if (dedup.size() != wp.size()) {
-		std::cout
-			<< "Warning: input contains "
-			<< (wp.size() - dedup.size())
-			<< " duplicate keys; only the first occurrence is kept."
-			<< std::endl;
+		std::cout << "Warning: input contains " << (wp.size() - dedup.size())
+				  << " duplicate keys; only the first occurrence is kept."
+				  << std::endl;
 	}
 	return res;
 }
 
 template <typename E>
 auto ReadPointsSerial(char const *iFile, parlay::sequence<E> &wp,
-		      [[maybe_unused]] int id_offset = 0)
+					  [[maybe_unused]] int id_offset = 0)
 	-> std::pair<size_t, int>
 {
 	std::ifstream fs;
@@ -1759,7 +1672,7 @@ void PrintTreeParam(char const *tree_name, int leaf_size)
 
 // NOTE: default test functions for all custom tree
 static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
-					   typename Options>(Options opts) {
+										   typename Options>(Options opts) {
 	using Tree = TreeDesc::TreeType;
 	using TT [[maybe_unused]] = TypeTrait;
 	using entry_seq = TT::entry_seq;
@@ -1782,11 +1695,11 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 		// for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
 		int rec_type = 1;
 		auto [query_box_seq, max_size] =
-			GenRectangles<TT, kSavePoint, kFixSize>(
-				kRangeQueryNum, rec_type, base_points);
+			GenRectangles<TT, kSavePoint, kFixSize>(kRangeQueryNum, rec_type,
+													base_points);
 		typename TT::entry_seq Out;
 		RangeQueryFix<TT>(tree, opts.rounds, Out, kRangeQueryNum,
-				  query_box_seq);
+						  query_box_seq);
 		// }
 	};
 
@@ -1797,10 +1710,9 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 		// for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
 		int rec_type = 1;
 		auto [query_box_seq, max_size] =
-			GenRectangles<TT, kSavePoint, kFixSize>(
-				kRangeQueryNum, rec_type, base_points);
-		RangeCountFix<TT>(tree, opts.rounds, kRangeQueryNum,
-				  query_box_seq);
+			GenRectangles<TT, kSavePoint, kFixSize>(kRangeQueryNum, rec_type,
+													base_points);
+		RangeCountFix<TT>(tree, opts.rounds, kRangeQueryNum, query_box_seq);
 		// }
 	};
 
@@ -1808,7 +1720,7 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 	// 1 << 5, 1 << 6 and 1 << 7. Pass the half the tree holds and the half it
 	// does not.
 	auto incre_update_query = [&](auto const &entry_in_tree,
-				      auto const &entry_not_in_tree) {
+								  auto const &entry_not_in_tree) {
 		// NOTE: take the ratio over the whole input, like the membership block
 		// above.
 		auto const batch_size = static_cast<size_t>(
@@ -1842,74 +1754,58 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 		// // NOTE: batch insert
 		if (opts.tag & (1 << 0)) {
 			if (opts.summary) {
-				parlay::sequence<double> const ratio_seq = {
-					0.0001, 0.001, 0.01, 0.1
-				};
+				parlay::sequence<double> const ratio_seq = { 0.0001, 0.001,
+															 0.01, 0.1 };
 				for (auto ratio : ratio_seq) {
 					auto [base_path, batch_path] =
-						opts.ParseInsertBatchPath(
-							ratio);
+						opts.ParseInsertBatchPath(ratio);
 					// std::cout << base_path << " " << batch_path << std::endl;
 					[[maybe_unused]] auto [n, d] =
-						ReadEntries<typename TT::E>(
-							base_path.c_str(), wp);
+						ReadEntries<typename TT::E>(base_path.c_str(), wp);
 					[[maybe_unused]] auto [n2, d2] =
-						ReadEntries<typename TT::E>(
-							batch_path.c_str(), wi);
-					batch_insert<TT, Tree, kTestTime>(
-						tree, wp, wi, opts.rounds);
+						ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+					batch_insert<TT, Tree, kTestTime>(tree, wp, wi,
+													  opts.rounds);
 				}
 			} else {
 				auto [base_path, batch_path] =
-					opts.ParseInsertBatchPath(
-						opts.batch_ratio);
+					opts.ParseInsertBatchPath(opts.batch_ratio);
 				// std::cout << base_path << " " << batch_path << std::endl;
 				[[maybe_unused]] auto [n, d] =
-					ReadEntries<typename TT::E>(
-						base_path.c_str(), wp);
+					ReadEntries<typename TT::E>(base_path.c_str(), wp);
 				[[maybe_unused]] auto [n2, d2] =
-					ReadEntries<typename TT::E>(
-						batch_path.c_str(), wi);
-				batch_insert<TT, Tree, kTestTime>(tree, wp, wi,
-								  opts.rounds);
+					ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+				batch_insert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
 			}
 		}
 
 		// NOTE: batch delete
 		if (opts.tag & (1 << 1)) {
 			if (opts.summary) {
-				parlay::sequence<double> const ratio_seq = {
-					0.0001, 0.001, 0.01, 0.1
-				};
+				parlay::sequence<double> const ratio_seq = { 0.0001, 0.001,
+															 0.01, 0.1 };
 				// parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
 				for (auto ratio : ratio_seq) {
 					// puts("------------------------------");
 					auto [base_path, batch_path] =
-						opts.ParseDeleteBatchPath(
-							ratio);
+						opts.ParseDeleteBatchPath(ratio);
 					// std::cout << base_path << " " << batch_path << std::endl;
 					[[maybe_unused]] auto [n, d] =
-						ReadEntries<typename TT::E>(
-							base_path.c_str(), wp);
+						ReadEntries<typename TT::E>(base_path.c_str(), wp);
 					[[maybe_unused]] auto [n2, d2] =
-						ReadEntries<typename TT::E>(
-							batch_path.c_str(), wi);
-					batch_delete<TT, Tree, kTestTime>(
-						tree, wp, wi, opts.rounds);
+						ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+					batch_delete<TT, Tree, kTestTime>(tree, wp, wi,
+													  opts.rounds);
 				}
 			} else {
 				auto [base_path, batch_path] =
-					opts.ParseDeleteBatchPath(
-						opts.batch_ratio);
+					opts.ParseDeleteBatchPath(opts.batch_ratio);
 				// std::cout << base_path << " " << batch_path << std::endl;
 				[[maybe_unused]] auto [n, d] =
-					ReadEntries<typename TT::E>(
-						base_path.c_str(), wp);
+					ReadEntries<typename TT::E>(base_path.c_str(), wp);
 				[[maybe_unused]] auto [n2, d2] =
-					ReadEntries<typename TT::E>(
-						batch_path.c_str(), wi);
-				batch_delete<TT, Tree, kTestTime>(tree, wp, wi,
-								  opts.rounds);
+					ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+				batch_delete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
 			}
 		}
 
@@ -1917,16 +1813,14 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 			auto [base_path, batch_path] =
 				opts.ParseInsertBatchPath(opts.batch_ratio);
 			[[maybe_unused]] auto [n, d] =
-				ReadEntries<typename TT::E>(base_path.c_str(),
-							    wp);
-			BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds,
-							  tree);
+				ReadEntries<typename TT::E>(base_path.c_str(), wp);
+			BuildTree<TT, Tree, kTestTime, 0>(wp, opts.rounds, tree);
 		}
 
 		// NOTE: membership
 		if (opts.query_type & (1 << 0)) {
-			auto batch_size = static_cast<size_t>(
-				wp.size() * kMemberQueryRatio);
+			auto batch_size =
+				static_cast<size_t>(wp.size() * kMemberQueryRatio);
 			typename TT::entry_seq query_ele;
 			if (wi.size() == 0) {
 				query_ele = wp.subseq(0, batch_size);
@@ -1938,10 +1832,9 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 				query_ele = wi.subseq(0, batch_size);
 				membership_query(query_ele);
 
-				query_ele = parlay::append(
-					wp.subseq(0, batch_size / 2),
-					wi.subseq(0, batch_size -
-							     (batch_size / 2)));
+				query_ele =
+					parlay::append(wp.subseq(0, batch_size / 2),
+								   wi.subseq(0, batch_size - (batch_size / 2)));
 				query_ele = parlay::random_shuffle(query_ele);
 				membership_query(query_ele);
 			}
@@ -1961,88 +1854,68 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 		if (opts.query_type & (1 << 3)) {
 			bool constexpr kSavePoint = false;
 			bool constexpr kFixSize = false;
-			for (int rec_type = 0; rec_type < kRangeQueryType;
-			     rec_type++) {
+			for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
 				auto [query_box_seq, max_size] =
 					GenRectangles<TT, kSavePoint, kFixSize>(
-						kRangeQueryWithLogNum, rec_type,
-						wp);
+						kRangeQueryWithLogNum, rec_type, wp);
 				typename TT::entry_seq Out;
-				RangeQuerySerialWithLog<TT>(
-					tree, opts.rounds, Out,
-					kRangeQueryWithLogNum, rec_type,
-					query_box_seq);
+				RangeQuerySerialWithLog<TT>(tree, opts.rounds, Out,
+											kRangeQueryWithLogNum, rec_type,
+											query_box_seq);
 			}
 		}
 
 		// NOTE: batch update by size
 		if (opts.tag & (1 << 3)) {
 			parlay::sequence<double> const ratio_seq = {
-				0.0001, 0.0002, 0.0005, 0.001, 0.002,
-				0.005,	0.01,	0.02,	0.05,  0.1,
-				0.2,	0.5,	1.0
+				0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01,
+				0.02,	0.05,	0.1,	0.2,   0.5,	  1.0
 			};
 			// parlay::sequence<double> const ratio_seq = { 1.0 };
 			for (auto ratio : ratio_seq) {
-				auto [base_path, batch_path] =
-					opts.ParseInsertBatchPath(ratio);
+				auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
 				// std::cout << base_path << " " << batch_path << std::endl;
 				[[maybe_unused]] auto [n, d] =
-					ReadEntries<typename TT::E>(
-						base_path.c_str(), wp);
+					ReadEntries<typename TT::E>(base_path.c_str(), wp);
 				[[maybe_unused]] auto [n2, d2] =
-					ReadEntries<typename TT::E>(
-						batch_path.c_str(), wi);
-				batch_insert<TT, Tree, kTestTime>(tree, wp, wi,
-								  opts.rounds);
+					ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+				batch_insert<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
 			}
 
 			for (auto ratio : ratio_seq) {
-				auto [base_path, batch_path] =
-					opts.ParseDeleteBatchPath(ratio);
+				auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
 				// std::cout << base_path << " " << batch_path << std::endl;
 				[[maybe_unused]] auto [n, d] =
-					ReadEntries<typename TT::E>(
-						base_path.c_str(), wp);
+					ReadEntries<typename TT::E>(base_path.c_str(), wp);
 				[[maybe_unused]] auto [n2, d2] =
-					ReadEntries<typename TT::E>(
-						batch_path.c_str(), wi);
-				batch_delete<TT, Tree, kTestTime>(tree, wp, wi,
-								  opts.rounds);
+					ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+				batch_delete<TT, Tree, kTestTime>(tree, wp, wi, opts.rounds);
 			}
 		}
 
 		// NOTE: test randomness
 		if (opts.tag & (1 << 4)) {
-			const parlay::sequence<int> sort_ratio_seq = {
-				0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
-			};
+			const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30,
+														   40, 50, 60, 70,
+														   80, 90, 100 };
 			auto const time_period_num = 100;
 			auto const random_in = parlay::random_shuffle(wp);
 			auto const step = wp.size() / time_period_num;
-			auto const insert_batch_seq = parlay::tabulate(
-				time_period_num, [&](size_t i) {
-					return Tree::parse_input(
-						random_in.subseq(
-							i * step,
-							std::min((i + 1) * step,
-								 wp.size())));
+			auto const insert_batch_seq =
+				parlay::tabulate(time_period_num, [&](size_t i) {
+					return Tree::parse_input(random_in.subseq(
+						i * step, std::min((i + 1) * step, wp.size())));
 				});
-			auto const delete_batch_seq = parlay::tabulate(
-				time_period_num, [&](size_t i) {
-					return Tree::parse_delete_input(
-						random_in.subseq(
-							i * step,
-							std::min((i + 1) * step,
-								 wp.size())));
+			auto const delete_batch_seq =
+				parlay::tabulate(time_period_num, [&](size_t i) {
+					return Tree::parse_delete_input(random_in.subseq(
+						i * step, std::min((i + 1) * step, wp.size())));
 				});
 
 			puts("");
 			for (auto ratio : sort_ratio_seq) {
-				TestLeafRandom<TT>(tree, wp, insert_batch_seq,
-						   delete_batch_seq,
-						   time_period_num, opts.rounds,
-						   ratio);
+				TestLeafRandom<TT>(tree, wp, insert_batch_seq, delete_batch_seq,
+								   time_period_num, opts.rounds, ratio);
 			}
 		}
 	}
@@ -2056,7 +1929,7 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 
 		// NOTE: only the first half of wp was built into the tree.
 		incre_update_query(wp.cut(0, wp.size() / 2),
-				   wp.cut(wp.size() / 2, wp.size()));
+						   wp.cut(wp.size() / 2, wp.size()));
 	}
 
 	// NOTE: one dataset per ratio, reloaded inside the loop rather than one
@@ -2069,7 +1942,7 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 	// NOTE: each entry needs its own generated dataset under ins/<1/ratio>/ and
 	// del/<1/ratio>/ -- see scripts/gen_incre_data.sh.
 	parlay::sequence<double> const incre_ratio_seq = { 0.0001, 0.001, 0.01,
-							   0.1 };
+													   0.1 };
 
 	//  NOTE: incremental insert
 	if (opts.tag & (1 << 6)) {
@@ -2077,31 +1950,29 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 			// NOTE: batch_path, not base_path -- incre_data_generator writes the
 			// insert stream as ins/<1/ratio>/<i>.batch.bin. There is no base/batch
 			// pair in these datasets; the whole file is the batch stream.
-			auto [base_path, batch_path] =
-				opts.ParseInsertBatchPath(ratio);
+			auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
 			ReadEntries<typename TT::E>(batch_path.c_str(), wp);
 			BatchInsertByStep<TT, Tree, kTestTime>(tree, wp, ratio,
-							       opts.rounds);
+												   opts.rounds);
 
 			// NOTE: the first half of wp was inserted, the second half was not.
 			incre_update_query(wp.cut(0, wp.size() / 2),
-					   wp.cut(wp.size() / 2, wp.size()));
+							   wp.cut(wp.size() / 2, wp.size()));
 		}
 	}
 
 	//  NOTE: incremental delete
 	if (opts.tag & (1 << 7)) {
 		for (auto ratio : incre_ratio_seq) {
-			auto [base_path, batch_path] =
-				opts.ParseDeleteBatchPath(ratio);
+			auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
 			ReadEntries<typename TT::E>(batch_path.c_str(), wi);
 			BatchDeleteByStep<TT, Tree, kTestTime>(tree, wi, ratio,
-							       opts.rounds);
+												   opts.rounds);
 
 			// NOTE: the first half of wi was deleted, so the second half is the one
 			// left in the tree.
 			incre_update_query(wi.cut(wi.size() / 2, wi.size()),
-					   wi.cut(0, wi.size() / 2));
+							   wi.cut(0, wi.size() / 2));
 		}
 	}
 
@@ -2119,15 +1990,14 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TypeTrait,
 static int CountDynamicGraphBatches(std::string const &dir)
 {
 	int n = 0;
-	while (std::filesystem::exists(dir + std::to_string(n) +
-				       "_insert.bin")) {
+	while (std::filesystem::exists(dir + std::to_string(n) + "_insert.bin")) {
 		++n;
 	}
 	return n;
 }
 
 static auto constexpr TestTemporalGraph = []<class TreeDesc, typename TypeTrait,
-					     typename Options>(Options opts) {
+											 typename Options>(Options opts) {
 	using Tree = TreeDesc::TreeType;
 	using TT [[maybe_unused]] = TypeTrait;
 	using entry_seq = TT::entry_seq;
@@ -2148,33 +2018,28 @@ static auto constexpr TestTemporalGraph = []<class TreeDesc, typename TypeTrait,
 	if (opts.tag & (1 << 3)) {
 		string osm_path = opts.input_file_path;
 		entry_seq osm_records;
-		auto [input_num, input_dim] =
-			ReadEntries<typename TT::E, kInputType>(
-				osm_path.c_str(), osm_records);
+		auto [input_num, input_dim] = ReadEntries<typename TT::E, kInputType>(
+			osm_path.c_str(), osm_records);
 
-		parlay::stable_sort_inplace(osm_records, [&](auto const &a,
-							     auto const &b) {
-			return TT::Entry::get_val(a) < TT::Entry::get_val(b);
-		});
+		parlay::stable_sort_inplace(
+			osm_records, [&](auto const &a, auto const &b) {
+				return TT::Entry::get_val(a) < TT::Entry::get_val(b);
+			});
 		const std::vector<int> files = { 2015, 2016, 2017, 2018, 2019,
-						 2020, 2021, 2022, 2023, 2024 };
+										 2020, 2021, 2022, 2023, 2024 };
 		const auto year_num = files.size();
 		auto node_by_year = parlay::tabulate(year_num, [&](size_t i) {
-			return parlay::filter(
-				osm_records, [&](auto const &record) {
-					return TT::Entry::get_val(record) ==
-					       files[i];
-				});
+			return parlay::filter(osm_records, [&](auto const &record) {
+				return TT::Entry::get_val(record) == files[i];
+			});
 		});
 
 		// membership
-		auto member_res =
-			parlay::sequence<bool>(kMemberQueryOsmSize, true);
+		auto member_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
 		auto range_res = typename TT::entry_seq();
 
-		InsertOsmByTime<TT>(node_by_year, tree, opts.rounds,
-				    kOsmWindowLen, kMemberQueryOsmSize,
-				    member_res, range_res);
+		InsertOsmByTime<TT>(node_by_year, tree, opts.rounds, kOsmWindowLen,
+							kMemberQueryOsmSize, member_res, range_res);
 	}
 
 	// NOTE: temporal graph osm
@@ -2188,39 +2053,31 @@ static auto constexpr TestTemporalGraph = []<class TreeDesc, typename TypeTrait,
 		std::vector<std::string> insert_files(kDynamicGraphBatchNum);
 		std::vector<std::string> delete_files(kDynamicGraphBatchNum);
 		for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-			insert_files[i] = dynamic_graph_path +
-					  std::to_string(i) + "_insert.bin";
-			delete_files[i] = dynamic_graph_path +
-					  std::to_string(i) + "_delete.bin";
+			insert_files[i] =
+				dynamic_graph_path + std::to_string(i) + "_insert.bin";
+			delete_files[i] =
+				dynamic_graph_path + std::to_string(i) + "_delete.bin";
 		}
-		parlay::sequence<entry_seq> insert_batch_seq(
-			kDynamicGraphBatchNum);
-		parlay::sequence<entry_seq> delete_batch_seq(
-			kDynamicGraphBatchNum);
+		parlay::sequence<entry_seq> insert_batch_seq(kDynamicGraphBatchNum);
+		parlay::sequence<entry_seq> delete_batch_seq(kDynamicGraphBatchNum);
 		size_t total_entries = 0;
 		for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-			auto [n1, dim1] =
-				ReadEntries<typename TT::E, kInputType>(
-					insert_files[i].c_str(),
-					insert_batch_seq[i], total_entries);
+			auto [n1, dim1] = ReadEntries<typename TT::E, kInputType>(
+				insert_files[i].c_str(), insert_batch_seq[i], total_entries);
 			total_entries += n1;
 
-			auto [n2, dim2] =
-				ReadEntries<typename TT::E, kInputType>(
-					delete_files[i].c_str(),
-					delete_batch_seq[i], total_entries);
+			auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
+				delete_files[i].c_str(), delete_batch_seq[i], total_entries);
 			total_entries += n2;
 		}
 
 		// NOTE: membership query result
-		auto membership_res =
-			parlay::sequence<bool>(kMemberQueryOsmSize, true);
-		auto random_osm_records = parlay::random_shuffle(
-			parlay::flatten(insert_batch_seq));
+		auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
+		auto random_osm_records =
+			parlay::random_shuffle(parlay::flatten(insert_batch_seq));
 		auto membership_query_points =
 			parlay::tabulate(kMemberQueryOsmSize, [&](size_t i) {
-				return TT::Entry::get_key(
-					random_osm_records[i]);
+				return TT::Entry::get_key(random_osm_records[i]);
 			});
 
 		// NOTE: generate box
@@ -2228,36 +2085,30 @@ static auto constexpr TestTemporalGraph = []<class TreeDesc, typename TypeTrait,
 		// build a (vertex, occurrence) sequence, highest occurrence first. The
 		// top vertices are later used as the keys for the range queries.
 		auto osm_records = parlay::flatten(insert_batch_seq);
-		auto edge_list =
-			parlay::tabulate(osm_records.size(), [&](size_t i) {
-				auto key = TT::Entry::get_key(osm_records[i]);
-				uint64_t u = key >> 32;
-				uint64_t v = key & 0xffffffff;
-				return std::make_pair(u, v);
-			});
+		auto edge_list = parlay::tabulate(osm_records.size(), [&](size_t i) {
+			auto key = TT::Entry::get_key(osm_records[i]);
+			uint64_t u = key >> 32;
+			uint64_t v = key & 0xffffffff;
+			return std::make_pair(u, v);
+		});
 		auto range_query_vertex_occurrence = parlay::histogram_by_key(
-			parlay::map(edge_list,
-				    [](auto const &e) { return e.first; }));
-		parlay::sort_inplace(range_query_vertex_occurrence,
-				     [](auto const &a, auto const &b) {
-					     return a.second > b.second;
-				     });
+			parlay::map(edge_list, [](auto const &e) { return e.first; }));
+		parlay::sort_inplace(
+			range_query_vertex_occurrence,
+			[](auto const &a, auto const &b) { return a.second > b.second; });
 		range_query_vertex_occurrence =
-			range_query_vertex_occurrence.subseq(
-				0, kDynamicGraphRangeNum);
+			range_query_vertex_occurrence.subseq(0, kDynamicGraphRangeNum);
 		// WARN: may don't have enough vertices for range query
-		auto [range_query_offset, tot_range_size] = parlay::scan(
-			parlay::map(range_query_vertex_occurrence,
-				    [](auto const &p) { return p.second; }),
-			parlay::addm<size_t>());
+		auto [range_query_offset, tot_range_size] =
+			parlay::scan(parlay::map(range_query_vertex_occurrence,
+									 [](auto const &p) { return p.second; }),
+						 parlay::addm<size_t>());
 		range_query_offset.push_back(tot_range_size);
 
-		auto range_report_output =
-			typename TT::entry_seq(tot_range_size);
+		auto range_report_output = typename TT::entry_seq(tot_range_size);
 
 		// NOTE: flatten
-		auto flatten_seq =
-			TT::entry_seq::uninitialized(kDynamicFlattenSize);
+		auto flatten_seq = TT::entry_seq::uninitialized(kDynamicFlattenSize);
 
 		TestDynamicGraph<TT, Tree>(
 			insert_batch_seq, delete_batch_seq, tree, opts.rounds,
@@ -2276,44 +2127,35 @@ static auto constexpr TestTemporalGraph = []<class TreeDesc, typename TypeTrait,
 		std::vector<std::string> insert_files(kDynamicGraphBatchNum);
 		std::vector<std::string> delete_files(kDynamicGraphBatchNum);
 		for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-			insert_files[i] = dynamic_graph_path +
-					  std::to_string(i) + "_insert.bin";
-			delete_files[i] = dynamic_graph_path +
-					  std::to_string(i) + "_delete.bin";
+			insert_files[i] =
+				dynamic_graph_path + std::to_string(i) + "_insert.bin";
+			delete_files[i] =
+				dynamic_graph_path + std::to_string(i) + "_delete.bin";
 		}
-		parlay::sequence<entry_seq> insert_batch_seq(
-			kDynamicGraphBatchNum);
-		parlay::sequence<entry_seq> delete_batch_seq(
-			kDynamicGraphBatchNum);
+		parlay::sequence<entry_seq> insert_batch_seq(kDynamicGraphBatchNum);
+		parlay::sequence<entry_seq> delete_batch_seq(kDynamicGraphBatchNum);
 		size_t total_entries = 0;
 		for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-			auto [n1, dim1] =
-				ReadEntries<typename TT::E, kInputType>(
-					insert_files[i].c_str(),
-					insert_batch_seq[i], total_entries);
+			auto [n1, dim1] = ReadEntries<typename TT::E, kInputType>(
+				insert_files[i].c_str(), insert_batch_seq[i], total_entries);
 			total_entries += n1;
 
-			auto [n2, dim2] =
-				ReadEntries<typename TT::E, kInputType>(
-					delete_files[i].c_str(),
-					delete_batch_seq[i], total_entries);
+			auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
+				delete_files[i].c_str(), delete_batch_seq[i], total_entries);
 			total_entries += n2;
 		}
 
 		// membership query result
-		auto membership_res =
-			parlay::sequence<bool>(kMemberQueryOsmSize, true);
+		auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
 		auto const time_period_num = insert_batch_seq.size();
 
-		const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30,
-							       40, 50, 60, 70,
-							       80, 90, 100 };
+		const parlay::sequence<int> sort_ratio_seq = { 0,  10, 20, 30, 40, 50,
+													   60, 70, 80, 90, 100 };
 		puts("");
 		for (auto ratio : sort_ratio_seq) {
 			TestLeafRandomDynamicGraph<TT, Tree>(
-				tree, insert_batch_seq, delete_batch_seq,
-				membership_res, time_period_num, opts.rounds,
-				ratio);
+				tree, insert_batch_seq, delete_batch_seq, membership_res,
+				time_period_num, opts.rounds, ratio);
 		}
 	}
 
@@ -2321,90 +2163,75 @@ static auto constexpr TestTemporalGraph = []<class TreeDesc, typename TypeTrait,
 	if (opts.tag & (1 << 6)) {
 		string osm_path = opts.input_file_path;
 		entry_seq osm_records;
-		auto [input_num, input_dim] =
-			ReadEntries<typename TT::E, kInputType>(
-				osm_path.c_str(), osm_records);
+		auto [input_num, input_dim] = ReadEntries<typename TT::E, kInputType>(
+			osm_path.c_str(), osm_records);
 
-		parlay::stable_sort_inplace(osm_records, [&](auto const &a,
-							     auto const &b) {
-			return TT::Entry::get_val(a) < TT::Entry::get_val(b);
-		});
+		parlay::stable_sort_inplace(
+			osm_records, [&](auto const &a, auto const &b) {
+				return TT::Entry::get_val(a) < TT::Entry::get_val(b);
+			});
 		auto max_timestamp = osm_records.back().val;
-		auto timestamp_seq = parlay::tabulate(
-			max_timestamp, [&](size_t i) { return i + 1; });
+		auto timestamp_seq =
+			parlay::tabulate(max_timestamp, [&](size_t i) { return i + 1; });
 		const auto year_num = timestamp_seq.size();
 		auto node_by_year = parlay::tabulate(year_num, [&](size_t i) {
-			return parlay::filter(
-				osm_records, [&](auto const &record) {
-					return TT::Entry::get_val(record) ==
-					       timestamp_seq[i];
-				});
+			return parlay::filter(osm_records, [&](auto const &record) {
+				return TT::Entry::get_val(record) == timestamp_seq[i];
+			});
 		});
 
 		// NOTE: membership query stuff
-		auto membership_res =
-			parlay::sequence<bool>(kMemberQueryOsmSize, true);
+		auto membership_res = parlay::sequence<bool>(kMemberQueryOsmSize, true);
 		auto random_osm_records = parlay::random_shuffle(osm_records);
 		auto membership_query_points =
 			parlay::tabulate(kMemberQueryOsmSize, [&](size_t i) {
-				return TT::Entry::get_key(
-					random_osm_records[i]);
+				return TT::Entry::get_key(random_osm_records[i]);
 			});
 
 		// NOTE: range query stuff
 		// NOTE: count how often each source vertex occurs (its out-degree) and
 		// build a (vertex, occurrence) sequence, highest occurrence first. The
 		// top vertices are later used as the keys for the range queries.
-		auto edge_list =
-			parlay::tabulate(osm_records.size(), [&](size_t i) {
-				auto key = TT::Entry::get_key(osm_records[i]);
-				uint64_t u = key >> 32;
-				uint64_t v = key & 0xffffffff;
-				return std::make_pair(u, v);
-			});
+		auto edge_list = parlay::tabulate(osm_records.size(), [&](size_t i) {
+			auto key = TT::Entry::get_key(osm_records[i]);
+			uint64_t u = key >> 32;
+			uint64_t v = key & 0xffffffff;
+			return std::make_pair(u, v);
+		});
 		auto range_query_vertex_occurrence = parlay::histogram_by_key(
-			parlay::map(edge_list,
-				    [](auto const &e) { return e.first; }));
-		parlay::sort_inplace(range_query_vertex_occurrence,
-				     [](auto const &a, auto const &b) {
-					     return a.second > b.second;
-				     });
-		range_query_vertex_occurrence =
-			range_query_vertex_occurrence.subseq(
-				0, std::min(edge_list.size(),
-					    kDynamicGraphRangeNum));
+			parlay::map(edge_list, [](auto const &e) { return e.first; }));
+		parlay::sort_inplace(
+			range_query_vertex_occurrence,
+			[](auto const &a, auto const &b) { return a.second > b.second; });
+		range_query_vertex_occurrence = range_query_vertex_occurrence.subseq(
+			0, std::min(edge_list.size(), kDynamicGraphRangeNum));
 		// WARN: may don't have enough vertices for range query
-		auto [range_query_offset, tot_range_size] = parlay::scan(
-			parlay::map(range_query_vertex_occurrence,
-				    [](auto const &p) { return p.second; }),
-			parlay::addm<size_t>());
+		auto [range_query_offset, tot_range_size] =
+			parlay::scan(parlay::map(range_query_vertex_occurrence,
+									 [](auto const &p) { return p.second; }),
+						 parlay::addm<size_t>());
 		range_query_offset.push_back(tot_range_size);
 
-		auto range_report_output =
-			typename TT::entry_seq(tot_range_size);
+		auto range_report_output = typename TT::entry_seq(tot_range_size);
 
 		// NOTE: flatten stuff
 		size_t tree_size = 0;
 		size_t max_tree_size = 0;
-		for (int batch_id = 0; batch_id < node_by_year.size();
-		     batch_id++) {
+		for (int batch_id = 0; batch_id < node_by_year.size(); batch_id++) {
 			tree_size += node_by_year[batch_id].size();
 			if (batch_id >= kOsmWindowLen) {
-				tree_size -=
-					node_by_year[batch_id - kOsmWindowLen]
-						.size();
+				tree_size -= node_by_year[batch_id - kOsmWindowLen].size();
 			}
 			max_tree_size = std::max(max_tree_size, tree_size);
 		}
 		auto flatten_seq = TT::entry_seq::uninitialized(max_tree_size);
 
 		// NOTE: main function call
-		TestTemporalSignal<TT>(node_by_year, tree, opts.rounds,
-				       kOsmWindowLen, kMemberQueryOsmSize,
-				       membership_res, range_report_output,
-				       flatten_seq, membership_query_points,
-				       range_query_vertex_occurrence,
-				       range_query_offset);
+		TestTemporalSignal<TT>(
+			node_by_year, tree, opts.rounds, kOsmWindowLen, kMemberQueryOsmSize,
+			membership_res, range_report_output, flatten_seq,
+			membership_query_points, range_query_vertex_occurrence,
+			range_query_offset);
 	}
 };
 
@@ -2417,7 +2244,7 @@ static void Run(Options const &opts, RunFunc test_func)
 	using entry_seq [[maybe_unused]] = typename TT::entry_seq;
 
 	PrintTreeParam(TreeWrapper::TreeType::get_tree_name(),
-		       TreeWrapper::TreeType::get_leaf_size());
+				   TreeWrapper::TreeType::get_leaf_size());
 	opts.PrintOptions();
 	std::cout << "\n" << std::flush;
 

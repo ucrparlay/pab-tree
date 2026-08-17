@@ -74,42 +74,37 @@ int main(int argc, char **argv)
 	while (in.read_row(id, ts, lon, lat)) {
 		read_rows++;
 		if (ts.substr(0, 4) < std::to_string(start_year) ||
-		    ts.substr(0, 4) > std::to_string(end_year)) {
+			ts.substr(0, 4) > std::to_string(end_year)) {
 			continue;
 		}
 		auto lon_int = static_cast<uint32_t>(lon * 1e7);
 		auto lat_int = static_cast<uint32_t>(lat * 1e7);
 		record_seq.emplace_back(Record{
 			.code = libmorton::morton2D_64_encode(lon_int, lat_int),
-			.time = static_cast<uint32_t>(
-				std::stoul(ts.substr(0, 4))) });
+			.time = static_cast<uint32_t>(std::stoul(ts.substr(0, 4))) });
 		kept_rows++;
 	}
 
 	std::cout << "Finished reading CSV. Total rows: " << read_rows
-		  << ", Kept rows: " << kept_rows << "\n";
+			  << ", Kept rows: " << kept_rows << "\n";
 
 	// NOTE: remove duplicates
 	record_seq = parlay::sort(record_seq.cut(0, kept_rows));
 	record_seq = parlay::remove_duplicates_ordered(record_seq);
 	// check
-	auto z_code_seq = parlay::integer_sort(
-		parlay::tabulate(record_seq.size(),
-				 [&](size_t i) { return record_seq[i].code; }));
+	auto z_code_seq = parlay::integer_sort(parlay::tabulate(
+		record_seq.size(), [&](size_t i) { return record_seq[i].code; }));
 	parlay::parallel_for(1, z_code_seq.size(), [&](size_t i) {
 		if (z_code_seq[i] == z_code_seq[i - 1]) {
-			std::cerr << "Duplicate code found: " << z_code_seq[i]
-				  << "\n";
+			std::cerr << "Duplicate code found: " << z_code_seq[i] << "\n";
 		}
 	});
 	// resort by time
-	record_seq =
-		parlay::sort(record_seq, [](const Record &a, const Record &b) {
-			return a.time == b.time ? a.code < b.code :
-						  a.time < b.time;
-		});
+	record_seq = parlay::sort(record_seq, [](const Record &a, const Record &b) {
+		return a.time == b.time ? a.code < b.code : a.time < b.time;
+	});
 	std::cout << "Finished removing duplicates. Unique rows: "
-		  << record_seq.size() << "\n";
+			  << record_seq.size() << "\n";
 
 	// NOTE: write to file; ".bin" output suffix selects the binary form
 	if (std::string_view(output_path).ends_with(".bin")) {
@@ -121,23 +116,21 @@ int main(int argc, char **argv)
 		WriteBinaryEntries(output_path, record_seq.size(), 2, payload);
 	} else {
 		auto header = toString(record_seq.size()) + " " + toString(2);
-		auto record_str =
-			parlay::tabulate(record_seq.size(), [&](size_t i) {
-				std::string str;
-				str += toString(record_seq[i].code) + " ";
-				str += toString(record_seq[i].time);
-				parlay::sequence<char> cstr(str.begin(),
-							    str.end());
-				return cstr;
-			});
+		auto record_str = parlay::tabulate(record_seq.size(), [&](size_t i) {
+			std::string str;
+			str += toString(record_seq[i].code) + " ";
+			str += toString(record_seq[i].time);
+			parlay::sequence<char> cstr(str.begin(), str.end());
+			return cstr;
+		});
 		writeSeqToFile(header, record_str, output_path.c_str());
 	}
 
 	std::cout << "Input: " << input_path << "\n"
-		  << "Output: " << output_path << "\n"
-		  << "Year range: [" << start_year << ", " << end_year << "]\n"
-		  << "Rows read: " << read_rows << "\n"
-		  << "Rows kept: " << record_seq.size() << "\n";
+			  << "Output: " << output_path << "\n"
+			  << "Year range: [" << start_year << ", " << end_year << "]\n"
+			  << "Rows read: " << read_rows << "\n"
+			  << "Rows kept: " << record_seq.size() << "\n";
 
 	return EXIT_SUCCESS;
 }

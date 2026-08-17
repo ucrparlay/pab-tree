@@ -74,7 +74,7 @@ template <class idxT> struct reservation {
 
 template <class idxT, class S>
 long speculative_for(S step, idxT s, idxT e, long granularity,
-		     bool hasState = 1, long maxTries = -1)
+					 bool hasState = 1, long maxTries = -1)
 {
 	if (maxTries < 0)
 		maxTries = 100 + 200 * granularity;
@@ -86,8 +86,8 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
 	parlay::sequence<idxT> Ihold; // initially empty
 	parlay::sequence<S> state;
 	if (hasState)
-		state = parlay::tabulate(maxRoundSize,
-					 [&](size_t i) -> S { return step; });
+		state =
+			parlay::tabulate(maxRoundSize, [&](size_t i) -> S { return step; });
 
 	long round = 0;
 	long numberDone = s; // number of iterations done
@@ -107,9 +107,7 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
 			parlay::parallel_for(
 				0, size,
 				[&](size_t i) {
-					I[i] = (i < numberKeep) ?
-						       Ihold[i] :
-						       numberDone + i;
+					I[i] = (i < numberKeep) ? Ihold[i] : numberDone + i;
 					keep[i] = state[i].reserve(I[i]);
 				},
 				loop_granularity);
@@ -117,9 +115,7 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
 			parlay::parallel_for(
 				0, size,
 				[&](size_t i) {
-					I[i] = (i < numberKeep) ?
-						       Ihold[i] :
-						       numberDone + i;
+					I[i] = (i < numberKeep) ? Ihold[i] : numberDone + i;
 					keep[i] = step.reserve(I[i]);
 				},
 				loop_granularity);
@@ -130,8 +126,7 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
 				0, size,
 				[&](size_t i) {
 					if (keep[i])
-						keep[i] =
-							!state[i].commit(I[i]);
+						keep[i] = !state[i].commit(I[i]);
 				},
 				loop_granularity);
 		} else {
@@ -154,12 +149,11 @@ long speculative_for(S step, idxT s, idxT e, long granularity,
 
 		// adjust round size based on number of failed attempts
 		if (float(numberKeep) / float(size) > .2)
-			currentRoundSize = std::max(
-				currentRoundSize / 2,
-				std::max(maxRoundSize / 64 + 1, numberKeep));
-		else if (float(numberKeep) / float(size) < .1)
 			currentRoundSize =
-				std::min(currentRoundSize * 2, maxRoundSize);
+				std::max(currentRoundSize / 2,
+						 std::max(maxRoundSize / 64 + 1, numberKeep));
+		else if (float(numberKeep) / float(size) < .1)
+			currentRoundSize = std::min(currentRoundSize * 2, maxRoundSize);
 	}
 	return totalProcessed;
 }

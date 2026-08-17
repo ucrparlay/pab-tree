@@ -9,7 +9,7 @@ namespace pab_tree::detail
 // Legacy linear-scan helpers (kept for callers outside the hot path).
 template <typename Seq, typename F>
 size_t linear_search(Seq const &I, typename Seq::value_type const &v,
-		     const F &less)
+					 const F &less)
 {
 	for (size_t i = 0; i < I.size(); i++) {
 		if (!less(I[i], v)) {
@@ -40,7 +40,7 @@ size_t linear_search(Seq const &I, const F &less)
 // comparisons (≤ BinarySearchBase/2 on average).
 template <size_t BinarySearchBase, typename Seq, typename F>
 size_t binary_search(Seq const &I, typename Seq::value_type const &v,
-		     const F &less)
+					 const F &less)
 {
 	size_t lo = 0, hi = I.size();
 	while (hi - lo > BinarySearchBase) {

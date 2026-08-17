@@ -22,17 +22,15 @@
 #include "parlay/sequence.h"
 
 inline void WriteBinaryEntries(std::string const &path, uint64_t n,
-			       uint64_t dim,
-			       parlay::sequence<uint64_t> const &payload)
+							   uint64_t dim,
+							   parlay::sequence<uint64_t> const &payload)
 {
 	assert(payload.size() == n * dim);
 	uint64_t const max_v =
-		payload.empty() ?
-			0 :
-			parlay::reduce(payload, parlay::maxm<uint64_t>());
+		payload.empty() ? 0 : parlay::reduce(payload, parlay::maxm<uint64_t>());
 	uint64_t const width = max_v <= std::numeric_limits<uint32_t>::max() ?
-				       sizeof(uint32_t) :
-				       sizeof(uint64_t);
+							   sizeof(uint32_t) :
+							   sizeof(uint64_t);
 
 	std::ofstream out(path, std::ios::binary | std::ios::trunc);
 	if (!out.is_open()) {
@@ -44,13 +42,13 @@ inline void WriteBinaryEntries(std::string const &path, uint64_t n,
 		auto narrowed = parlay::tabulate(payload.size(), [&](size_t i) {
 			return static_cast<uint32_t>(payload[i]);
 		});
-		out.write(reinterpret_cast<char const *>(narrowed.data()),
-			  static_cast<std::streamsize>(narrowed.size() *
-						       sizeof(uint32_t)));
+		out.write(
+			reinterpret_cast<char const *>(narrowed.data()),
+			static_cast<std::streamsize>(narrowed.size() * sizeof(uint32_t)));
 	} else {
-		out.write(reinterpret_cast<char const *>(payload.data()),
-			  static_cast<std::streamsize>(payload.size() *
-						       sizeof(uint64_t)));
+		out.write(
+			reinterpret_cast<char const *>(payload.data()),
+			static_cast<std::streamsize>(payload.size() * sizeof(uint64_t)));
 	}
 	out.close();
 }
@@ -71,24 +69,20 @@ inline auto ReadBinaryEntries(char const *path)
 	uint64_t const dim = header[1];
 	uint64_t const width = header[2];
 	if (!fs.good() ||
-	    (width != sizeof(uint32_t) && width != sizeof(uint64_t))) {
-		std::cerr << "Bad binary header in " << path
-			  << " (width = " << width
-			  << "); regenerate the .bin file." << std::endl;
+		(width != sizeof(uint32_t) && width != sizeof(uint64_t))) {
+		std::cerr << "Bad binary header in " << path << " (width = " << width
+				  << "); regenerate the .bin file." << std::endl;
 		abort();
 	}
 
-	auto const payload_bytes =
-		static_cast<std::streamsize>(n * dim * width);
+	auto const payload_bytes = static_cast<std::streamsize>(n * dim * width);
 	parlay::sequence<uint64_t> data;
 	if (width == sizeof(uint64_t)) {
 		data = parlay::sequence<uint64_t>::uninitialized(n * dim);
 		fs.read(reinterpret_cast<char *>(data.data()), payload_bytes);
 	} else {
-		auto narrowed =
-			parlay::sequence<uint32_t>::uninitialized(n * dim);
-		fs.read(reinterpret_cast<char *>(narrowed.data()),
-			payload_bytes);
+		auto narrowed = parlay::sequence<uint32_t>::uninitialized(n * dim);
+		fs.read(reinterpret_cast<char *>(narrowed.data()), payload_bytes);
 		data = parlay::tabulate(narrowed.size(), [&](size_t i) {
 			return static_cast<uint64_t>(narrowed[i]);
 		});

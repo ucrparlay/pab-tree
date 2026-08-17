@@ -10,18 +10,16 @@ enum InputType : std::uint8_t {
 };
 
 template <typename Key, typename Val> class Wrapper {
-    public:
+public:
 	using K = Key;
 	using V = Val;
 
 	struct LeafAugEmpty {
 		LeafAugEmpty() = default;
 
-		template <typename Slice>
-		LeafAugEmpty([[maybe_unused]] Slice In) {};
+		template <typename Slice> LeafAugEmpty([[maybe_unused]] Slice In) {};
 
-		template <typename Slice>
-		void update_aug([[maybe_unused]] Slice In)
+		template <typename Slice> void update_aug([[maybe_unused]] Slice In)
 		{
 		}
 
@@ -40,14 +38,13 @@ template <typename Key, typename Val> class Wrapper {
 		}
 
 		[[nodiscard]] static bool force_parallel(size_t /*sz*/,
-							 size_t /*granularity*/)
+												 size_t /*granularity*/)
 		{
 			return true;
 		}
 
 		template <typename TreeNodes, typename split_seq>
-		void update(TreeNodes const & /*nodes*/,
-			    split_seq const & /*splits*/)
+		void update(TreeNodes const & /*nodes*/, split_seq const & /*splits*/)
 		{
 		}
 
@@ -75,14 +72,12 @@ template <typename Key, typename Val> class Wrapper {
 			return val;
 		}
 
-		template <typename StrRange>
-		void ReadKey(StrRange str, size_t i)
+		template <typename StrRange> void ReadKey(StrRange str, size_t i)
 		{
 			this->key = { std::stoul(str), i };
 		}
 
-		template <typename StrRange>
-		void ReadKey(StrRange str, StrRange str2)
+		template <typename StrRange> void ReadKey(StrRange str, StrRange str2)
 		{
 			this->key = { std::stoul(str), std::stoul(str2) };
 		}
@@ -107,8 +102,7 @@ template <typename Key, typename Val> class Wrapper {
 			return this->key == rhs.key;
 		}
 
-		friend std::ostream &operator<<(std::ostream &o,
-						Element const &a)
+		friend std::ostream &operator<<(std::ostream &o, Element const &a)
 		{
 			o << "[";
 			o << a.key << " " << a.val;

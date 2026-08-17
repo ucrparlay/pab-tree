@@ -94,7 +94,7 @@ struct leaf_node : TypeTrait::Node {
 		assert(this->is_sorted);
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			parlay::make_slice(this->elements.begin(),
-					   this->elements.begin() + this->size),
+							   this->elements.begin() + this->size),
 			[k](E const e) { return Entry::get_key(e) < k; });
 	}
 
@@ -104,33 +104,29 @@ struct leaf_node : TypeTrait::Node {
 		assert(this->is_sorted);
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			parlay::make_slice(this->elements.begin(),
-					   this->elements.begin() + this->size),
+							   this->elements.begin() + this->size),
 			[k](E const e) { return Entry::get_key(e) <= k; });
 	}
 
 	bool contain(K const &k) const
 	{
 		return this->is_sorted ?
-			       ([&] {
-				       auto idx = this->binary_search_key(k);
-				       return idx < this->size &&
-					      (Entry::get_key(
-						       this->elements[idx]) ==
-					       k);
-			       })() :
-			       (std::ranges::find_if(
-					this->elements.begin(),
-					this->elements.begin() + this->size,
-					[&](E const &e) {
-						return Entry::get_key(e) == k;
-					}) !=
-				this->elements.begin() + this->size);
+				   ([&] {
+					   auto idx = this->binary_search_key(k);
+					   return idx < this->size &&
+							  (Entry::get_key(this->elements[idx]) == k);
+				   })() :
+				   (std::ranges::find_if(
+						this->elements.begin(),
+						this->elements.begin() + this->size, [&](E const &e) {
+							return Entry::get_key(e) == k;
+						}) != this->elements.begin() + this->size);
 	}
 
 	entry_seq get_ele() const
 	{
 		return entry_seq(this->elements.begin(),
-				 this->elements.begin() + this->size);
+						 this->elements.begin() + this->size);
 	}
 
 	auto get_ele_begin_iter()
@@ -151,7 +147,7 @@ struct leaf_node : TypeTrait::Node {
 	auto get_ele_slice() const
 	{
 		return parlay::make_slice(this->elements.begin(),
-					  this->elements.begin() + this->size);
+								  this->elements.begin() + this->size);
 	}
 
 	auto const &get_ele_container() const
@@ -254,15 +250,13 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 #endif
 		);
 
-	multi_way_node(TT::node_seq const &_tree_nodes,
-		       TT::split_seq const &_split,
-		       TT::interior_aug const &_aug)
-		: Node{ false,
-			std::accumulate(_tree_nodes.begin(), _tree_nodes.end(),
-					static_cast<size_t>(0),
-					[](size_t acc, Node *n) -> size_t {
-						return acc + n->size;
-					}) }
+	multi_way_node(TT::node_seq const &_tree_nodes, TT::split_seq const &_split,
+				   TT::interior_aug const &_aug)
+		: Node{ false, std::accumulate(_tree_nodes.begin(), _tree_nodes.end(),
+									   static_cast<size_t>(0),
+									   [](size_t acc, Node *n) -> size_t {
+										   return acc + n->size;
+									   }) }
 		, node_n(_tree_nodes.size())
 		, aug(_aug)
 	{
@@ -276,15 +270,13 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 	}
 
 	multi_way_node(TT::node_slice _tree_nodes_slice,
-		       TT::split_slice _split_slice,
-		       TT::interior_aug const &_aug)
+				   TT::split_slice _split_slice, TT::interior_aug const &_aug)
 		: Node{ false,
-			std::accumulate(_tree_nodes_slice.begin(),
-					_tree_nodes_slice.end(),
-					static_cast<size_t>(0),
-					[](size_t acc, Node *n) -> size_t {
-						return acc + n->size;
-					}) }
+				std::accumulate(_tree_nodes_slice.begin(),
+								_tree_nodes_slice.end(), static_cast<size_t>(0),
+								[](size_t acc, Node *n) -> size_t {
+									return acc + n->size;
+								}) }
 		, node_n(_tree_nodes_slice.size())
 		, aug(_aug)
 	{
@@ -314,13 +306,12 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 	auto get_node_slice() const
 	{
 		return parlay::make_slice(tree_nodes.begin(),
-					  tree_nodes.begin() + get_node_n());
+								  tree_nodes.begin() + get_node_n());
 	}
 
 	auto get_split_slice() const
 	{
-		return parlay::make_slice(split.begin(),
-					  split.begin() + get_split_n());
+		return parlay::make_slice(split.begin(), split.begin() + get_split_n());
 	}
 
 	TT::buf_size_type get_node_id_containing_key(TT::K const k) const
@@ -328,33 +319,27 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		// return the first idx s.t. split[idx] > k
 		// i.e.: if split[1] == k, then k belongs to tree_nodes[2]
 		return pab_tree::detail::binary_search<k_binary_search_base>(
-			this->get_split_slice(),
-			[&](TT::K const key) { return key <= k; });
+			this->get_split_slice(), [&](TT::K const key) { return key <= k; });
 	}
 
-	TT::buf_size_type
-	get_node_id_containing_key_exclusive(TT::K const k) const
+	TT::buf_size_type get_node_id_containing_key_exclusive(TT::K const k) const
 	{
 		// return the first idx s.t. split[idx] >= k
 		// i.e.: if split[1] == k, then k belongs to tree_nodes[1]
 		return pab_tree::detail::binary_search<k_binary_search_base>(
-			this->get_split_slice(),
-			[&](TT::K const key) { return key < k; });
+			this->get_split_slice(), [&](TT::K const key) { return key < k; });
 	}
 
-	bool validate_key_in_node(TT::buf_size_type node_idx,
-				  TT::K const k) const
+	bool validate_key_in_node(TT::buf_size_type node_idx, TT::K const k) const
 	{
 		if (this->get_split_n() == 0) {
 			return true; // one child: every key belongs to it
 		}
-		return node_idx == 0 ?
-			       k < this->split.front() :
-			       (node_idx == this->get_split_n() ?
-					k >= this->split[this->get_split_n() -
-							 1] :
-					(k >= this->split[node_idx - 1] &&
-					 k < this->split[node_idx]));
+		return node_idx == 0 ? k < this->split.front() :
+							   (node_idx == this->get_split_n() ?
+									k >= this->split[this->get_split_n() - 1] :
+									(k >= this->split[node_idx - 1] &&
+									 k < this->split[node_idx]));
 	}
 
 	TT::buf_size_type node_n;
@@ -365,7 +350,7 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 
 template <typename Interior, typename TT>
 static Interior *alloc_interior_node(typename TT::node_seq const &tree_nodes,
-				     typename TT::split_seq const &split)
+									 typename TT::split_seq const &split)
 {
 	Interior *o = parlay::type_allocator<Interior>::alloc();
 	new (o) Interior(tree_nodes, split);
@@ -374,7 +359,7 @@ static Interior *alloc_interior_node(typename TT::node_seq const &tree_nodes,
 
 template <typename Interior, typename TT>
 static Interior *alloc_interior_node(typename TT::node_slice tree_nodes_slice,
-				     typename TT::split_slice split_slice)
+									 typename TT::split_slice split_slice)
 {
 	Interior *o = parlay::type_allocator<Interior>::alloc();
 	new (o) Interior(tree_nodes_slice, split_slice);
@@ -384,8 +369,8 @@ static Interior *alloc_interior_node(typename TT::node_slice tree_nodes_slice,
 // TODO: maybe replace the node_arr, ST, and AT with template parameters
 template <typename Interior, typename TT>
 static Interior *alloc_interior_node(typename TT::node_slice const &tree_nodes,
-				     typename TT::split_seq const &split,
-				     typename TT::interior_aug const &aug)
+									 typename TT::split_seq const &split,
+									 typename TT::interior_aug const &aug)
 {
 	Interior *o = parlay::type_allocator<Interior>::alloc();
 	new (o) Interior(tree_nodes, split, aug);

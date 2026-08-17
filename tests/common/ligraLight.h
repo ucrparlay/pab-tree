@@ -76,42 +76,35 @@ template <typename Graph, typename Fa, typename Cond> struct edge_map {
 	bool verbose;
 	parlay::sequence<vertexId> dup_seq;
 	edge_map(Graph const &G, Fa fa, Cond cond, bool dedup = false,
-		 bool verbose = false)
+			 bool verbose = false)
 		: G(G)
 		, fa(fa)
 		, cond(cond)
 		, dedup(dedup)
 		, verbose(verbose)
 	{
-		dup_seq = parlay::sequence<vertexId>::uninitialized(
-			G.numVertices());
+		dup_seq = parlay::sequence<vertexId>::uninitialized(G.numVertices());
 	}
 
 	auto edge_map_sparse(vertex_subset_sparse const &vtx_subset)
 	{
 		if (verbose)
-			std::cout << "edge map sparse: " << vtx_subset.size()
-				  << std::endl;
+			std::cout << "edge map sparse: " << vtx_subset.size() << std::endl;
 		auto nested_edges = parlay::map(vtx_subset, [&](vertexId v) {
-			return parlay::delayed_tabulate(
-				G[v].degree, [&, v](size_t i) {
-					return std::pair(v, G[v].Neighbors[i]);
-				});
+			return parlay::delayed_tabulate(G[v].degree, [&, v](size_t i) {
+				return std::pair(v, G[v].Neighbors[i]);
+			});
 		});
 		auto edges = delayed::flatten(nested_edges);
 		auto r = delayed::filter_map(
 			edges,
-			[&](auto x) {
-				return cond(x.second) && fa(x.first, x.second);
-			},
+			[&](auto x) { return cond(x.second) && fa(x.first, x.second); },
 			[](auto x) { return x.second; });
 		if (dedup) {
-			parlay::parallel_for(0, r.size(), [&](size_t i) {
-				dup_seq[r[i]] = i;
-			});
-			auto flags = parlay::tabulate(r.size(), [&](size_t i) {
-				return i == dup_seq[r[i]];
-			});
+			parlay::parallel_for(0, r.size(),
+								 [&](size_t i) { dup_seq[r[i]] = i; });
+			auto flags = parlay::tabulate(
+				r.size(), [&](size_t i) { return i == dup_seq[r[i]]; });
 			return vertex_subset_(parlay::pack(r, flags));
 		}
 		return vertex_subset_(std::move(r));
@@ -120,8 +113,7 @@ template <typename Graph, typename Fa, typename Cond> struct edge_map {
 	auto edge_map_dense(vertex_subset_dense const &vtx_subset)
 	{
 		if (verbose)
-			std::cout << "edge map dense:  " << vtx_subset.size()
-				  << std::endl;
+			std::cout << "edge map dense:  " << vtx_subset.size() << std::endl;
 		auto r = parlay::tabulate(G.numVertices(), [&](vertexId v) -> bool {
 			bool result = false;
 			if (cond(v)) {
@@ -129,11 +121,9 @@ template <typename Graph, typename Fa, typename Cond> struct edge_map {
 				auto vtx = G[v];
 				auto d = vtx.degree;
 				auto ngh = vtx.Neighbors;
-				auto do_block = [&, vsub = vtx_subset.begin()](
-							size_t i) {
+				auto do_block = [&, vsub = vtx_subset.begin()](size_t i) {
 					size_t begin = block_size * i;
-					size_t end = std::min<size_t>(
-						begin + block_size, d);
+					size_t end = std::min<size_t>(begin + block_size, d);
 					for (size_t j = begin; j < end; j++) {
 						if (!cond(v))
 							return;
@@ -149,8 +139,7 @@ template <typename Graph, typename Fa, typename Cond> struct edge_map {
 				if (num_blocks == 1)
 					do_block(0);
 				else
-					parlay::parallel_for(0, num_blocks,
-							     do_block, 1);
+					parlay::parallel_for(0, num_blocks, do_block, 1);
 			}
 			return result;
 		});
@@ -165,13 +154,11 @@ template <typename Graph, typename Fa, typename Cond> struct edge_map {
 		bool do_dense;
 		if (vtx_subset.is_sparse) {
 			auto out_degree = parlay::reduce(parlay::delayed_map(
-				vtx_subset.sparse,
-				[&](size_t i) { return G[i].degree; }));
+				vtx_subset.sparse, [&](size_t i) { return G[i].degree; }));
 			if ((l + out_degree) > G.m / 20) {
 				parlay::sequence<bool> d_vtx_subset(n, false);
 				parlay::parallel_for(0, l, [&](size_t i) {
-					d_vtx_subset[vtx_subset.sparse[i]] =
-						true;
+					d_vtx_subset[vtx_subset.sparse[i]] = true;
 				});
 				t.next("convert");
 				return edge_map_dense(d_vtx_subset);
@@ -182,8 +169,7 @@ template <typename Graph, typename Fa, typename Cond> struct edge_map {
 				return edge_map_dense(vtx_subset.dense);
 			else {
 				auto s_vtx_subset =
-					parlay::pack_index<vertexId>(
-						vtx_subset.dense);
+					parlay::pack_index<vertexId>(vtx_subset.dense);
 				return edge_map_sparse(s_vtx_subset);
 			}
 		}

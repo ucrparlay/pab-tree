@@ -24,15 +24,14 @@ auto btree<TT>::range_report(TT::Box const query_box, Range &&out) const
 	}
 
 	size_type rt_size = 0;
-	range_report_iter(this->root_, query_box, rt_size,
-			  parlay::make_slice(out));
+	range_report_iter(this->root_, query_box, rt_size, parlay::make_slice(out));
 	return rt_size;
 }
 
 template <typename TT>
 template <typename Range>
 void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
-				  size_type &offset, Range out) const
+								  size_type &offset, Range out) const
 {
 	auto const *TL = static_cast<Leaf const *>(T);
 	if (TL->is_sorted) {
@@ -40,38 +39,33 @@ void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
 		// Narrow: search for r only in [l, size) since r >= l.
 		const auto *elems = TL->elements.data() + l;
 		const buf_size_type rem = static_cast<buf_size_type>(TL->size) -
-					  static_cast<buf_size_type>(l);
+								  static_cast<buf_size_type>(l);
 		size_t lo = 0, hi = static_cast<size_t>(rem);
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go =
-				Entry::get_key(elems[mid]) < query_box.second;
+			bool const go = Entry::get_key(elems[mid]) < query_box.second;
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += (Entry::get_key(elems[i]) < query_box.second) ?
-				       1 :
-				       0;
+			cnt += (Entry::get_key(elems[i]) < query_box.second) ? 1 : 0;
 		}
 		const auto r = l + static_cast<decltype(l)>(lo + cnt);
 		assert(l <= r && r <= TL->size);
 		assert(offset + (r - l) <= out.size() &&
-		       "out is too small; size it with range_count");
-		std::copy_n(TL->elements.begin() + l, r - l,
-			    out.begin() + offset);
+			   "out is too small; size it with range_count");
+		std::copy_n(TL->elements.begin() + l, r - l, out.begin() + offset);
 		offset += r - l;
 		return;
 	}
 
 	// Unsorted leaf: linear scan
-	for (buf_size_type i = 0; i < static_cast<buf_size_type>(TL->size);
-	     i++) {
+	for (buf_size_type i = 0; i < static_cast<buf_size_type>(TL->size); i++) {
 		auto const k = Entry::get_key(TL->elements[i]);
 		if (k >= query_box.first && k < query_box.second) {
 			assert(offset < out.size() &&
-			       "out is too small; size it with range_count");
+				   "out is too small; size it with range_count");
 			out[offset++] = TL->elements[i];
 		}
 	}
@@ -80,7 +74,7 @@ void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
 template <typename TT>
 template <typename Range>
 void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
-				  size_type &offset, Range out) const
+								  size_type &offset, Range out) const
 {
 	// Iterative descent: avoids O(height) recursive-call overhead for
 	// narrow queries that fall inside a single child at each interior
@@ -88,11 +82,9 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 	while (!T->is_leaf) {
 		auto const *TI = static_cast<Interior const *>(T);
 		auto *const *nodes =
-			TI->tree_nodes
-				.data(); // Node* const* → nodes[i] is Node*
+			TI->tree_nodes.data(); // Node* const* → nodes[i] is Node*
 
-		const buf_size_type l =
-			TI->get_node_id_containing_key(query_box.first);
+		const buf_size_type l = TI->get_node_id_containing_key(query_box.first);
 
 		// Right boundary child: narrow search to [l, split_n) since r
 		// >= l, saving roughly half the binary-search work in the
@@ -112,14 +104,13 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		for (size_t i = lo; i < hi; ++i) {
 			cnt += (sp_l[i] < query_box.second) ? 1 : 0;
 		}
-		const buf_size_type r =
-			l + static_cast<buf_size_type>(lo + cnt);
+		const buf_size_type r = l + static_cast<buf_size_type>(lo + cnt);
 
 		assert(l < TI->get_node_n());
 		assert(r < TI->get_node_n());
 		assert(TI->validate_key_in_node(l, query_box.first));
 		assert(TI->validate_key_in_node(r, query_box.second) ||
-		       TI->split[r] == query_box.second);
+			   TI->split[r] == query_box.second);
 
 		if (l == r) {
 			// Entire query falls in one child — keep descending
@@ -144,14 +135,13 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 				off[k + 1] = off[k] + nodes[l + 1 + k]->size;
 			}
 			assert(off[mid_n] <= out.size() &&
-			       "out is too small; size it with range_count");
+				   "out is too small; size it with range_count");
 			offset = off[mid_n];
 			parlay::parallel_for(
 				0, mid_n,
 				[&](buf_size_type k) {
 					flatten_rec<Range, true, false>(
-						nodes[l + 1 + k],
-						out.cut(off[k], off[k + 1]));
+						nodes[l + 1 + k], out.cut(off[k], off[k + 1]));
 				},
 				1);
 		}
@@ -169,14 +159,13 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 template <typename TT>
 template <typename Range>
 void btree<TT>::range_report_flatten_rec(Node const *T, size_type &offset,
-					 Range out) const
+										 Range out) const
 {
 	if (T->is_leaf) {
 		auto const *TL = static_cast<Leaf const *>(T);
 		assert(offset + TL->size <= out.size() &&
-		       "out is too small; size it with range_count");
-		std::copy_n(TL->elements.begin(), TL->size,
-			    out.begin() + offset);
+			   "out is too small; size it with range_count");
+		std::copy_n(TL->elements.begin(), TL->size, out.begin() + offset);
 		offset += TL->size;
 		return;
 	}
@@ -191,7 +180,7 @@ void btree<TT>::range_report_flatten_rec(Node const *T, size_type &offset,
 template <typename TT>
 template <typename Range>
 void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
-				 size_type &offset, Range out) const
+								 size_type &offset, Range out) const
 {
 	if (T->is_leaf) {
 		range_report_leaf(T, query_box, offset, out);
@@ -206,7 +195,7 @@ void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
 	assert(r < TI->get_node_n());
 	assert(TI->validate_key_in_node(l, query_box.first));
 	assert(TI->validate_key_in_node(r, query_box.second) ||
-	       TI->split[r] == query_box.second);
+		   TI->split[r] == query_box.second);
 
 	// visit nodes [l, r]
 
@@ -222,8 +211,7 @@ void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
 		for (buf_size_type i = l + 1; i < r; i++) {
 			flatten_rec<decltype(out), false>(
 				TI->tree_nodes[i],
-				out.cut(offset,
-					offset + TI->tree_nodes[i]->size));
+				out.cut(offset, offset + TI->tree_nodes[i]->size));
 			offset += TI->tree_nodes[i]->size;
 		}
 	}
