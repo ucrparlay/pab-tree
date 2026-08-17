@@ -683,17 +683,24 @@ BTree<TT>::ReInsertTreeAfterDelete(Node* T,
 
 template<typename TT>
 TT::Node*
-BTree<TT>::CopyTreeRecursive(Node* T)
+BTree<TT>::CopyTreeRecursive(Node const* T)
 {
   if (T->is_leaf) {
     auto const TL = static_cast<Leaf const*>(T);
-    return AllocNormalLeafNode<TT::EntrySlice, Leaf>(TL->GetEle());
+    // GetEle() returns an EntrySeq, and a template argument list needs the
+    // explicit typename.
+    return AllocNormalLeafNode<typename TT::EntrySeq, Leaf>(TL->GetEle());
   }
   auto const TI = static_cast<Interior const*>(T);
-  auto new_nodes = parlay::tabulate(TI->GetNodeN(), [&](size_t i) {
-    return CopyTreeRecursive(TI->tree_nodes[i]);
-  });
-  return AllocInteriorNode(parlay::make_slice(new_nodes), TI->GetSplitSlice());
+  auto new_nodes = parlay::tabulate(
+    TI->GetNodeN(), [&](size_t i) -> typename TT::Node* {
+      return CopyTreeRecursive(TI->tree_nodes[i]);
+    });
+  // GetSplitSlice() is const here, so use the sequence overload. Both
+  // template parameters are in non-deduced positions.
+  auto const split_slice = TI->GetSplitSlice();
+  typename TT::SplitSeq new_splits(split_slice.begin(), split_slice.end());
+  return AllocInteriorNode<Interior, TT>(new_nodes, new_splits);
 }
 
 } // namespace pb_tree
