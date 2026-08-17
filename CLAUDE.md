@@ -13,6 +13,98 @@
 
 A parallel, cache-oblivious B-tree (`pmos::BTree<TypeTrait>`) that supports parallel batch insert, batch delete, and range queries. It lives entirely in `include/pb_tree/`.
 
+## Library review — `docs/code_review_2026-08.md` (2026-08-17)
+
+Full review of `include/pb_tree/`: 89 findings (13 critical, 31 high). **Read it
+before changing library code** — several of its findings are traps that current
+tooling cannot catch.
+
+> NOTE: `/docs` is gitignored (`.gitignore:7`), so that file is on disk but not
+> committed. `git add -f docs/code_review_2026-08.md` to track it, or move it
+> somewhere unignored. The summary below is the tracked copy.
+
+The short version:
+
+- **The safety net is inert.** Default build is `-DNDEBUG -w`, so all 152
+  `assert()`s compile to nothing and every warning is off. `Validate()` returns
+  `true` unconditionally (`validation.hpp:190`) — it discards
+  `VerifyTreeProperty`/`CheckHeight`, which only assert. `kCheckSize` checks no
+  sizes at all. Do not treat a green `unit_test` as evidence of anything.
+- **Seven stop-ship defects**, three of which fire in normal use: deleting from
+  a small tree frees live entries (`b_batch_delete.hpp:85`); duplicate keys are
+  silently unreachable to every query (`node_op.hpp:31`); querying an empty or
+  default-constructed tree segfaults (`membership.hpp:14`, `range_count.hpp:17`,
+  `range_report.hpp:26`, `utility.hpp:24`). Also: copy ctor/assign do not
+  compile (`node_op.hpp:685,691`), `BTree t(seq)` is ambiguous
+  (`b_tree.h:77-87`), `Build()` leaks the old tree (`b_build_tree.hpp:34`), and
+  `BatchDelete(..., sorted_input=true, ...)` deletes nothing
+  (`b_batch_delete.hpp:80` passes `sorted_seq` where it built `sorted_slice`).
+- **The delete/rebalance path never calls `UpdateAug`**, so any non-trivial
+  augmentation is correct after `Build`/`BatchInsert` and silently wrong after
+  a `BatchDelete` that rebalances. `InteriorAug` cannot be implemented at all —
+  `Update()` gets no arguments and no access to children.
+- **What was checked and is fine**: `BalanceOverLeaves`' in-place-write
+  invariants, the fixed-array bounds arithmetic, parallel slice disjointness in
+  the insert path, the branchless `BinarySearch`, and the unsigned-`BufSizeT`
+  underflow class.
+
+## Conventions (set 2026-08-17)
+
+Plan: `docs/refactor_plan_2026-08.md`.
+
+- **Rename**: `pb_tree` → `pab_tree`; class `BTree` → `pab_tree::btree`;
+  directory `include/pab_tree/`; guards `PABTREE_*`; CMake `PMOS` targets →
+  `pab_tree`. `tests/` and `scripts/` follow.
+- **Naming**: everything is `lower_snake_case` except `CamelCase` template
+  parameters and `UPPER_CASE` macros. That covers classes, functions, members,
+  enum values, type aliases **and concepts**.
+  - `static constexpr` constants take a **`k_` prefix**: `kBufUB` → `k_buf_ub`,
+    `kSplitFactor` → `k_split_factor`.
+  - **Enum values take no prefix**: `kSorted` → `sorted`. They are values of a
+    type, not compile-time sizes.
+  - **Template parameters take no prefix either**, even when constant —
+    `kCheckSize` → `CheckSize`.
+  - Type aliases take the STL name where one exists (`value_type`, `key_type`,
+    `size_type`), else bare snake_case (`entry_seq`).
+  - Nothing is `UPPER_CASE` unless it is a macro. This also avoids macro
+    capture: `BLOCK_SIZE` is `#define`d in `<linux/fs.h>` and
+    `<sys/mount.h>`, so an `UPPER_CASE` class member of that name would be
+    rewritten by the preprocessor whatever its scope.
+  - Never use leading-underscore + capital or double underscore; reserved to
+    the implementation. Ctor params keep their leading `_`, members stay plain.
+- **Macros must be `PABTREE_`-prefixed.** The library's own macros are all
+  include guards and already are. But the library *reads* `DEBUG` at 9 sites
+  (`CMakeLists.txt:87` sets it) — rename to `PABTREE_DEBUG`. `DEBUG` is one of
+  the most commonly defined names anywhere, and a consumer whose build sets it
+  silently enables the `GetNodeBoxRec` verification loops: an O(subtree)
+  traversal with heap allocation per child per interior update. Tests-only
+  macros (`MEMCHECK`, `DYNAMIC_GRAPH`, `OSM`, `MAC`, `CCP`, `SIEVE`, `LEAF<N>`)
+  are lower priority; `MAC` and `SIEVE` are generic enough to be worth it.
+  Kernel and STL naming agree on functions, variables, structs and macros
+  (checked against `/usr/include/linux/*.h` and libstdc++ 15.1.1); they differ
+  on enum values and type-alias suffixes, where the STL form above wins.
+- **Format**: Linux kernel style, 8-wide tabs, 80 columns. **There is no
+  `BasedOnStyle: Linux`** — verified with clang-format 22.1.3, the only values
+  are LLVM/Google/Chromium/Mozilla/WebKit/Microsoft/GNU. The settings are
+  spelled out in `.clang-format.kernel` at the repo root (staged, not active;
+  R3 renames it into place). One deviation from the kernel file:
+  `Standard: c++20`, not `Cpp03` — Cpp03 writes `vector<vector<int> >`.
+  Measured: all 24 headers format cleanly, most get *shorter*, and of 49 lines
+  over 80 columns only 2 are code (`validation.hpp:59` string literal,
+  `comparator.h:90` trailing comment) — the rest are long comment blocks.
+- **Order**: delete → rename → restyle → reformat, as separate commits.
+  Reformat commit goes in `.git-blame-ignore-revs`.
+- **Comments**: short and factual. No blocks, no jargon.
+- **Do not change**: the algorithm implementations, existing asserts (adding
+  new ones is fine), the submodules, or `external/baselines/`.
+- **Gate**: `unit_test` after each mechanical pass. It runs here — data is at
+  `/ssd1/zmen002/kv_pair/`. Elsewhere every test skips and ctest passes green,
+  so a green run only means something where the data exists.
+- **Settled**: the tree is a **set** (distinct keys, debug assert only);
+  loggers are deleted (`contain` → `bool`); deep copy is fixed, not deleted;
+  the wrong assert at `b_batch_insert.hpp:86` stays with a correct one added
+  beside it.
+
 ## Build
 
 ```bash
@@ -105,12 +197,37 @@ Typical values in tests: `kBuf` ∈ {16, 32, **64** (default), 128, 256, 512, 10
 
 ```cpp
 using SizeT    = uint_fast32_t;   // entry/size counts
-using BufSizeT = int;             // node/slot counts (signed! backward loops use i >= 0)
+using BufSizeT = <unsigned>;      // node/slot counts -- see WARNING below
 using SizeBufUBArr    = std::array<SizeT,    kBufUB>;
 using BufSizeBufUBArr = std::array<BufSizeT, kBufUB>;
 using BooleanBufUBArr = std::array<bool,     kBufUB>;
 using EntryArr = std::array<E, kBufUB>;   // fixed-size leaf element buffer
 ```
+
+**WARNING — `BufSizeT` is UNSIGNED, not `int`.** This doc said `int` until
+2026-08-17; that was stale. `type_trait.h:118-123` picks it by width:
+
+```cpp
+using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 65535U),
+                   uint_fast32_t,
+                   std::conditional_t<(kBufferSize * kBufUBFac > 255U),
+                     uint_fast16_t, uint_fast8_t>>;
+```
+
+So `kBuf=64` → `kBufUB=256` → `uint_fast16_t`; `kBuf=32` → `kBufUB=128` →
+`uint_fast8_t`. Consequences for anyone editing node code:
+
+- A backward loop `for (BufSizeT i = n-1; i >= 0; --i)` **never terminates**.
+  The library's one backward loop (`node_op.hpp:440`) is explicitly `int` and
+  carries a `// WARN: signed` comment — keep it that way, and use `int` for any
+  new one.
+- Every `- 1` on a count must be guarded. Existing sites are
+  (`GetSplitN()` returns `node_n == 0 ? 0 : node_n - 1`); match that pattern.
+- `BinarySearch` returns `size_t`; assigning to `BufSizeT` narrows silently
+  (the build passes `-w`, see below).
+
+A 2026-08-17 review checked every `-1` site and backward loop in the library and
+found no live underflow — but the guarding is by convention, not by type.
 
 ## Node types
 
