@@ -83,6 +83,9 @@ int main()
 
 ## API
 
+The batch calls are the ones worth using; everything is built to run a whole
+batch in parallel.
+
 | Call | Notes |
 |---|---|
 | `build(range)` | Replaces any existing contents |
@@ -91,11 +94,47 @@ int main()
 | `contain(key) -> bool` | |
 | `range_count(box) -> size_t` | `box` is half-open, `[first, second)` |
 | `range_report(box, out) -> size_t` | See the sizing rule below |
-| `get_entries(out)` | Every entry; `out` must hold `get_size()` |
+| `get_entries(out)` | Every entry; `out` must hold `get_size()`. Not in key order |
 | `get_size()`, `validate()`, `delete_tree()` | |
+
+Any random-access range works for `build`, `batch_insert` and `batch_delete` —
+`std::vector`, `std::array`, `std::span`, `parlay::sequence`. Contiguous ones
+are read in place.
 
 All queries are `const`. `validate()` is `[[nodiscard]]` and returns whether
 the tree's invariants hold.
+
+### Standard container interface
+
+The names `std::set` and `tlx::btree_set` use also work:
+
+| Group | Members |
+|---|---|
+| capacity | `size` `empty` `max_size` `clear` |
+| lookup | `contains` `count` `find` `lower_bound` `upper_bound` `equal_range` |
+| iteration | `begin` `end` `cbegin` `cend` `rbegin` `rend` `to_seq` |
+| modifiers | `bulk_load` `insert` `erase` (range, single entry/key, or iterator) |
+| compare | `==` `!=` `<` `<=` `>` `>=` |
+| observers | `key_comp` `value_comp` |
+| types | `key_type` `mapped_type` `value_type` `size_type` `iterator` … |
+
+```cpp
+tree t(data);                        // build from any range
+for (auto const &e : t) { … }        // key order
+auto it = t.lower_bound(100);
+t.erase(it, t.upper_bound(200));     // one batch_delete underneath
+if (t.contains(500)) { … }
+```
+
+Single-element `insert`/`erase` go through the batch path, so a loop over them
+is far slower than one batch call. `insert` and `erase` take a range when you
+give them one.
+
+**Iteration writes to the tree.** Leaves hold their entries unsorted on
+purpose, so the leaf under the cursor gets sorted as the iterator reaches it.
+That makes iteration and lookup unsafe to run from several threads at once.
+Call `sort_leaves()` first — one parallel pass, idempotent — and afterwards
+both only read.
 
 ## Rules
 

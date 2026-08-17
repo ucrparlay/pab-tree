@@ -223,6 +223,61 @@ indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
 
 All `b_tree_impl/**/*.hpp` files are `#include`d at the bottom of `b_tree.h`; they are not compiled separately.
 
+## STL container interface (added 2026-08-17)
+
+`btree` now carries the API common to TLX's four B+-tree containers and to
+`std::set`, on top of the batch interface. `include/pab_tree/b_tree_impl/query_op/iterator.hpp`
+holds the iteration half.
+
+| Group | Members |
+|---|---|
+| types | `key_type` `mapped_type` `value_type` `difference_type` `size_type` `key_compare` `value_compare` `iterator` `const_iterator` `reverse_iterator` `const_reverse_iterator` |
+| capacity | `size` `empty` `max_size` `clear` |
+| lookup | `contains` `count` `find` `lower_bound` `upper_bound` `equal_range` |
+| iteration | `begin` `end` `cbegin` `cend` `rbegin` `rend` `to_seq` `sort_leaves` |
+| modifiers | `bulk_load` `insert(range)` `insert(entry)` `erase(range)` `erase(key)` `erase(iter)` `erase(first,last)` |
+| compare | `operator==` `operator<=>` |
+| observers | `key_comp` `value_comp` |
+
+Not adopted: `get_allocator` (no allocator parameter yet), `insert(hint, x)`,
+`erase_one` (a duplicate of `erase(key)` here, since keys are distinct),
+`print`/`print_leaves`. `validate` is the existing spelling of TLX's `verify`.
+
+### Iteration rests on one structural fact
+
+Leaves are ordered **against each other** — the B+-tree invariant — but a
+leaf's own entries are not necessarily sorted (`is_sorted`, the deliberate
+performance trick that `sorted_leaf_ratio` measures). So ordered iteration
+only needs the leaf currently under the cursor to be sorted, and
+`ensure_leaf_sorted` does that on arrival. This is the same lazy-sort that
+`extract_points_in_leaf<sorted=true>` already performed for `to_seq`.
+
+**That write means iteration and lookup are not thread-safe by default.** Call
+`sort_leaves()` first (one parallel pass, idempotent) and afterwards both only
+read.
+
+An earlier draft called `sort_leaves()` from inside `begin`/`find`/
+`lower_bound`/`upper_bound`. That is O(n) *per lookup* — probing n keys became
+O(n²) and the test hung. Per-leaf sorting is what makes lookups O(log n).
+
+### `const_iterator` carries no path stack
+
+Crossing a leaf boundary re-descends from the root via `next_leaf`/`prev_leaf`,
+which track the deepest node that still had a child on the far side. That is
+O(height) per leaf, so O(height / k_buf) amortised per entry, and it keeps the
+iterator 3 words wide rather than holding an O(height) stack. Entries are
+immutable (`iterator` is `const_iterator`, as in `std::set`) because moving one
+would break the leaf holding it.
+
+### Overload traps found while writing this
+
+- `erase(K)` vs `erase(Range&&)`: `erase(500u)` bound to the **template**,
+  because binding `unsigned&&` to an rvalue outranks `const unsigned&`, and
+  that tiebreak is applied before the non-template preference. Both range
+  overloads are now constrained with `requires std::ranges::range<...>`.
+- `CHECK(t.validate<true, false>())` does not compile — the comma inside the
+  template argument list splits the macro's arguments.
+
 ## Type system
 
 The tree is parameterised by `TypeTrait = BTreeTypeTrait<EleType, kBufferSize, LeafAug, InteriorAug, kSkHeight, NodeType>`.

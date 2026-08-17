@@ -1,7 +1,7 @@
 # Open issues after the refactor
 
 Everything still wrong in `include/pab_tree/` as of 2026-08-17, after the
-31-commit refactor. Each entry was re-checked against the current code, so the
+35-commit refactor. Each entry was re-checked against the current code, so the
 paths, names and line numbers are live, not pre-refactor.
 
 Ordered by what I would fix next. The full history is in
@@ -22,41 +22,18 @@ enforced in release too, but it is a guard, not a fix for a live defect.
 
 ---
 
-## 1. Batch operations require a parlay range
+## 1. No exception guarantee
 
-`b_batch_insert.hpp:67`, `b_batch_delete.hpp:68`
-
-```cpp
-parlay::slice<const E *, const E *> sorted_slice{ In.begin(), In.end() };
-```
-
-This needs the range's iterator to be a raw `const E *`, so
-`batch_insert(std::vector<E>)` fails while `build(std::vector<E>)` succeeds.
-The static_assert that used to advertise otherwise is gone, but the
-inconsistency remains, and the failure surfaces deep in an implementation
-header rather than at the call site.
+The tree itself is RAII — copy/move constructor, copy/move assignment and
+destructor are all there, so a `btree` owns and releases its nodes. What is
+missing is the guarantee *during* an operation: nodes are raw pointers from
+`parlay::type_allocator` with manual free, so a throwing allocation mid-insert
+leaves the tree in an indeterminate state and leaks every node built so far.
+Structural; not attempted.
 
 ---
 
-## 2. No standard container conveniences
-
-`b_tree.h`
-
-No `size()`, `empty()`, `clear()`, `swap()`, no iteration, no single-key
-insert or erase. Defensible for a batch-parallel design, but `empty()` and
-`clear()` cost nothing and `size()` is a one-line alias for `get_size()`.
-
----
-
-## 3. No RAII and no exception guarantee
-
-Nodes are raw pointers from `parlay::type_allocator` with manual free. A
-throwing allocation mid-insert leaves the tree in an indeterminate state and
-leaks every node built so far. Structural; not attempted.
-
----
-
-## 4. Eleven TODO markers
+## 2. Eleven TODO markers
 
 `b_tree.h:27,136,146,468` · `tree_node.h:81,183,385,409` ·
 `box_op.h:21` · `b_batch_insert.hpp:59` · `points_op.hpp:55`

@@ -1,10 +1,15 @@
 #ifndef PABTREE_B_TREE_H_
 #define PABTREE_B_TREE_H_
 
+#include <array>
+#include <compare>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
+#include <limits>
 #include <ostream>
+#include <ranges>
 #include <tuple>
 #include <utility>
 
@@ -197,6 +202,29 @@ public:
 	using Interior = btree_interior_node;
 
 	// ---- public API ----
+
+	// STL container type names.
+	using key_type = K;
+	using mapped_type = V;
+	using value_type = E;
+	using difference_type = std::ptrdiff_t;
+
+	// Order two entries by key. Element types need not define operator<.
+	struct value_compare {
+		bool operator()(E const &a, E const &b) const
+		{
+			return Entry::get_key(a) < Entry::get_key(b);
+		}
+	};
+
+	// Order two keys.
+	struct key_compare {
+		bool operator()(K const &a, K const &b) const
+		{
+			return a < b;
+		}
+	};
+
 	struct default_hybrid_pred {
 		template <typename InputNode, typename Range>
 		bool operator()(InputNode const *T, Range In) const noexcept
@@ -243,8 +271,244 @@ public:
 	template <typename Range>
 	auto range_report(TT::Box query_box, Range &&out) const -> size_type;
 
+	// ---- STL container interface ----
+	// Names from std::set. build/batch_insert/batch_delete stay the
+	// primary interface; these are the standard spellings of the same
+	// operations.
+
+	size_type size() const
+	{
+		return this->root_ ? this->root_->size : 0;
+	}
+
+	[[nodiscard]] bool empty() const
+	{
+		return this->size() == 0;
+	}
+
+	size_type max_size() const
+	{
+		return std::numeric_limits<size_type>::max();
+	}
+
+	void clear()
+	{
+		this->delete_tree();
+	}
+
+	bool contains(K const &k) const
+	{
+		return this->contain(k);
+	}
+
+	// Keys are distinct, so this is 0 or 1.
+	size_type count(K const &k) const
+	{
+		return this->contain(k) ? 1 : 0;
+	}
+
+	void swap(btree &other) noexcept
+	{
+		std::swap(this->root_, other.root_);
+	}
+
+	key_compare key_comp() const
+	{
+		return key_compare{};
+	}
+
+	value_compare value_comp() const
+	{
+		return value_compare{};
+	}
+
+	// Same as build.
+	template <typename Range> void bulk_load(Range &&In)
+	{
+		this->build(std::forward<Range>(In));
+	}
+
+	// Same as batch_insert/batch_delete. Constrained to ranges so a
+	// single entry or key picks the overloads below instead.
+	template <typename Range>
+		requires std::ranges::range<std::remove_cvref_t<Range>>
+	void insert(Range &&In)
+	{
+		this->batch_insert(std::forward<Range>(In));
+	}
+
+	template <typename Range>
+		requires std::ranges::range<std::remove_cvref_t<Range>>
+	void erase(Range &&In)
+	{
+		this->batch_delete(std::forward<Range>(In));
+	}
+
+	// Insert or erase one entry. Both go through the batch path, so a
+	// loop over them is much slower than one batch call.
+	void insert(E const &e)
+	{
+		this->batch_insert(std::array<E, 1>{ e });
+	}
+
+	// Returns whether the key was present.
+	bool erase(K const &k)
+	{
+		if (!this->contain(k)) {
+			return false;
+		}
+		this->batch_delete(std::array<K, 1>{ k });
+		return true;
+	}
+
+	// Entries in key order. Sorts any unsorted leaf as a side effect.
+	TT::entry_seq to_seq() const;
+
+	// ---- iteration ----
+	// Leaves are ordered against each other but a leaf's own entries may
+	// not be, so ordered iteration needs the leaf it is on to be sorted.
+	// Every leaf an iterator reaches is sorted on arrival, the same way
+	// get_entries and to_seq already do it.
+	//
+	// That write makes iteration and lookup unsafe to run from several
+	// threads at once. Call sort_leaves first to do the sorting up
+	// front; afterwards both only read.
+
+	// Sort every unsorted leaf, in parallel. Idempotent.
+	void sort_leaves() const;
+
+	// Bidirectional iterator over entries in key order. Entries are
+	// immutable: moving one would break the leaf it sits in.
+	//
+	// It holds no path stack. Crossing a leaf boundary re-descends from
+	// the root, which is O(height) per leaf and O(height / k_buf) per
+	// entry, and keeps the iterator 3 words wide.
+	class const_iterator {
+	public:
+		using iterator_category = std::bidirectional_iterator_tag;
+		using value_type = E;
+		using difference_type = std::ptrdiff_t;
+		using pointer = E const *;
+		using reference = E const &;
+
+		const_iterator() = default;
+
+		reference operator*() const
+		{
+			return this->leaf_->elements[this->idx_];
+		}
+
+		pointer operator->() const
+		{
+			return &this->leaf_->elements[this->idx_];
+		}
+
+		const_iterator &operator++();
+		const_iterator &operator--();
+
+		const_iterator operator++(int)
+		{
+			auto const tmp = *this;
+			++*this;
+			return tmp;
+		}
+
+		const_iterator operator--(int)
+		{
+			auto const tmp = *this;
+			--*this;
+			return tmp;
+		}
+
+		bool operator==(const_iterator const &other) const
+		{
+			return this->leaf_ == other.leaf_ && this->idx_ == other.idx_;
+		}
+
+	private:
+		friend class btree;
+
+		const_iterator(btree const *tree, Leaf *leaf, buf_size_type idx)
+			: tree_(tree)
+			, leaf_(leaf)
+			, idx_(idx)
+		{
+		}
+
+		btree const *tree_ = nullptr;
+		// nullptr marks end().
+		Leaf *leaf_ = nullptr;
+		buf_size_type idx_ = 0;
+	};
+
+	using iterator = const_iterator;
+	using reverse_iterator = std::reverse_iterator<const_iterator>;
+	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+	const_iterator begin() const;
+
+	const_iterator end() const
+	{
+		return const_iterator(this, nullptr, 0);
+	}
+
+	const_iterator cbegin() const
+	{
+		return this->begin();
+	}
+
+	const_iterator cend() const
+	{
+		return this->end();
+	}
+
+	reverse_iterator rbegin() const
+	{
+		return reverse_iterator(this->end());
+	}
+
+	reverse_iterator rend() const
+	{
+		return reverse_iterator(this->begin());
+	}
+
+	// end() when the key is absent.
+	const_iterator find(K const &k) const;
+	// First entry with key >= k.
+	const_iterator lower_bound(K const &k) const;
+	// First entry with key > k.
+	const_iterator upper_bound(K const &k) const;
+	// Keys are distinct, so this spans 0 or 1 entries.
+	std::pair<const_iterator, const_iterator> equal_range(K const &k) const;
+
+	// Erase what pos points at, or everything in [first, last). Both
+	// read the keys out first, then run one batch_delete, so no
+	// iterator stays live across the update.
+	void erase(const_iterator pos);
+	void erase(const_iterator first, const_iterator last);
+
+	// Compare contents. Both sides are flattened in key order, so this
+	// is O(n) work plus O(n) space.
+	bool operator==(btree const &other) const;
+	std::weak_ordering operator<=>(btree const &other) const;
+
 	// ---- implementation ----
 private:
+	// Leaf navigation for const_iterator. All four return nullptr when
+	// there is no such leaf.
+	Leaf *leftmost_leaf() const;
+	Leaf *rightmost_leaf() const;
+	// First leaf holding keys > k / last leaf holding keys < k, where k
+	// is a key of the leaf being left.
+	Leaf *next_leaf(K const &k) const;
+	Leaf *prev_leaf(K const &k) const;
+	// Leaf whose key range covers k, nullptr if the tree is empty.
+	Leaf *leaf_covering(K const &k) const;
+	// Sort a leaf if it is not already. Every leaf handed to an iterator
+	// goes through here.
+	static void ensure_leaf_sorted(Leaf *TL);
+	static void sort_leaves_rec(Node *T);
+
 	// Order by key. Element types are not required to define operator<.
 	static constexpr auto key_less = [](E const &a, E const &b) {
 		return Entry::get_key(a) < Entry::get_key(b);
@@ -567,6 +831,7 @@ private:
 #include "pab_tree/b_tree_impl/batch_op/b_build_tree.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_delete_tree.hpp"
 #include "pab_tree/b_tree_impl/points_op.hpp"
+#include "pab_tree/b_tree_impl/query_op/iterator.hpp"
 #include "pab_tree/b_tree_impl/query_op/membership.hpp"
 #include "pab_tree/b_tree_impl/query_op/range_count.hpp"
 #include "pab_tree/b_tree_impl/query_op/range_report.hpp"
