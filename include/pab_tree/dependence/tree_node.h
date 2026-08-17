@@ -70,7 +70,6 @@ struct leaf_node : TypeTrait::Node {
 	template <typename Range>
 	leaf_node(Range In, alloc_normal_leaf_tag)
 		: Node{ true, static_cast<size_t>(In.size()) }
-		, elements(entry_arr())
 		, aug(AT(In))
 		, is_sorted{ true }
 	{
@@ -78,10 +77,10 @@ struct leaf_node : TypeTrait::Node {
 		assert(parlay::is_sorted(In, [](auto a, auto b) {
 			return Entry::get_key(a) < Entry::get_key(b);
 		}));
-		// TODO: maybe double check a better way to initialize the array
-		// maybe SIMD?
+		// elements is left default-initialised: copy_n fills [0, size)
+		// and nothing reads past it. Value-initialising the whole
+		// k_buf_ub array here cost more than the copy.
 		std::ranges::copy_n(In.begin(), In.size(), elements.begin());
-		// });
 	}
 
 	[[nodiscard]] bool capacity_full() const
