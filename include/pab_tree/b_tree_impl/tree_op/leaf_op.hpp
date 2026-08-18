@@ -15,102 +15,108 @@
 
 namespace pab_tree
 {
-template <typename type_trait>
-template <typename Range, typename LeafSortPred>
-type_trait::node_type *btree<type_trait>::post_process_leaf_change(
-	node_type *T, Range In, const type_trait::pattern_type leaf_entries_pattern,
-	LeafSortPred const &leaf_sort_pred)
+template <typename TT>
+template <typename R, typename LeafSortPred>
+TT::node_type *
+btree<TT>::post_process_leaf_change(node_type *node, R in,
+									const TT::pattern_type leaf_entries_pattern,
+									LeafSortPred const &leaf_sort_pred)
 {
-	// WARN: does not know whether the T->elements are sorted or not,
-	// so might mark it as unsorted if the leaf entries pattern is
-	// unsort/hybrid, even if the entries are actually sorted.
-	assert(T->is_leaf);
-	auto TL = static_cast<leaf_type *>(T);
-	if (leaf_entries_pattern == type_trait::leaf_entries_pattern::sorted) {
-		std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter(), key_less);
-		TL->is_sorted = true;
-	} else if (leaf_entries_pattern ==
-			   type_trait::leaf_entries_pattern::unsorted) {
-		TL->is_sorted = false;
-	} else if (leaf_entries_pattern ==
-			   type_trait::leaf_entries_pattern::hybrid) {
-		if (leaf_sort_pred(T, In)) {
-			std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter(),
+	/*
+	 * WARN: does not know whether the node->elements are sorted or not,
+	 * so might mark it as unsorted if the leaf entries pattern is
+	 * unsort/hybrid, even if the entries are actually sorted.
+	 */
+	assert(node->is_leaf);
+	auto leaf = static_cast<leaf_type *>(node);
+	if (leaf_entries_pattern == TT::leaf_entries_pattern::sorted) {
+		std::sort(leaf->get_ele_begin_iter(), leaf->get_ele_end_iter(),
+				  key_less);
+		leaf->is_sorted = true;
+	} else if (leaf_entries_pattern == TT::leaf_entries_pattern::unsorted) {
+		leaf->is_sorted = false;
+	} else if (leaf_entries_pattern == TT::leaf_entries_pattern::hybrid) {
+		if (leaf_sort_pred(node, in)) {
+			std::sort(leaf->get_ele_begin_iter(), leaf->get_ele_end_iter(),
 					  key_less);
-			TL->is_sorted = true;
+			leaf->is_sorted = true;
 		} else {
-			TL->is_sorted = false;
+			leaf->is_sorted = false;
 		}
 	} else {
 		assert(false && "Invalid leaf entries pattern");
 	}
-	return T;
+	return node;
 }
 
-template <typename type_trait>
-template <typename Range, bool sorted>
-void btree<type_trait>::extract_points_in_leaf(node_type *T, Range Out)
+template <typename TT>
+template <typename R, bool Sorted>
+void btree<TT>::extract_points_in_leaf(node_type *node, R out)
 {
-	auto TL = static_cast<leaf_type *>(T);
-	if constexpr (sorted) {
-		if (!TL->is_sorted) {
-			std::sort(TL->elements.begin(), TL->elements.begin() + TL->size,
-					  key_less);
-			TL->is_sorted = true;
+	auto leaf = static_cast<leaf_type *>(node);
+	if constexpr (Sorted) {
+		if (!leaf->is_sorted) {
+			std::sort(leaf->elements.begin(),
+					  leaf->elements.begin() + leaf->size, key_less);
+			leaf->is_sorted = true;
 		}
 	}
-	assert(Out.size() >= TL->size);
-	std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size, Out.begin());
+	assert(out.size() >= leaf->size);
+	std::ranges::copy_n(leaf->get_ele_begin_iter(), leaf->size, out.begin());
 }
 
-template <typename type_trait>
-template <typename Range, typename LeafSortPred>
-type_trait::node_type *btree<type_trait>::insert_points_2_leaf(
-	node_type *T, Range In, type_trait::pattern_type leaf_entries_pattern,
-	LeafSortPred const &leaf_sort_pred)
+template <typename TT>
+template <typename R, typename LeafSortPred>
+TT::node_type *
+btree<TT>::insert_points_2_leaf(node_type *node, R in,
+								TT::pattern_type leaf_entries_pattern,
+								LeafSortPred const &leaf_sort_pred)
 {
-	leaf_type *TL = static_cast<leaf_type *>(T);
+	leaf_type *leaf = static_cast<leaf_type *>(node);
 
-	assert(T->size + In.size() <= type_trait::k_buf_ub);
-	assert(T->size == TL->get_ele().size());
-	if (TL->elements.size() == 0) {
-		assert(TL->size == 0);
-		TL->initialize_ele_seq();
-		assert(TL->elements.size() == type_trait::k_buf_ub);
+	assert(node->size + in.size() <= TT::k_buf_ub);
+	assert(node->size == leaf->get_ele().size());
+	if (leaf->elements.size() == 0) {
+		assert(leaf->size == 0);
+		leaf->initialize_ele_seq();
+		assert(leaf->elements.size() == TT::k_buf_ub);
 	}
-	// PERF: buf_size_type should be enough since total size fits within
-	std::ranges::copy_n(In.begin(), In.size(), TL->get_ele_end_iter());
-	TL->size += In.size();
-	TL->update_aug(parlay::make_slice(TL->elements.begin(),
-									  TL->elements.begin() + TL->size));
+	/* PERF: buf_size_type should be enough since total size fits within */
+	std::ranges::copy_n(in.begin(), in.size(), leaf->get_ele_end_iter());
+	leaf->size += in.size();
+	leaf->update_aug(parlay::make_slice(leaf->elements.begin(),
+										leaf->elements.begin() + leaf->size));
 
-	return post_process_leaf_change(T, In, leaf_entries_pattern,
+	return post_process_leaf_change(node, in, leaf_entries_pattern,
 									leaf_sort_pred);
 }
 
-template <typename type_trait>
-template <typename Range>
-type_trait::size_type btree<type_trait>::handling_leaf_split_overflow(
-	node_type *T, Range In, node_split_pair_slice node_split_slice)
+template <typename TT>
+template <typename R>
+TT::size_type
+btree<TT>::handling_leaf_split_overflow(node_type *node, R in,
+										node_split_pair_slice node_split_slice)
 {
-	leaf_type *TL = static_cast<leaf_type *>(T);
-	auto entry_seq = type_trait::entry_seq::uninitialized(T->size + In.size());
+	leaf_type *leaf = static_cast<leaf_type *>(node);
+	auto entry_seq = TT::entry_seq::uninitialized(node->size + in.size());
 
-	if (TL->is_sorted) {
-		// In is always sorted (sorted by BatchInsert_ before descent).
-		// Both halves sorted: O(n) merge instead of O(n log n) sort.
-		std::ranges::merge(TL->get_ele_begin_iter(), TL->get_ele_end_iter(),
-						   In.begin(), In.end(), entry_seq.begin(),
+	if (leaf->is_sorted) {
+		/*
+		 * in is always sorted (sorted by batch_insert_ before descent).
+		 * Both halves sorted: O(n) merge instead of O(n log n) sort.
+		 */
+		std::ranges::merge(leaf->get_ele_begin_iter(), leaf->get_ele_end_iter(),
+						   in.begin(), in.end(), entry_seq.begin(),
 						   [](entry_type const &a, entry_type const &b) {
-							   return type_trait::entry_less(a, b);
+							   return TT::entry_less(a, b);
 						   });
-		free_node<leaf_type>(T);
+		free_node<leaf_type>(node);
 	} else {
-		std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size,
+		std::ranges::copy_n(leaf->get_ele_begin_iter(), leaf->size,
 							entry_seq.begin());
-		parlay::copy(In, parlay::make_slice(entry_seq.begin() + TL->size,
+		parlay::copy(in, parlay::make_slice(entry_seq.begin() + leaf->size,
 											entry_seq.end()));
-		free_node<leaf_type>(T);
+		free_node<leaf_type>(node);
 		entry_seq = parlay::sort(entry_seq, key_less);
 	}
 
@@ -119,55 +125,59 @@ type_trait::size_type btree<type_trait>::handling_leaf_split_overflow(
 		gen_nodes_output_handler{
 			.set_key = [&](size_type i,
 						   auto key) { node_split_slice[i].second = key; },
-			.set_node = [&](size_type i,
-							auto node) { node_split_slice[i].first = node; } });
+			.set_node =
+				[&](size_type i, auto child) {
+					node_split_slice[i].first = child;
+				} });
 
 	return rt_bkt_n;
 }
 
-template <typename type_trait>
+template <typename TT>
 template <typename LeafSortPred>
-type_trait::node_type *btree<type_trait>::delete_points_4_leaf(
-	node_type *T, type_trait::const_key_slice In,
-	const type_trait::pattern_type leaf_entries_pattern,
-	LeafSortPred const &leaf_sort_pred)
+TT::node_type *
+btree<TT>::delete_points_4_leaf(node_type *node, TT::const_key_slice in,
+								const TT::pattern_type leaf_entries_pattern,
+								LeafSortPred const &leaf_sort_pred)
 {
-	auto TL = static_cast<leaf_type *>(T);
+	auto leaf = static_cast<leaf_type *>(node);
 
-	// Keys that are not here are skipped, so In may be longer than the
-	// leaf and may name keys it does not hold.
+	/*
+	 * Keys that are not here are skipped, so in may be longer than the
+	 * leaf and may name keys it does not hold.
+	 */
 
-	auto it = TL->elements.begin();
-	auto end = TL->elements.begin() + TL->size;
+	auto it = leaf->elements.begin();
+	auto end = leaf->elements.begin() + leaf->size;
 	buf_size_type delete_cnt = 0;
-	for (size_type i = 0; i < In.size(); i++) {
-		it =
-			std::ranges::find_if(TL->elements.begin(), end, [&](auto const &e) {
-				return type_trait::key_equal(entry_traits::get_key(e), In[i]);
+	for (size_type i = 0; i < in.size(); i++) {
+		it = std::ranges::find_if(
+			leaf->elements.begin(), end, [&](auto const &e) {
+				return TT::key_equal(entry_traits::get_key(e), in[i]);
 			});
 		if (it != end) {
 			std::ranges::iter_swap(it, --end);
 			delete_cnt++;
 		}
-		if (end == TL->elements.begin()) { // all elements are deleted
+		if (end == leaf->elements.begin()) { /* all elements are deleted */
 			break;
 		}
 	}
 
-	// Exactly the keys that were found came out.
-	assert(std::cmp_equal(std::distance(TL->elements.begin(), end),
-						  TL->size - delete_cnt));
-	assert(delete_cnt <= In.size());
-	TL->size = std::distance(TL->elements.begin(), end);
+	/* Exactly the keys that were found came out. */
+	assert(std::cmp_equal(std::distance(leaf->elements.begin(), end),
+						  leaf->size - delete_cnt));
+	assert(delete_cnt <= in.size());
+	leaf->size = std::distance(leaf->elements.begin(), end);
 
-	assert(TL->size >= 0);
-	TL->update_aug(parlay::make_slice(TL->elements.begin(),
-									  TL->elements.begin() + TL->size));
+	assert(leaf->size >= 0);
+	leaf->update_aug(parlay::make_slice(leaf->elements.begin(),
+										leaf->elements.begin() + leaf->size));
 
-	return post_process_leaf_change(T, In, leaf_entries_pattern,
+	return post_process_leaf_change(node, in, leaf_entries_pattern,
 									leaf_sort_pred);
 }
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_B_TREE_IMPL_LEAF_OP_HPP_
+#endif /* PABTREE_B_TREE_IMPL_LEAF_OP_HPP_ */

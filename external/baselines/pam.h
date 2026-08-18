@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "pb_tree/b_tree.h"
+#include "pab_tree/b_tree.h"
 #include <pam.h>
 // #include "geobase.h"
 // #include "hilbert.h"
@@ -15,26 +15,25 @@ using parlay::par_do;
 using parlay::par_do_if;
 using parlay::sequence;
 
-template<class TypeTrait>
+template<class TT>
 class PamRaw
 {
 public:
-  using TT = TypeTrait;
+  using type_trait = TT;
   // TODO: Do we really need to define these types again?
 
-  using E = typename TT::E;
-  using K = typename TT::K;
-  using V = typename TT::V;
-  using Entry = TT::Entry;
+  using entry_type = typename type_trait::entry_type;
+  using key_type = typename type_trait::key_type;
+  using mapped_type = typename type_trait::mapped_type;
+  using entry_traits = type_trait::entry_traits;
 
-  using Num = typename TT::Num;
-  using EntrySlice = typename TT::EntrySlice;
-  using Split = typename TT::Split;
-  using SplitSeq = typename TT::SplitSeq;
+  using num_comparator = typename type_trait::num_comparator;
+  using entry_slice = typename type_trait::entry_slice;
+  using split_type = typename type_trait::split_type;
+  using split_seq = typename type_trait::split_seq;
 
-  // begin of CPAM_RAW definition
-  using key_type = K;
-  using val_type = V;
+  // begin of CPAM_RAW definition; key_type above is already what PAM wants
+  using val_type = mapped_type;
   using aug_type = size_t; // aug size of the tree
 
   //	CPAM entry
@@ -65,24 +64,24 @@ public:
   using zmap = aug_map<entry>;
   using par = std::pair<typename entry::key_t, typename entry::val_t>;
 
-  using Leaf = zmap::Tree::node;
-  using Interior = zmap::Tree::node;
+  using leaf_type = zmap::Tree::node;
+  using interior_type = zmap::Tree::node;
 
-  using InputRangeT = parlay::sequence<par>;
-  using InputDeleteRangeT = parlay::sequence<K>;
+  using input_range_type = parlay::sequence<par>;
+  using input_delete_range_type = parlay::sequence<key_type>;
 
-  static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
+  static auto parse_input(type_trait::entry_seq const& input_seq) -> input_range_type
   {
     return parlay::map(input_seq, [&](auto e) -> par {
-      return { Entry::GetKey(e), Entry::GetVal(e) };
+      return { entry_traits::get_key(e), entry_traits::get_val(e) };
     });
   }
 
-  static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
-    -> InputDeleteRangeT
+  static auto parse_delete_input(type_trait::entry_seq const& input_seq)
+    -> input_delete_range_type
   {
     return parlay::map(input_seq,
-                       [&](auto e) -> K { return Entry::GetKey(e); });
+                       [&](auto e) -> key_type { return entry_traits::get_key(e); });
   }
   // template <typename T>
   // auto knn(T& tree, Point const& query_point, auto k, auto& vis_leaf) {
@@ -101,8 +100,8 @@ public:
   //   return nn_res.top().second;
   // }
 
-  template<typename Range>
-  auto map_init(Range entries)
+  template<typename R>
+  auto map_init(R entries)
   {
     zmap m1(entries);
     return std::move(m1);
@@ -115,14 +114,14 @@ public:
   //   return make_tuple(add, remove);
   // }
   //
-  template<typename Range, typename M>
-  auto map_insert(Range P, M&& mmp)
+  template<typename R, typename M>
+  auto map_insert(R P, M&& mmp)
   {
     return std::move(zmap::multi_insert(std::forward<M>(mmp), P));
   }
 
-  template<typename Range, typename M>
-  auto map_delete(Range P, M&& mmp)
+  template<typename R, typename M>
+  auto map_delete(R P, M&& mmp)
   {
     return std::move(zmap::multi_delete(std::forward<M>(mmp), P));
   }
@@ -144,7 +143,7 @@ public:
   //   return std::move(zmap::multi_delete(std::forward<M>(mmp), delete_pts));
   // }
   //
-  // int mbr_mbr_relation(Box const& a, Box const& b) {
+  // int mbr_mbr_relation(box_type const& a, box_type const& b) {
   //   if (!BT::BoxIntersectBox(a, b)) {
   //     return -1;  // disjoint
   //   } else if (BT::WithinBox(a, b)) {
@@ -181,63 +180,61 @@ public:
   // }
 
   // APIs
-  template<typename Range>
-  void Build(Range&& In)
+  template<typename R>
+  void build(R&& In)
   {
-    pam_aug_map_ = std::move(map_init(std::forward<Range>(In)));
+    pam_aug_map_ = std::move(map_init(std::forward<R>(In)));
   }
 
-  template<typename Range>
-  void BatchInsert(Range&& In)
+  template<typename R>
+  void batch_insert(R&& In)
   {
     if (!this->pam_aug_map_.root || !zmap::size(this->pam_aug_map_.root)) {
-      return Build(std::forward<Range>(In));
+      return build(std::forward<R>(In));
     }
-    pam_aug_map_ = map_insert(std::forward<Range>(In), std::move(pam_aug_map_));
+    pam_aug_map_ = map_insert(std::forward<R>(In), std::move(pam_aug_map_));
   }
 
-  template<typename Range>
-  void BatchDelete(Range&& In)
+  template<typename R>
+  void batch_delete(R&& In)
   {
     if (!this->pam_aug_map_.root || !zmap::size(this->pam_aug_map_.root)) {
       return;
     }
-    pam_aug_map_ = map_delete(std::forward<Range>(In), std::move(pam_aug_map_));
+    pam_aug_map_ = map_delete(std::forward<R>(In), std::move(pam_aug_map_));
   }
 
-  // template <typename Node, typename Range>
-  // auto KNN(Node* T, Point const& q, psi::kBoundedQueue<Point, Range>& bq) {
+  // template <typename node_type, typename R>
+  // auto KNN(node_type* T, Point const& q, psi::kBoundedQueue<Point, R>& bq) {
   //   psi::KNNLogger logger;
   //   // this->knn(this->cpam_aug_map_, q, bq.max_size(), logger.vis_leaf_num);
   //   zmap::template knn<BT>(this->cpam_aug_map_, q, bq, logger);
   //   return logger;
   // }
   //
-  // auto RangeCount(Box const& q) {
+  // auto range_count(box_type const& q) {
   //   psi::RangeQueryLogger logger;
   //   auto size = this->range_count(this->cpam_aug_map_, q);
   //   return std::make_pair(size, logger);
   // }
   //
-  // template <typename Range>
-  // auto RangeQuery(Box const& q, Range&& Out) {
+  // template <typename R>
+  // auto range_query(box_type const& q, R&& out) {
   //   psi::RangeQueryLogger logger;
-  //   auto size = this->range_report(this->cpam_aug_map_, q, Out);
+  //   auto size = this->range_report(this->cpam_aug_map_, q, out);
   //   return std::make_pair(size, logger);
   // }
 
-  auto Contain(K const k) const
+  auto contain(key_type const k) const
   {
-    pb_tree::RangeQueryLogger logger;
-    auto res = this->pam_aug_map_.contains(k);
-    return std::make_pair(res, logger);
+    return this->pam_aug_map_.contains(k);
   }
 
   // template<class T, class MBR>
   // auto RangeCountImpl(T& tree, MBR query_mbr)
   // {
   //   // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
-  //   auto f = [&](TT::K cur_key) {
+  //   auto f = [&](type_trait::key_type cur_key) {
   //     if (cur_key < query_mbr.first) { // query box is to the right
   //       return -1;
   //     } else if (cur_key >= query_mbr.second) { // query box is to the left
@@ -252,24 +249,22 @@ public:
   //   return ret;
   // }
 
-  auto RangeCount(TT::Box const query_box)
-    -> std::pair<size_t, pb_tree::RangeReportLogger>
+  auto range_count(type_trait::box_type const query_box) -> size_t
   {
     // the bounding box should be [a, b)
-    pb_tree::RangeReportLogger logger;
     // auto rt_size = this->RangeCountImpl(this->pam_aug_map_, query_box);
 
     auto rt_tree =
       zmap::range(this->pam_aug_map_, query_box.first, query_box.second);
     auto rt_size = zmap::size(rt_tree.root);
-    return { rt_size, logger };
+    return rt_size;
   }
 
   template<class T, class MBR, typename Out>
-  auto RangeReportImpl(T& tree, MBR query_mbr, Out&& out)
+  auto range_report_impl(T& tree, MBR query_mbr, Out&& out)
   {
     // auto ret = zmap::values(filter_range(tree, query_mbr, use_hilbert));
-    auto f = [&](TT::K cur_key) {
+    auto f = [&](type_trait::key_type cur_key) {
       if (cur_key < query_mbr.first) { // query box is to the right
         return -1;
       } else if (cur_key >= query_mbr.second) { // query box is to the left
@@ -284,42 +279,40 @@ public:
     return ret;
   }
 
-  template<typename Range>
-  auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pb_tree::RangeReportLogger>
+  template<typename R>
+  auto range_report(type_trait::box_type const query_box, R&& out) -> size_t
   {
     // the bounding box should be [a, b)
-    pb_tree::RangeReportLogger logger;
-    auto rt_size = this->RangeReportImpl(this->pam_aug_map_, query_box, out);
-    return { rt_size, logger };
+    auto rt_size = this->range_report_impl(this->pam_aug_map_, query_box, out);
+    return rt_size;
   }
 
-  template<typename Range>
-  void GetEntries(Range& out)
+  template<typename R>
+  void get_entries(R& out)
   {
     zmap::foreach_index(this->pam_aug_map_, [&](auto const& e, size_t i) {
       out[i] = { std::get<0>(e), std::get<1>(e) };
     });
   }
 
-  void DeleteTree()
+  void delete_tree()
   {
     pam_aug_map_.clear();
   }
 
-  size_t GetSize() const
+  size_t get_size() const
   {
     return pam_aug_map_.size();
   }
-  constexpr static char const* GetTreeName()
+  constexpr static char const* get_tree_name()
   {
     return "PAM";
   }
-  constexpr static int GetLeafSize()
+  constexpr static int get_leaf_size()
   {
     return 1;
   }
-  constexpr static char const* CheckHasBox()
+  constexpr static char const* check_has_box()
   {
     return "HasBox";
   }

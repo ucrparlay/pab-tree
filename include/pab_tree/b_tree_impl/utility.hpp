@@ -16,38 +16,42 @@
 namespace pab_tree
 {
 
-template <typename type_trait>
-template <typename Range>
-void btree<type_trait>::get_entries(Range &Out) const
+template <typename TT>
+template <typename R>
+void btree<TT>::get_entries(R &out) const
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return;
 	}
-	// Checked here, not deeper: Out.begin() + size is already out of
-	// bounds by the time flatten_rec sees it.
-	assert(Out.size() >= this->root_->size);
-	this->flatten_rec<typename type_trait::entry_slice, false, false>(
+	/*
+	 * Checked here, not deeper: out.begin() + size is already out of
+	 * bounds by the time flatten_rec sees it.
+	 */
+	assert(out.size() >= this->root_->size);
+	this->flatten_rec<typename TT::entry_slice, false, false>(
 		this->root_,
-		parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));
+		parlay::make_slice(out.begin(), out.begin() + this->root_->size));
 }
 
-template <typename type_trait>
-type_trait::entry_seq btree<type_trait>::to_seq() const
+template <typename TT>
+TT::entry_seq btree<TT>::to_seq() const
 {
 	if (this->root_ == nullptr) [[unlikely]] {
-		return typename type_trait::entry_seq();
+		return typename TT::entry_seq();
 	}
-	// Leaves are ordered against each other, so sorting each leaf is
-	// enough to put the whole flatten in key order.
-	typename type_trait::entry_seq out =
+	/*
+	 * Leaves are ordered against each other, so sorting each leaf is
+	 * enough to put the whole flatten in key order.
+	 */
+	typename TT::entry_seq out =
 		parlay::sequence<entry_type>::uninitialized(this->root_->size);
-	this->flatten_rec<typename type_trait::entry_slice, false, true>(
+	this->flatten_rec<typename TT::entry_slice, false, true>(
 		this->root_, parlay::make_slice(out.begin(), out.end()));
 	return out;
 }
 
-template <typename type_trait>
-bool btree<type_trait>::operator==(btree const &other) const
+template <typename TT>
+bool btree<TT>::operator==(btree const &other) const
 {
 	if (this->size() != other.size()) {
 		return false;
@@ -60,14 +64,14 @@ bool btree<type_trait>::operator==(btree const &other) const
 	auto const b = other.to_seq();
 	return std::ranges::equal(
 		a, b, [](entry_type const &x, entry_type const &y) {
-			return type_trait::key_equal(entry_traits::get_key(x),
-										 entry_traits::get_key(y)) &&
+			return TT::key_equal(entry_traits::get_key(x),
+								 entry_traits::get_key(y)) &&
 				   entry_traits::get_val(x) == entry_traits::get_val(y);
 		});
 }
 
-template <typename type_trait>
-std::weak_ordering btree<type_trait>::operator<=>(btree const &other) const
+template <typename TT>
+std::weak_ordering btree<TT>::operator<=>(btree const &other) const
 {
 	if (this == &other) {
 		return std::weak_ordering::equivalent;
@@ -98,6 +102,6 @@ std::weak_ordering btree<type_trait>::operator<=>(btree const &other) const
 	return a.size() <=> b.size();
 }
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_B_TREE_IMPL_UTILITY_HPP_
+#endif /* PABTREE_B_TREE_IMPL_UTILITY_HPP_ */

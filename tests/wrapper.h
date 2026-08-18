@@ -3,23 +3,23 @@
 #include <cstdint>
 #include <iostream>
 
-enum InputType : std::uint8_t {
-	kNormalInput = 0,
-	kOsmInput,
-	kDynamicGraphInput,
+enum input_type : std::uint8_t {
+	normal_input = 0,
+	osm_input,
+	dynamic_graph_input,
 };
 
 template <typename Key, typename Val>
-class Wrapper {
+class wrapper {
 public:
 	using key_type = Key;
 	using mapped_type = Val;
 
-	struct LeafAugEmpty {
-		LeafAugEmpty() = default;
+	struct leaf_aug_empty {
+		leaf_aug_empty() = default;
 
 		template <typename Slice>
-		LeafAugEmpty([[maybe_unused]] Slice In) {};
+		leaf_aug_empty([[maybe_unused]] Slice In) {};
 
 		template <typename Slice>
 		void update_aug([[maybe_unused]] Slice In)
@@ -31,8 +31,8 @@ public:
 		}
 	};
 
-	struct InteriorAugEmpty {
-		InteriorAugEmpty() = default;
+	struct interior_aug_empty {
+		interior_aug_empty() = default;
 
 		template <typename TreeNodes>
 		static bool create(TreeNodes const & /*nodes*/)
@@ -46,8 +46,8 @@ public:
 			return true;
 		}
 
-		template <typename TreeNodes, typename split_seq>
-		void update(TreeNodes const & /*nodes*/, split_seq const & /*splits*/)
+		template <typename TreeNodes, typename SplitSeq>
+		void update(TreeNodes const & /*nodes*/, SplitSeq const & /*splits*/)
 		{
 		}
 
@@ -60,9 +60,9 @@ public:
 		}
 	};
 
-	// NOTE: the element we use
+	/* NOTE: the element we use */
 	template <typename KeyType, typename ValType>
-	struct Element {
+	struct element {
 		using key_type = KeyType;
 		using mapped_type = ValType;
 
@@ -77,40 +77,40 @@ public:
 		}
 
 		template <typename StrRange>
-		void ReadKey(StrRange str, size_t i)
+		void read_key(StrRange str, size_t i)
 		{
 			this->key = { std::stoul(str), i };
 		}
 
 		template <typename StrRange>
-		void ReadKey(StrRange str, StrRange str2)
+		void read_key(StrRange str, StrRange str2)
 		{
 			this->key = { std::stoul(str), std::stoul(str2) };
 		}
 
 		template <typename StrRange>
-		void ReadKey(StrRange str)
+		void read_key(StrRange str)
 		{
 			this->key = std::stoul(str);
 		}
 
 		template <typename StrRange>
-		void ReadVal(StrRange In)
+		void read_val(StrRange In)
 		{
 			this->val = std::stoul(In);
 		}
 
-		bool operator<(Element const &rhs) const
+		bool operator<(element const &rhs) const
 		{
 			return this->key < rhs.key;
 		}
 
-		bool operator==(Element const &rhs) const
+		bool operator==(element const &rhs) const
 		{
 			return this->key == rhs.key;
 		}
 
-		friend std::ostream &operator<<(std::ostream &o, Element const &a)
+		friend std::ostream &operator<<(std::ostream &o, element const &a)
 		{
 			o << "[";
 			o << a.key << " " << a.val;
@@ -122,14 +122,14 @@ public:
 		mapped_type val;
 	};
 
-	// NOTE: user needs to add a layer to expose API to b_tree
+	/* NOTE: user needs to add a layer to expose API to b_tree */
 	template <typename EntryType>
-	struct ElementWrapper {
+	struct element_wrapper {
 		using entry_type = EntryType;
 		using key_type = typename entry_type::key_type;
 		using mapped_type = typename entry_type::mapped_type;
 
-		// differs from different entry, interface for pmos structure
+		/* differs from different entry, interface for pmos structure */
 		static auto get_key(entry_type const &e)
 		{
 			return e.get_key();
@@ -144,5 +144,5 @@ public:
 		};
 	};
 
-	using entry_type = Element<key_type, mapped_type>;
+	using entry_type = element<key_type, mapped_type>;
 };

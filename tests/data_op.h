@@ -13,12 +13,12 @@
 #include "parlay/primitives.h"
 #include "parlay/sequence.h"
 #include "test_framework.h"
-///**********************************START*********************************///
+/************************************START***********************************/
 
-using Axis = uint64_t;
-Axis const kValueUB = 1'000'000'000;
+using axis = uint64_t;
+axis const k_value_ub = 1'000'000'000;
 int rand_seed = 1;
-// Axis const kValueUB = 1'000'000;
+/* Axis const k_value_ub = 1'000'000; */
 
 inline std::string toString(auto const &a)
 {
@@ -34,7 +34,7 @@ void PrintPoints(auto const &wp)
 	return;
 }
 
-void PrintToFile(std::string const &path, auto const &wp)
+void print_to_file(std::string const &path, auto const &wp)
 {
 	using entry_type =
 		typename std::remove_reference_t<decltype(wp)>::value_type;
@@ -45,7 +45,9 @@ void PrintToFile(std::string const &path, auto const &wp)
 
 	auto header = toString(gen_num) + " " + toString(gen_dim);
 
-	// NOTE: create a parlay::sequence<char> in order to call the writeSeqToFile
+	/*
+	 * NOTE: create a parlay::sequence<char> in order to call the writeSeqToFile
+	 */
 	auto wp_str = parlay::tabulate(wp.size(), [&](size_t i) {
 		std::string str;
 		str += std::to_string(wp[i].key) + " ";
@@ -53,18 +55,22 @@ void PrintToFile(std::string const &path, auto const &wp)
 						  decltype(wp)>::value_type::mapped_type>::value == 1) {
 			str += std::to_string(std::get<0>(wp[i].val)) + " ";
 		}
-		// for (int j = 0; std::cmp_less(j, gen_dim); j++) {
-		//   str += std::to_string(wp[i].pnt[j]) + " ";
-		// }
+		/*
+		 * for (int j = 0; std::cmp_less(j, gen_dim); j++) {
+		 *   str += std::to_string(wp[i].pnt[j]) + " ";
+		 * }
+		 */
 		parlay::sequence<char> cstr(str.begin(), str.end());
 		return cstr;
 	});
 
-	// NOTE: write to file in parallel
+	/* NOTE: write to file in parallel */
 	writeSeqToFile(header, wp_str, path.c_str());
 
-	// NOTE: sometimes parallel written cannot be finished correcly
-	// naive check for it
+	/*
+	 * NOTE: sometimes parallel written cannot be finished correcly
+	 * naive check for it
+	 */
 	std::ifstream file(path);
 	int lineCount = 0;
 	std::string line;
@@ -81,10 +87,12 @@ void PrintToFile(std::string const &path, auto const &wp)
 	return;
 }
 
-// NOTE: binary counterpart of PrintToFile. Writes the ".bin" format described
-// in binary_io.h (header [N, dim, width], values narrowed to 32-bit when the
-// data range fits).
-void PrintToBinaryFile(std::string const &path, auto const &wp)
+/*
+ * NOTE: binary counterpart of print_to_file. Writes the ".bin" format described
+ * in binary_io.h (header [N, dim, width], values narrowed to 32-bit when the
+ * data range fits).
+ */
+void print_to_binary_file(std::string const &path, auto const &wp)
 {
 	using entry_type =
 		typename std::remove_reference_t<decltype(wp)>::value_type;
@@ -92,15 +100,16 @@ void PrintToBinaryFile(std::string const &path, auto const &wp)
 	uint64_t const gen_num = wp.size();
 	uint64_t constexpr gen_dim =
 		1 + std::tuple_size_v<typename entry_type::mapped_type>;
-	static_assert(std::tuple_size_v<typename entry_type::mapped_type> == 1,
-				  "PrintToBinaryFile: only key + 1 value column is supported.");
+	static_assert(
+		std::tuple_size_v<typename entry_type::mapped_type> == 1,
+		"print_to_binary_file: only key + 1 value column is supported.");
 
 	auto payload = parlay::sequence<uint64_t>(gen_num * gen_dim);
 	parlay::parallel_for(0, gen_num, [&](size_t i) {
 		payload[i * gen_dim] = wp[i].key;
 		payload[(i * gen_dim) + 1] = std::get<0>(wp[i].val);
 	});
-	WriteBinaryEntries(path, gen_num, gen_dim, payload);
+	write_binary_entries(path, gen_num, gen_dim, payload);
 	return;
 }
 
@@ -108,33 +117,35 @@ template <typename Seq>
 auto bucketize(Seq const &data, size_t const numBuckets = 10)
 {
 	parlay::sequence<size_t> buckets(numBuckets, 0);
-	// Find min and max values
+	/* Find min and max values */
 	auto minVal = *std::min_element(data.begin(), data.end());
 	auto maxVal = *std::max_element(data.begin(), data.end());
 
-	// int const numBuckets = 10;
+	/* int const numBuckets = 10; */
 	auto range = maxVal - minVal;
 	auto bucketWidth = range / numBuckets;
 
-	// Count elements in each bucket
+	/* Count elements in each bucket */
 	for (auto val : data) {
 		int bucketIdx = static_cast<int>((val - minVal) / bucketWidth);
-		// if (bucketIdx == 0) {
-		//   std::cout << val << " ";
-		// }
-		// Handle edge case for maximum value
+		/*
+		 * if (bucketIdx == 0) {
+		 *   std::cout << val << " ";
+		 * }
+		 * Handle edge case for maximum value
+		 */
 		if (bucketIdx >= numBuckets)
 			bucketIdx = numBuckets - 1;
 		buckets[bucketIdx]++;
 	}
-	// std::flush(std::cout);
+	/* std::flush(std::cout); */
 
-	// Display results
+	/* Display results */
 	std::cout << std::scientific << std::setprecision(4);
 	std::cout << "Range: [" << minVal << ", " << maxVal << "]\n";
 	std::cout << "Bucket width: " << bucketWidth << "\n\n";
 
-	// for (int i = 0; i < numBuckets; i++) {
+	/* for (int i = 0; i < numBuckets; i++) { */
 	for (int i = 0; i < 10; i++) {
 		double lower = minVal + i * bucketWidth;
 		double upper = minVal + (i + 1) * bucketWidth;
@@ -151,9 +162,11 @@ auto bucketize(Seq const &data, size_t const numBuckets = 10)
 template <class Seq>
 auto SampleWeightedSeq(Seq &&weight_seq, size_t n)
 {
-	// std::random_device rd;      // a seed source for the random number engine
-	// std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
-	// std::uniform_int_distribution<int> distrib(1, kValueUB);
+	/*
+	 * std::random_device rd;      // a seed source for the random number engine
+	 * std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
+	 * std::uniform_int_distribution<int> distrib(1, k_value_ub);
+	 */
 
 	auto [cum_seq, total] = parlay::scan(weight_seq);
 	parlay::random_generator gen(rand_seed);
@@ -177,8 +190,10 @@ auto SupplySample(Seq const &current_seq, size_t extra_n, size_t l, size_t r)
 	std::set<size_t> selected_set;
 	auto sorted_seq = parlay::sort(current_seq);
 	while (selected_set.size() < extra_n) {
-		// std::cout << selected_set.size() << "/" << extra_n << "\n" << std::flush;
-		size_t idx = GetRandomIndex(l, r);
+		/*
+		 * std::cout << selected_set.size() << "/" << extra_n << "\n" << std::flush;
+		 */
+		size_t idx = get_random_index(l, r);
 		if (*std::lower_bound(sorted_seq.begin(), sorted_seq.end(), idx) !=
 				idx &&
 			selected_set.find(idx) == selected_set.end()) {
@@ -271,10 +286,10 @@ public:
 	}
 };
 
-template <typename entry_type, typename BaseDisFunc, typename BatchDisFunc>
+template <typename Entry, typename BaseDisFunc, typename BatchDisFunc>
 class Generator {
 public:
-	using entry_seq = parlay::sequence<entry_type>;
+	using entry_seq = parlay::sequence<Entry>;
 
 	static void validate(int batch_op, size_t base_n, size_t batch_n,
 						 auto const &base_k_seq, auto const &batch_k_seq)
@@ -320,15 +335,15 @@ public:
 
 	static entry_seq to_entry(parlay::sequence<size_t> const &key_seq)
 	{
-		// shuffle keys
+		/* shuffle keys */
 		auto rand_seq = parlay::random_shuffle(parlay::make_slice(key_seq));
 		return parlay::tabulate(key_seq.size(), [&](size_t i) {
-			if constexpr (std::is_same_v<typename entry_type::mapped_type,
+			if constexpr (std::is_same_v<typename Entry::mapped_type,
 										 std::tuple<>>) {
-				return entry_type{ .key = rand_seq[i] };
+				return Entry{ .key = rand_seq[i] };
 			} else if constexpr (std::tuple_size_v<
-									 typename entry_type::mapped_type> == 1) {
-				return entry_type{ .key = rand_seq[i], .val = { i } };
+									 typename Entry::mapped_type> == 1) {
+				return Entry{ .key = rand_seq[i], .val = { i } };
 			} else {
 				static_assert(
 					false,
@@ -341,9 +356,11 @@ public:
 	Discreatize(auto const &base_ran_seq, auto const &batch_ran_seq,
 				int batch_op)
 	{
-		// the first element is the random number
-		// the second element is the flag for base or batch
-		// the third is the numbered id
+		/*
+		 * the first element is the random number
+		 * the second element is the flag for base or batch
+		 * the third is the numbered id
+		 */
 		auto base_flag_seq = parlay::map(base_ran_seq, [&](double x) {
 			return std::make_tuple(x, bool(0), size_t(0));
 		});
@@ -351,14 +368,14 @@ public:
 			return std::make_tuple(x, bool(1), size_t(0));
 		});
 
-		// append both seq and sort
+		/* append both seq and sort */
 		auto ground_seq =
 			parlay::sort(parlay::append(base_flag_seq, batch_flag_seq),
 						 [&](auto const &a, auto const &b) {
 							 return std::get<0>(a) < std::get<0>(b);
 						 });
 
-		// assign id to the sorted sequence
+		/* assign id to the sorted sequence */
 		parlay::parallel_for(0, ground_seq.size(),
 							 [&](size_t i) { std::get<2>(ground_seq[i]) = i; });
 
@@ -396,47 +413,49 @@ public:
 	}
 };
 
-// template <class T>
-// parlay::sequence<T> exponential_generator(size_t n, double lambda) {
-//   printf("exponential distribution with lambda: %.10f\n", lambda);
-//   size_t cutoff = n;
-//   parlay::sequence<size_t> nums(cutoff + 1, 0);
-//
-//   parlay::parallel_for(0, cutoff, [&](size_t i) {
-//     nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
-//   });
-//   size_t tot = scan_inplace(make_slice(nums));
-//   assert(tot >= n);
-//
-//   parlay::sequence<T> seq(n);
-//   parlay::parallel_for(0, cutoff, [&](size_t i) {
-//     parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
-//       // seq[j] = _hash(static_cast<T>(i));
-//       seq[j] = i;
-//     });
-//   });
-//   return random_shuffle(seq);
-// }
-//
-// template <class T>
-// parlay::sequence<T> zipfian_generator(size_t n, double s) {
-//   printf("zipfian distribution with s: %f\n", s);
-//   size_t cutoff = n;
-//   auto harmonic = parlay::delayed_seq<double>(
-//       cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
-//   double sum = parlay::reduce(make_slice(harmonic));
-//   double v = n / sum;
-//   parlay::sequence<size_t> nums(cutoff + 1, 0);
-//   parlay::parallel_for(
-//       0, cutoff, [&](size_t i) { nums[i] = max(1.0, v / pow(i + 1, s)); });
-//   size_t tot = scan_inplace(make_slice(nums));
-//   assert(tot >= n);
-//   parlay::sequence<T> seq(n);
-//   parlay::parallel_for(0, cutoff, [&](size_t i) {
-//     parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
-//       // seq[j] = _hash(static_cast<T>(i));
-//       seq[j] = i;
-//     });
-//   });
-//   return random_shuffle(seq);
-// }
+/*
+ * template <class T>
+ * parlay::sequence<T> exponential_generator(size_t n, double lambda) {
+ *   printf("exponential distribution with lambda: %.10f\n", lambda);
+ *   size_t cutoff = n;
+ *   parlay::sequence<size_t> nums(cutoff + 1, 0);
+ *
+ *   parlay::parallel_for(0, cutoff, [&](size_t i) {
+ *     nums[i] = std::max(1.0, n * (lambda * exp(-lambda * (i + 0.5))));
+ *   });
+ *   size_t tot = scan_inplace(make_slice(nums));
+ *   assert(tot >= n);
+ *
+ *   parlay::sequence<T> seq(n);
+ *   parlay::parallel_for(0, cutoff, [&](size_t i) {
+ *     parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
+ *       // seq[j] = _hash(static_cast<T>(i));
+ *       seq[j] = i;
+ *     });
+ *   });
+ *   return random_shuffle(seq);
+ * }
+ *
+ * template <class T>
+ * parlay::sequence<T> zipfian_generator(size_t n, double s) {
+ *   printf("zipfian distribution with s: %f\n", s);
+ *   size_t cutoff = n;
+ *   auto harmonic = parlay::delayed_seq<double>(
+ *       cutoff, [&](size_t i) { return 1.0 / pow(i + 1, s); });
+ *   double sum = parlay::reduce(make_slice(harmonic));
+ *   double v = n / sum;
+ *   parlay::sequence<size_t> nums(cutoff + 1, 0);
+ *   parlay::parallel_for(
+ *       0, cutoff, [&](size_t i) { nums[i] = max(1.0, v / pow(i + 1, s)); });
+ *   size_t tot = scan_inplace(make_slice(nums));
+ *   assert(tot >= n);
+ *   parlay::sequence<T> seq(n);
+ *   parlay::parallel_for(0, cutoff, [&](size_t i) {
+ *     parlay::parallel_for(nums[i], min(n, nums[i + 1]), [&](size_t j) {
+ *       // seq[j] = _hash(static_cast<T>(i));
+ *       seq[j] = i;
+ *     });
+ *   });
+ *   return random_shuffle(seq);
+ * }
+ */

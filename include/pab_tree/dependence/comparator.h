@@ -10,16 +10,18 @@
 
 namespace pab_tree
 {
-//*----------- double precision comparision ----------------
-//* God made the integers, all else is the work of man.
-//* -- Leopold Kronecker
+/*
+ * ----------- double precision comparision ----------------
+ * God made the integers, all else is the work of man.
+ * -- Leopold Kronecker
+ */
 template <typename T>
 class numeric_comparator {
 public:
 	static bool gt(T const a, T const b)
 	{
 		if constexpr (std::is_floating_point_v<T>) {
-			return a - b > eps;
+			return a - b > k_eps;
 		} else {
 			return a > b;
 		}
@@ -28,7 +30,7 @@ public:
 	static bool lt(T const a, T const b)
 	{
 		if constexpr (std::is_floating_point_v<T>) {
-			return a - b < -eps;
+			return a - b < -k_eps;
 		} else {
 			return a < b;
 		}
@@ -37,7 +39,7 @@ public:
 	static bool eq(T const a, T const b)
 	{
 		if constexpr (std::is_floating_point_v<T>) {
-			return std::abs(a - b) < eps;
+			return std::abs(a - b) < k_eps;
 		} else {
 			return a == b;
 		}
@@ -69,9 +71,9 @@ public:
 	}
 
 private:
-	static constexpr T eps = std::numeric_limits<T>::epsilon();
+	static constexpr T k_eps = std::numeric_limits<T>::epsilon();
 };
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_DEPENDENCE_COMPARATOR_H_
+#endif /* PABTREE_DEPENDENCE_COMPARATOR_H_ */

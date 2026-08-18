@@ -1,10 +1,12 @@
 #pragma once
 
-// Binary ".bin" dataset format (little-endian):
-//   uint64_t header[3] = { N, dim, width }   width = bytes per value, 4 or 8
-//   N*dim values of `width` bytes each, row-major (key, val...).
-// Writers automatically narrow to 4-byte values when every value fits in
-// uint32_t; readers widen back to uint64_t transparently.
+/*
+ * Binary ".bin" dataset format (little-endian):
+ *   uint64_t header[3] = { N, dim, width }   width = bytes per value, 4 or 8
+ *   N*dim values of `width` bytes each, row-major (key, val...).
+ * Writers automatically narrow to 4-byte values when every value fits in
+ * uint32_t; readers widen back to uint64_t transparently.
+ */
 
 #include <cassert>
 #include <cstdint>
@@ -21,9 +23,9 @@
 #include "parlay/primitives.h"
 #include "parlay/sequence.h"
 
-inline void WriteBinaryEntries(std::string const &path, uint64_t n,
-							   uint64_t dim,
-							   parlay::sequence<uint64_t> const &payload)
+inline void write_binary_entries(std::string const &path, uint64_t n,
+								 uint64_t dim,
+								 parlay::sequence<uint64_t> const &payload)
 {
 	assert(payload.size() == n * dim);
 	uint64_t const max_v =
@@ -53,8 +55,8 @@ inline void WriteBinaryEntries(std::string const &path, uint64_t n,
 	out.close();
 }
 
-// Returns (N, dim, values) with 4-byte payloads widened back to uint64_t.
-inline auto ReadBinaryEntries(char const *path)
+/* Returns (N, dim, values) with 4-byte payloads widened back to uint64_t. */
+inline auto read_binary_entries(char const *path)
 	-> std::tuple<uint64_t, uint64_t, parlay::sequence<uint64_t>>
 {
 	std::ifstream fs(path, std::ios::binary);

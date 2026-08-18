@@ -1,5 +1,7 @@
-// Timothy Chan  12/05
-// approximate nearest neighbors: SSS method (static version)
+/*
+ * Timothy Chan  12/05
+ * approximate nearest neighbors: SSS method (static version)
+ */
 
 #include <limits.h>
 #include <math.h>
@@ -32,12 +34,12 @@ int cmp_shuffle(Point *p, Point *q)
 	return (*p)[j] - (*q)[j];
 }
 
-void SSS_preprocess(Point P[], int n)
+void sss_preprocess(Point cmd[], int n)
 {
 	shift = (int)(drand48() * MAX);
 	q1 = new int[d];
 	q2 = new int[d];
-	qsort((void *)P, n, sizeof(Point),
+	qsort((void *)cmd, n, sizeof(Point),
 		  (int (*)(void const *, void const *))cmp_shuffle);
 }
 
@@ -77,56 +79,56 @@ float dist_sq_to_box(Point q, Point p1, Point p2)
 	return z;
 }
 
-void SSS_query0(Point P[], int n, Point q)
+void sss_query0(Point cmd[], int n, Point q)
 {
 	if (n == 0)
 		return;
-	check_dist(P[n / 2], q);
-	if (n == 1 || dist_sq_to_box(q, P[0], P[n - 1]) * sq(1 + eps) > r_sq)
+	check_dist(cmd[n / 2], q);
+	if (n == 1 || dist_sq_to_box(q, cmd[0], cmd[n - 1]) * sq(1 + eps) > r_sq)
 		return;
-	if (cmp_shuffle(&q, &P[n / 2]) < 0) {
-		SSS_query0(P, n / 2, q);
-		if (cmp_shuffle(&q2, &P[n / 2]) > 0)
-			SSS_query0(P + n / 2 + 1, n - n / 2 - 1, q);
+	if (cmp_shuffle(&q, &cmd[n / 2]) < 0) {
+		sss_query0(cmd, n / 2, q);
+		if (cmp_shuffle(&q2, &cmd[n / 2]) > 0)
+			sss_query0(cmd + n / 2 + 1, n - n / 2 - 1, q);
 	} else {
-		SSS_query0(P + n / 2 + 1, n - n / 2 - 1, q);
-		if (cmp_shuffle(&q1, &P[n / 2]) < 0)
-			SSS_query0(P, n / 2, q);
+		sss_query0(cmd + n / 2 + 1, n - n / 2 - 1, q);
+		if (cmp_shuffle(&q1, &cmd[n / 2]) < 0)
+			sss_query0(cmd, n / 2, q);
 	}
 }
 
-Point SSS_query(Point P[], int n, Point q)
+Point sss_query(Point cmd[], int n, Point q)
 {
 	r_sq = FLT_MAX;
-	SSS_query0(P, n, q);
+	sss_query0(cmd, n, q);
 	return ans;
 }
 
 int main(int argc, char *argv[])
 {
 	int n, m, i, j;
-	Point *P, q;
+	Point *cmd, q;
 	eps = (argc == 2) ? atof(argv[1]) : 0;
 	cin >> n;
 	cin >> m;
 	cin >> d;
 	srand48(12121 + n + m + d);
-	P = new Point[n];
+	cmd = new Point[n];
 	q = new int[d];
 	for (i = 0; i < n; i++) {
-		P[i] = new int[d];
+		cmd[i] = new int[d];
 		for (j = 0; j < d; j++)
-			cin >> P[i][j];
+			cin >> cmd[i][j];
 	}
-	SSS_preprocess(P, n);
+	sss_preprocess(cmd, n);
 	for (i = 0; i < m; i++) {
 		for (j = 0; j < d; j++)
 			cin >> q[j];
-		SSS_query(P, n, q);
+		sss_query(cmd, n, q);
 		cout << r << "\n";
 	}
 	for (i = 0; i < n; i++)
-		delete P[i];
-	delete P;
+		delete cmd[i];
+	delete cmd;
 	delete q;
 }

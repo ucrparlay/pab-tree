@@ -30,9 +30,9 @@ namespace pab_tree
 struct alloc_normal_leaf_tag {};
 struct alloc_empty_leaf_tag {};
 
-template <typename TypeTrait>
-struct leaf_node : TypeTrait::node_type {
-	using type_trait = TypeTrait;
+template <typename TT>
+struct leaf_node : TT::node_type {
+	using type_trait = TT;
 	using node_type = type_trait::node_type;
 	using entry_type = typename type_trait::entry_type;
 	using key_type = typename type_trait::key_type;
@@ -50,7 +50,7 @@ struct leaf_node : TypeTrait::node_type {
 #endif
 		);
 
-	// default allocator
+	/* default allocator */
 	leaf_node()
 		: node_type{ true, static_cast<size_t>(0) }
 		, aug(aug_type())
@@ -65,24 +65,26 @@ struct leaf_node : TypeTrait::node_type {
 	{
 	}
 
-	// alloc a leaf with default size
-	template <typename Range>
-	leaf_node(Range In, alloc_normal_leaf_tag)
-		: node_type{ true, static_cast<size_t>(In.size()) }
-		, aug(aug_type(In))
+	/* alloc a leaf with default size */
+	template <typename R>
+	leaf_node(R in, alloc_normal_leaf_tag)
+		: node_type{ true, static_cast<size_t>(in.size()) }
+		, aug(aug_type(in))
 		, is_sorted{ true }
 	{
 		static_assert(!node_has_non_trivial_aug<aug_type> ||
-						  leaf_aug_constructible_from<aug_type, Range>,
+						  leaf_aug_constructible_from<aug_type, R>,
 					  "leaf augmentation needs a constructor taking the "
 					  "leaf's entries");
-		assert(In.size() <= type_trait::k_buf_ub);
+		assert(in.size() <= type_trait::k_buf_ub);
 		assert(parlay::is_sorted(
-			In, [](auto a, auto b) { return type_trait::entry_less(a, b); }));
-		// elements is left default-initialised: copy_n fills [0, size)
-		// and nothing reads past it. Value-initialising the whole
-		// k_buf_ub array here cost more than the copy.
-		std::ranges::copy_n(In.begin(), In.size(), elements.begin());
+			in, [](auto a, auto b) { return type_trait::entry_less(a, b); }));
+		/*
+		 * elements is left default-initialised: copy_n fills [0, size)
+		 * and nothing reads past it. Value-initialising the whole
+		 * k_buf_ub array here cost more than the copy.
+		 */
+		std::ranges::copy_n(in.begin(), in.size(), elements.begin());
 	}
 
 	[[nodiscard]] bool capacity_full() const
@@ -90,7 +92,7 @@ struct leaf_node : TypeTrait::node_type {
 		return this->size >= type_trait::k_buf_ub;
 	}
 
-	// return the first idx s.t. entry_traits::get_key(elements[idx]) >= k
+	/* return the first idx s.t. entry_traits::get_key(elements[idx]) >= k */
 	auto binary_search_key(key_type const &k) const
 	{
 		assert(this->is_sorted);
@@ -102,7 +104,7 @@ struct leaf_node : TypeTrait::node_type {
 			});
 	}
 
-	// return the first idx s.t. entry_traits::get_key(elements[idx]) > k
+	/* return the first idx s.t. entry_traits::get_key(elements[idx]) > k */
 	auto binary_search_key_exclusive(key_type const k) const
 	{
 		assert(this->is_sorted);
@@ -185,16 +187,18 @@ struct leaf_node : TypeTrait::node_type {
 		return aug;
 	}
 
-	// TODO: should put this one in the aug as well and don't use the
-	// monostate
-	template <typename Range>
-	void update_aug(Range In)
+	/*
+	 * TODO: should put this one in the aug as well and don't use the
+	 * monostate
+	 */
+	template <typename R>
+	void update_aug(R in)
 	{
 		if constexpr (node_has_non_trivial_aug<aug_type>) {
-			static_assert(leaf_aug_updatable_with<aug_type, Range>,
+			static_assert(leaf_aug_updatable_with<aug_type, R>,
 						  "leaf augmentation needs "
 						  "update_aug(range-of-entries)");
-			aug.update_aug(In);
+			aug.update_aug(in);
 		}
 	}
 
@@ -208,40 +212,37 @@ struct leaf_node : TypeTrait::node_type {
 	bool is_sorted;
 };
 
-// Alloc a leaf
-template <typename Range, typename leaf_type>
-static leaf_type *alloc_normal_leaf_node(Range In)
+/* Alloc a leaf */
+template <typename R, typename LeafType>
+static LeafType *alloc_normal_leaf_node(R in)
 {
-	leaf_type *o =
-		leaf_type::type_trait::node_alloc::template alloc<leaf_type>();
-	new (o) leaf_type(In, alloc_normal_leaf_tag());
+	LeafType *o = LeafType::type_trait::node_alloc::template alloc<LeafType>();
+	new (o) LeafType(in, alloc_normal_leaf_tag());
 	return o;
 }
 
-// Alloc a empty leaf_type
-template <typename leaf_type>
-static leaf_type *alloc_empty_leaf_node()
+/* Alloc an empty leaf */
+template <typename LeafType>
+static LeafType *alloc_empty_leaf_node()
 {
-	leaf_type *o =
-		leaf_type::type_trait::node_alloc::template alloc<leaf_type>();
-	new (o) leaf_type();
+	LeafType *o = LeafType::type_trait::node_alloc::template alloc<LeafType>();
+	new (o) LeafType();
 	return o;
 }
 
-// Alloc a empty leaf_type, but set the aug by hand
-template <typename leaf_type>
-static leaf_type *alloc_empty_leaf_node(typename leaf_type::aug_type const &aug)
+/* Alloc an empty leaf, but set the aug by hand */
+template <typename LeafType>
+static LeafType *alloc_empty_leaf_node(typename LeafType::aug_type const &aug)
 {
-	leaf_type *o =
-		leaf_type::type_trait::node_alloc::template alloc<leaf_type>();
-	new (o) leaf_type(aug);
+	LeafType *o = LeafType::type_trait::node_alloc::template alloc<LeafType>();
+	new (o) LeafType(aug);
 	return o;
 }
 
-// multi-way node whose children # is fixed
-template <typename TypeTrait>
-struct multi_way_node : TypeTrait::node_type {
-	using type_trait = TypeTrait;
+/* multi-way node whose children # is fixed */
+template <typename TT>
+struct multi_way_node : TT::node_type {
+	using type_trait = TT;
 	using node_type = type_trait::node_type;
 	using buf_size_type = typename type_trait::buf_size_type;
 
@@ -250,7 +251,7 @@ struct multi_way_node : TypeTrait::node_type {
 		buf_size_type a = 0;
 		auto temp = type_trait::k_buf_ub;
 		while (temp > 1) {
-			temp >>= 1; // divide by 2
+			temp >>= 1; /* divide by 2 */
 			a++;
 		}
 		return a;
@@ -321,7 +322,7 @@ struct multi_way_node : TypeTrait::node_type {
 		return node_n == 0 ? 0 : node_n - 1;
 	}
 
-	// Same accessors leaf_node exposes.
+	/* Same accessors leaf_node exposes. */
 	type_trait::interior_aug const &get_aug() const
 	{
 		return aug;
@@ -351,8 +352,10 @@ struct multi_way_node : TypeTrait::node_type {
 	type_trait::buf_size_type
 	get_node_id_containing_key(type_trait::key_type const k) const
 	{
-		// return the first idx s.t. split[idx] > k
-		// i.e.: if split[1] == k, then k belongs to tree_nodes[2]
+		/*
+		 * return the first idx s.t. split[idx] > k
+		 * i.e.: if split[1] == k, then k belongs to tree_nodes[2]
+		 */
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			this->get_split_slice(), [&](type_trait::key_type const key) {
 				return !type_trait::key_less(k, key);
@@ -362,8 +365,10 @@ struct multi_way_node : TypeTrait::node_type {
 	type_trait::buf_size_type
 	get_node_id_containing_key_exclusive(type_trait::key_type const k) const
 	{
-		// return the first idx s.t. split[idx] >= k
-		// i.e.: if split[1] == k, then k belongs to tree_nodes[1]
+		/*
+		 * return the first idx s.t. split[idx] >= k
+		 * i.e.: if split[1] == k, then k belongs to tree_nodes[1]
+		 */
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			this->get_split_slice(), [&](type_trait::key_type const key) {
 				return type_trait::key_less(key, k);
@@ -374,9 +379,9 @@ struct multi_way_node : TypeTrait::node_type {
 							  type_trait::key_type const k) const
 	{
 		if (this->get_split_n() == 0) {
-			return true; // one child: every key belongs to it
+			return true; /* one child: every key belongs to it */
 		}
-		// a >= b is !(a < b); a < b is key_less directly.
+		/* a >= b is !(a < b); a < b is key_less directly. */
 		return node_idx == 0 ?
 				   type_trait::key_less(k, this->split.front()) :
 				   (node_idx == this->get_split_n() ?
@@ -392,57 +397,59 @@ struct multi_way_node : TypeTrait::node_type {
 	type_trait::interior_aug aug;
 };
 
-template <typename interior_type, typename type_trait>
-static interior_type *
-alloc_interior_node(typename type_trait::node_seq const &tree_nodes,
-					typename type_trait::split_seq const &split)
+template <typename InteriorType, typename TT>
+static InteriorType *
+alloc_interior_node(typename TT::node_seq const &tree_nodes,
+					typename TT::split_seq const &split)
 {
-	interior_type *o =
-		interior_type::type_trait::node_alloc::template alloc<interior_type>();
-	new (o) interior_type(tree_nodes, split);
+	InteriorType *o =
+		InteriorType::type_trait::node_alloc::template alloc<InteriorType>();
+	new (o) InteriorType(tree_nodes, split);
 	return o;
 }
 
-template <typename interior_type, typename type_trait>
-static interior_type *
-alloc_interior_node(typename type_trait::node_slice tree_nodes_slice,
-					typename type_trait::split_slice split_slice)
+template <typename InteriorType, typename TT>
+static InteriorType *
+alloc_interior_node(typename TT::node_slice tree_nodes_slice,
+					typename TT::split_slice split_slice)
 {
-	interior_type *o =
-		interior_type::type_trait::node_alloc::template alloc<interior_type>();
-	new (o) interior_type(tree_nodes_slice, split_slice);
+	InteriorType *o =
+		InteriorType::type_trait::node_alloc::template alloc<InteriorType>();
+	new (o) InteriorType(tree_nodes_slice, split_slice);
 	return o;
 }
 
-// TODO: maybe replace the node_arr, ST, and aug_type with template parameters
-template <typename interior_type, typename type_trait>
-static interior_type *
-alloc_interior_node(typename type_trait::node_slice const &tree_nodes,
-					typename type_trait::split_seq const &split,
-					typename type_trait::interior_aug const &aug)
+/*
+ * TODO: maybe replace the node_arr, ST, and aug_type with template parameters
+ */
+template <typename InteriorType, typename TT>
+static InteriorType *
+alloc_interior_node(typename TT::node_slice const &tree_nodes,
+					typename TT::split_seq const &split,
+					typename TT::interior_aug const &aug)
 {
-	interior_type *o =
-		interior_type::type_trait::node_alloc::template alloc<interior_type>();
-	new (o) interior_type(tree_nodes, split, aug);
+	InteriorType *o =
+		InteriorType::type_trait::node_alloc::template alloc<InteriorType>();
+	new (o) InteriorType(tree_nodes, split, aug);
 	return o;
 }
 
-template <typename interior_type, typename type_trait>
-static interior_type *alloc_interior_node()
+template <typename InteriorType, typename TT>
+static InteriorType *alloc_interior_node()
 {
-	interior_type *o =
-		interior_type::type_trait::node_alloc::template alloc<interior_type>();
-	new (o) interior_type();
+	InteriorType *o =
+		InteriorType::type_trait::node_alloc::template alloc<InteriorType>();
+	new (o) InteriorType();
 	return o;
 }
 
 template <typename NodeType>
-static void free_node(auto T)
+static void free_node(auto node)
 {
 	NodeType::type_trait::node_alloc::template free<NodeType>(
-		static_cast<NodeType *>(T));
+		static_cast<NodeType *>(node));
 }
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_DEPENDENCE_TREE_NODE_H_
+#endif /* PABTREE_DEPENDENCE_TREE_NODE_H_ */

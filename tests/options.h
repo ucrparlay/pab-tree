@@ -19,7 +19,7 @@ struct Options {
 		this->temporal_graph = params.getOptionIntValue("-G", 0);
 	}
 
-	void PrintOptions() const
+	void print_options() const
 	{
 		std::cout << "InputFile: "
 				  << std::filesystem::path(input_file_path).filename().string()
@@ -27,10 +27,10 @@ struct Options {
 		std::cout << "Dis: " << this->dis_type << "; ";
 	}
 
-	static auto ExtractPrefixes(std::string const &path)
+	static auto extract_prefixes(std::string const &path)
 		-> std::pair<std::string, std::string>
 	{
-		// locate pivot: first occurrence of "/ins/" or "/del/"
+		/* locate pivot: first occurrence of "/ins/" or "/del/" */
 		size_t posIns = path.find("/ins/");
 		size_t posDel = path.find("/del/");
 		size_t pivot = std::string::npos;
@@ -43,19 +43,19 @@ struct Options {
 		}
 
 		if (pivot == std::string::npos) {
-			// pattern not found
+			/* pattern not found */
 			return { "", "" };
 		}
 
-		// directory prefix (up to just before /ins/ or /del/)
+		/* directory prefix (up to just before /ins/ or /del/) */
 		std::string dirPrefix = path.substr(0, pivot) + "/";
 
-		// filename part
+		/* filename part */
 		size_t lastSlash = path.find_last_of('/');
 		std::string filename = (lastSlash == std::string::npos) ?
 								   path :
 								   path.substr(lastSlash + 1);
-		// strip extensions
+		/* strip extensions */
 		auto strip_suffix = [](std::string &s, std::string const &suf) {
 			if (s.size() >= suf.size() &&
 				s.compare(s.size() - suf.size(), suf.size(), suf) == 0) {
@@ -65,49 +65,57 @@ struct Options {
 		strip_suffix(filename, ".bin");
 		strip_suffix(filename, ".in");
 		strip_suffix(filename, ".base");
-		// NOTE: ".batch" too, so -p can point at a batch file. The incremental
-		// datasets (incre_data_generator) name both the insert and the delete
-		// stream "<i>.batch.<ext>" -- there is no base/batch pair there, the whole
-		// file IS the batch stream. Without this the prefix comes out as
-		// "<i>.batch" and every derived path becomes "<i>.batch.base.<ext>".
+		/*
+		 * NOTE: ".batch" too, so -p can point at a batch file. The incremental
+		 * datasets (incre_data_generator) name both the insert and the delete
+		 * stream "<i>.batch.<ext>" -- there is no base/batch pair there, the whole
+		 * file IS the batch stream. Without this the prefix comes out as
+		 * "<i>.batch" and every derived path becomes "<i>.batch.base.<ext>".
+		 */
 		strip_suffix(filename, ".batch");
 
 		return { dirPrefix, filename };
 	}
 
-	// NOTE: derived base/batch paths inherit the input file's extension, so a
-	// ".bin" input selects ".bin" batch files (read via ReadEntriesBinary)
-	[[nodiscard]] auto InputExtension() const -> std::string
+	/*
+	 * NOTE: derived base/batch paths inherit the input file's extension, so a
+	 * ".bin" input selects ".bin" batch files (read via read_entries_binary)
+	 */
+	[[nodiscard]] auto input_extension() const -> std::string
 	{
 		return input_file_path.ends_with(".bin") ? ".bin" : ".in";
 	}
 
-	[[nodiscard]] auto ParseInsertBatchPath(double batch_ratio) const
+	[[nodiscard]] auto parse_insert_batch_path(double batch_ratio) const
 		-> std::pair<std::string, std::string>
 	{
-		// PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
-		// PARA: dir_pre: ../kdtree/uni/1000000_1/
-		// PARA: file_pre: 1
-		auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
+		/*
+		 * PARA: /ssd1/zmen002/kv_pair/uni/1000000_1/ins/100"
+		 * PARA: dir_pre: ../kdtree/uni/1000000_1/
+		 * PARA: file_pre: 1
+		 */
+		auto [dir_prefix, file_prefix] =
+			extract_prefixes(this->input_file_path);
 		std::string base_path =
 			dir_prefix + "ins/" +
 			std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
-			file_prefix + ".base" + InputExtension();
+			file_prefix + ".base" + input_extension();
 
 		std::string batch_path = base_path;
 		batch_path.replace(batch_path.find(".base."), 6, ".batch.");
 		return std::make_pair(base_path, batch_path);
 	}
 
-	[[nodiscard]] auto ParseDeleteBatchPath(double batch_ratio) const
+	[[nodiscard]] auto parse_delete_batch_path(double batch_ratio) const
 		-> std::pair<std::string, std::string>
 	{
-		// NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in
-		auto [dir_prefix, file_prefix] = ExtractPrefixes(this->input_file_path);
+		/* NOTE: ../kdtree/uni/1000000_1/ins/10/1.base.in */
+		auto [dir_prefix, file_prefix] =
+			extract_prefixes(this->input_file_path);
 		std::string base_path =
 			dir_prefix + "del/" +
 			std::to_string(static_cast<size_t>(1 / batch_ratio)) + "/" +
-			file_prefix + ".base" + InputExtension();
+			file_prefix + ".base" + input_extension();
 
 		std::string batch_path = base_path;
 		batch_path.replace(batch_path.find(".base."), 6, ".batch.");
@@ -115,7 +123,7 @@ struct Options {
 		return std::make_pair(base_path, batch_path);
 	}
 
-	void PrintOptionValue() const
+	void print_option_value() const
 	{
 		std::cout << "Options: " << std::endl;
 		std::cout << "val_n: " << val_n << std::endl;
@@ -135,7 +143,7 @@ struct Options {
 	int rounds;
 	int query_type;
 	bool summary;
-	double batch_ratio; // decides the default batch file path
+	double batch_ratio; /* decides the default batch file path */
 	int tree_type;
 	int temporal_graph;
 	std::string dis_type;

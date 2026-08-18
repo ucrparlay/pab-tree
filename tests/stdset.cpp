@@ -2,29 +2,29 @@
 
 #include "baselines/stdset.h"
 
-template <typename TypeTrait>
-struct StdSetWrapper {
-	using TreeType = typename StdSetTree::StdSetRaw<TypeTrait>;
+template <typename TT>
+struct stdset_wrapper {
+	using tree_type = typename StdSetTree::stdset_raw<TT>;
 };
 
 template <typename Options, typename RunFunc>
-void ApplyStdSet(Options const &opts, RunFunc test_func)
+void apply_stdset(Options const &opts, RunFunc test_func)
 {
 #if defined(DYNAMIC_GRAPH)
-	using Wrapper = Wrapper<uint64_t, uint32_t>;
+	using wrapper = wrapper<uint64_t, uint32_t>;
 #elif defined(OSM)
-	using Wrapper = Wrapper<uint64_t, uint32_t>;
+	using wrapper = wrapper<uint64_t, uint32_t>;
 #else
-	using Wrapper = Wrapper<uint32_t, uint32_t>;
+	using wrapper = wrapper<uint32_t, uint32_t>;
 #endif
 
-	using key_type = Wrapper::key_type;
-	using mapped_type = Wrapper::mapped_type;
-	using entry_type = Wrapper::entry_type;
-	using TypeTrait = pab_tree::btree_type_trait<
-		Wrapper::ElementWrapper<entry_type>, 16, Wrapper::LeafAugEmpty,
-		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
-	Run<StdSetWrapper<TypeTrait>>(opts, test_func);
+	using key_type = wrapper::key_type;
+	using mapped_type = wrapper::mapped_type;
+	using entry_type = wrapper::entry_type;
+	using TT = pab_tree::btree_type_trait<
+		wrapper::element_wrapper<entry_type>, 16, wrapper::leaf_aug_empty,
+		wrapper::interior_aug_empty, pab_tree::proto_node>;
+	Run<stdset_wrapper<TT>>(opts, test_func);
 }
 
 int main(int argc, char *argv[])
@@ -32,16 +32,16 @@ int main(int argc, char *argv[])
 	commandLine params(argc, argv);
 	Options opts(params);
 
-	auto test_func = []<class TreeDesc, typename TypeTrait, typename Options>(
-						 Options &opts) {
+	auto test_func =
+		[]<class TreeDesc, typename TT, typename Options>(Options &opts) {
 
-	};
+		};
 
 #if defined(DYNAMIC_GRAPH) || defined(OSM)
-	ApplyStdSet(opts, TestTemporalGraph);
+	apply_stdset(opts, TestTemporalGraph);
 #else
-	ApplyStdSet(opts, DefaultTestFunc);
-#endif // DYNAMIC_GRAPH
+	apply_stdset(opts, DefaultTestFunc);
+#endif /* DYNAMIC_GRAPH */
 
 	return 0;
 }

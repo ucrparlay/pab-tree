@@ -9,8 +9,8 @@
 
 namespace pab_tree
 {
-template <typename type_trait>
-void btree<type_trait>::delete_tree()
+template <typename TT>
+void btree<TT>::delete_tree()
 {
 	if (this->root_ == nullptr) {
 		return;
@@ -19,31 +19,33 @@ void btree<type_trait>::delete_tree()
 	this->root_ = nullptr;
 }
 
-template <typename type_trait>
-template <bool granularity>
-void btree<type_trait>::delete_tree_rec(node_type *T)
+template <typename TT>
+template <bool Granularity>
+void btree<TT>::delete_tree_rec(node_type *node)
 {
-	if (T == nullptr) {
+	if (node == nullptr) {
 		return;
 	}
-	if (T->is_leaf) {
-		free_node<leaf_type>(T);
+	if (node->is_leaf) {
+		free_node<leaf_type>(node);
 	} else {
-		auto TI = static_cast<interior_type *>(T);
+		auto interior = static_cast<interior_type *>(node);
 
-		// enable granularity control by default, if it is
-		// disabled, always delete in parallel
+		/*
+		 * enable granularity control by default, if it is
+		 * disabled, always delete in parallel
+		 */
 		parlay::parallel_for(
-			0, TI->get_node_n(),
-			[&](size_t i) { delete_tree_rec(TI->tree_nodes[i]); },
-			// WARN: the granularity control may not work well here
-			force_parallel_recursion<granularity>(TI) ?
+			0, interior->get_node_n(),
+			[&](size_t i) { delete_tree_rec(interior->tree_nodes[i]); },
+			/* WARN: the granularity control may not work well here */
+			force_parallel_recursion<Granularity>(interior) ?
 				1 :
 				interior_type::type_trait::k_buf_ub);
 
-		free_node<interior_type>(T);
+		free_node<interior_type>(node);
 	}
 }
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_
+#endif /* PABTREE_B_TREE_IMPL_BATCH_OP_B_DELETE_TREE_HPP_ */

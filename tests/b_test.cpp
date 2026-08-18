@@ -1,16 +1,16 @@
 #include "test_framework.h"
 #include <cstdint>
 
-// NOTE: Trees
-template <typename TypeTrait>
-struct BTreeWrapper {
-	using TreeType = typename pab_tree::btree<TypeTrait>;
+/* NOTE: Trees */
+template <typename TT>
+struct btree_wrapper {
+	using tree_type = typename pab_tree::btree<TT>;
 };
 
 template <typename Options, typename RunFunc>
-static void ApplyOrthogonal(Options const &opts, RunFunc test_func)
+static void apply_orthogonal(Options const &opts, RunFunc test_func)
 {
-	// using EleType = Element<uint32_t, uint32_t>;
+	/* using EleType = Element<uint32_t, uint32_t>; */
 #ifdef LEAF1
 	static constexpr uint const k_buf = 1;
 #elif defined(LEAF2)
@@ -34,26 +34,26 @@ static void ApplyOrthogonal(Options const &opts, RunFunc test_func)
 #elif defined(LEAF1024)
 	static constexpr uint const k_buf = 1024;
 #else
-	static constexpr uint const k_buf = 64; // Default
-#endif // LEAF1
+	static constexpr uint const k_buf = 64; /* Default */
+#endif /* LEAF1 */
 
 #if defined(DYNAMIC_GRAPH)
-	using Wrapper = Wrapper<uint64_t, uint32_t>;
+	using wrapper = wrapper<uint64_t, uint32_t>;
 #elif defined(OSM)
-	// using Wrapper = Wrapper<std::pair<uint64_t, uint64_t>, uint32_t>;
-	using Wrapper = Wrapper<uint64_t, uint32_t>;
+	/* using wrapper = wrapper<std::pair<uint64_t, uint64_t>, uint32_t>; */
+	using wrapper = wrapper<uint64_t, uint32_t>;
 #else
-	using Wrapper = Wrapper<uint32_t, uint32_t>;
+	using wrapper = wrapper<uint32_t, uint32_t>;
 #endif
 
-	using key_type [[maybe_unused]] = Wrapper::key_type;
-	using mapped_type [[maybe_unused]] = Wrapper::mapped_type;
-	using entry_type = Wrapper::entry_type;
-	using TypeTrait = pab_tree::btree_type_trait<
-		Wrapper::ElementWrapper<entry_type>, k_buf, Wrapper::LeafAugEmpty,
-		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
+	using key_type [[maybe_unused]] = wrapper::key_type;
+	using mapped_type [[maybe_unused]] = wrapper::mapped_type;
+	using entry_type = wrapper::entry_type;
+	using TT = pab_tree::btree_type_trait<
+		wrapper::element_wrapper<entry_type>, k_buf, wrapper::leaf_aug_empty,
+		wrapper::interior_aug_empty, pab_tree::proto_node>;
 	if (opts.tree_type == 0) {
-		Run<BTreeWrapper<TypeTrait>>(opts, test_func);
+		Run<btree_wrapper<TT>>(opts, test_func);
 	}
 }
 
@@ -63,10 +63,10 @@ int main(int argc, char *argv[])
 	Options opts(params);
 
 #if defined(DYNAMIC_GRAPH) || defined(OSM)
-	ApplyOrthogonal(opts, TestTemporalGraph);
+	apply_orthogonal(opts, TestTemporalGraph);
 #else
-	ApplyOrthogonal(opts, DefaultTestFunc);
-#endif // DYNAMIC_GRAPH
+	apply_orthogonal(opts, DefaultTestFunc);
+#endif /* DYNAMIC_GRAPH */
 
 	return EXIT_SUCCESS;
 }

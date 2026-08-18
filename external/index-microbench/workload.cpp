@@ -541,18 +541,18 @@ run_rdtsc_benchmark(int index_type, int thread_num, int key_num)
   return;
 }
 
-template<typename TypeTrait>
+template<typename TT>
 struct MassTreeWrapper
 {
-  // using TreeType = typename CPAMTree::CpamRaw<TypeTrait>;
+  // using tree_type = typename CPAMTree::cpam_raw<TT>;
 };
-template<typename TypeTrait>
+template<typename TT>
 struct BwTreeWrapper
 {
-  // using TreeType = typename PAMTree::PamRaw<TypeTrait>;
+  // using tree_type = typename PAMTree::PamRaw<TT>;
 };
 
-template<int kPrint>
+template<int Print>
 void
 ConDelete(auto num_thread, auto idx, const auto& wp)
 {
@@ -566,7 +566,7 @@ ConDelete(auto num_thread, auto idx, const auto& wp)
 
     int gc_counter = 0;
     for (size_t i = start_index; i < end_index; i++) {
-      idx->remove(wp[i].GetKey(), wp[i].GetVal(), ti);
+      idx->remove(wp[i].get_key(), wp[i].get_val(), ti);
       gc_counter++;
       if (gc_counter % 4096 == 0) {
         ti->rcu_quiesce();
@@ -582,12 +582,12 @@ ConDelete(auto num_thread, auto idx, const auto& wp)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func, false);
   t.stop();
-  if constexpr (kPrint) {
+  if constexpr (Print) {
     std::cout << t.total_time() << " " << std::flush;
   }
 }
 
-template<int kPrint>
+template<int Print>
 void
 ConInsert(auto num_thread, auto idx, const auto& wp)
 {
@@ -601,7 +601,7 @@ ConInsert(auto num_thread, auto idx, const auto& wp)
 
     int gc_counter = 0;
     for (size_t i = start_index; i < end_index; i++) {
-      idx->insert(wp[i].GetKey(), wp[i].GetVal(), ti);
+      idx->insert(wp[i].get_key(), wp[i].get_val(), ti);
       gc_counter++;
       if (gc_counter % 4096 == 0) {
         ti->rcu_quiesce();
@@ -617,12 +617,12 @@ ConInsert(auto num_thread, auto idx, const auto& wp)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func, false);
   t.stop();
-  if constexpr (kPrint) {
+  if constexpr (Print) {
     std::cout << t.total_time() << " " << std::flush;
   }
 }
 
-template<int kPrint>
+template<int Print>
 auto
 ConBuild(auto num_thread, int index_type, const auto& wp)
 {
@@ -630,12 +630,12 @@ ConBuild(auto num_thread, int index_type, const auto& wp)
   Index<keytype, keycomp>* idx =
     getInstance<keytype, keycomp>(index_type, key_type);
 
-  ConInsert<kPrint>(num_thread, idx, wp);
+  ConInsert<Print>(num_thread, idx, wp);
 
   return idx;
 }
 
-template<int kPrint = 1>
+template<int Print = 1>
 double
 ConMembership(auto num_thread, auto idx, const auto& query_ele)
 {
@@ -670,13 +670,13 @@ ConMembership(auto num_thread, auto idx, const auto& query_ele)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  if constexpr (kPrint) {
+  if constexpr (Print) {
     std::cout << t.total_time() << " " << std::flush;
   }
   return t.total_time();
 }
 
-template<int kPrint = 1>
+template<int Print = 1>
 double
 ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
 {
@@ -708,7 +708,7 @@ ConRangeCount(auto num_thread, auto idx, auto const& query_box_seq)
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  if constexpr (kPrint) {
+  if constexpr (Print) {
     std::cout << t.total_time() << " " << std::flush;
   }
   return t.total_time();
@@ -742,7 +742,7 @@ ConRangeQuerySerialWithLog(auto idx,
   ti->rcu_quiesce();
 }
 
-template<int kPrint = 1>
+template<int Print = 1>
 double
 ConRangeQuery(auto num_thread,
               auto idx,
@@ -790,7 +790,7 @@ ConRangeQuery(auto num_thread,
   t.reset(), t.start();
   StartThreads(idx, num_thread, func2, false);
   t.stop();
-  if constexpr (kPrint) {
+  if constexpr (Print) {
     std::cout << t.total_time() << " " << std::flush;
   }
   return t.total_time();
@@ -902,7 +902,7 @@ ConInsertByStep(auto num_thread,
         size_t const lo = (in.size() * tid) / num_thread;
         size_t const hi = (in.size() * (tid + 1)) / num_thread;
         for (size_t i = lo; i < hi; i++) {
-          idx->insert(in[i].GetKey(), in[i].GetVal(), ti);
+          idx->insert(in[i].get_key(), in[i].get_val(), ti);
           if (++counter % 4096 == 0) {
             ti->rcu_quiesce();
           }
@@ -955,7 +955,7 @@ ConDeleteByStep(auto num_thread,
         size_t const lo = (in.size() * tid) / num_thread;
         size_t const hi = (in.size() * (tid + 1)) / num_thread;
         for (size_t i = lo; i < hi; i++) {
-          idx->remove(in[i].GetKey(), in[i].GetVal(), ti);
+          idx->remove(in[i].get_key(), in[i].get_val(), ti);
           if (++counter % 4096 == 0) {
             ti->rcu_quiesce();
           }
@@ -982,7 +982,7 @@ ConDeleteByStep(auto num_thread,
 // order as incre_update_query in tests/test_framework.h: three membership
 // passes, then range query, then range count. The masstree carve-outs are the
 // same ones the query_type lambdas in ApplyConcurrentIndex use.
-template<typename TT>
+template<typename type_trait>
 void
 ConQueryAfterStep(auto num_thread,
                   auto idx,
@@ -993,13 +993,13 @@ ConQueryAfterStep(auto num_thread,
   // NOTE: ratio over the whole input, matching incre_update_query in
   // tests/test_framework.h.
   auto const batch_size = static_cast<size_t>(
-    (entry_in_tree.size() + entry_not_in_tree.size()) * kMemberQueryRatio);
+    (entry_in_tree.size() + entry_not_in_tree.size()) * k_member_query_ratio);
 
   auto membership = [&](auto const& ele) {
     ConMembership(
       num_thread,
       idx,
-      parlay::map(ele, [](auto const& e) { return e.GetKey(); }));
+      parlay::map(ele, [](auto const& e) { return e.get_key(); }));
   };
 
   // NOTE: one membership pass, the mix -- both halves put together, shuffled,
@@ -1013,40 +1013,40 @@ ConQueryAfterStep(auto num_thread,
   membership(shuffled.cut(0, batch_size));
 
   // NOTE: rectangle type 1 only, again matching test_framework.h.
-  // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+  // for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
   {
     int const rec_type = 1;
     auto [query_box_seq, max_size] =
-      GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
-    ConRangeQuery(num_thread, idx, index_type, kRangeQueryNum, query_box_seq);
+      gen_rectangles<type_trait, false, false>(k_range_query_num, rec_type, entry_in_tree);
+    ConRangeQuery(num_thread, idx, index_type, k_range_query_num, query_box_seq);
   }
 
-  // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+  // for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
   {
     int const rec_type = 1;
     auto [query_box_seq, max_size] =
-      GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, entry_in_tree);
+      gen_rectangles<type_trait, false, false>(k_range_query_num, rec_type, entry_in_tree);
     ConRangeCount(num_thread, idx, query_box_seq);
   }
 }
 
-template<typename TT>
+template<typename type_trait>
 void
 ConcurrentIdxOSM(auto num_thread,
                  auto primal_idx,
                  int index_type,
-                 const parlay::sequence<typename TT::EntrySeq>& node_by_time,
+                 const parlay::sequence<typename type_trait::entry_seq>& node_by_time,
                  const int sliding_window_len,
                  const size_t member_query_n)
 {
   const int time_period_num = node_by_time.size();
   auto const& insert_entry = node_by_time;
   auto const& delete_entry = node_by_time;
-  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto query_points = type_trait::key_seq::uninitialized(member_query_n);
   auto step = member_query_n / time_period_num;
   for (int i = 0; i < time_period_num; i++) {
     parlay::parallel_for(0, step, [&](size_t j) {
-      query_points[(i * step) + j] = TT::Entry::GetKey(node_by_time[i][j]);
+      query_points[(i * step) + j] = type_trait::entry_traits::get_key(node_by_time[i][j]);
     });
   }
 
@@ -1061,13 +1061,13 @@ ConcurrentIdxOSM(auto num_thread,
   }
   auto box_seq_by_year =
     parlay::tabulate(time_period_num, [&](size_t batch_id) {
-      bool constexpr kSavePoint = false;
-      bool constexpr kFixSize = false;
+      bool constexpr k_save_point = false;
+      bool constexpr k_fix_size = false;
       auto wp = parlay::flatten(node_by_time.cut(
         batch_in_tree[batch_id].first, batch_in_tree[batch_id].second));
       // return query box seq and max size
-      return GenRectangles<TT, kSavePoint, kFixSize>(
-        kOSMRangeQueryNum, kOSMRecType, wp);
+      return gen_rectangles<type_trait, k_save_point, k_fix_size>(
+        k_osm_range_query_num, k_osm_rec_type, wp);
     });
 
   parlay::sequence<double> insert_time(time_period_num, 0.0);
@@ -1109,7 +1109,7 @@ ConcurrentIdxOSM(auto num_thread,
     time = ConRangeQuery<0>(num_thread,
                             primal_idx,
                             index_type,
-                            kOSMRangeQueryNum,
+                            k_osm_range_query_num,
                             box_seq_by_year[batch_id].first);
     t.stop();
     range_query_time[batch_id] += time;
@@ -1135,7 +1135,7 @@ ConcurrentIdxOSM(auto num_thread,
   }
 }
 
-template<typename TT>
+template<typename type_trait>
 void
 ConcurrentIdxDynamicGraph(auto num_thread,
                           auto primal_idx,
@@ -1148,7 +1148,7 @@ ConcurrentIdxDynamicGraph(auto num_thread,
   auto time_period_num = insert_batch_seq.size();
   auto const& insert_entry = insert_batch_seq;
   auto const& delete_entry = delete_batch_seq;
-  auto query_points = TT::KeySeq::uninitialized(member_query_n);
+  auto query_points = type_trait::key_seq::uninitialized(member_query_n);
   auto step = member_query_n / time_period_num;
   if (member_query_n % time_period_num != 0) {
     std::cout << "the member query num should be divisible by time period num"
@@ -1158,7 +1158,7 @@ ConcurrentIdxDynamicGraph(auto num_thread,
 
   for (int i = 0; i < time_period_num; i++) {
     parlay::parallel_for(0, step, [&](size_t j) {
-      query_points[(i * step) + j] = TT::Entry::GetKey(insert_batch_seq[i][j]);
+      query_points[(i * step) + j] = type_trait::entry_traits::get_key(insert_batch_seq[i][j]);
     });
   }
 
@@ -1227,39 +1227,38 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
 {
   // opts.PrintOptionValue();
 
-  using Wrapper = Wrapper<uint64_t, uint32_t>;
-  using E = typename Wrapper::E;
-  // using EleType = Element<uint32_t, uint32_t>;
-  using TT = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                     16,
-                                     Wrapper::LeafAugEmpty,
-                                     Wrapper::InteriorAugEmpty,
-                                     8,
-                                     pb_tree::ProtoNode>;
+  using wrapper = wrapper<uint64_t, uint32_t>;
+  using entry_type = typename wrapper::entry_type;
+  using type_trait =
+    pab_tree::btree_type_trait<wrapper::element_wrapper<entry_type>,
+                               16,
+                               wrapper::leaf_aug_empty,
+                               wrapper::interior_aug_empty,
+                               pab_tree::proto_node>;
 
 #if defined(DYNAMIC_GRAPH)
-  constexpr int kInputType = InputType::kDynamicGraphInput;
+  constexpr int k_input_type = input_type::dynamic_graph_input;
 #elif defined(OSM)
-  constexpr int kInputType = InputType::kOSM;
+  constexpr int k_input_type = input_type::osm_input;
 #else
-  constexpr int kInputType = InputType::kNormalInput;
+  constexpr int k_input_type = input_type::normal_input;
 #endif
 
-  using EntrySeq = typename TT::EntrySeq;
+  using entry_seq = typename type_trait::entry_seq;
 
   int index_type = 0;
   if (opts.tree_type == 5) {
     index_type = TYPE_MASSTREE;
-    PrintTreeParam("MassTree", 1);
+    print_tree_param("MassTree", 1);
   } else if (opts.tree_type == 6) {
     index_type = TYPE_BWTREE;
-    PrintTreeParam("BwTree", 1);
+    print_tree_param("BwTree", 1);
   } else {
     std::cout << "Unsupported tree type: " << opts.tree_type << std::endl;
     return;
   }
 
-  opts.PrintOptions();
+  opts.print_options();
   std::cout << "\n" << std::flush;
 
   int num_thread = parlay::num_workers();
@@ -1269,26 +1268,26 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
   // NOTE: real world sliding window
   if (opts.tag & (1 << 3)) {
     string osm_path = opts.input_file_path;
-    EntrySeq osm_records;
+    entry_seq osm_records;
     auto [input_num, input_dim] =
-      ReadEntries<typename TT::E, kInputType>(osm_path.c_str(), osm_records);
+      read_entries<typename type_trait::entry_type, k_input_type>(osm_path.c_str(), osm_records);
     parlay::sort_inplace(osm_records, [&](auto const& a, auto const& b) {
-      return TT::Entry::GetVal(a) < TT::Entry::GetVal(b);
+      return type_trait::entry_traits::get_val(a) < type_trait::entry_traits::get_val(b);
     });
     const std::vector<int> files = { 2015, 2016, 2017, 2018, 2019,
                                      2020, 2021, 2022, 2023, 2024 };
     auto node_by_year = parlay::tabulate(files.size(), [&](size_t i) {
       return parlay::filter(osm_records, [&](auto const& record) {
-        return TT::Entry::GetVal(record) == files[i];
+        return type_trait::entry_traits::get_val(record) == files[i];
       });
     });
 
-    ConcurrentIdxOSM<TT>(num_thread,
+    ConcurrentIdxOSM<type_trait>(num_thread,
                          idx,
                          index_type,
                          node_by_year,
-                         kOsmWindowLen,
-                         kMemberQueryOsmSize);
+                         k_osm_window_len,
+                         k_member_query_osm_size);
   }
 
   if (opts.tag & (1 << 4)) { // NOTE: temporal graph
@@ -1296,22 +1295,22 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
     //   "/data/zmen002/geometry/osm_temporal_graph/north_america/";
     string dynamic_graph_path = opts.input_file_path;
 
-    constexpr int kDynamicGraphBatchNum = 10;
-    std::array<std::string, kDynamicGraphBatchNum> insert_files;
-    std::array<std::string, kDynamicGraphBatchNum> delete_files;
-    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
+    constexpr int k_dynamic_graph_batch_num = 10;
+    std::array<std::string, k_dynamic_graph_batch_num> insert_files;
+    std::array<std::string, k_dynamic_graph_batch_num> delete_files;
+    for (int i = 0; i < k_dynamic_graph_batch_num; i++) {
       insert_files[i] = dynamic_graph_path + std::to_string(i) + "_insert.in";
       delete_files[i] = dynamic_graph_path + std::to_string(i) + "_delete.in";
     }
-    parlay::sequence<EntrySeq> insert_batch_seq(kDynamicGraphBatchNum);
-    parlay::sequence<EntrySeq> delete_batch_seq(kDynamicGraphBatchNum);
+    parlay::sequence<entry_seq> insert_batch_seq(k_dynamic_graph_batch_num);
+    parlay::sequence<entry_seq> delete_batch_seq(k_dynamic_graph_batch_num);
     size_t total_entries = 0;
-    for (int i = 0; i < kDynamicGraphBatchNum; i++) {
-      auto [n1, dim1] = ReadEntries<typename TT::E, kInputType>(
+    for (int i = 0; i < k_dynamic_graph_batch_num; i++) {
+      auto [n1, dim1] = read_entries<typename type_trait::entry_type, k_input_type>(
         insert_files[i].c_str(), insert_batch_seq[i], total_entries);
       total_entries += n1;
 
-      auto [n2, dim2] = ReadEntries<typename TT::E, kInputType>(
+      auto [n2, dim2] = read_entries<typename type_trait::entry_type, k_input_type>(
         delete_files[i].c_str(), delete_batch_seq[i], total_entries);
       total_entries += n2;
 
@@ -1320,20 +1319,20 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
 
     // generate box
     auto random_wi = parlay::random_shuffle(insert_batch_seq[0]);
-    auto box_seq = parlay::tabulate(kDynamicGraphRangeNum, [&](size_t i) {
+    auto box_seq = parlay::tabulate(k_dynamic_graph_range_num, [&](size_t i) {
       auto e = random_wi[i];
-      uint64_t key = TT::Entry::GetKey(e);
+      uint64_t key = type_trait::entry_traits::get_key(e);
       uint64_t u = key >> 32;
       auto box = std::make_pair(u << 32, (u + 1) << 32);
       return std::make_pair(box, 20);
     });
-    ConcurrentIdxDynamicGraph<TT>(num_thread,
+    ConcurrentIdxDynamicGraph<type_trait>(num_thread,
                                   idx,
                                   index_type,
                                   insert_batch_seq,
                                   delete_batch_seq,
                                   box_seq,
-                                  kMemberQueryOsmSize);
+                                  k_member_query_osm_size);
   }
 
   std::cout << "\n" << std::flush;
@@ -1345,37 +1344,37 @@ ApplyConcurrentIndex(Options const& opts)
 {
   // opts.PrintOptionValue();
 
-  using Wrapper = Wrapper<uint32_t, uint32_t>;
-  using E = typename Wrapper::E;
+  using wrapper = wrapper<uint32_t, uint32_t>;
+  using entry_type = typename wrapper::entry_type;
   // using EleType = Element<uint32_t, uint32_t>;
-  using TT = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                     16,
-                                     Wrapper::LeafAugEmpty,
-                                     Wrapper::InteriorAugEmpty,
-                                     8,
-                                     pb_tree::ProtoNode>;
+  using type_trait =
+    pab_tree::btree_type_trait<wrapper::element_wrapper<entry_type>,
+                               16,
+                               wrapper::leaf_aug_empty,
+                               wrapper::interior_aug_empty,
+                               pab_tree::proto_node>;
 
-  using EntrySeq = TT::EntrySeq;
+  using entry_seq = type_trait::entry_seq;
 
   int index_type = 0;
   if (opts.tree_type == 5) {
     index_type = TYPE_MASSTREE;
-    PrintTreeParam("MassTree", 1);
+    print_tree_param("MassTree", 1);
   } else if (opts.tree_type == 6) {
     index_type = TYPE_BWTREE;
-    PrintTreeParam("BwTree", 1);
+    print_tree_param("BwTree", 1);
   } else {
     std::cout << "Unsupported tree type: " << opts.tree_type << std::endl;
     return;
   }
 
-  opts.PrintOptions();
+  opts.print_options();
   std::cout << "\n" << std::flush;
 
   int num_thread = parlay::num_workers();
 
-  EntrySeq wp;
-  EntrySeq wi;
+  entry_seq wp;
+  entry_seq wi;
 
   Index<keytype, keycomp>* primal_idx = nullptr;
 
@@ -1397,7 +1396,7 @@ ApplyConcurrentIndex(Options const& opts)
   // build and everything that uses it. Mirrors the same gate in
   // tests/test_framework.h.
   if ((opts.tag & (1 << 5)) == 0) {
-    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    read_entries<typename type_trait::entry_type>(opts.input_file_path.c_str(), wp);
 
     // NOTE: always built, so the first column is a real build time here just
     // like in tests/test_framework.h. Tags 1<<6 and 1<<7 do not use it and
@@ -1411,10 +1410,10 @@ ApplyConcurrentIndex(Options const& opts)
       if (opts.summary) {
         parlay::sequence<double> const ratio_seq = { 0.0001, 0.001, 0.01, 0.1 };
         for (auto ratio : ratio_seq) {
-          auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+          auto [base_path, batch_path] = opts.parse_insert_batch_path(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          auto [n, d] = read_entries<typename type_trait::entry_type>(base_path.c_str(), wp);
+          auto [n2, d2] = read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
           if (index_type == TYPE_MASSTREE) { // WARN: masstree MLE for 1e9 input
                                              // if rebuild the whole index
             ConInsert<1>(num_thread, primal_idx, wi);
@@ -1427,10 +1426,10 @@ ApplyConcurrentIndex(Options const& opts)
         }
       } else {
         auto [base_path, batch_path] =
-          opts.ParseInsertBatchPath(opts.batch_ratio);
+          opts.parse_insert_batch_path(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        auto [n, d] = read_entries<typename type_trait::entry_type>(base_path.c_str(), wp);
+        auto [n2, d2] = read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
         if (index_type == TYPE_MASSTREE) {
           ConInsert<1>(num_thread, primal_idx, wi);
           ConDelete<0>(num_thread, primal_idx, wi);
@@ -1449,10 +1448,10 @@ ApplyConcurrentIndex(Options const& opts)
         // parlay::sequence<double> const ratio_seq = { 0.01, 0.1 };
         for (auto ratio : ratio_seq) {
           // puts("------------------------------");
-          auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+          auto [base_path, batch_path] = opts.parse_delete_batch_path(ratio);
           // std::cout << base_path << " " << batch_path << std::endl;
-          auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-          auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+          auto [n, d] = read_entries<typename type_trait::entry_type>(base_path.c_str(), wp);
+          auto [n2, d2] = read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
           if (index_type == TYPE_MASSTREE) {
             ConDelete<1>(num_thread, primal_idx, wi);
             ConInsert<0>(num_thread, primal_idx, wi);
@@ -1464,10 +1463,10 @@ ApplyConcurrentIndex(Options const& opts)
         }
       } else {
         auto [base_path, batch_path] =
-          opts.ParseDeleteBatchPath(opts.batch_ratio);
+          opts.parse_delete_batch_path(opts.batch_ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        auto [n, d] = read_entries<typename type_trait::entry_type>(base_path.c_str(), wp);
+        auto [n2, d2] = read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
         if (index_type == TYPE_MASSTREE) {
           ConDelete<1>(num_thread, primal_idx, wi);
           ConInsert<0>(num_thread, primal_idx, wi);
@@ -1482,14 +1481,14 @@ ApplyConcurrentIndex(Options const& opts)
     // PARA: lambda for membership
     auto membership_query = [&](auto const& input_query_ele) {
       auto query_ele =
-        parlay::map(input_query_ele, [&](auto const& e) { return e.GetKey(); });
+        parlay::map(input_query_ele, [&](auto const& e) { return e.get_key(); });
       ConMembership(num_thread, primal_idx, query_ele);
     };
 
-    // NOTE: Membership query
+    // NOTE: membership query
     if (opts.query_type & (1 << 0)) {
-      auto batch_size = static_cast<size_t>(wp.size() * kMemberQueryRatio);
-      typename TT::EntrySeq query_ele;
+      auto batch_size = static_cast<size_t>(wp.size() * k_member_query_ratio);
+      typename type_trait::entry_seq query_ele;
       if (wi.size() == 0) {
         query_ele = wi.subseq(0, batch_size);
         membership_query(query_ele);
@@ -1511,21 +1510,21 @@ ApplyConcurrentIndex(Options const& opts)
     // range_query lambda in tests/test_framework.h -- the two drivers must emit
     // the same columns in the same order.
     auto range_query = [&](auto const& base_points) {
-      // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      // for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
       int const rec_type = 1;
       auto [query_box_seq, max_size] =
-        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
+        gen_rectangles<type_trait, false, false>(k_range_query_num, rec_type, base_points);
       ConRangeQuery(
-        num_thread, primal_idx, index_type, kRangeQueryNum, query_box_seq);
+        num_thread, primal_idx, index_type, k_range_query_num, query_box_seq);
       // }
     };
 
     // PARA: lambda for range count
     auto range_count = [&](auto const& base_points) {
-      // for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      // for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
       int const rec_type = 1;
       auto [query_box_seq, max_size] =
-        GenRectangles<TT, false, false>(kRangeQueryNum, rec_type, base_points);
+        gen_rectangles<type_trait, false, false>(k_range_query_num, rec_type, base_points);
       ConRangeCount(num_thread, primal_idx, query_box_seq);
       // }
     };
@@ -1542,11 +1541,11 @@ ApplyConcurrentIndex(Options const& opts)
 
     // NOTE: range query with log
     if (opts.query_type & (1 << 3)) {
-      for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
+      for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
         auto [query_box_seq, max_size] =
-          GenRectangles<TT, false, false>(kRangeQueryWithLogNum, rec_type, wp);
+          gen_rectangles<type_trait, false, false>(k_range_query_with_log_num, rec_type, wp);
         ConRangeQuerySerialWithLog(
-          primal_idx, rec_type, kRangeQueryWithLogNum, query_box_seq);
+          primal_idx, rec_type, k_range_query_with_log_num, query_box_seq);
       }
     }
 
@@ -1566,10 +1565,10 @@ ApplyConcurrentIndex(Options const& opts)
                                : parlay::sequence<double>{ opts.batch_ratio };
 
       for (auto ratio : ratio_seq) {
-        auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
+        auto [base_path, batch_path] = opts.parse_insert_batch_path(ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        auto [n, d] = read_entries<typename type_trait::entry_type>(base_path.c_str(), wp);
+        auto [n2, d2] = read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
         // NOTE: don't empty idx before dropping it. It is rebuilt every round
         // and freed on the next line, and masstree never gives back what
         // remove() touches -- the old clear-out cost about 1.4TB at 1e9.
@@ -1580,10 +1579,10 @@ ApplyConcurrentIndex(Options const& opts)
       }
 
       for (auto ratio : ratio_seq) {
-        auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
+        auto [base_path, batch_path] = opts.parse_delete_batch_path(ratio);
         // std::cout << base_path << " " << batch_path << std::endl;
-        auto [n, d] = ReadEntries<typename TT::E>(base_path.c_str(), wp);
-        auto [n2, d2] = ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+        auto [n, d] = read_entries<typename type_trait::entry_type>(base_path.c_str(), wp);
+        auto [n2, d2] = read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
         // NOTE: same here -- no clearing an index we are about to drop.
         auto* idx = ConBuild<0>(num_thread, index_type, wp);
         ConDelete<1>(num_thread, idx, wi);
@@ -1599,11 +1598,11 @@ ApplyConcurrentIndex(Options const& opts)
   //  batch by batch.
   if (opts.tag & (1 << 5)) {
     release_primal();
-    ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp);
+    read_entries<typename type_trait::entry_type>(opts.input_file_path.c_str(), wp);
     auto half = wp.size() / 2;
 
     // NOTE: time the build over the whole input, then rebuild from half so the
-    // queries see a half filled index. BuildTree with kOutputRatio 2 in
+    // queries see a half filled index. BuildTree with OutputRatio 2 in
     // tests/test_framework.h does the same: it times the full build and only
     // its last, untimed build is the half one.
     auto* idx = ConBuild<1>(num_thread, index_type, wp);
@@ -1612,7 +1611,7 @@ ApplyConcurrentIndex(Options const& opts)
     idx = ConBuild<0>(num_thread, index_type, wp.cut(0, half));
 
     // NOTE: only the first half of wp went into the index.
-    ConQueryAfterStep<TT>(
+    ConQueryAfterStep<type_trait>(
       num_thread, idx, index_type, wp.cut(0, half), wp.cut(half, wp.size()));
     delete idx;
     ReclaimMassTreeMemory();
@@ -1635,12 +1634,12 @@ ApplyConcurrentIndex(Options const& opts)
       // NOTE: batch_path, not base_path -- incre_data_generator writes the
       // insert stream as ins/<1/ratio>/<i>.batch.bin. There is no base/batch
       // pair in these datasets; the whole file is the batch stream.
-      auto [base_path, batch_path] = opts.ParseInsertBatchPath(ratio);
-      ReadEntries<typename TT::E>(batch_path.c_str(), wp);
+      auto [base_path, batch_path] = opts.parse_insert_batch_path(ratio);
+      read_entries<typename type_trait::entry_type>(batch_path.c_str(), wp);
       auto* idx = ConInsertByStep(num_thread, index_type, wp, ratio);
 
       // NOTE: the first half of wp was inserted, the second half was not.
-      ConQueryAfterStep<TT>(num_thread,
+      ConQueryAfterStep<type_trait>(num_thread,
                             idx,
                             index_type,
                             wp.cut(0, wp.size() / 2),
@@ -1655,13 +1654,13 @@ ApplyConcurrentIndex(Options const& opts)
     release_primal();
 
     for (auto ratio : incre_ratio_seq) {
-      auto [base_path, batch_path] = opts.ParseDeleteBatchPath(ratio);
-      ReadEntries<typename TT::E>(batch_path.c_str(), wi);
+      auto [base_path, batch_path] = opts.parse_delete_batch_path(ratio);
+      read_entries<typename type_trait::entry_type>(batch_path.c_str(), wi);
       auto* idx = ConDeleteByStep(num_thread, index_type, wi, ratio);
 
       // NOTE: the first half of wi was deleted, so the second half is the one
       // left in the index.
-      ConQueryAfterStep<TT>(num_thread,
+      ConQueryAfterStep<type_trait>(num_thread,
                             idx,
                             index_type,
                             wi.cut(wi.size() / 2, wi.size()),

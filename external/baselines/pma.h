@@ -5,57 +5,56 @@
 #include "PMA/CPMA.hpp"
 #include "PMA/internal/leaf.hpp"
 #include "StructOfArrays/multipointer.hpp"
-#include "dependence/loggers.h"
 #include "parlay/primitives.h"
-#include "pb_tree/b_tree.h"
+#include "pab_tree/b_tree.h"
 
 namespace PMA {
 
-template<class TypeTrait>
+template<class TT>
 class PmaWrapper
 {
 public:
-  using TT = TypeTrait;
+  using type_trait = TT;
 
-  using E = typename TT::E;
-  using K = typename TT::K;
-  using V = typename TT::V;
-  using Entry = TT::Entry;
+  using entry_type = typename type_trait::entry_type;
+  using key_type = typename type_trait::key_type;
+  using mapped_type = typename type_trait::mapped_type;
+  using entry_traits = type_trait::entry_traits;
 
-  using Num = typename TT::Num;
-  using EntrySlice = typename TT::EntrySlice;
-  using Split = typename TT::Split;
-  using SplitSeq = typename TT::SplitSeq;
+  using num_comparator = typename type_trait::num_comparator;
+  using entry_slice = typename type_trait::entry_slice;
+  using split_type = typename type_trait::split_type;
+  using split_seq = typename type_trait::split_seq;
 
-  using Leaf = TT::Node*;
-  using Interior = TT::Node*;
+  using leaf_type = type_trait::node_type*;
+  using interior_type = type_trait::node_type*;
 
-  // using PmaLeaf = uncompressed_leaf<K>;
-  using PmaLeaf = uncompressed_leaf<K, V>;
+  // using pma_leaf = uncompressed_leaf<key_type>;
+  using pma_leaf = uncompressed_leaf<key_type, mapped_type>;
   // TODO: try
   // https://github.com/wheatman/Packed-Memory-Array/blob/69edd1831174682a1f702375542a8244e8faeccc/include/PMA/CPMA.hpp#L80
-  using PmosPmaSettings = PMA_traits<PmaLeaf, Eytzinger, 0, false, false>;
-  using PmaPointer = PmaLeaf::element_ptr_type;
-  // static_assert(!PmaLeaf::binary);
-  // static_assert(PmosPmaSettings::parallel);
-  using PMA = CPMA<PmosPmaSettings>;
+  using pmos_pma_settings = PMA_traits<pma_leaf, Eytzinger, 0, false, false>;
+  using pma_pointer = pma_leaf::element_ptr_type;
+  // static_assert(!pma_leaf::binary);
+  // static_assert(pmos_pma_settings::parallel);
+  using PMA = CPMA<pmos_pma_settings>;
   std::shared_ptr<PMA> pma_tree_;
 
-  using InputRangeT = std::pair<parlay::sequence<K>, parlay::sequence<V>>;
-  using InputDeleteRangeT = parlay::sequence<K>;
+  using input_range_type = std::pair<parlay::sequence<key_type>, parlay::sequence<mapped_type>>;
+  using input_delete_range_type = parlay::sequence<key_type>;
 
-  static auto ParseInput(TT::EntrySeq const& input_seq) -> InputRangeT
+  static auto parse_input(type_trait::entry_seq const& input_seq) -> input_range_type
   {
     return { parlay::map(input_seq,
-                         [&](auto e) { return Entry::GetKey(e) + 1; }),
-             parlay::map(input_seq, [&](auto e) { return Entry::GetVal(e); }) };
+                         [&](auto e) { return entry_traits::get_key(e) + 1; }),
+             parlay::map(input_seq, [&](auto e) { return entry_traits::get_val(e); }) };
   }
 
-  static auto ParseDeleteInput(TT::EntrySeq const& input_seq)
-    -> InputDeleteRangeT
+  static auto parse_delete_input(type_trait::entry_seq const& input_seq)
+    -> input_delete_range_type
   {
     return parlay::map(input_seq,
-                       [&](auto e) -> K { return Entry::GetKey(e) + 1; });
+                       [&](auto e) -> key_type { return entry_traits::get_key(e) + 1; });
   }
 
   template<class PT>
@@ -79,7 +78,7 @@ public:
     size_t n = P.first.size();
     // parlay::sort_inplace(parlay::make_slice(P.first));
     // parlay::sort_inplace(parlay::make_slice(P.second));
-    PmaPointer it(P.first.begin(), P.second.begin());
+    pma_pointer it(P.first.begin(), P.second.begin());
     pma_tree_->insert_batch(it, n, false);
     // std::cout << "PMA insert done. size: " << pma_tree_.size() << std::endl;
   }
@@ -94,54 +93,46 @@ public:
   }
 
   // APIs
-  template<typename Range>
-  void Build(Range&& In)
+  template<typename R>
+  void build(R&& In)
   {
-    map_init(std::forward<Range>(In));
+    map_init(std::forward<R>(In));
   }
 
-  template<typename Range>
-  void BatchInsert(Range&& In)
+  template<typename R>
+  void batch_insert(R&& In)
   {
-    map_insert(std::forward<Range>(In));
+    map_insert(std::forward<R>(In));
   }
 
-  template<typename Range>
-  void BatchDelete(Range In)
+  template<typename R>
+  void batch_delete(R In)
   {
-    map_delete(std::forward<Range>(In));
+    map_delete(std::forward<R>(In));
   }
 
-  auto Contain(K const k) const
+  auto contain(key_type const k) const
   {
-    pb_tree::MembershipLogger logger;
-    auto res = this->pma_tree_->has(k);
-    return std::make_pair(res, logger);
+    return this->pma_tree_->has(k);
   }
 
-  auto RangeCount(TT::Box const query_box)
-    -> std::pair<size_t, pb_tree::RangeReportLogger>
+  auto range_count(type_trait::box_type const query_box) -> size_t
   {
     // the bounding box should be [a, b)
-    pb_tree::RangeReportLogger logger;
-
     auto cnt = 0;
     auto f = [&](auto ele) { cnt++; };
     auto rt_size =
       this->pma_tree_->map_range(f, query_box.first, query_box.second);
-    return { rt_size, logger };
+    return rt_size;
   }
 
-  template<typename Range>
-  auto RangeReport(TT::Box const query_box, Range&& out)
-    -> std::pair<size_t, pb_tree::RangeReportLogger>
+  template<typename R>
+  auto range_report(type_trait::box_type const query_box, R&& out) -> size_t
   {
     // the bounding box should be [a, b)
-    pb_tree::RangeReportLogger logger;
-
     auto cnt = 0;
     auto f = [&](auto ele) {
-      if constexpr (std::is_same_v<decltype(ele), typename TT::K>) {
+      if constexpr (std::is_same_v<decltype(ele), typename type_trait::key_type>) {
         // Binary case: ele is just the key
         out[cnt++] = ele;
       } else {
@@ -153,11 +144,11 @@ public:
     };
     auto rt_size =
       this->pma_tree_->map_range(f, query_box.first, query_box.second);
-    return { rt_size, logger };
+    return rt_size;
   }
 
-  template<typename Range>
-  void GetEntries(Range& out)
+  template<typename R>
+  void get_entries(R& out)
   {
     auto n_leaves = this->pma_tree_->total_leaves();
     // Count exact per-leaf element counts using the same iteration logic as
@@ -172,7 +163,7 @@ public:
     parlay::parallel_for(0, n_leaves, [&](uint64_t i) {
       uint64_t pos = offsets[i];
       this->pma_tree_->get_leaf(i).template map<true>([&](auto ele) {
-        if constexpr (std::is_same_v<decltype(ele), typename TT::K>) {
+        if constexpr (std::is_same_v<decltype(ele), typename type_trait::key_type>) {
           out[pos++] = ele;
         } else {
           out[pos].key = std::get<0>(ele);
@@ -183,28 +174,28 @@ public:
     });
   }
 
-  void DeleteTree()
+  void delete_tree()
   {
     // auto tmp = std::move(this->pma_tree_);
     this->pma_tree_.reset();
     this->pma_tree_ = std::make_shared<PMA>();
   }
 
-  auto GetSize() const
+  auto get_size() const
   {
     return this->pma_tree_->size();
   }
 
-  constexpr static int GetLeafSize()
+  constexpr static int get_leaf_size()
   {
     return 1;
   }
-  constexpr static char const* GetTreeName()
+  constexpr static char const* get_tree_name()
   {
     return "PMA";
   }
 
-  constexpr static char const* CheckHasBox()
+  constexpr static char const* check_has_box()
   {
     return "HasBox";
   }

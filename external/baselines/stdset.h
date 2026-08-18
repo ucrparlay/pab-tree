@@ -4,7 +4,7 @@
 #include <set>
 #include <utility>
 
-#include "pb_tree/b_tree.h"
+#include "pab_tree/b_tree.h"
 
 namespace StdSetTree {
 using parlay::sequence;
@@ -13,62 +13,62 @@ using parlay::sequence;
 // Batch insert / batch delete are implemented as plain serial loops over the
 // input, so this serves as a single-threaded ordered-set reference point for
 // the parallel B-tree benchmarks.
-template<class TypeTrait>
-class StdSetRaw
+template<class TT>
+class stdset_raw
 {
 public:
-  using TT = TypeTrait;
+  using type_trait = TT;
 
-  using E = typename TT::E;
-  using K = typename TT::K;
-  using V = typename TT::V;
-  using Entry = typename TT::Entry;
+  using entry_type = typename type_trait::entry_type;
+  using key_type = typename type_trait::key_type;
+  using mapped_type = typename type_trait::mapped_type;
+  using entry_traits = typename type_trait::entry_traits;
 
   // Order elements by key only, so the set behaves as an ordered map on keys.
-  struct KeyLess
+  struct key_less
   {
-    bool operator()(E const& a, E const& b) const
+    bool operator()(entry_type const& a, entry_type const& b) const
     {
-      return Entry::GetKey(a) < Entry::GetKey(b);
+      return entry_traits::get_key(a) < entry_traits::get_key(b);
     }
   };
 
-  using SetType = std::set<E, KeyLess>;
+  using set_type = std::set<entry_type, key_less>;
 
-  // The framework declares `Tree::Leaf` / `Tree::Interior` aliases (used only
+  // The framework declares `Tree::leaf_type` / `Tree::interior_type` aliases (used only
   // for size reporting in some paths); std::set has no such notion, so map both
   // to the element type to satisfy the interface.
-  using Leaf = E;
-  using Interior = E;
+  using leaf_type = entry_type;
+  using interior_type = entry_type;
 
-  // The framework feeds whatever ParseInput / ParseDeleteInput return straight
-  // back into Build / BatchInsert / BatchDelete, so we just keep the element
+  // The framework feeds whatever parse_input / parse_delete_input return straight
+  // back into build / batch_insert / batch_delete, so we just keep the element
   // (resp. key) sequences as-is.
-  using InputRangeT = typename TT::EntrySeq;
-  using InputDeleteRangeT = typename TT::KeySeq;
+  using input_range_type = typename type_trait::entry_seq;
+  using input_delete_range_type = typename type_trait::key_seq;
 
-  static auto ParseInput(typename TT::EntrySeq const& input_seq) -> InputRangeT
+  static auto parse_input(typename type_trait::entry_seq const& input_seq) -> input_range_type
   {
     return input_seq;
   }
 
-  static auto ParseDeleteInput(typename TT::EntrySeq const& input_seq)
-    -> InputDeleteRangeT
+  static auto parse_delete_input(typename type_trait::entry_seq const& input_seq)
+    -> input_delete_range_type
   {
     return parlay::map(input_seq,
-                       [&](auto e) -> K { return Entry::GetKey(e); });
+                       [&](auto e) -> key_type { return entry_traits::get_key(e); });
   }
 
-  // Build a probe element carrying only a key, for ordered lookups/erases.
-  static E KeyProbe(K const k)
+  // build a probe element carrying only a key, for ordered lookups/erases.
+  static entry_type key_probe(key_type const k)
   {
-    return Entry::ToEntry(k, V{});
+    return entry_traits::to_entry(k, mapped_type{});
   }
 
   // APIs --------------------------------------------------------------------
 
-  template<typename Range>
-  void Build(Range&& In)
+  template<typename R>
+  void build(R&& In)
   {
     set_.clear();
     for (auto const& e : In) {
@@ -76,57 +76,51 @@ public:
     }
   }
 
-  template<typename Range, typename... Args>
-  void BatchInsert(Range&& In, Args&&...)
+  template<typename R, typename... Args>
+  void batch_insert(R&& In, Args&&...)
   {
     for (auto const& e : In) {
       set_.insert(e);
     }
   }
 
-  template<typename Range, typename... Args>
-  void BatchDelete(Range&& In, Args&&...)
+  template<typename R, typename... Args>
+  void batch_delete(R&& In, Args&&...)
   {
     for (auto const& k : In) {
-      set_.erase(KeyProbe(k));
+      set_.erase(key_probe(k));
     }
   }
 
-  auto Contain(K const k) const
+  auto contain(key_type const k) const
   {
-    pb_tree::RangeQueryLogger logger;
-    bool res = set_.find(KeyProbe(k)) != set_.end();
-    return std::make_pair(res, logger);
+    return set_.find(key_probe(k)) != set_.end();
   }
 
-  auto RangeCount(typename TT::Box const query_box) const
-    -> std::pair<size_t, pb_tree::RangeReportLogger>
+  auto range_count(typename type_trait::box_type const query_box) const -> size_t
   {
     // half-open range [first, second)
-    pb_tree::RangeReportLogger logger;
-    auto lo = set_.lower_bound(KeyProbe(query_box.first));
-    auto hi = set_.lower_bound(KeyProbe(query_box.second));
+    auto lo = set_.lower_bound(key_probe(query_box.first));
+    auto hi = set_.lower_bound(key_probe(query_box.second));
     size_t cnt = static_cast<size_t>(std::distance(lo, hi));
-    return { cnt, logger };
+    return cnt;
   }
 
-  template<typename Range>
-  auto RangeReport(typename TT::Box const query_box, Range&& out) const
-    -> std::pair<size_t, pb_tree::RangeReportLogger>
+  template<typename R>
+  auto range_report(typename type_trait::box_type const query_box, R&& out) const -> size_t
   {
     // half-open range [first, second)
-    pb_tree::RangeReportLogger logger;
-    auto lo = set_.lower_bound(KeyProbe(query_box.first));
-    auto hi = set_.lower_bound(KeyProbe(query_box.second));
+    auto lo = set_.lower_bound(key_probe(query_box.first));
+    auto hi = set_.lower_bound(key_probe(query_box.second));
     size_t i = 0;
     for (auto it = lo; it != hi; ++it) {
       out[i++] = *it;
     }
-    return { i, logger };
+    return i;
   }
 
-  template<typename Range>
-  void GetEntries(Range& out)
+  template<typename R>
+  void get_entries(R& out)
   {
     size_t i = 0;
     for (auto const& e : set_) {
@@ -134,29 +128,29 @@ public:
     }
   }
 
-  void DeleteTree()
+  void delete_tree()
   {
     set_.clear();
   }
 
-  [[nodiscard]] size_t GetSize() const
+  [[nodiscard]] size_t get_size() const
   {
     return set_.size();
   }
-  constexpr static char const* GetTreeName()
+  constexpr static char const* get_tree_name()
   {
     return "StdSet";
   }
-  constexpr static int GetLeafSize()
+  constexpr static int get_leaf_size()
   {
     return 1;
   }
-  constexpr static char const* CheckHasBox()
+  constexpr static char const* check_has_box()
   {
     return "HasBox";
   }
 
-  SetType set_;
+  set_type set_;
 };
 
 } // namespace StdSetTree

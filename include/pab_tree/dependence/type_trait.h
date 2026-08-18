@@ -20,17 +20,19 @@ template <typename EleType, uint BufferSize, typename LeafAugType,
 		  typename NodeAllocType>
 class type_trait_base {
 public:
-	// element type
+	/* element type */
 	using entry_type = EleType::entry_type;
 	using key_type = typename EleType::key_type;
 	using mapped_type = typename EleType::mapped_type;
-	using entry_traits = EleType; // abstract type to access entry_type
+	using entry_traits = EleType; /* abstract type to access entry_type */
 
-	// general type
+	/* general type */
 	using num_comparator = numeric_comparator<key_type>;
 
-	// Key ordering. Every ordering decision in the tree goes through
-	// key_less; nothing compares keys with a raw operator.
+	/*
+	 * Key ordering. Every ordering decision in the tree goes through
+	 * key_less; nothing compares keys with a raw operator.
+	 */
 	using key_compare = KeyCompare;
 
 	static bool key_less(key_type const &a, key_type const &b)
@@ -38,8 +40,10 @@ public:
 		return KeyCompare{}(a, b);
 	}
 
-	// a == b under key_compare. Two comparisons in general, but the
-	// default and any comparator supplying a static equal() get one.
+	/*
+	 * a == b under key_compare. Two comparisons in general, but the
+	 * default and any comparator supplying a static equal() get one.
+	 */
 	static bool key_equal(key_type const &a, key_type const &b)
 	{
 		if constexpr (requires {
@@ -55,7 +59,7 @@ public:
 		}
 	}
 
-	// Order entries by their keys.
+	/* Order entries by their keys. */
 	static bool entry_less(entry_type const &a, entry_type const &b)
 	{
 		return key_less(entry_traits::get_key(a), entry_traits::get_key(b));
@@ -81,7 +85,7 @@ public:
 	using interior_aug = InteriorAugType;
 
 	using node_type = NodeType;
-	// Where nodes come from. See parlay_node_alloc in node_base.h.
+	/* Where nodes come from. See parlay_node_alloc in node_base.h. */
 	using node_alloc = NodeAllocType;
 	using node_seq = parlay::sequence<node_type *>;
 	using node_slice = parlay::slice<node_type **, node_type **>;
@@ -97,34 +101,40 @@ public:
 	};
 };
 
-// Defaults for everything btree_type_trait does not require. Inherit and
-// override only what you need, then hand it to btree_trait below -- that way
-// setting the last parameter does not mean naming the four before it.
+/*
+ * Defaults for everything btree_type_trait does not require. Inherit and
+ * override only what you need, then hand it to btree_trait below -- that way
+ * setting the last parameter does not mean naming the four before it.
+ */
 struct default_options {
 	using leaf_aug = empty_leaf_aug;
 	using interior_aug = empty_interior_aug;
 	using node = proto_node;
 	using node_alloc = parlay_node_alloc;
-	// void means std::less<key_type>. A plain alias, not a member template, so
-	// an options struct can be declared inside a function.
+	/*
+	 * void means std::less<key_type>. A plain alias, not a member template, so
+	 * an options struct can be declared inside a function.
+	 */
 	using key_compare = void;
 };
 
-// The tree's configuration. Only EleType is required.
-//
-//   EleType         reads the key and value out of your entry; see the
-//                   entry_adaptor concept
-//   BufferSize      leaf size; a leaf holds BufferSize..4*BufferSize entries
-//   LeafAugType     per-leaf augmentation, recomputed on every leaf change
-//   InteriorAugType per-interior augmentation, recomputed on every update
-//   NodeType        common base of both node types; see the node_base concept
-//   KeyCompare      key ordering; everything in the tree goes through it
-//   NodeAllocType   where nodes come from; must be thread safe
-//
-// They are positional, so overriding a later one means naming the earlier
-// defaults. The defaults are all spelled `pab_tree::empty_leaf_aug`,
-// `empty_interior_aug`, `proto_node`, `std::less<key_type>` and
-// `parlay_node_alloc`.
+/*
+ * The tree's configuration. Only EleType is required.
+ *
+ *   EleType         reads the key and value out of your entry; see the
+ *                   entry_adaptor concept
+ *   BufferSize      leaf size; a leaf holds BufferSize..4*BufferSize entries
+ *   LeafAugType     per-leaf augmentation, recomputed on every leaf change
+ *   InteriorAugType per-interior augmentation, recomputed on every update
+ *   NodeType        common base of both node types; see the node_base concept
+ *   KeyCompare      key ordering; everything in the tree goes through it
+ *   NodeAllocType   where nodes come from; must be thread safe
+ *
+ * They are positional, so overriding a later one means naming the earlier
+ * defaults. The defaults are all spelled `pab_tree::empty_leaf_aug`,
+ * `empty_interior_aug`, `proto_node`, `std::less<key_type>` and
+ * `parlay_node_alloc`.
+ */
 template <entry_adaptor EleType, uint BufferSize = 64,
 		  typename LeafAugType = empty_leaf_aug,
 		  typename InteriorAugType = empty_interior_aug,
@@ -153,9 +163,11 @@ public:
 		(BufferSize * k_buf_ub_fac > 65535U), uint_fast32_t,
 		std::conditional_t<(BufferSize * k_buf_ub_fac > 255U), uint_fast16_t,
 						   uint_fast8_t>>;
-	// The range-independent half of the augmentation contract. The rest is
-	// checked where update_aug/update are called, against the range each
-	// site actually passes.
+	/*
+	 * The range-independent half of the augmentation contract. The rest is
+	 * checked where update_aug/update are called, against the range each
+	 * site actually passes.
+	 */
 	static_assert(leaf_augmentation<LeafAugType>,
 				  "leaf augmentation needs a default constructor and reset()");
 	static_assert(interior_augmentation<InteriorAugType>,
@@ -176,13 +188,15 @@ public:
 	static constexpr uint_fast8_t const k_split_factor = 8;
 };
 
-// btree_type_trait by name rather than by position. An alias, so the two
-// cannot drift apart:
-//
-//   struct desc : pab_tree::default_options {
-//           using key_compare = std::greater<uint64_t>;
-//   };
-//   using tt = pab_tree::btree_trait<my_ele, 64, desc>;
+/*
+ * btree_type_trait by name rather than by position. An alias, so the two
+ * cannot drift apart:
+ *
+ *   struct desc : pab_tree::default_options {
+ *           using key_compare = std::greater<uint64_t>;
+ *   };
+ *   using tt = pab_tree::btree_trait<my_ele, 64, desc>;
+ */
 template <entry_adaptor EleType, uint BufferSize = 64,
 		  typename Options = default_options>
 using btree_trait = btree_type_trait<
@@ -193,6 +207,6 @@ using btree_trait = btree_type_trait<
 					   typename Options::key_compare>,
 	typename Options::node_alloc>;
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_DEPENDENCE_TYPE_TRAIT_H_
+#endif /* PABTREE_DEPENDENCE_TYPE_TRAIT_H_ */

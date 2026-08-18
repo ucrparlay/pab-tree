@@ -140,8 +140,19 @@ Plan: `docs/refactor_plan_2026-08.md`.
 - **Comments**: short and concise. One or two lines, never a paragraph. No
   jargon. State the fact; add detail only if it is very important. Same for
   commit messages.
+- **One empty line after every function declaration.** The declaration blocks
+  in `b_tree.h` were packed solid; inline definitions were already separated.
+  clang-format does not do this (it only caps consecutive blanks at 1), so it
+  is a manual rule.
+- **Comment syntax is kernel style — `/* */`, never `//`** (done 2026-08-18).
+  A lone comment is `/* text */`; a run of adjacent ones becomes one block with
+  a bare `/*`, ` * ` bodies and a bare `*/`. Trailing comments are
+  `code /* text */`. Applies to `include/pab_tree/` and `tests/`, not to
+  `tests/common/` (vendored PBBS).
 - **Do not change**: the algorithm implementations, existing asserts (adding
-  new ones is fine), the submodules, or `external/baselines/`.
+  new ones is fine), or the submodules. `external/baselines/` was frozen until
+  2026-08-18, when it was migrated to the renamed API on request — it had not
+  compiled since the rename. The algorithms inside it are still frozen.
 - **Gate**: `unit_test` after each mechanical pass. It runs here — data is at
   `/ssd1/zmen002/kv_pair/`. Elsewhere every test skips and ctest passes green,
   so a green run only means something where the data exists.
@@ -149,6 +160,165 @@ Plan: `docs/refactor_plan_2026-08.md`.
   loggers are deleted (`contain` → `bool`); deep copy is fixed, not deleted;
   the wrong assert at `b_batch_insert.hpp:86` stays with a correct one added
   beside it.
+
+## Kernel-style comments (converted 2026-08-18)
+
+All 44 files under `include/pab_tree/` and `tests/` (not `tests/common/`,
+vendored PBBS) now use `/* */`. 461 comments in the library, ~1200 in the
+tests. Done by script, not by hand; any redo must track string and
+block-comment state so a `//` inside a literal is never touched (there are
+none today, but there are `//` sequences inside the new blocks).
+
+**Strip exactly one space after `//`, not all of them.** `// ` and ` * ` are
+both 3 columns, so the conversion is then *exactly* width-neutral and
+commented-out code keeps its own indentation. Verified: lines over 80 columns
+went 117 → 117, all pre-existing and all in `tests/`; `include/pab_tree/` has
+none, before or after.
+
+**A comment body containing `*/` silently produces uncompilable code.** The one
+case was `tests/data_op.h`'s banner
+`///****...****///` — the `*/` inside `*///` closes the block early and strips
+the rest to loose tokens. Rewritten as a real block comment of the same width,
+`/****...****/`. The converter now hard-errors on any body holding `*/` or
+`/*` rather than emitting the broken form.
+
+Two other things worth knowing:
+
+- **Trailing comments gain 3 columns** (` */`), so a line at exactly 80 breaks.
+  Only one did — `range_report.hpp:94`; the comment moved above the statement,
+  which then fit on one line.
+- **27 `//` remain, all legitimately** — they are text *inside* the new blocks,
+  from commented-out code that carried its own comment.
+
+`clang-format -i` over the result changed **nothing** (`ReflowComments: false`),
+so the converter output is already canonical.
+
+## Naming pass completed (2026-08-18)
+
+The alias rename (2026-08-18) covered type aliases only. This pass covered
+everything else, in `include/pab_tree/`, `tests/`, `external/baselines/` and
+`external/index-microbench/workload.cpp`.
+
+| what | count | now |
+|---|---|---|
+| library template params in `snake_case` | 107 decls / 20 files | `TT`, `LeafType`, `InteriorType`, `Granularity`, `Sorted` |
+| library capitalised params/locals | ~200 decls / ~900 uses | `T`→`node`, `TI`→`interior`, `TL`→`leaf`, `In`→`in`, `Out`→`out`, `A`→`in_slice`, `I`→`seq`, `P`→`target` |
+| `Build_` `BatchInsert_` `BatchDelete_` | 16 sites | `build_`, `batch_insert_`, `batch_delete_` |
+| `In_offset` (decl disagreed with its definition) | 1 | `in_offset` |
+| `static constexpr T eps` | 1 | `k_eps` |
+| mixed-case include guard `..._B_Batch_DELETE_HPP_` | 1 macro | all upper |
+| test constants `kCamelCase` | 45 names / 267 uses | `k_snake_case` |
+| test enums | 3 types / 10 values | `input_type`/`dis_type`/`delete_type`, values lose the `k` |
+| test template params | 8 names | `TT`, `Entry`, `NodeType`, `SplitSeq`, `InputType`, `TestTime`, `Serial`, `Print`, `OutputRatio` |
+| test + baseline CamelCase functions/types | 123 names | `snake_case` |
+
+**Codegen is byte-identical throughout** — `b_test` is 140799 instructions
+before and after, with every mnemonic count unchanged. That is the proof the
+whole pass is semantics-free; run it after any similar rename.
+
+### `-Wshadow` is what makes the big rename safe
+
+`T` → `node` collides with 29 existing locals, `TL` → `leaf` with 31. A
+same-scope collision fails to compile, but a collision in a **nested** scope
+compiles and silently changes meaning. Establish a baseline first
+(`include/pab_tree` had 0), rename, then compare:
+
+```bash
+g++ -std=c++20 -O0 -fsyntax-only -pthread -Wshadow -Iinclude \
+  -Iexternal/parlaylib/include -Itests \
+  -Iexternal/googletest/googletest/include tests/self_test.cpp 2>&1 \
+  | grep Wshadow | grep include/pab_tree
+```
+
+It caught 8, and **one had already changed behaviour**:
+`verify_unoverlapped_tree` called `check_contain_node(T, node)`, and with `T`
+renamed both arguments became the loop-local `node`. The fix is to rename the
+inner local (`child`, `sub`, `new_node`), not the parameter.
+
+### Three traps in the rename tooling itself
+
+- **Word-boundary renames hit include paths.** `type_trait` → `TT`
+  rewrote `#include "pab_tree/dependence/type_trait.h"`. Check for
+  `<NewName>.h` after every pass.
+- **A scanner that skips comments must know about `//`.** The first version
+  handled `/* */` and quotes only, so in the baselines an apostrophe in a `//`
+  comment (`CPAM's`) opened a bogus char literal and silently swallowed every
+  rename to the next quote — 5 in `cpam.h`, 12 across `tests/`, all found only
+  because the build broke later. Treat a quote as a literal only when it closes
+  on the same line.
+- **Same-name-different-thing needs scoping, not a global rename.**
+  `type_trait` is a template parameter in 16 files and a class alias in
+  `b_tree.h`/`tree_node.h`; `k_test_time` and `k_input_type` are each *both* a
+  template parameter and a local `constexpr`. Rename per declaration scope
+  (`template <…>` through the end of that entity), never file-wide, and never
+  touch `::type_trait` member access.
+
+### Template parameters shortened (2026-08-18, same session)
+
+`TypeTrait` → **`TT`** and `Range` → **`R`**, on request: 634 and 250 sites.
+`TT` and `R` were both free, and both sit with the existing single-capital
+parameters (`T`, `F`, `A`, `Seq`). Codegen unchanged again — 140799
+instructions.
+
+`Range` is a template parameter at every site but one:
+`tests/data_op.h:144` prints `"Range: ["`. A rename tool that skips string
+literals keeps that safe; a plain `sed` would not.
+
+`external/baselines/BwTree.h` was **deleted** rather than migrated — nothing
+included it, and the BwTree the workload actually drives lives in
+`external/index-microbench/BwTree/`.
+
+### Names that could not take the obvious form
+
+- `Typename` → `coord_type`, not `typename` (keyword).
+- `DeleteType`'s values `kBatchDelete`/`kBatchDiff` → `del_batch`/`del_diff`,
+  because `batch_delete` is already a free function template. The enum is
+  **unused** — nothing but its own declaration mentions it.
+- Test parameters `WP`/`WI` → `wp_in`/`wi_in`, because the bodies already
+  derive locals named `wp`/`wi` from them.
+- gtest suite and test names stay CamelCase (`TEST(SelfTest, Augmentation)`) —
+  they are labels, not identifiers.
+- `tests/common/` is vendored PBBS and was excluded, as in every earlier pass.
+
+## `external/` consumers were stale; all of them build again
+
+Every consumer of the library outside `tests/` predated the
+`pb_tree` → `pab_tree` rename and did not compile. Confirmed pre-existing by
+`git stash` before touching anything. All are fixed now.
+
+| file | was broken on | fixed by |
+|---|---|---|
+| `stdset.h`, `tlxbtree.h` | `pb_tree/b_tree.h: No such file` | include path, trait aliases, loggers, API → `snake_case` |
+| `cpam.h`, `pma.h` | `dependence/loggers.h: No such file` | same |
+| `pam.h`, `spma.h` | pulled in by `cpam.cpp`/`pma.cpp` | same |
+| `BwTree.h` | same | deleted -- dead, nothing included it |
+| `workload.cpp` | `Wrapper::E`, `pb_tree::`, `TT` | same, plus the trait's dropped `kSkHeight` parameter |
+
+**The API contract is what `test_framework.h` calls**, and it is worth deriving
+rather than guessing: `build batch_insert batch_delete contain delete_tree
+get_entries range_count range_report sorted_leaf_ratio validate`, plus
+`box_type entry_traits input_range_type input_delete_range_type interior_type
+leaf_type parse_input parse_delete_input` and `tree_type::type_trait`.
+
+```bash
+grep -ohE '\bpkd\.[A-Za-z_]\w*' tests/test_framework.h | sed 's/pkd\.//' | sort -u
+```
+
+Loggers were removed rather than reinstated: `contain` returns `bool`,
+`range_count`/`range_report` return `size_t`. **CPAM was the one that could not
+just drop it** — `zmap::range_report_filter2` takes a logger and the algorithm
+is frozen, so `cpam.h` now passes a local `visit_counter` holding the only two
+fields CPAM touches (`vis_leaf_num`, `vis_interior_num`).
+
+Two latent bugs surfaced and were fixed: `workload.cpp` referenced
+`InputType::kOSM`, which the enum never had (the `-DOSM` path could not have
+compiled), and `cpam.h`/`pam.h` both carried `using key_type = K;` beside the
+inherited `key_type`, a redeclaration once `K` *was* `key_type`.
+
+**All 14 targets build**: `self_test unit_test b_test data_generator
+incre_data_generator data_to_binary filter_csv_year temporal_graph_osm
+temporal_graph_signal stdset tlxbtree cpam pma index_microbench_workload`.
+
 
 ## Build
 
@@ -322,8 +492,12 @@ Two of the requested names collided and were resolved:
   breaks. `V` is `mapped_type` instead — already present, and the STL name for
   a map's value. `value_type` still means the stored entry.
 
-`class TypeTrait` became `type_trait_base`; the *template parameters* named
-`TypeTrait` stay CamelCase, which the convention wants.
+`class TypeTrait` became `type_trait_base`. The *template parameters* are
+`TT` (2026-08-18); `type_trait` in snake_case is the class **alias**, a
+different thing — `btree<TT>` declares `using type_trait = TT;` and
+`leaf_node`/`multi_way_node` do the same, which is how
+`LeafType::type_trait::node_alloc` reaches the allocator from a node type
+alone.
 
 **This changed the user-facing adaptor contract.** A user now writes
 `entry_type` / `key_type` / `mapped_type`, not `E` / `K` / `V`. README updated.
@@ -1683,11 +1857,10 @@ Same interface/semantics, reads the `.bin` format via `ReadBinaryEntries`
 packs `(u<<32)|v` and uses `offset` like the text reader. Aborts on
 missing/truncated file or bad header.
 
-### Known issue (pre-existing, 2026-06)
+### Baseline targets build again (fixed 2026-08-18)
 
-`stdset`/baseline targets currently fail to compile due to a `TestLeafRandom<TT>`
-call signature mismatch in `TestLeafRandomness` — unrelated to the reader work
-(verified by stashing). `b_test` builds fine.
+They were broken from 2026-06 until the naming pass; see "`external/` consumers
+were stale" above. All 14 targets compile.
 
 ## Baselines (`external/baselines/*.h` + `tests/<name>.cpp`)
 

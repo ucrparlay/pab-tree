@@ -1,8 +1,10 @@
-// Dataset-free correctness tests. Generates its own keys from a seed and
-// checks every operation against std::map, so it runs anywhere.
-//
-// tests/unit_test.cpp is the other half: same tree, real benchmark data, and
-// it skips when the data is absent.
+/*
+ * Dataset-free correctness tests. Generates its own keys from a seed and
+ * checks every operation against std::map, so it runs anywhere.
+ *
+ * tests/unit_test.cpp is the other half: same tree, real benchmark data, and
+ * it skips when the data is absent.
+ */
 
 #include <gtest/gtest.h>
 
@@ -29,7 +31,7 @@
 namespace
 {
 
-// ---- the element the tree stores ----
+/* ---- the element the tree stores ---- */
 
 struct entry {
 	uint32_t key;
@@ -57,9 +59,9 @@ struct ele {
 	}
 };
 
-// ---- augmentations, checked against the tree they annotate ----
+/* ---- augmentations, checked against the tree they annotate ---- */
 
-// Sum of the keys in one leaf.
+/* Sum of the keys in one leaf. */
 struct sum_leaf_aug {
 	uint64_t sum = 0;
 
@@ -86,8 +88,10 @@ struct sum_leaf_aug {
 	}
 };
 
-// Entries below one interior node. Reads only proto_node::size, so it needs
-// no access to the children's own augmentation.
+/*
+ * Entries below one interior node. Reads only proto_node::size, so it needs
+ * no access to the children's own augmentation.
+ */
 struct subtree_size_aug {
 	uint64_t total = 0;
 
@@ -113,9 +117,11 @@ struct subtree_size_aug {
 	}
 };
 
-// The augmentation contract, pinned. The range-free half is checked by the
-// trait; the rest is checked where update_aug/update are called, against the
-// range that site passes.
+/*
+ * The augmentation contract, pinned. The range-free half is checked by the
+ * trait; the rest is checked where update_aug/update are called, against the
+ * range that site passes.
+ */
 namespace aug_contract
 {
 using entry_slice = parlay::slice<entry *, entry *>;
@@ -125,12 +131,14 @@ static_assert(pab_tree::leaf_aug_constructible_from<sum_leaf_aug, entry_slice>);
 static_assert(pab_tree::leaf_aug_updatable_with<sum_leaf_aug, entry_slice>);
 static_assert(pab_tree::interior_augmentation<subtree_size_aug>);
 
-// The empty defaults satisfy it too, so an unaugmented tree is not a special
-// case.
+/*
+ * The empty defaults satisfy it too, so an unaugmented tree is not a special
+ * case.
+ */
 static_assert(pab_tree::leaf_augmentation<pab_tree::empty_leaf_aug>);
 static_assert(pab_tree::interior_augmentation<pab_tree::empty_interior_aug>);
 
-// And the ones that would not work are rejected.
+/* And the ones that would not work are rejected. */
 struct no_reset {
 	uint64_t s = 0;
 };
@@ -151,9 +159,9 @@ static_assert(!pab_tree::interior_augmentation<no_force_parallel>);
 static_assert(!pab_tree::leaf_aug_updatable_with<not_updatable, entry_slice>);
 static_assert(
 	!pab_tree::leaf_aug_constructible_from<not_updatable, entry_slice>);
-} // namespace aug_contract
+} /* namespace aug_contract */
 
-// ---- workloads ----
+/* ---- workloads ---- */
 
 enum class dist { uniform, clustered, sequential, sparse, boundary };
 
@@ -174,8 +182,10 @@ char const *dist_name(dist d)
 	return "?";
 }
 
-// n distinct keys. Distinct is a precondition of the tree, so every shape
-// here dedupes before it returns.
+/*
+ * n distinct keys. Distinct is a precondition of the tree, so every shape
+ * here dedupes before it returns.
+ */
 std::vector<uint32_t> gen_keys(size_t n, dist d, uint64_t seed)
 {
 	std::mt19937_64 rng(seed);
@@ -184,7 +194,7 @@ std::vector<uint32_t> gen_keys(size_t n, dist d, uint64_t seed)
 
 	switch (d) {
 	case dist::uniform: {
-		// Draw from a space wide enough that dedup rarely bites.
+		/* Draw from a space wide enough that dedup rarely bites. */
 		auto const span = static_cast<uint32_t>(
 			std::min<uint64_t>(std::max<uint64_t>(n * 8, 64), 0xFFFFFFF0ULL));
 		while (keys.size() < n * 2 && keys.size() < 4 * n + 64) {
@@ -196,7 +206,7 @@ std::vector<uint32_t> gen_keys(size_t n, dist d, uint64_t seed)
 		break;
 	}
 	case dist::clustered: {
-		// A few hot regions, so leaves fill unevenly.
+		/* A few hot regions, so leaves fill unevenly. */
 		size_t const centres = std::max<size_t>(1, n / 500);
 		std::vector<uint32_t> hot;
 		for (size_t i = 0; i < centres; ++i) {
@@ -221,8 +231,10 @@ std::vector<uint32_t> gen_keys(size_t n, dist d, uint64_t seed)
 		}
 		break;
 	case dist::boundary:
-		// Runs of consecutive keys separated by gaps, so batches land
-		// exactly on split boundaries.
+		/*
+		 * Runs of consecutive keys separated by gaps, so batches land
+		 * exactly on split boundaries.
+		 */
 		for (size_t i = 0; i < n; ++i) {
 			keys.push_back(static_cast<uint32_t>((i / 4) * 1024 + (i % 4)));
 		}
@@ -243,13 +255,13 @@ std::vector<entry> to_entries(std::vector<uint32_t> const &keys)
 	std::vector<entry> v;
 	v.reserve(keys.size());
 	for (auto k : keys) {
-		// A value derived from the key, so a misplaced entry is visible.
+		/* A value derived from the key, so a misplaced entry is visible. */
 		v.push_back(entry{ k, k ^ 0x5bf03635u });
 	}
 	return v;
 }
 
-// ---- checks against the oracle ----
+/* ---- checks against the oracle ---- */
 
 using oracle = std::map<uint32_t, uint32_t>;
 
@@ -260,42 +272,45 @@ void add_to_oracle(oracle &ref, std::vector<entry> const &v)
 	}
 }
 
-// Every leaf's augmentation equals the sum of the keys it holds, and every
-// interior's equals the entries below it. Catches an update_aug that a
-// rebalance forgot.
-template <typename Tree, typename node_type>
-void check_aug(node_type const *T, size_t &leaves, size_t &interiors)
+/*
+ * Every leaf's augmentation equals the sum of the keys it holds, and every
+ * interior's equals the entries below it. Catches an update_aug that a
+ * rebalance forgot.
+ */
+template <typename Tree, typename NodeType>
+void check_aug(NodeType const *node, size_t &leaves, size_t &interiors)
 {
 	using leaf_type = typename Tree::leaf_type;
 	using interior_type = typename Tree::interior_type;
 
-	if (T->is_leaf) {
-		auto const *TL = static_cast<leaf_type const *>(T);
+	if (node->is_leaf) {
+		auto const *leaf = static_cast<leaf_type const *>(node);
 		uint64_t want = 0;
-		for (size_t i = 0; i < TL->size; ++i) {
-			want += TL->elements[i].key;
+		for (size_t i = 0; i < leaf->size; ++i) {
+			want += leaf->elements[i].key;
 		}
-		ASSERT_EQ(TL->get_aug().sum, want) << "leaf aug is stale";
+		ASSERT_EQ(leaf->get_aug().sum, want) << "leaf aug is stale";
 		leaves++;
 		return;
 	}
 
-	auto const *TI = static_cast<interior_type const *>(T);
+	auto const *interior = static_cast<interior_type const *>(node);
 	uint64_t want = 0;
-	for (size_t i = 0; i < TI->get_node_n(); ++i) {
-		want += TI->tree_nodes[i]->size;
+	for (size_t i = 0; i < interior->get_node_n(); ++i) {
+		want += interior->tree_nodes[i]->size;
 	}
-	ASSERT_EQ(TI->get_aug().total, want) << "interior aug is stale";
-	ASSERT_EQ(TI->get_aug().total, TI->size) << "interior aug != subtree size";
+	ASSERT_EQ(interior->get_aug().total, want) << "interior aug is stale";
+	ASSERT_EQ(interior->get_aug().total, interior->size)
+		<< "interior aug != subtree size";
 	interiors++;
 
-	for (size_t i = 0; i < TI->get_node_n(); ++i) {
+	for (size_t i = 0; i < interior->get_node_n(); ++i) {
 		ASSERT_NO_FATAL_FAILURE(
-			check_aug<Tree>(TI->tree_nodes[i], leaves, interiors));
+			check_aug<Tree>(interior->tree_nodes[i], leaves, interiors));
 	}
 }
 
-// Contents, ordering, membership and the range queries, all against ref.
+/* Contents, ordering, membership and the range queries, all against ref. */
 template <typename Tree>
 void check_against(Tree &t, oracle const &ref)
 {
@@ -304,7 +319,7 @@ void check_against(Tree &t, oracle const &ref)
 	ASSERT_EQ(t.size(), ref.size());
 	ASSERT_EQ(t.empty(), ref.empty());
 
-	// Forward iteration, then backwards from end().
+	/* Forward iteration, then backwards from end(). */
 	{
 		size_t cnt = 0;
 		auto rt = ref.begin();
@@ -325,7 +340,7 @@ void check_against(Tree &t, oracle const &ref)
 		ASSERT_EQ(rit, ref.begin());
 	}
 
-	// get_entries returns everything, in no particular order.
+	/* get_entries returns everything, in no particular order. */
 	{
 		parlay::sequence<entry> got(t.size());
 		t.get_entries(got);
@@ -340,7 +355,7 @@ void check_against(Tree &t, oracle const &ref)
 		ASSERT_EQ(flat, want) << "get_entries does not match the oracle";
 	}
 
-	// to_seq is the same contents in key order.
+	/* to_seq is the same contents in key order. */
 	{
 		auto const seq = t.to_seq();
 		ASSERT_EQ(seq.size(), ref.size());
@@ -357,7 +372,7 @@ void check_against(Tree &t, oracle const &ref)
 	}
 }
 
-// Membership and ordered lookup over present and absent keys.
+/* Membership and ordered lookup over present and absent keys. */
 template <typename Tree>
 void check_lookups(Tree const &t, oracle const &ref,
 				   std::vector<uint32_t> const &probes)
@@ -397,7 +412,7 @@ void check_lookups(Tree const &t, oracle const &ref,
 	}
 }
 
-// range_count and range_report over boxes drawn around live keys.
+/* range_count and range_report over boxes drawn around live keys. */
 template <typename Tree>
 void check_ranges(Tree const &t, oracle const &ref, uint64_t seed, int boxes)
 {
@@ -417,11 +432,11 @@ void check_ranges(Tree const &t, oracle const &ref, uint64_t seed, int boxes)
 		uint32_t lo = 0;
 		uint32_t hi = 0;
 		if (b == 0) {
-			// The whole key space.
+			/* The whole key space. */
 			lo = 0;
 			hi = 0xFFFFFFFFu;
 		} else if (b == 1) {
-			// Empty box.
+			/* Empty box. */
 			lo = keys[rng() % keys.size()];
 			hi = lo;
 		} else {
@@ -430,7 +445,7 @@ void check_ranges(Tree const &t, oracle const &ref, uint64_t seed, int boxes)
 			if (lo > hi) {
 				std::swap(lo, hi);
 			}
-			// Half-open, so nudge sometimes to cover both edges.
+			/* Half-open, so nudge sometimes to cover both edges. */
 			if ((rng() & 1) && hi != 0xFFFFFFFFu) {
 				hi++;
 			}
@@ -470,7 +485,7 @@ void check_ranges(Tree const &t, oracle const &ref, uint64_t seed, int boxes)
 uint64_t g_seed = 20260817;
 int g_rounds = 1;
 
-// One full scenario: build, query, insert, delete, re-query.
+/* One full scenario: build, query, insert, delete, re-query. */
 template <unsigned KBuf>
 void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 {
@@ -482,7 +497,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 				 "  (rerun: ./self_test --seed=" + std::to_string(seed) + ")");
 
 	auto const all = gen_keys(n, d, seed);
-	// Two thirds build the tree, one third is the insert batch.
+	/* Two thirds build the tree, one third is the insert batch. */
 	size_t const split = all.size() * 2 / 3;
 	std::vector<uint32_t> base(all.begin(), all.begin() + split);
 	std::vector<uint32_t> extra(all.begin() + split, all.end());
@@ -497,7 +512,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 	add_to_oracle(ref, base_e);
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 
-	// Probe live keys, the insert batch (absent so far), and neighbours.
+	/* Probe live keys, the insert batch (absent so far), and neighbours. */
 	std::vector<uint32_t> probes;
 	{
 		std::mt19937_64 rng(seed ^ 0x9e3779b97f4a7c15ULL);
@@ -521,7 +536,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 		ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 1, 12));
 	}
 
-	// Insert the rest.
+	/* Insert the rest. */
 	t.batch_insert(extra_e);
 	add_to_oracle(ref, extra_e);
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
@@ -530,7 +545,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 		ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 2, 12));
 	}
 
-	// Delete half of what is in there, chosen across the whole key range.
+	/* Delete half of what is in there, chosen across the whole key range. */
 	{
 		std::vector<uint32_t> live;
 		for (auto const &kv : ref) {
@@ -551,7 +566,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 		}
 	}
 
-	// Delete everything that is left.
+	/* Delete everything that is left. */
 	{
 		std::vector<uint32_t> live;
 		for (auto const &kv : ref) {
@@ -565,13 +580,15 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 	}
 }
 
-} // namespace
+} /* namespace */
 
-// ---- the trait can be configured by name, not just by position ----
+/* ---- the trait can be configured by name, not just by position ---- */
 
-// Overriding a late parameter must not mean naming the earlier defaults.
-// btree_trait is an alias for btree_type_trait, so the two cannot drift:
-// these static asserts fail if the mapping is ever wrong.
+/*
+ * Overriding a late parameter must not mean naming the earlier defaults.
+ * btree_trait is an alias for btree_type_trait, so the two cannot drift:
+ * these static asserts fail if the mapping is ever wrong.
+ */
 namespace trait_forms
 {
 struct desc : pab_tree::default_options {
@@ -581,28 +598,30 @@ struct alloc_only : pab_tree::default_options {
 	using node_alloc = pab_tree::parlay_node_alloc;
 };
 
-// everything defaulted
+/* everything defaulted */
 static_assert(std::is_same_v<pab_tree::btree_trait<ele>,
 							 pab_tree::btree_type_trait<ele>>);
-// BufferSize defaults to 64
+/* BufferSize defaults to 64 */
 static_assert(std::is_same_v<pab_tree::btree_type_trait<ele>,
 							 pab_tree::btree_type_trait<ele, 64>>);
-// only the comparator overridden
+/* only the comparator overridden */
 static_assert(
 	std::is_same_v<
 		pab_tree::btree_trait<ele, 32, desc>,
 		pab_tree::btree_type_trait<
 			ele, 32, pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
 			pab_tree::proto_node, std::greater<uint32_t>>>);
-// only the allocator named, explicitly equal to the default
+/* only the allocator named, explicitly equal to the default */
 static_assert(std::is_same_v<pab_tree::btree_trait<ele, 8, alloc_only>,
 							 pab_tree::btree_type_trait<ele, 8>>);
-} // namespace trait_forms
+} /* namespace trait_forms */
 
 TEST(SelfTest, TraitByName)
 {
-	// An options struct declared inside a function: key_compare is a
-	// plain alias, not a member template, so this compiles.
+	/*
+	 * An options struct declared inside a function: key_compare is a
+	 * plain alias, not a member template, so this compiles.
+	 */
 	struct desc : pab_tree::default_options {
 		using key_compare = std::greater<uint32_t>;
 	};
@@ -616,7 +635,7 @@ TEST(SelfTest, TraitByName)
 	ASSERT_TRUE(ok);
 	ASSERT_EQ(t.size(), keys.size());
 
-	// descending, because the option took effect
+	/* descending, because the option took effect */
 	auto sorted = keys;
 	std::sort(sorted.begin(), sorted.end(), std::greater<uint32_t>());
 	auto it = t.begin();
@@ -624,10 +643,12 @@ TEST(SelfTest, TraitByName)
 		ASSERT_EQ(it->key, sorted[i]);
 }
 
-// ---- the element adaptor is used directly, with either signature ----
+/* ---- the element adaptor is used directly, with either signature ---- */
 
-// By-value accessors. The library used to wrap every adaptor in a layer
-// that forced this signature; it now calls the adaptor as written.
+/*
+ * By-value accessors. The library used to wrap every adaptor in a layer
+ * that forced this signature; it now calls the adaptor as written.
+ */
 struct ele_by_value {
 	using entry_type = entry;
 	using key_type = uint32_t;
@@ -647,7 +668,7 @@ struct ele_by_value {
 	}
 };
 
-// A fat entry, where a by-value copy would be 64 bytes if one happened.
+/* A fat entry, where a by-value copy would be 64 bytes if one happened. */
 struct big_entry {
 	uint32_t key;
 	char payload[60];
@@ -682,7 +703,7 @@ TEST(SelfTest, ElementAdaptorSignatures)
 {
 	auto const keys = gen_keys(20000, dist::uniform, g_seed ^ 0xe1e);
 
-	// by-value accessors
+	/* by-value accessors */
 	{
 		using tt = pab_tree::btree_type_trait<ele_by_value, 32>;
 		pab_tree::btree<tt> t;
@@ -695,7 +716,7 @@ TEST(SelfTest, ElementAdaptorSignatures)
 			ASSERT_TRUE(t.contain(keys[i]));
 	}
 
-	// a 64-byte entry, by-reference accessors
+	/* a 64-byte entry, by-reference accessors */
 	{
 		using tt = pab_tree::btree_type_trait<ele_big, 32>;
 		pab_tree::btree<tt> t;
@@ -719,7 +740,7 @@ TEST(SelfTest, ElementAdaptorSignatures)
 	}
 }
 
-// ---- get_entries' output-size contract ----
+/* ---- get_entries' output-size contract ---- */
 
 TEST(SelfTest, GetEntriesOutputSize)
 {
@@ -731,7 +752,7 @@ TEST(SelfTest, GetEntriesOutputSize)
 	t.build(all);
 	ASSERT_EQ(t.size(), all.size());
 
-	// Exactly sized: every entry lands, none past the end.
+	/* Exactly sized: every entry lands, none past the end. */
 	{
 		parlay::sequence<entry> out(t.size());
 		t.get_entries(out);
@@ -746,7 +767,7 @@ TEST(SelfTest, GetEntriesOutputSize)
 		EXPECT_EQ(got, want);
 	}
 
-	// Oversized is fine; the tail is left alone.
+	/* Oversized is fine; the tail is left alone. */
 	{
 		parlay::sequence<entry> out(t.size() + 100);
 		for (size_t i = t.size(); i < out.size(); ++i)
@@ -757,7 +778,7 @@ TEST(SelfTest, GetEntriesOutputSize)
 				<< "get_entries wrote past size()";
 	}
 
-	// An empty tree writes nothing and does not dereference a null root.
+	/* An empty tree writes nothing and does not dereference a null root. */
 	{
 		tree e;
 		parlay::sequence<entry> out(4);
@@ -766,9 +787,11 @@ TEST(SelfTest, GetEntriesOutputSize)
 		EXPECT_EQ(out[0].key, 7u);
 	}
 
-	// One short must be caught rather than overrun. Asserts are live in
-	// this build (-UNDEBUG); in a release build the call is undefined,
-	// which is what the README says.
+	/*
+	 * One short must be caught rather than overrun. Asserts are live in
+	 * this build (-UNDEBUG); in a release build the call is undefined,
+	 * which is what the README says.
+	 */
 #ifndef NDEBUG
 	GTEST_FLAG_SET(death_test_style, "threadsafe");
 	parlay::sequence<entry> small(t.size() - 1);
@@ -778,7 +801,7 @@ TEST(SelfTest, GetEntriesOutputSize)
 #endif
 }
 
-// ---- deleting a key that is not there does nothing ----
+/* ---- deleting a key that is not there does nothing ---- */
 
 TEST(SelfTest, DeleteAbsentKeys)
 {
@@ -788,7 +811,7 @@ TEST(SelfTest, DeleteAbsentKeys)
 	auto const seed = g_seed ^ 0xab5e27;
 	SCOPED_TRACE("absent-key delete seed=" + std::to_string(seed));
 
-	// Even keys only, so every odd key is absent.
+	/* Even keys only, so every odd key is absent. */
 	std::vector<entry> v;
 	oracle ref;
 	for (uint32_t i = 0; i < 40000; i += 2) {
@@ -805,11 +828,11 @@ TEST(SelfTest, DeleteAbsentKeys)
 		keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
 		t.batch_delete(keys);
 		for (auto k : keys)
-			ref.erase(k); // std::map::erase ignores absent keys too
+			ref.erase(k); /* std::map::erase ignores absent keys too */
 		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 	};
 
-	// 1. every key absent, and more of them than the tree holds
+	/* 1. every key absent, and more of them than the tree holds */
 	{
 		std::vector<uint32_t> odd;
 		for (uint32_t i = 1; i < 120000; i += 2)
@@ -819,7 +842,7 @@ TEST(SelfTest, DeleteAbsentKeys)
 		ASSERT_EQ(t.size(), before) << "an absent-key delete changed the size";
 	}
 
-	// 2. absent keys beyond both ends of the key range
+	/* 2. absent keys beyond both ends of the key range */
 	{
 		std::vector<uint32_t> outside{ 0xFFFFFFFEu, 0xFFFFFF00u, 1u, 3u };
 		auto const before = t.size();
@@ -827,18 +850,18 @@ TEST(SelfTest, DeleteAbsentKeys)
 		ASSERT_EQ(t.size(), before);
 	}
 
-	// 3. a mix: half present, half not
+	/* 3. a mix: half present, half not */
 	{
 		std::mt19937_64 rng(seed);
 		std::vector<uint32_t> mixed;
 		for (int i = 0; i < 4000; ++i) {
 			uint32_t const k = static_cast<uint32_t>(rng() % 40000);
-			mixed.push_back(k); // even => present, odd => absent
+			mixed.push_back(k); /* even => present, odd => absent */
 		}
 		ASSERT_NO_FATAL_FAILURE(erase_both(mixed, "half present"));
 	}
 
-	// 4. deleting the same present key twice: second time is a no-op
+	/* 4. deleting the same present key twice: second time is a no-op */
 	{
 		auto const k = t.begin()->key;
 		ASSERT_TRUE(t.contain(k));
@@ -849,51 +872,53 @@ TEST(SelfTest, DeleteAbsentKeys)
 		ASSERT_EQ(t.size(), before);
 	}
 
-	// 5. single-key erase(k) reports whether it was there
+	/* 5. single-key erase(k) reports whether it was there */
 	{
 		auto const present = t.begin()->key;
 		ASSERT_TRUE(t.erase(present));
 		ASSERT_FALSE(t.erase(present));
-		ASSERT_FALSE(t.erase(1u)); // odd, never present
+		ASSERT_FALSE(t.erase(1u)); /* odd, never present */
 		ref.erase(present);
 		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 	}
 
-	// 6. emptying the tree with a batch that also names absent keys
+	/* 6. emptying the tree with a batch that also names absent keys */
 	{
 		std::vector<uint32_t> everything;
 		for (auto const &kv : ref)
 			everything.push_back(kv.first);
 		for (uint32_t i = 1; i < 2000; i += 2)
-			everything.push_back(i); // absent
+			everything.push_back(i); /* absent */
 		ASSERT_NO_FATAL_FAILURE(erase_both(everything, "empty it out"));
 		ASSERT_TRUE(t.empty());
 		ASSERT_EQ(t.begin(), t.end());
 	}
 }
 
-// ---- the default leaf-sort decision is reproducible ----
+/* ---- the default leaf-sort decision is reproducible ---- */
 
-// FNV over every leaf's is_sorted flag, in tree order.
-template <typename Tree, typename node_type>
-void hash_leaf_sortedness(node_type const *T, uint64_t &h, size_t &leaves)
+/* FNV over every leaf's is_sorted flag, in tree order. */
+template <typename Tree, typename NodeType>
+void hash_leaf_sortedness(NodeType const *node, uint64_t &h, size_t &leaves)
 {
 	using leaf_type = typename Tree::leaf_type;
 	using interior_type = typename Tree::interior_type;
 
-	if (T->is_leaf) {
-		auto const *TL = static_cast<leaf_type const *>(T);
-		h = (h ^ (TL->is_sorted ? 1u : 0u)) * 1099511628211ULL;
+	if (node->is_leaf) {
+		auto const *leaf = static_cast<leaf_type const *>(node);
+		h = (h ^ (leaf->is_sorted ? 1u : 0u)) * 1099511628211ULL;
 		leaves++;
 		return;
 	}
-	auto const *TI = static_cast<interior_type const *>(T);
-	for (size_t i = 0; i < TI->get_node_n(); ++i)
-		hash_leaf_sortedness<Tree>(TI->tree_nodes[i], h, leaves);
+	auto const *interior = static_cast<interior_type const *>(node);
+	for (size_t i = 0; i < interior->get_node_n(); ++i)
+		hash_leaf_sortedness<Tree>(interior->tree_nodes[i], h, leaves);
 }
 
-// Runs the default insert/delete path and prints the leaf-sortedness
-// pattern. Called in the child process; see the test below.
+/*
+ * Runs the default insert/delete path and prints the leaf-sortedness
+ * pattern. Called in the child process; see the test below.
+ */
 static void print_hybrid_pattern()
 {
 	using tt = pab_tree::btree_type_trait<ele, 32>;
@@ -908,7 +933,7 @@ static void print_hybrid_pattern()
 
 	tree t;
 	t.build(base);
-	t.batch_insert(rest); // default path: hybrid + default_hybrid_pred
+	t.batch_insert(rest); /* default path: hybrid + default_hybrid_pred */
 	t.batch_delete(del);
 
 	uint64_t h = 1469598103934665603ULL;
@@ -918,20 +943,24 @@ static void print_hybrid_pattern()
 	std::fflush(stdout);
 }
 
-// default_hybrid_pred mixes bit 3 of each end of the input slice into its
-// coin flip. That bit comes from the slice's offset inside its buffer, not
-// from the address -- allocations are 16-byte aligned, so bit 3 of the base
-// is 0 -- so the decision is the same from run to run.
-//
-// This has to be checked across processes. Inside one process the slices
-// the predicate sees are internal buffers that the pool hands back at the
-// same address every time, so two runs prove nothing; only a fresh process
-// gets a different ASLR base. Verified: with the shift changed from 3 to 12
-// the in-process version still passed, this one fails.
+/*
+ * default_hybrid_pred mixes bit 3 of each end of the input slice into its
+ * coin flip. That bit comes from the slice's offset inside its buffer, not
+ * from the address -- allocations are 16-byte aligned, so bit 3 of the base
+ * is 0 -- so the decision is the same from run to run.
+ *
+ * This has to be checked across processes. Inside one process the slices
+ * the predicate sees are internal buffers that the pool hands back at the
+ * same address every time, so two runs prove nothing; only a fresh process
+ * gets a different ASLR base. Verified: with the shift changed from 3 to 12
+ * the in-process version still passed, this one fails.
+ */
 TEST(SelfTest, DefaultHybridPredIsReproducible)
 {
-	// Resolve our own path here: inside popen, /proc/self/exe is the
-	// shell, not this binary.
+	/*
+	 * Resolve our own path here: inside popen, /proc/self/exe is the
+	 * shell, not this binary.
+	 */
 	char exe[4096];
 	ssize_t const len = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 	ASSERT_GT(len, 0) << "cannot resolve /proc/self/exe";
@@ -965,11 +994,13 @@ TEST(SelfTest, DefaultHybridPredIsReproducible)
 		   "it depends on the address layout, not just the input";
 }
 
-// ---- a custom node base ----
+/* ---- a custom node base ---- */
 
-// Same shape proto_node has, plus a field of its own. node_base is what
-// the tree requires: constructible from (bool, size_t), with public
-// is_leaf and a writable size.
+/*
+ * Same shape proto_node has, plus a field of its own. node_base is what
+ * the tree requires: constructible from (bool, size_t), with public
+ * is_leaf and a writable size.
+ */
 struct tagged_node {
 	tagged_node()
 		: is_leaf(false)
@@ -990,8 +1021,10 @@ struct tagged_node {
 	unsigned tag;
 };
 
-// An aggregate qualifies too: C++20 parenthesized aggregate init (P0960)
-// makes this constructible from (bool, size_t) without a constructor.
+/*
+ * An aggregate qualifies too: C++20 parenthesized aggregate init (P0960)
+ * makes this constructible from (bool, size_t) without a constructor.
+ */
 struct aggregate_node {
 	bool is_leaf = false;
 	size_t size = 0;
@@ -1001,7 +1034,7 @@ static_assert(pab_tree::node_base<pab_tree::proto_node>);
 static_assert(pab_tree::node_base<tagged_node>);
 static_assert(pab_tree::node_base<aggregate_node>);
 
-// And the ones the tree could not work with are rejected.
+/* And the ones the tree could not work with are rejected. */
 struct no_size {
 	no_size(bool l, size_t)
 		: is_leaf(l)
@@ -1045,7 +1078,7 @@ TEST(SelfTest, CustomNodeBase)
 	add_to_oracle(ref, rest);
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 
-	// The custom field survives on every node the tree built.
+	/* The custom field survives on every node the tree built. */
 	ASSERT_NE(t.get_root(), nullptr);
 	ASSERT_EQ(t.get_root()->tag, 0xABu) << "custom node field lost";
 
@@ -1057,27 +1090,29 @@ TEST(SelfTest, CustomNodeBase)
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 }
 
-// ---- a custom node allocator is used for every node ----
+/* ---- a custom node allocator is used for every node ---- */
 
-// Counts allocations and frees. Also a leak check: the tree must return
-// every node it took by the time it is destroyed.
+/*
+ * Counts allocations and frees. Also a leak check: the tree must return
+ * every node it took by the time it is destroyed.
+ */
 struct counting_alloc {
 	static inline std::atomic<long> live{ 0 };
 	static inline std::atomic<long> total{ 0 };
 
-	template <typename T>
-	static T *alloc()
+	template <typename node>
+	static node *alloc()
 	{
 		live.fetch_add(1, std::memory_order_relaxed);
 		total.fetch_add(1, std::memory_order_relaxed);
-		return parlay::type_allocator<T>::alloc();
+		return parlay::type_allocator<node>::alloc();
 	}
 
-	template <typename T>
-	static void free(T *p)
+	template <typename node>
+	static void free(node *p)
 	{
 		live.fetch_sub(1, std::memory_order_relaxed);
-		parlay::type_allocator<T>::retire(p);
+		parlay::type_allocator<node>::retire(p);
 	}
 };
 
@@ -1112,8 +1147,10 @@ TEST(SelfTest, CustomAllocator)
 		ASSERT_TRUE(ok);
 		ASSERT_EQ(t.size(), keys.size());
 
-		// A tree of n entries with leaf size 16 holds at least n/k_buf_ub
-		// leaves, so the count has to be in a sane range.
+		/*
+		 * A tree of n entries with leaf size 16 holds at least n/k_buf_ub
+		 * leaves, so the count has to be in a sane range.
+		 */
 		ASSERT_GE(counting_alloc::live.load(),
 				  static_cast<long>(keys.size() / (4 * 16)));
 
@@ -1125,18 +1162,20 @@ TEST(SelfTest, CustomAllocator)
 		ASSERT_TRUE(ok);
 	}
 
-	// The tree is gone; every node it took must have come back.
+	/* The tree is gone; every node it took must have come back. */
 	EXPECT_EQ(counting_alloc::live.load(), 0)
 		<< "leaked " << counting_alloc::live.load() << " nodes of "
 		<< counting_alloc::total.load();
 }
 
-// ---- a custom key comparator orders the whole tree ----
+/* ---- a custom key comparator orders the whole tree ---- */
 
 TEST(SelfTest, ReverseComparator)
 {
-	// std::greater: the tree is ordered descending, so every structural
-	// invariant, the descent, the sorts and validate() must follow it.
+	/*
+	 * std::greater: the tree is ordered descending, so every structural
+	 * invariant, the descent, the sorts and validate() must follow it.
+	 */
 	struct desc : pab_tree::default_options {
 		using key_compare = std::greater<uint32_t>;
 	};
@@ -1151,7 +1190,7 @@ TEST(SelfTest, ReverseComparator)
 	std::vector<entry> base(all.begin(), all.begin() + all.size() / 2);
 	std::vector<entry> rest(all.begin() + all.size() / 2, all.end());
 
-	// The oracle uses the same order.
+	/* The oracle uses the same order. */
 	std::map<uint32_t, uint32_t, std::greater<uint32_t>> ref;
 	auto add = [&](std::vector<entry> const &v) {
 		for (auto const &e : v)
@@ -1168,7 +1207,7 @@ TEST(SelfTest, ReverseComparator)
 		ASSERT_TRUE(ok) << "validate() failed under std::greater";
 		ASSERT_EQ(t.size(), ref.size());
 
-		// Iteration follows the comparator, so it runs high to low.
+		/* Iteration follows the comparator, so it runs high to low. */
 		auto rt = ref.begin();
 		size_t cnt = 0;
 		for (auto it = t.begin(); it != t.end(); ++it, ++rt, ++cnt) {
@@ -1177,14 +1216,14 @@ TEST(SelfTest, ReverseComparator)
 		}
 		ASSERT_EQ(cnt, ref.size());
 
-		// to_seq is descending.
+		/* to_seq is descending. */
 		auto const seq = t.to_seq();
 		ASSERT_EQ(seq.size(), ref.size());
 		for (size_t i = 1; i < seq.size(); ++i)
 			ASSERT_GT(ele::get_key(seq[i - 1]), ele::get_key(seq[i]))
 				<< "to_seq not descending at " << i;
 
-		// Membership and the ordered lookups.
+		/* Membership and the ordered lookups. */
 		for (size_t i = 0; i < keys.size(); i += 97) {
 			auto const k = keys[i];
 			ASSERT_EQ(t.contain(k), ref.count(k) != 0);
@@ -1203,7 +1242,7 @@ TEST(SelfTest, ReverseComparator)
 	add(rest);
 	ASSERT_NO_FATAL_FAILURE(check("after batch_insert"));
 
-	// range_count takes its box in comparator order: [hi, lo) descending.
+	/* range_count takes its box in comparator order: [hi, lo) descending. */
 	{
 		std::vector<uint32_t> sorted_keys = keys;
 		std::sort(sorted_keys.begin(), sorted_keys.end());
@@ -1212,7 +1251,7 @@ TEST(SelfTest, ReverseComparator)
 			auto lo = sorted_keys[rng() % sorted_keys.size()];
 			auto hi = sorted_keys[rng() % sorted_keys.size()];
 			if (lo < hi)
-				std::swap(lo, hi); // first is the greater under std::greater
+				std::swap(lo, hi); /* first is the greater under std::greater */
 			auto const want = static_cast<size_t>(
 				std::distance(ref.lower_bound(lo), ref.lower_bound(hi)));
 			ASSERT_EQ(t.range_count({ lo, hi }), want)
@@ -1220,7 +1259,7 @@ TEST(SelfTest, ReverseComparator)
 		}
 	}
 
-	// Deleting still rebalances correctly under the comparator.
+	/* Deleting still rebalances correctly under the comparator. */
 	{
 		std::vector<uint32_t> live = keys;
 		std::mt19937_64 rng(seed ^ 7);
@@ -1233,7 +1272,7 @@ TEST(SelfTest, ReverseComparator)
 	ASSERT_NO_FATAL_FAILURE(check("after batch_delete"));
 }
 
-// ---- edge cases: the sizes where the structure changes shape ----
+/* ---- edge cases: the sizes where the structure changes shape ---- */
 
 template <unsigned KBuf>
 void small_sizes()
@@ -1272,7 +1311,7 @@ TEST(SelfTest, SmallSizesLeaf64)
 	small_sizes<64>();
 }
 
-// ---- the shapes, at a size that builds a real multi-level tree ----
+/* ---- the shapes, at a size that builds a real multi-level tree ---- */
 
 template <unsigned KBuf>
 void shapes(size_t n)
@@ -1307,7 +1346,7 @@ TEST(SelfTest, ShapesLeaf256)
 	shapes<256>(200000);
 }
 
-// ---- many small batches against one tree ----
+/* ---- many small batches against one tree ---- */
 
 TEST(SelfTest, Churn)
 {
@@ -1328,7 +1367,7 @@ TEST(SelfTest, Churn)
 	for (int round = 0; round < 40; ++round) {
 		SCOPED_TRACE("round " + std::to_string(round));
 
-		// Insert a random slice of the pool that is not in the tree.
+		/* Insert a random slice of the pool that is not in the tree. */
 		std::vector<entry> add;
 		for (size_t i = 0; i < 800; ++i) {
 			auto const k = pool[rng() % pool.size()];
@@ -1337,7 +1376,7 @@ TEST(SelfTest, Churn)
 				ref[k] = k ^ 0x5bf03635u;
 			}
 		}
-		// A batch must itself hold distinct keys.
+		/* A batch must itself hold distinct keys. */
 		std::sort(add.begin(), add.end(),
 				  [](entry const &a, entry const &b) { return a.key < b.key; });
 		add.erase(std::unique(add.begin(), add.end(),
@@ -1354,7 +1393,7 @@ TEST(SelfTest, Churn)
 			}
 		}
 
-		// Delete a random slice of what is live.
+		/* Delete a random slice of what is live. */
 		std::vector<uint32_t> live;
 		for (auto const &kv : ref) {
 			live.push_back(kv.first);
@@ -1375,7 +1414,7 @@ TEST(SelfTest, Churn)
 	ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 5, 20));
 }
 
-// ---- augmentation stays current through every path ----
+/* ---- augmentation stays current through every path ---- */
 
 TEST(SelfTest, Augmentation)
 {
@@ -1411,7 +1450,7 @@ TEST(SelfTest, Augmentation)
 	t.batch_insert(rest);
 	ASSERT_NO_FATAL_FAILURE(verify("after batch_insert"));
 
-	// Delete enough to force merges and redistribution.
+	/* Delete enough to force merges and redistribution. */
 	{
 		std::vector<uint32_t> live = keys;
 		std::mt19937_64 rng(seed);
@@ -1423,7 +1462,7 @@ TEST(SelfTest, Augmentation)
 	ASSERT_NO_FATAL_FAILURE(verify("after batch_delete"));
 }
 
-// ---- copy, move and assignment ----
+/* ---- copy, move and assignment ---- */
 
 TEST(SelfTest, ValueSemantics)
 {
@@ -1438,12 +1477,12 @@ TEST(SelfTest, ValueSemantics)
 	a.build(e);
 	ASSERT_NO_FATAL_FAILURE(check_against(a, ref));
 
-	// Copy is deep: mutating the copy leaves the original alone.
+	/* Copy is deep: mutating the copy leaves the original alone. */
 	tree b = a;
 	ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
 	ASSERT_TRUE(a == b);
 
-	// Drop the 1000 smallest keys from the copy.
+	/* Drop the 1000 smallest keys from the copy. */
 	std::vector<uint32_t> drop;
 	for (auto const &kv : ref) {
 		drop.push_back(kv.first);
@@ -1457,14 +1496,16 @@ TEST(SelfTest, ValueSemantics)
 	ASSERT_FALSE(a == b);
 	ASSERT_NO_FATAL_FAILURE(check_against(a, ref));
 
-	// Ordering is lexicographic over the contents in key order, as in
-	// std::set. b lost its smallest keys, so it now starts higher.
+	/*
+	 * Ordering is lexicographic over the contents in key order, as in
+	 * std::set. b lost its smallest keys, so it now starts higher.
+	 */
 	ASSERT_TRUE(a < b);
 	ASSERT_TRUE(b > a);
 	ASSERT_TRUE(a <= b);
 	ASSERT_FALSE(b <= a);
 
-	// A prefix is less than what it is a prefix of.
+	/* A prefix is less than what it is a prefix of. */
 	{
 		tree pre = a;
 		std::vector<uint32_t> tail;
@@ -1478,7 +1519,7 @@ TEST(SelfTest, ValueSemantics)
 		ASSERT_TRUE(a > pre);
 	}
 
-	// Move leaves the source empty and usable.
+	/* Move leaves the source empty and usable. */
 	tree c = std::move(a);
 	ASSERT_NO_FATAL_FAILURE(check_against(c, ref));
 	ASSERT_TRUE(a.empty());
@@ -1486,12 +1527,12 @@ TEST(SelfTest, ValueSemantics)
 	a = c;
 	ASSERT_TRUE(a == c);
 
-	// Self-assignment must not free the tree.
+	/* Self-assignment must not free the tree. */
 	tree *p = &c;
 	c = *p;
 	ASSERT_NO_FATAL_FAILURE(check_against(c, ref));
 
-	// swap and clear.
+	/* swap and clear. */
 	tree d;
 	d.swap(c);
 	ASSERT_TRUE(c.empty());
@@ -1501,7 +1542,7 @@ TEST(SelfTest, ValueSemantics)
 	ASSERT_EQ(d.begin(), d.end());
 }
 
-// ---- single-element and iterator modifiers ----
+/* ---- single-element and iterator modifiers ---- */
 
 TEST(SelfTest, SingleElementOps)
 {
@@ -1529,7 +1570,7 @@ TEST(SelfTest, SingleElementOps)
 	}
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 
-	// erase(iterator) and erase(first, last).
+	/* erase(iterator) and erase(first, last). */
 	t.erase(t.begin());
 	ref.erase(ref.begin());
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
@@ -1541,7 +1582,7 @@ TEST(SelfTest, SingleElementOps)
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 }
 
-// ---- an empty and a default-constructed tree answer every query ----
+/* ---- an empty and a default-constructed tree answer every query ---- */
 
 TEST(SelfTest, EmptyTree)
 {
@@ -1563,7 +1604,7 @@ TEST(SelfTest, EmptyTree)
 	ASSERT_EQ(t.to_seq().size(), 0u);
 	ASSERT_FALSE(t.erase(5u));
 
-	// Emptied by deletion, not merely never filled.
+	/* Emptied by deletion, not merely never filled. */
 	auto const e = to_entries(gen_keys(1000, dist::uniform, g_seed));
 	t.build(e);
 	std::vector<uint32_t> all;
@@ -1575,26 +1616,30 @@ TEST(SelfTest, EmptyTree)
 	ASSERT_FALSE(t.contain(e[0].key));
 	ASSERT_EQ(t.begin(), t.end());
 
-	// And usable again afterwards.
+	/* And usable again afterwards. */
 	t.batch_insert(e);
 	add_to_oracle(ref, e);
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 }
 
-// HOW TO RUN
-//   ./self_test                         every test, fixed seed
-//   ./self_test --seed=12345            reproduce a reported failure
-//   ./self_test --rounds=20             more shapes per size, for fuzzing
-//   ./self_test --gtest_filter=SelfTest.Churn
-//
-// Needs no data files. Every failure prints the seed and the flag to
-// reproduce it.
+/*
+ * HOW TO RUN
+ *   ./self_test                         every test, fixed seed
+ *   ./self_test --seed=12345            reproduce a reported failure
+ *   ./self_test --rounds=20             more shapes per size, for fuzzing
+ *   ./self_test --gtest_filter=SelfTest.Churn
+ *
+ * Needs no data files. Every failure prints the seed and the flag to
+ * reproduce it.
+ */
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);
 
-	// Child mode for SelfTest.DefaultHybridPredIsReproducible: print the
-	// pattern and exit, so the parent can compare two fresh processes.
+	/*
+	 * Child mode for SelfTest.DefaultHybridPredIsReproducible: print the
+	 * pattern and exit, so the parent can compare two fresh processes.
+	 */
 	if (std::getenv("PABTREE_HYBRID_CHILD") != nullptr) {
 		print_hybrid_pattern();
 		return 0;

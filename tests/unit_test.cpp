@@ -14,20 +14,20 @@
 
 namespace fs = std::filesystem;
 
-template <typename TypeTrait>
-struct BTreeWrapper {
-	using TreeType = typename pab_tree::btree<TypeTrait>;
+template <typename TT>
+struct btree_wrapper {
+	using tree_type = typename pab_tree::btree<TT>;
 };
 
 template <typename Options, typename RunFunc>
-static void CheckOrthogonal(Options const &opts, RunFunc test_func)
+static void check_orthogonal(Options const &opts, RunFunc test_func)
 {
-	// using key_type = std::pair<uint32_t, uint32_t>;
-	using Wrapper = Wrapper<uint32_t, uint32_t>;
-	using key_type [[maybe_unused]] = Wrapper::key_type;
-	using mapped_type [[maybe_unused]] = Wrapper::mapped_type;
-	using entry_type = Wrapper::entry_type;
-	// using EleType = Element<uint32_t, uint32_t>;
+	/* using key_type = std::pair<uint32_t, uint32_t>; */
+	using wrapper = wrapper<uint32_t, uint32_t>;
+	using key_type [[maybe_unused]] = wrapper::key_type;
+	using mapped_type [[maybe_unused]] = wrapper::mapped_type;
+	using entry_type = wrapper::entry_type;
+	/* using EleType = Element<uint32_t, uint32_t>; */
 #ifdef LEAF1
 	static constexpr uint const k_buf = 1;
 #elif defined(LEAF2)
@@ -51,14 +51,14 @@ static void CheckOrthogonal(Options const &opts, RunFunc test_func)
 #elif defined(LEAF1024)
 	static constexpr uint const k_buf = 1024;
 #else
-	static constexpr uint const k_buf = 32; // Default
-#endif // LEAF1
+	static constexpr uint const k_buf = 32; /* Default */
+#endif /* LEAF1 */
 
-	using TypeTrait = pab_tree::btree_type_trait<
-		Wrapper::ElementWrapper<entry_type>, k_buf, Wrapper::LeafAugEmpty,
-		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
+	using TT = pab_tree::btree_type_trait<
+		wrapper::element_wrapper<entry_type>, k_buf, wrapper::leaf_aug_empty,
+		wrapper::interior_aug_empty, pab_tree::proto_node>;
 	if (opts.tree_type == 0) {
-		Run<BTreeWrapper<TypeTrait>>(opts, test_func);
+		Run<btree_wrapper<TT>>(opts, test_func);
 	}
 }
 
@@ -69,46 +69,45 @@ public:
 
 protected:
 #ifndef MAC
-	static constexpr char const *kDataPrefix = "/ssd1/zmen002/kv_pair";
+	static constexpr char const *k_data_prefix = "/ssd1/zmen002/kv_pair";
 #else
-	static constexpr char const *kDataPrefix =
+	static constexpr char const *k_data_prefix =
 		"/Users/ziyang/code/ParallelMultiwayOrderedSet/benchmarks";
-#endif // !  #ifndef MAC
-	static constexpr int kTag = 0b0011; // 2#0001
-	// static constexpr int kTag = 0b0000; // 2#0001
-	static constexpr double kBatchRatio = 0.01;
-	static constexpr int kQueryType = 0b011; // 2#001
-	static constexpr int kRangeQueryType = 3;
-	// static constexpr int kRangeQueryType = 2;
-	static constexpr int kRangeQueryNum = 1000;
-	static constexpr int kTreeType = 0;
-	static constexpr int kDim = 1;
-	static constexpr int kRounds = 2;
-	static constexpr int kSummary = 0;
-	static constexpr double kMembershipQueryRatio = 0.1;
+#endif /* !  #ifndef MAC */
+	static constexpr int k_tag = 0b0011; /* 2#0001 */
+	/* static constexpr int k_tag = 0b0000; // 2#0001 */
+	static constexpr double k_batch_ratio = 0.01;
+	static constexpr int k_query_type = 0b011; /* 2#001 */
+	static constexpr int k_range_query_type = 3;
+	/* static constexpr int k_range_query_type = 2; */
+	static constexpr int k_range_query_num = 1000;
+	static constexpr int k_tree_type = 0;
+	static constexpr int k_dim = 1;
+	static constexpr int k_rounds = 2;
+	static constexpr int k_summary = 0;
+	static constexpr double k_membership_query_ratio = 0.1;
 
 	std::vector<size_t> nodes{ 1000000, 5000000, 10000000, 50000000 };
 	std::vector<std::string> distributions{ "uni", "exp", "norm", "dual_norm" };
 	std::vector<std::string> batch_ops{ "ins" };
 
-	template <typename type_trait, typename TreeDesc>
-	static void CheckCorrectness(Options opts)
+	template <typename TT, typename TreeDesc>
+	static void check_correctness(Options opts)
 	{
-		using Tree = TreeDesc::TreeType;
-		using entry_seq = typename type_trait::entry_seq;
+		using Tree = TreeDesc::tree_type;
+		using entry_seq = typename TT::entry_seq;
 
 		Tree tree;
-		constexpr bool kTestTime = false;
+		constexpr bool k_test_time = false;
 		entry_seq wp;
 		entry_seq wi;
 		auto [base_path, batch_path] =
-			opts.ParseInsertBatchPath(opts.batch_ratio);
+			opts.parse_insert_batch_path(opts.batch_ratio);
 		[[maybe_unused]] auto [n, d] =
-			ReadEntries<typename type_trait::entry_type>(base_path.c_str(), wp);
+			read_entries<typename TT::entry_type>(base_path.c_str(), wp);
 		[[maybe_unused]] auto [n2, d2] =
-			ReadEntries<typename type_trait::entry_type>(batch_path.c_str(),
-														 wi);
-		BuildTree<type_trait, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+			read_entries<typename TT::entry_type>(batch_path.c_str(), wi);
+		build_tree<TT, Tree, k_test_time, 2>(wp, opts.rounds, tree);
 		if (redirect_output) {
 			ASSERT_TRUE((tree.template validate<true, false>()));
 		} else {
@@ -122,7 +121,7 @@ protected:
 		}
 
 		if (opts.tag & (1 << 0)) {
-			batch_insert<type_trait, Tree, kTestTime>(tree, wp, wi, 2);
+			batch_insert<TT, Tree, k_test_time>(tree, wp, wi, 2);
 			ASSERT_EQ(tree.get_size(), wp.size() + wi.size());
 			if (redirect_output) {
 				ASSERT_TRUE((tree.template validate<true, false>()));
@@ -140,8 +139,8 @@ protected:
 		}
 
 		if (opts.tag & (1 << 1)) {
-			// WARN: must happen after the insertion
-			batch_delete<type_trait, Tree, kTestTime>(tree, wp, wi, 2);
+			/* WARN: must happen after the insertion */
+			batch_delete<TT, Tree, k_test_time>(tree, wp, wi, 2);
 			assert(tree.get_size() == wp.size());
 			if (redirect_output) {
 				ASSERT_TRUE((tree.template validate<true, false>()));
@@ -163,40 +162,40 @@ protected:
 		}
 
 		if (opts.query_type & (1 << 0)) {
-			// this part needs to correct for all parts
+			/* this part needs to correct for all parts */
 			auto batch_size =
-				static_cast<size_t>(wp.size() * kMembershipQueryRatio);
+				static_cast<size_t>(wp.size() * k_membership_query_ratio);
 			auto query_ele =
 				parlay::random_shuffle(new_wp).subseq(0, batch_size);
 			auto res = parlay::sequence<bool>(query_ele.size(), false);
-			Membership<type_trait>(tree, query_ele, opts.rounds, res);
+			membership<TT>(tree, query_ele, opts.rounds, res);
 			assert(parlay::all_of(res, [&](auto r) { return r == true; }));
-			if (opts.tag & (1 << 1)) { // specifically for delete
+			if (opts.tag & (1 << 1)) { /* specifically for delete */
 				query_ele = wi;
 				auto res = parlay::sequence<bool>(query_ele.size(), true);
-				Membership<type_trait>(tree, query_ele, opts.rounds, res);
+				membership<TT>(tree, query_ele, opts.rounds, res);
 				assert(parlay::all_of(res, [&](auto r) { return r == false; }));
 			}
 		}
 
 		if (opts.query_type & (1 << 1)) {
-			for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-				RangeQuery<type_trait>(new_wp, tree, kRounds, kRangeQueryNum,
-									   rec_type);
+			for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
+				range_query<TT>(new_wp, tree, k_rounds, k_range_query_num,
+								rec_type);
 			}
 		}
 
 		if (opts.query_type & (1 << 2)) {
-			for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-				range_count<type_trait>(new_wp, tree, kRounds, kRangeQueryNum,
-										rec_type);
+			for (int rec_type = 0; rec_type < k_range_query_type; rec_type++) {
+				range_count<TT>(new_wp, tree, k_rounds, k_range_query_num,
+								rec_type);
 			}
 		}
 
 		tree.delete_tree();
 	}
 
-	static auto FindBaseFiles(std::string const &files_path)
+	static auto find_base_files(std::string const &files_path)
 		-> std::vector<std::string>
 	{
 		std::vector<std::string> base_files;
@@ -215,18 +214,20 @@ protected:
 		return base_files;
 	}
 
-	static void RunTest(std::string const &file_path,
-						std::string const &distribution)
+	static void run_test(std::string const &file_path,
+						 std::string const &distribution)
 	{
-		// These must outlive argv: std::to_string returns a temporary, so calling
-		// .c_str() on it inline leaves every pointer dangling.
-		std::string const s_summary = std::to_string(kSummary);
-		std::string const s_dim = std::to_string(kDim);
-		std::string const s_tag = std::to_string(kTag);
-		std::string const s_rounds = std::to_string(kRounds);
-		std::string const s_tree_type = std::to_string(kTreeType);
-		std::string const s_query_type = std::to_string(kQueryType);
-		std::string const s_batch_ratio = std::to_string(kBatchRatio);
+		/*
+		 * These must outlive argv: std::to_string returns a temporary, so calling
+		 * .c_str() on it inline leaves every pointer dangling.
+		 */
+		std::string const s_summary = std::to_string(k_summary);
+		std::string const s_dim = std::to_string(k_dim);
+		std::string const s_tag = std::to_string(k_tag);
+		std::string const s_rounds = std::to_string(k_rounds);
+		std::string const s_tree_type = std::to_string(k_tree_type);
+		std::string const s_query_type = std::to_string(k_query_type);
+		std::string const s_batch_ratio = std::to_string(k_batch_ratio);
 
 		std::vector<char const *> argv = {
 			"unit_test",		   "-p", file_path.c_str(),	   "-s",
@@ -236,7 +237,7 @@ protected:
 			s_batch_ratio.c_str(), "-D", distribution.c_str()
 		};
 
-		// Print the command being executed
+		/* Print the command being executed */
 		std::cout << "Running: unit_test";
 		for (size_t i = 1; i < argv.size(); i++) {
 			std::cout << " " << argv[i];
@@ -251,7 +252,9 @@ protected:
 		commandLine params(argv_mutable.size(), argv_mutable.data());
 		Options opts(params);
 
-		// Redirect stdout to suppress output from test execution (if enabled)
+		/*
+		 * Redirect stdout to suppress output from test execution (if enabled)
+		 */
 		std::streambuf *old_cout = nullptr;
 		std::ostringstream null_stream;
 		if (redirect_output) {
@@ -259,32 +262,32 @@ protected:
 			std::cout.rdbuf(null_stream.rdbuf());
 		}
 
-		auto run = [&]<typename TreeWrapper, typename TypeTrait>(
-					   Options opts) -> void {
-			CheckCorrectness<TypeTrait, TreeWrapper>(opts);
+		auto run =
+			[&]<typename TreeWrapper, typename TT>(Options opts) -> void {
+			check_correctness<TT, TreeWrapper>(opts);
 		};
 
-		CheckOrthogonal(opts, run);
+		check_orthogonal(opts, run);
 
-		// Restore stdout (if it was redirected)
+		/* Restore stdout (if it was redirected) */
 		if (old_cout) {
 			std::cout.rdbuf(old_cout);
 		}
 	}
 
-	static void BTreeTest(std::string const &distribution, size_t node_size)
+	static void btree_test(std::string const &distribution, size_t node_size)
 	{
 		std::string files_path =
-			std::string(kDataPrefix) + "/" + distribution + "/" +
-			std::to_string(node_size) + "_" + std::to_string(kDim) + "/ins/" +
-			std::to_string(static_cast<int>(1 / kBatchRatio));
-		auto base_files = FindBaseFiles(files_path);
+			std::string(k_data_prefix) + "/" + distribution + "/" +
+			std::to_string(node_size) + "_" + std::to_string(k_dim) + "/ins/" +
+			std::to_string(static_cast<int>(1 / k_batch_ratio));
+		auto base_files = find_base_files(files_path);
 
 		if (base_files.empty()) {
 			GTEST_SKIP() << "Data files not found at: " << files_path;
 		}
 
-		// Filter files if file_filter is specified
+		/* Filter files if file_filter is specified */
 		if (!file_filter.empty()) {
 			std::vector<std::string> filtered_files;
 			for (auto const &file : base_files) {
@@ -300,108 +303,110 @@ protected:
 
 		for (auto const &file : base_files) {
 			SCOPED_TRACE("Testing file: " + file);
-			EXPECT_NO_THROW(RunTest(file, distribution));
+			EXPECT_NO_THROW(run_test(file, distribution));
 		}
 	}
 };
 
 TEST_F(ParTreeCorrectTest, Uni1M)
 {
-	BTreeTest("uni", 1000000);
+	btree_test("uni", 1000000);
 }
 
 TEST_F(ParTreeCorrectTest, Uni5M)
 {
-	BTreeTest("uni", 5000000);
+	btree_test("uni", 5000000);
 }
 
 TEST_F(ParTreeCorrectTest, Uni10M)
 {
-	BTreeTest("uni", 10000000);
+	btree_test("uni", 10000000);
 }
 
 TEST_F(ParTreeCorrectTest, Uni50M)
 {
-	BTreeTest("uni", 50000000);
+	btree_test("uni", 50000000);
 }
 
 TEST_F(ParTreeCorrectTest, Exp1M)
 {
-	BTreeTest("exp", 1000000);
+	btree_test("exp", 1000000);
 }
 
 TEST_F(ParTreeCorrectTest, Exp5M)
 {
-	BTreeTest("exp", 5000000);
+	btree_test("exp", 5000000);
 }
 
 TEST_F(ParTreeCorrectTest, Exp10M)
 {
-	BTreeTest("exp", 10000000);
+	btree_test("exp", 10000000);
 }
 
 TEST_F(ParTreeCorrectTest, Exp50M)
 {
-	BTreeTest("exp", 50000000);
+	btree_test("exp", 50000000);
 }
 
 TEST_F(ParTreeCorrectTest, Norm1M)
 {
-	BTreeTest("norm", 1000000);
+	btree_test("norm", 1000000);
 }
 
 TEST_F(ParTreeCorrectTest, Norm5M)
 {
-	BTreeTest("norm", 5000000);
+	btree_test("norm", 5000000);
 }
 
 TEST_F(ParTreeCorrectTest, Norm10M)
 {
-	BTreeTest("norm", 10000000);
+	btree_test("norm", 10000000);
 }
 
 TEST_F(ParTreeCorrectTest, Norm50M)
 {
-	BTreeTest("norm", 50000000);
+	btree_test("norm", 50000000);
 }
 
 TEST_F(ParTreeCorrectTest, DualNorm1M)
 {
-	BTreeTest("dual_norm", 1000000);
+	btree_test("dual_norm", 1000000);
 }
 
 TEST_F(ParTreeCorrectTest, DualNorm5M)
 {
-	BTreeTest("dual_norm", 5000000);
+	btree_test("dual_norm", 5000000);
 }
 
 TEST_F(ParTreeCorrectTest, DualNorm10M)
 {
-	BTreeTest("dual_norm", 10000000);
+	btree_test("dual_norm", 10000000);
 }
 
 TEST_F(ParTreeCorrectTest, DualNorm50M)
 {
-	BTreeTest("dual_norm", 50000000);
+	btree_test("dual_norm", 50000000);
 }
 
-// Define the static members
+/* Define the static members */
 std::string ParTreeCorrectTest::file_filter = "";
 bool ParTreeCorrectTest::redirect_output = true;
 
-// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M
-// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --file_filter=1.base.bin
-// ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --no_redirect
+/*
+ * ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M
+ * ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --file_filter=1.base.bin
+ * ./unit_test --gtest_filter=ParTreeCorrectTest.Uni1M --no_redirect
+ */
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);
 
-	// Parse custom arguments
+	/* Parse custom arguments */
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
 		if (arg.starts_with("--file_filter=")) {
 			ParTreeCorrectTest::file_filter =
-				arg.substr(14); // Length of "--file_filter="
+				arg.substr(14); /* Length of "--file_filter=" */
 			std::cout << "Filtering files containing: "
 					  << ParTreeCorrectTest::file_filter << std::endl;
 		} else if (arg == "--no_redirect") {

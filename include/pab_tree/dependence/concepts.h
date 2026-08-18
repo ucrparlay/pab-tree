@@ -9,15 +9,19 @@
 namespace pab_tree
 {
 
-// True when the augmentation carries state, so the tree can skip maintaining
-// it entirely when it does not.
+/*
+ * True when the augmentation carries state, so the tree can skip maintaining
+ * it entirely when it does not.
+ */
 template <typename T>
 concept node_has_non_trivial_aug =
 	(!std::is_empty_v<T>) && (!std::same_as<T, std::monostate>);
 
-// What the node base must provide. Both node types derive from it: the tree
-// reads is_leaf to pick the downcast and size to answer range queries without
-// descending, and rebalancing writes size.
+/*
+ * What the node base must provide. Both node types derive from it: the tree
+ * reads is_leaf to pick the downcast and size to answer range queries without
+ * descending, and rebalancing writes size.
+ */
 template <typename T>
 concept node_base =
 	std::constructible_from<T, bool, size_t> && requires(T t, size_t n) {
@@ -26,14 +30,16 @@ concept node_base =
 		t.size = n;
 	};
 
-// Tags a pab_tree so generic test code can detect one.
+/* Tags a pab_tree so generic test code can detect one. */
 template <typename T>
 concept is_pab_tree = requires(T t) {
 	{ t.pab_tree_tag() } -> std::same_as<void>;
 };
 
-// What a user's element adaptor must provide. entry_type is the stored
-// entry, key_type the key it is ordered by, mapped_type the payload.
+/*
+ * What a user's element adaptor must provide. entry_type is the stored
+ * entry, key_type the key it is ordered by, mapped_type the payload.
+ */
 template <typename T>
 concept entry_adaptor =
 	requires(typename T::entry_type e, typename T::key_type k,
@@ -47,9 +53,11 @@ concept entry_adaptor =
 		{ k < k } -> std::convertible_to<bool>;
 	};
 
-// What an augmentation must provide regardless of the range it is handed.
-// The range-dependent halves are separate below, because the constructor and
-// update_aug are called with different range types.
+/*
+ * What an augmentation must provide regardless of the range it is handed.
+ * The range-dependent halves are separate below, because the constructor and
+ * update_aug are called with different range types.
+ */
 template <typename A>
 concept leaf_augmentation =
 	std::default_initializable<A> && requires(A a) { a.reset(); };
@@ -61,17 +69,17 @@ concept interior_augmentation =
 		{ A::force_parallel(sz, sz) } -> std::convertible_to<bool>;
 	};
 
-// Checked where the call happens, against the range actually passed.
-template <typename A, typename Range>
-concept leaf_aug_constructible_from = std::constructible_from<A, Range>;
+/* Checked where the call happens, against the range actually passed. */
+template <typename A, typename R>
+concept leaf_aug_constructible_from = std::constructible_from<A, R>;
 
-template <typename A, typename Range>
-concept leaf_aug_updatable_with = requires(A a, Range r) { a.update_aug(r); };
+template <typename A, typename R>
+concept leaf_aug_updatable_with = requires(A a, R r) { a.update_aug(r); };
 
 template <typename A, typename Nodes, typename Splits>
 concept interior_aug_updatable_with =
 	requires(A a, Nodes const &n, Splits const &s) { a.update(n, s); };
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_DEPENDENCE_CONCEPTS_H_
+#endif /* PABTREE_DEPENDENCE_CONCEPTS_H_ */

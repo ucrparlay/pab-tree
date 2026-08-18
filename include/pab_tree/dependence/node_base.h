@@ -8,10 +8,12 @@
 namespace pab_tree
 {
 
-// How nodes are obtained and released. alloc returns raw storage; the
-// caller placement-news into it, and free is called after the destructor.
-// A pool is what makes this fast -- the tree allocates one node per leaf
-// and per interior, so a general-purpose allocator shows up immediately.
+/*
+ * How nodes are obtained and released. alloc returns raw storage; the
+ * caller placement-news into it, and free is called after the destructor.
+ * A pool is what makes this fast -- the tree allocates one node per leaf
+ * and per interior, so a general-purpose allocator shows up immediately.
+ */
 struct parlay_node_alloc {
 	template <typename T>
 	static T *alloc()
@@ -26,8 +28,10 @@ struct parlay_node_alloc {
 	}
 };
 
-// Base of every node. is_leaf selects the downcast; size is the subtree entry
-// count, which the range queries read without descending.
+/*
+ * Base of every node. is_leaf selects the downcast; size is the subtree entry
+ * count, which the range queries read without descending.
+ */
 struct proto_node {
 	proto_node()
 		: is_leaf{ false }
@@ -40,8 +44,10 @@ struct proto_node {
 	size_t size;
 };
 
-// Defaults for a tree that carries no augmentation. Both are empty, so
-// node_has_non_trivial_aug is false and every update_aug call compiles away.
+/*
+ * Defaults for a tree that carries no augmentation. Both are empty, so
+ * node_has_non_trivial_aug is false and every update_aug call compiles away.
+ */
 struct empty_leaf_aug {
 	empty_leaf_aug() = default;
 	template <typename Slice>
@@ -72,6 +78,6 @@ struct empty_interior_aug {
 	}
 };
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_DEPENDENCE_NODE_BASE_H_
+#endif /* PABTREE_DEPENDENCE_NODE_BASE_H_ */

@@ -10,10 +10,10 @@
 
 namespace pab_tree
 {
-template <typename type_trait>
-void btree<type_trait>::partition_binary_search_rec(
+template <typename TT>
+void btree<TT>::partition_binary_search_rec(
 	auto split_seq_s,
-	// parlay::sequence<int>& split_pos_seq,
+	/* parlay::sequence<int>& split_pos_seq, */
 	auto &split_pos_seq, entry_slice entry_seq_s, size_t split_offset,
 	size_t in_offset)
 {
@@ -25,8 +25,8 @@ void btree<type_trait>::partition_binary_search_rec(
 		split_pos_seq[split_offset] =
 			in_offset + parlay::internal::binary_search(
 							entry_seq_s, [&](entry_type const e) {
-								return type_trait::key_less(
-									entry_traits::get_key(e), split_seq_s[0]);
+								return TT::key_less(entry_traits::get_key(e),
+													split_seq_s[0]);
 							});
 		return;
 	}
@@ -34,8 +34,7 @@ void btree<type_trait>::partition_binary_search_rec(
 	size_t mid = split_seq_s.size() >> 1;
 	size_t pos =
 		parlay::internal::binary_search(entry_seq_s, [&](entry_type const e) {
-			return type_trait::key_less(entry_traits::get_key(e),
-										split_seq_s[mid]);
+			return TT::key_less(entry_traits::get_key(e), split_seq_s[mid]);
 		});
 	split_pos_seq[split_offset + mid] = in_offset + pos;
 	partition_binary_search_rec(split_seq_s.cut(0, mid), split_pos_seq,
@@ -47,23 +46,22 @@ void btree<type_trait>::partition_binary_search_rec(
 								split_offset + mid + 1, in_offset + pos);
 }
 
-template <typename type_trait>
-template <typename Range>
-void btree<type_trait>::split_batch_binary_search(
-	size_buf_ub_arr &split_pos_arr, Range In,
-	type_trait::split_slice_const split_slice)
+template <typename TT>
+template <typename R>
+void btree<TT>::split_batch_binary_search(size_buf_ub_arr &split_pos_arr, R in,
+										  TT::split_slice_const split_slice)
 {
-	// TODO: maybe we can decide it by skewed distribution
+	/* TODO: maybe we can decide it by skewed distribution */
 	size_type offset = 0;
 	for (buf_size_type i = 0; i < split_slice.size(); i++) {
 		size_type pos = parlay::internal::binary_search(
-			In.cut(offset, In.size()), [&](auto e) {
+			in.cut(offset, in.size()), [&](auto e) {
 				if constexpr (std::same_as<decltype(e),
-										   typename type_trait::key_type>) {
-					return type_trait::key_less(e, split_slice[i]);
+										   typename TT::key_type>) {
+					return TT::key_less(e, split_slice[i]);
 				} else {
-					return type_trait::key_less(entry_traits::get_key(e),
-												split_slice[i]);
+					return TT::key_less(entry_traits::get_key(e),
+										split_slice[i]);
 				}
 			});
 		offset += pos;
@@ -71,44 +69,45 @@ void btree<type_trait>::split_batch_binary_search(
 	}
 }
 
-template <typename type_trait>
-template <typename Range>
+template <typename TT>
+template <typename R>
 [[gnu::always_inline]] inline void
-btree<type_trait>::partition_batch(size_buf_ub_arr &split_pos_arr, Range In,
-								   interior_type const *TI)
+btree<TT>::partition_batch(size_buf_ub_arr &split_pos_arr, R in,
+						   interior_type const *interior)
 {
-	// Binary search costs O(split_n log(n/split_n)), the merge O(n +
-	// split_n); the merge wins once the batch is small relative to the
-	// number of children.
-	if (In.size() > type_trait::k_split_factor * TI->get_split_n()) {
-		split_batch_binary_search(split_pos_arr, In, TI->get_split_slice());
+	/*
+	 * Binary search costs O(split_n log(n/split_n)), the merge O(n +
+	 * split_n); the merge wins once the batch is small relative to the
+	 * number of children.
+	 */
+	if (in.size() > TT::k_split_factor * interior->get_split_n()) {
+		split_batch_binary_search(split_pos_arr, in,
+								  interior->get_split_slice());
 	} else {
-		split_batch_merge(split_pos_arr, In, TI->get_split_slice());
+		split_batch_merge(split_pos_arr, in, interior->get_split_slice());
 	}
 }
 
-template <typename type_trait>
-template <typename Range>
-void btree<type_trait>::split_batch_merge(
-	size_buf_ub_arr &split_pos_arr, Range In,
-	type_trait::split_slice_const split_slice)
+template <typename TT>
+template <typename R>
+void btree<TT>::split_batch_merge(size_buf_ub_arr &split_pos_arr, R in,
+								  TT::split_slice_const split_slice)
 {
-	assert(parlay::is_sorted(split_slice, [&](auto k1, auto k2) {
-		return type_trait::key_less(k1, k2);
-	}));
+	assert(parlay::is_sorted(
+		split_slice, [&](auto k1, auto k2) { return TT::key_less(k1, k2); }));
 
 	size_type cnt = 0;
 	auto split_iter = split_slice.begin();
-	auto input_iter = In.begin();
+	auto input_iter = in.begin();
 
-	while (split_iter != split_slice.end() && input_iter != In.end()) {
+	while (split_iter != split_slice.end() && input_iter != in.end()) {
 		bool less(false);
-		if constexpr (std::same_as<typename Range::value_type,
-								   typename type_trait::key_type>) {
-			less = type_trait::key_less(*input_iter, *split_iter);
+		if constexpr (std::same_as<typename R::value_type,
+								   typename TT::key_type>) {
+			less = TT::key_less(*input_iter, *split_iter);
 		} else {
-			less = type_trait::key_less(entry_traits::get_key(*input_iter),
-										*split_iter);
+			less =
+				TT::key_less(entry_traits::get_key(*input_iter), *split_iter);
 		}
 		if (less) {
 			++input_iter;
@@ -124,6 +123,6 @@ void btree<type_trait>::split_batch_merge(
 	}
 }
 
-} // namespace pab_tree
+} /* namespace pab_tree */
 
-#endif // PABTREE_B_TREE_IMPL_POINTS_OP_HPP_
+#endif /* PABTREE_B_TREE_IMPL_POINTS_OP_HPP_ */
