@@ -1,7 +1,7 @@
 # Findings register — still open
 
-8 open library findings: 2 medium, 6 low. No high ones remain. 5 are from
-the 2026-08-17 review, 3 were found since.
+7 open library findings: 1 medium, 6 low. No high ones remain. 5 are from
+the 2026-08-17 review, 2 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
 fixed -- `git log 376e067..HEAD` names each defect -- or reviewed and dropped
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| augmentation concepts never applied (medium) | split by call site and applied at all four |
 | trait parameters positional and undocumented (medium) | `BufferSize` defaults to 64; `btree_trait` takes the rest by name |
 | element needs three wrapper layers (medium) | `ele_wrapper` deleted; the by-value copy it blamed was already elided |
 | both `GetEntries` findings (medium, low) | `to_seq()` covered ordering; the output-size precondition is now asserted |
@@ -50,32 +51,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 2
-
-### The augmentation concepts are declared but never applied
-`include/pab_tree/dependence/concepts.h`:39,46 · extensibility
-**Status: open — found 2026-08-17 while constraining NodeType**
-
-`leaf_augmentation` and `interior_augmentation` have existed since the
-refactor and nothing references them. A concept that is never applied
-enforces nothing, so a malformed augmentation still fails deep inside a
-header rather than at the user's declaration.
-
-They cannot be attached to the trait as written. Both are parameterised on a
-`Slice` type, and the library calls the leaf augmentation's constructor and
-`update_aug` with more than one range type — `entry_slice` at the two
-`update_aug` call sites, and whatever range `build` holds at the constructor.
-Pinning the concept to a single slice type would reject valid augmentations.
-
-Partly mitigated: `btree_type_trait` now `static_assert`s the requirements
-that do not depend on a range type — both augmentations default-constructible,
-and `interior_aug::force_parallel(size_t, size_t) -> bool`.
-
-*Suggested fix:* restate both concepts over a generic range
-(`template <typename A, typename R> concept leaf_augmentation = ... requires(A a, R r)`)
-and apply them at the call sites in `leaf_node::update_aug` and
-`btree_interior_node::update_aug`, where the range type is known, rather than
-on the trait.
+## MEDIUM — 1
 
 ### The interior binary-search base is 8, not the tuned 16
 `include/pab_tree/b_tree_impl/query_op/range_count.hpp`:37,79 ·

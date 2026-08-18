@@ -298,6 +298,38 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## The augmentation concepts are applied now (2026-08-17)
+
+I opened this one while constraining `NodeType`: `leaf_augmentation` and
+`interior_augmentation` had existed since the refactor and **nothing used
+them**. The blocker was that each was pinned to a single `Slice` type while
+the library calls the augmentation with more than one range.
+
+Fixed by splitting them by where the call happens:
+
+| concept | checked |
+|---|---|
+| `leaf_augmentation<A>` / `interior_augmentation<A>` | in the trait — default-constructible, `reset()`, and `force_parallel` |
+| `leaf_aug_constructible_from<A, Range>` | in `leaf_node`'s entry constructor |
+| `leaf_aug_updatable_with<A, Range>` | in `leaf_node::update_aug` |
+| `interior_aug_updatable_with<A, Nodes, Splits>` | in `btree_interior_node::update_aug` |
+
+Each site checks against the range **it** passes, so nothing is
+over-constrained. Verified against five malformed augmentations; every one now
+names what it is missing rather than failing inside a header.
+
+### One check is lazy, and that is not fixable here
+
+A leaf augmentation with no `update_aug` **compiles** if the program only ever
+calls `build` — that path instantiates the augmentation's constructor but not
+`update_aug`. Add a `batch_insert` and the assert fires. My first probe did
+exactly that and reported the check as broken; it was the probe.
+
+Making it eager would mean asserting in the trait, which cannot name the range
+type — the circularity that made these concepts dead in the first place.
+
+Compile-time only: 55463 instructions, no mnemonic count changed.
+
 ## Trait configuration: defaults plus a by-name form (2026-08-17)
 
 `kSkHeightVal`, which the finding called unguessable, was already removed by

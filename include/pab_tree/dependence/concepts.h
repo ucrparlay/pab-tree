@@ -46,21 +46,30 @@ concept entry_type =
 		{ k < k } -> std::convertible_to<bool>;
 	};
 
-// What a leaf augmentation must provide. Called with the leaf's entries.
-template <typename A, typename Slice>
+// What an augmentation must provide regardless of the range it is handed.
+// The range-dependent halves are separate below, because the constructor and
+// update_aug are called with different range types.
+template <typename A>
 concept leaf_augmentation =
-	std::default_initializable<A> && std::constructible_from<A, Slice> &&
-	requires(A a, Slice s) { a.update_aug(s); };
+	std::default_initializable<A> && requires(A a) { a.reset(); };
 
-// What an interior augmentation must provide. update() is called with the
-// node's children and split keys.
-template <typename A, typename Nodes, typename Splits>
+template <typename A>
 concept interior_augmentation =
-	std::default_initializable<A> &&
-	requires(A a, Nodes const &n, Splits const &s, size_t sz) {
-		a.update(n, s);
+	std::default_initializable<A> && requires(A a, size_t sz) {
+		a.reset();
 		{ A::force_parallel(sz, sz) } -> std::convertible_to<bool>;
 	};
+
+// Checked where the call happens, against the range actually passed.
+template <typename A, typename Range>
+concept leaf_aug_constructible_from = std::constructible_from<A, Range>;
+
+template <typename A, typename Range>
+concept leaf_aug_updatable_with = requires(A a, Range r) { a.update_aug(r); };
+
+template <typename A, typename Nodes, typename Splits>
+concept interior_aug_updatable_with =
+	requires(A a, Nodes const &n, Splits const &s) { a.update(n, s); };
 
 } // namespace pab_tree
 

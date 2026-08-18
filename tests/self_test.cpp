@@ -111,6 +111,46 @@ struct subtree_size_aug {
 	}
 };
 
+// The augmentation contract, pinned. The range-free half is checked by the
+// trait; the rest is checked where update_aug/update are called, against the
+// range that site passes.
+namespace aug_contract
+{
+using entry_slice = parlay::slice<entry *, entry *>;
+
+static_assert(pab_tree::leaf_augmentation<sum_leaf_aug>);
+static_assert(pab_tree::leaf_aug_constructible_from<sum_leaf_aug, entry_slice>);
+static_assert(pab_tree::leaf_aug_updatable_with<sum_leaf_aug, entry_slice>);
+static_assert(pab_tree::interior_augmentation<subtree_size_aug>);
+
+// The empty defaults satisfy it too, so an unaugmented tree is not a special
+// case.
+static_assert(pab_tree::leaf_augmentation<pab_tree::empty_leaf_aug>);
+static_assert(pab_tree::interior_augmentation<pab_tree::empty_interior_aug>);
+
+// And the ones that would not work are rejected.
+struct no_reset {
+	uint64_t s = 0;
+};
+struct no_force_parallel {
+	uint64_t s = 0;
+	void reset()
+	{
+	}
+};
+struct not_updatable {
+	uint64_t s = 0;
+	void reset()
+	{
+	}
+};
+static_assert(!pab_tree::leaf_augmentation<no_reset>);
+static_assert(!pab_tree::interior_augmentation<no_force_parallel>);
+static_assert(!pab_tree::leaf_aug_updatable_with<not_updatable, entry_slice>);
+static_assert(
+	!pab_tree::leaf_aug_constructible_from<not_updatable, entry_slice>);
+} // namespace aug_contract
+
 // ---- workloads ----
 
 enum class dist { uniform, clustered, sequential, sparse, boundary };

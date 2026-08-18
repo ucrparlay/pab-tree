@@ -148,20 +148,14 @@ public:
 		(BufferSize * k_buf_ub_fac > 65535U), uint_fast32_t,
 		std::conditional_t<(BufferSize * k_buf_ub_fac > 255U), uint_fast16_t,
 						   uint_fast8_t>>;
-	// The augmentation requirements that do not depend on a range type.
-	// update_aug/update are called with several different range types, so
-	// they are checked where they are called, not here.
-	static_assert(std::default_initializable<LeafAugType>,
-				  "leaf augmentation must be default constructible");
-	static_assert(std::default_initializable<InteriorAugType>,
-				  "interior augmentation must be default constructible");
-	static_assert(
-		requires(size_t n) {
-			{
-				InteriorAugType::force_parallel(n, n)
-			} -> std::convertible_to<bool>;
-		},
-		"interior augmentation needs static bool force_parallel(size_t, size_t)");
+	// The range-independent half of the augmentation contract. The rest is
+	// checked where update_aug/update are called, against the range each
+	// site actually passes.
+	static_assert(leaf_augmentation<LeafAugType>,
+				  "leaf augmentation needs a default constructor and reset()");
+	static_assert(interior_augmentation<InteriorAugType>,
+				  "interior augmentation needs a default constructor, reset() "
+				  "and static bool force_parallel(size_t, size_t)");
 
 	static constexpr buf_size_type k_buf = BufferSize;
 	static constexpr buf_size_type k_buf_lb = BufferSize;

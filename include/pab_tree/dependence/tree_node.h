@@ -71,6 +71,10 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 		, aug(AT(In))
 		, is_sorted{ true }
 	{
+		static_assert(!node_has_non_trivial_aug<AT> ||
+						  leaf_aug_constructible_from<AT, Range>,
+					  "leaf augmentation needs a constructor taking the "
+					  "leaf's entries");
 		assert(In.size() <= TT::k_buf_ub);
 		assert(parlay::is_sorted(
 			In, [](auto a, auto b) { return TT::entry_less(a, b); }));
@@ -178,6 +182,9 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	template <typename Range> void update_aug(Range In)
 	{
 		if constexpr (node_has_non_trivial_aug<AT>) {
+			static_assert(leaf_aug_updatable_with<AT, Range>,
+						  "leaf augmentation needs "
+						  "update_aug(range-of-entries)");
 			aug.update_aug(In);
 		}
 	}

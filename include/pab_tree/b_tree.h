@@ -161,6 +161,12 @@ public:
 		void update_aug()
 		{
 			if constexpr (node_has_non_trivial_aug<typename TT::interior_aug>) {
+				static_assert(
+					interior_aug_updatable_with<
+						typename TT::interior_aug,
+						decltype(this->get_node_slice()),
+						decltype(this->get_split_slice())>,
+					"interior augmentation needs update(children, splits)");
 				this->aug.update(this->get_node_slice(),
 								 this->get_split_slice());
 			}
