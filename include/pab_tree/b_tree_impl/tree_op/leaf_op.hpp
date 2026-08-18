@@ -133,13 +133,8 @@ btree<TT>::delete_points_4_leaf(Node *T, TT::const_key_slice In,
 {
 	auto TL = static_cast<Leaf *>(T);
 
-	assert(T->size >= In.size());
-	assert(parlay::all_of(In, [&](auto a) {
-		return std::find_if(TL->elements.begin(),
-							TL->elements.begin() + TL->size, [&](auto const e) {
-								return TT::key_equal(Entry::get_key(e), a);
-							}) != TL->elements.begin() + TL->size;
-	}));
+	// Keys that are not here are skipped, so In may be longer than the
+	// leaf and may name keys it does not hold.
 
 	auto it = TL->elements.begin();
 	auto end = TL->elements.begin() + TL->size;
@@ -158,9 +153,10 @@ btree<TT>::delete_points_4_leaf(Node *T, TT::const_key_slice In,
 		}
 	}
 
-	assert(end == TL->elements.begin() ||
-		   std::cmp_equal(std::distance(TL->elements.begin(), end),
-						  TL->size - In.size()));
+	// Exactly the keys that were found came out.
+	assert(std::cmp_equal(std::distance(TL->elements.begin(), end),
+						  TL->size - delete_cnt));
+	assert(delete_cnt <= In.size());
 	TL->size = std::distance(TL->elements.begin(), end);
 
 	assert(TL->size >= 0);

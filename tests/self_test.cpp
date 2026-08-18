@@ -524,6 +524,100 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 } // namespace
 
+// ---- deleting a key that is not there does nothing ----
+
+TEST(SelfTest, DeleteAbsentKeys)
+{
+	using tt = pab_tree::btree_type_trait<ele, 16>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0xab5e27;
+	SCOPED_TRACE("absent-key delete seed=" + std::to_string(seed));
+
+	// Even keys only, so every odd key is absent.
+	std::vector<entry> v;
+	oracle ref;
+	for (uint32_t i = 0; i < 40000; i += 2) {
+		v.push_back(entry{ i, i ^ 0x5bf03635u });
+		ref[i] = i ^ 0x5bf03635u;
+	}
+	tree t;
+	t.build(v);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	auto erase_both = [&](std::vector<uint32_t> keys, char const *what) {
+		SCOPED_TRACE(what);
+		std::sort(keys.begin(), keys.end());
+		keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+		t.batch_delete(keys);
+		for (auto k : keys)
+			ref.erase(k); // std::map::erase ignores absent keys too
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	};
+
+	// 1. every key absent, and more of them than the tree holds
+	{
+		std::vector<uint32_t> odd;
+		for (uint32_t i = 1; i < 120000; i += 2)
+			odd.push_back(i);
+		auto const before = t.size();
+		ASSERT_NO_FATAL_FAILURE(erase_both(odd, "all absent, batch > tree"));
+		ASSERT_EQ(t.size(), before) << "an absent-key delete changed the size";
+	}
+
+	// 2. absent keys beyond both ends of the key range
+	{
+		std::vector<uint32_t> outside{ 0xFFFFFFFEu, 0xFFFFFF00u, 1u, 3u };
+		auto const before = t.size();
+		ASSERT_NO_FATAL_FAILURE(erase_both(outside, "outside the range"));
+		ASSERT_EQ(t.size(), before);
+	}
+
+	// 3. a mix: half present, half not
+	{
+		std::mt19937_64 rng(seed);
+		std::vector<uint32_t> mixed;
+		for (int i = 0; i < 4000; ++i) {
+			uint32_t const k = static_cast<uint32_t>(rng() % 40000);
+			mixed.push_back(k); // even => present, odd => absent
+		}
+		ASSERT_NO_FATAL_FAILURE(erase_both(mixed, "half present"));
+	}
+
+	// 4. deleting the same present key twice: second time is a no-op
+	{
+		auto const k = t.begin()->key;
+		ASSERT_TRUE(t.contain(k));
+		ASSERT_NO_FATAL_FAILURE(erase_both({ k }, "present key, first time"));
+		ASSERT_FALSE(t.contain(k));
+		auto const before = t.size();
+		ASSERT_NO_FATAL_FAILURE(erase_both({ k }, "same key, second time"));
+		ASSERT_EQ(t.size(), before);
+	}
+
+	// 5. single-key erase(k) reports whether it was there
+	{
+		auto const present = t.begin()->key;
+		ASSERT_TRUE(t.erase(present));
+		ASSERT_FALSE(t.erase(present));
+		ASSERT_FALSE(t.erase(1u)); // odd, never present
+		ref.erase(present);
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	}
+
+	// 6. emptying the tree with a batch that also names absent keys
+	{
+		std::vector<uint32_t> everything;
+		for (auto const &kv : ref)
+			everything.push_back(kv.first);
+		for (uint32_t i = 1; i < 2000; i += 2)
+			everything.push_back(i); // absent
+		ASSERT_NO_FATAL_FAILURE(erase_both(everything, "empty it out"));
+		ASSERT_TRUE(t.empty());
+		ASSERT_EQ(t.begin(), t.end());
+	}
+}
+
 // ---- the default leaf-sort decision is reproducible ----
 
 // FNV over every leaf's is_sorted flag, in tree order.

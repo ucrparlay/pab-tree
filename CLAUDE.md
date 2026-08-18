@@ -298,6 +298,37 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## Deleting an absent key is a no-op (settled 2026-08-17)
+
+Your call, and it is what `std::set::erase` does. Release builds already
+behaved this way — `delete_points_4_leaf`'s loop has an `if (it != end)` guard
+and derives `TL->size` from the write cursor, so absent keys were already
+skipped and the size already came out right. Only asserts aborted.
+
+Four asserts encoded the old "every key must be present" precondition and were
+**replaced, not deleted** — the new ones are strictly stronger:
+
+| was | now |
+|---|---|
+| `assert(T->size >= In.size())` | dropped — a batch may be longer than the leaf |
+| `assert(parlay::all_of(In, ...found...))` | dropped — that is the precondition being removed |
+| `assert(distance(begin,end) == TL->size - In.size())` | `... == TL->size - delete_cnt` **plus** `delete_cnt <= In.size()` |
+| `assert(new_node->size + In.size() == old_size)` | `new_node->size <= old_size` and `old_size - new_node->size <= In.size()` |
+
+The third one makes `delete_cnt` load-bearing; it was previously incremented
+and never read.
+
+Fault-injected to confirm the replacements still bite: suppressing
+`delete_cnt++` and double-counting it are both caught under `-DDEBUG`.
+
+**A probe that only deletes absent keys cannot test this.** My first fault run
+used the reviewer's repro (all keys absent), so `delete_cnt` stayed 0, the
+invariant held trivially, and both faults came back "not caught". Run the
+fault against `SelfTest.DeleteAbsentKeys`, which mixes present and absent.
+
+Both of the review's exact repros now pass under `-DDEBUG`: build 0..999 then
+delete 5000..5099, and even keys then delete {1,3,5,7}.
+
 ## The four inlined binary searches stay inlined (measured 2026-08-17)
 
 The finding asked to replace the four hand-inlined right-boundary searches

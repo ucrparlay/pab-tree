@@ -162,7 +162,9 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 		[[maybe_unused]] auto new_node =
 			delete_points_4_leaf(T, In, leaf_entries_pattern, leaf_sort_pred);
 		assert(new_node == T);
-		assert(new_node->size + In.size() == old_size);
+		// Absent keys are skipped, so at most In.size() came out.
+		assert(new_node->size <= old_size);
+		assert(old_size - new_node->size <= In.size());
 		// return std::make_tuple(T->size < TT::k_buf_lb,
 		//                        T->size < TT::k_buf_lb ? 1 : 0,
 		return std::make_tuple(get_node_invalid_status(T),

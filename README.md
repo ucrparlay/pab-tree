@@ -143,6 +143,12 @@ side of a split key where no descent reaches them, so they become invisible to
 `contain` and the range queries while `get_size()` still counts them. Debug
 builds assert on it.
 
+**Deleting a key that is not there does nothing.** `batch_delete` and
+`erase(key)` skip keys the tree does not hold, like `std::set::erase`. The
+batch may name absent keys, may be longer than the tree, and may repeat a
+delete; only the keys actually present come out. `erase(key)` returns whether
+it was there.
+
 **`range_report`'s output must be large enough.** It writes
 `range_count(box)` entries and does not check `out.size()`. A smaller `out`
 overruns; debug builds assert.

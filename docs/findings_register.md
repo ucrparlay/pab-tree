@@ -1,6 +1,6 @@
 # Findings register — still open
 
-14 open library findings: 7 medium, 7 low. No high ones remain. 11 are from
+12 open library findings: 5 medium, 7 low. No high ones remain. 9 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| deleting an absent key aborts (medium x2) | absent keys are now a documented no-op; 4 asserts replaced with stronger ones |
 | `2n` scratch buffer (medium) | **re-verified frozen** — the suggested fix would index out of bounds; memory cost documented instead |
 | no reusable traversal skeleton (medium) | partly — the pure half extracted; the parallel dispatch deliberately left |
 | both `DefaultHybridPred` findings (medium) | **refuted by measurement**, not fixed — see below |
@@ -46,7 +47,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 7
+## MEDIUM — 5
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -95,55 +96,6 @@ drifted 96 -> 163 ms).
 sites at 8 and at 16 and keep the winner as a named constant. Do not bundle it
 with a refactor -- the two effects are separable and were confused once
 already.
-
-### Deleting a key that is not in the tree aborts in Debug builds; the precondition is undocumented
-`include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:140 · api-usability
-**Status: undocumented precondition**
-
-```cpp
-assert(T->size >= In.size());
-assert(parlay::all_of(In, [&](auto a) {
-  return std::find_if(TL->elements.begin(), TL->elements.begin() + TL->size,
-                      [&](auto const e) { return Entry::GetKey(e) == a; }) !=
-         TL->elements.begin() + TL->size;
-}));
-```
-
-plus `assert(new_node->size + In.size() == old_size)` at b_batch_delete.hpp:155. `BatchDelete`'s declaration (b_tree.h:319-325) documents nothing, and neither does README.md. Reproduced: build 1000 keys 0..999, `BatchDelete` of keys 5000..5099, compiled without `-DNDEBUG` -> `Assertion 'parlay::all_of(In, ...)' failed`, abort. In Release the same call is harmless (verified: size stays 1000) because `DeletePoints4
-
-*Suggested fix:* Decide and document the contract. If absent keys are meant to be allowed (the Release behaviour, and the more useful semantics), delete the two preconditions at leaf_op.hpp:140-146 and relax b_batch_delete.hpp:155 to `assert(new_node->size + In.size() >= old_size)`; then state in the `BatchDelete` doc comment that keys not present are ignored and duplicates are idempotent, and add a unit test cove
-
-### BatchDelete asserts every key is present; deleting an absent key aborts in non-NDEBUG builds
-`include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:141 · correctness · VERIFIED
-**Status: same as above**
-
-`DeletePoints4Leaf` asserts that every key in the batch exists in the target leaf:
-
-```cpp
-// leaf_op.hpp:140-145
-assert(T->size >= In.size());
-assert(parlay::all_of(In, [&](auto a) {
-  return std::find_if(TL->elements.begin(), TL->elements.begin() + TL->size,
-                      [&](auto const e) { return Entry::GetKey(e) == a; }) !=
-         TL->elements.begin() + TL->size;
-```
-
-Deleting keys that are not in the tree — an entirely ordinary operation for a set — aborts. My probe built 1000 entries with even keys and deleted `{1,3,5,7}`:
-
-```
-probe: leaf_op.hpp:141: ... Assertion `parlay::all_of(In, [&](auto a) { ... }) ' failed.
-Aborted (core dumped)
-```
-
-The same program compiled `-O2 -D
-
-> Verifier narrowed: Two corrections, neither of which changes the verdict:
-
-(a) It is not one assertion but three that fire on an absent key, so a user cannot suppress it with a single-line patch:
-  - `leaf_op.hpp:141-146` — the membership `all_of` (the one my probe hit first);
-  - `leaf_op.hpp:164-166` — `assert(end =
-
-*Suggested fix:* Remove the second assertion at leaf_op.hpp:141-145 (the implementation already handles absent keys correctly via the two-pointer compaction), and document on the `BatchDelete` declaration in b_tree.h:319-325 that keys not present are ignored. Keep `assert(T->size >= In.size())` only if that is genuinely required — my probe suggests it is not, since deleting 3 absent keys from a leaf is legal.
 
 ### GetEntries returns unsorted output, has no size check, and its ordering contract is undocumented
 `include/pab_tree/b_tree_impl/utility.hpp`:22 · api-usability
