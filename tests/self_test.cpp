@@ -524,6 +524,101 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 } // namespace
 
+// ---- the element adaptor is used directly, with either signature ----
+
+// By-value accessors. The library used to wrap every adaptor in a layer
+// that forced this signature; it now calls the adaptor as written.
+struct ele_by_value {
+	using E = entry;
+	using K = uint32_t;
+	using V = uint32_t;
+
+	static K get_key(E e)
+	{
+		return e.key;
+	}
+	static V get_val(E e)
+	{
+		return e.val;
+	}
+	static E to_entry(K k, V v)
+	{
+		return E{ k, v };
+	}
+};
+
+// A fat entry, where a by-value copy would be 64 bytes if one happened.
+struct big_entry {
+	uint32_t key;
+	char payload[60];
+};
+
+struct ele_big {
+	using E = big_entry;
+	using K = uint32_t;
+	using V = uint32_t;
+
+	static K get_key(E const &e)
+	{
+		return e.key;
+	}
+	static V get_val(E const &e)
+	{
+		return e.key;
+	}
+	static E to_entry(K const &k, V const &)
+	{
+		E e{};
+		e.key = k;
+		return e;
+	}
+};
+
+static_assert(pab_tree::entry_type<ele>);
+static_assert(pab_tree::entry_type<ele_by_value>);
+static_assert(pab_tree::entry_type<ele_big>);
+
+TEST(SelfTest, ElementAdaptorSignatures)
+{
+	auto const keys = gen_keys(20000, dist::uniform, g_seed ^ 0xe1e);
+
+	// by-value accessors
+	{
+		using tt = pab_tree::btree_type_trait<ele_by_value, 32>;
+		pab_tree::btree<tt> t;
+		oracle ref;
+		auto const v = to_entries(keys);
+		t.build(v);
+		add_to_oracle(ref, v);
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+		for (size_t i = 0; i < keys.size(); i += 71)
+			ASSERT_TRUE(t.contain(keys[i]));
+	}
+
+	// a 64-byte entry, by-reference accessors
+	{
+		using tt = pab_tree::btree_type_trait<ele_big, 32>;
+		pab_tree::btree<tt> t;
+		std::vector<big_entry> v(keys.size());
+		for (size_t i = 0; i < keys.size(); ++i)
+			v[i].key = keys[i];
+		t.build(v);
+		bool const ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok);
+		ASSERT_EQ(t.size(), keys.size());
+		for (size_t i = 0; i < keys.size(); i += 71)
+			ASSERT_TRUE(t.contain(keys[i]));
+
+		auto sorted = keys;
+		std::sort(sorted.begin(), sorted.end());
+		std::vector<uint32_t> half(sorted.begin(),
+								   sorted.begin() + sorted.size() / 2);
+		t.batch_delete(half);
+		ASSERT_EQ(t.size(), keys.size() - half.size());
+		ASSERT_TRUE((t.template validate<true, false>()));
+	}
+}
+
 // ---- get_entries' output-size contract ----
 
 TEST(SelfTest, GetEntriesOutputSize)

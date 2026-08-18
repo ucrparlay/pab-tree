@@ -48,7 +48,8 @@ struct entry {
         uint64_t key, val;
 };
 
-// Tells the tree how to read your entry.
+// Tells the tree how to read your entry. The tree calls these directly --
+// take the entry by reference or by value, whichever you prefer.
 struct my_ele {
         using E = entry;
         using K = uint64_t;

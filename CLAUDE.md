@@ -298,6 +298,46 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## `ele_wrapper` deleted — one adaptor layer, not two (2026-08-17)
+
+`btree_type_trait` wrapped every user adaptor in `ele_wrapper`, which
+inherited it and re-declared the three accessors with **by-value** parameters:
+
+```cpp
+static auto get_key(E const e) { return EleType::get_key(e); }
+```
+
+It added nothing else — `E`/`K`/`V` were already inherited — so the trait now
+uses `EleType` directly and the library calls the adaptor as the user wrote
+it. `TT::Entry` is the user's type.
+
+### The finding's performance claim is wrong; its API claim is right
+
+It calls the copy "on the hottest path there is". In source, yes.
+**Measured, the compiler already elides it**, even for a fat entry:
+
+| entry | instructions before | after |
+|---|---|---|
+| 8 bytes | 55463 | 55463 |
+| **64 bytes** | 25601 | 25601 |
+
+No mnemonic count changed in either. Only `.key` is read from the copy, so
+`-O3` never materialises it. So this is an API simplification — one less layer
+for a user to reason about, and signatures that no longer lie — not a speedup.
+
+**A timing run said the opposite and was wrong.** With the 64-byte entry it
+reported +2.2% / +3.9% / +6.2% *slower* after removing a copy, which cannot be
+real. That benchmark's own noise floor is 3.7-11.8% (min-to-max over six
+identical runs). When a result contradicts the mechanism, check the noise
+floor before believing it.
+
+### Both accessor signatures work
+
+`SelfTest.ElementAdaptorSignatures` builds trees through an adaptor taking
+`E const &` and one taking `E` by value, plus a 64-byte entry type, and static
+asserts all three satisfy `entry_type`. Removing the wrapper does not break
+adaptors written for the old by-value signature.
+
 ## `get_entries`' output-size precondition is now checked (2026-08-17)
 
 `assert(Out.size() >= root_->size)` at the top of `get_entries`. It has to be

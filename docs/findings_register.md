@@ -1,6 +1,6 @@
 # Findings register — still open
 
-10 open library findings: 4 medium, 6 low. No high ones remain. 7 are from
+9 open library findings: 3 medium, 6 low. No high ones remain. 6 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| element needs three wrapper layers (medium) | `ele_wrapper` deleted; the by-value copy it blamed was already elided |
 | both `GetEntries` findings (medium, low) | `to_seq()` covered ordering; the output-size precondition is now asserted |
 | deleting an absent key aborts (medium x2) | absent keys are now a documented no-op; 4 asserts replaced with stronger ones |
 | `2n` scratch buffer (medium) | **re-verified frozen** — the suggested fix would index out of bounds; memory cost documented instead |
@@ -48,7 +49,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 4
+## MEDIUM — 3
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -97,22 +98,6 @@ drifted 96 -> 163 ms).
 sites at 8 and at 16 and keep the winner as a named constant. Do not bundle it
 with a refactor -- the two effects are separable and were confused once
 already.
-
-### Element type needs three wrapper layers, and the library's own layer forces a by-value copy on every key access
-`include/pab_tree/dependence/type_trait.h`:21 · api-usability
-**Status: open**
-
-A user must write an element struct *and* a static-accessor wrapper (`tests/wrapper.h:130`: "NOTE: user needs to add a layer to expose API to b_tree"), and the library then wraps that again in `EleWrapper`, which adds nothing but signature changes:
-
-```cpp
-static auto GetKey(E const e)      { return EleType::GetKey(e); }
-static auto GetVal(E const e)      { return EleType::GetVal(e); }
-static E ToEntry(K const& k, V const& v) { return EleType::ToEntry(k, v); }
-```
-
-Note `E const e` — by value. The test wrapper takes `E const&` (`wrapper.h:139`), so the copy is imposed by the library layer, on the hottest path there is: `Entry::GetKey` appears 42 times across the impl, inside every binary-sea
-
-*Suggested fix:* Delete `EleWrapper` and set `using Entry = EleType;` directly in `TypeTrait` (line 48 already comments that `Entry` is 'abstract type to access E'), or at minimum change the forwarders to `static K GetKey(E const& e)` / `static V GetVal(E const& e)`. Replace the class with a documented concept: `template<typename T> concept EntryType = requires(typename T::E const& e) { typename T::E; typename T::
 
 ### Trait parameters are positional and undocumented; kSkHeightVal has no discoverable meaning
 `include/pab_tree/dependence/type_trait.h`:86 · api-usability
