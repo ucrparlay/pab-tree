@@ -129,7 +129,8 @@ void btree<type_trait>::BatchDelete_(
 }
 
 // Flatten the whole tree and rebuild it from the surviving entries.
-template <typename type_trait> void btree<type_trait>::rebuild_from_flatten()
+template <typename type_trait>
+void btree<type_trait>::rebuild_from_flatten()
 {
 	auto tree_entries = type_trait::entry_seq::uninitialized(this->root_->size);
 	flatten_rec(this->root_, parlay::make_slice(tree_entries));

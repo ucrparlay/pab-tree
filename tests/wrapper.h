@@ -9,7 +9,8 @@ enum InputType : std::uint8_t {
 	kDynamicGraphInput,
 };
 
-template <typename Key, typename Val> class Wrapper {
+template <typename Key, typename Val>
+class Wrapper {
 public:
 	using key_type = Key;
 	using mapped_type = Val;
@@ -17,9 +18,11 @@ public:
 	struct LeafAugEmpty {
 		LeafAugEmpty() = default;
 
-		template <typename Slice> LeafAugEmpty([[maybe_unused]] Slice In) {};
+		template <typename Slice>
+		LeafAugEmpty([[maybe_unused]] Slice In) {};
 
-		template <typename Slice> void update_aug([[maybe_unused]] Slice In)
+		template <typename Slice>
+		void update_aug([[maybe_unused]] Slice In)
 		{
 		}
 
@@ -58,7 +61,8 @@ public:
 	};
 
 	// NOTE: the element we use
-	template <typename KeyType, typename ValType> struct Element {
+	template <typename KeyType, typename ValType>
+	struct Element {
 		using key_type = KeyType;
 		using mapped_type = ValType;
 
@@ -72,22 +76,26 @@ public:
 			return val;
 		}
 
-		template <typename StrRange> void ReadKey(StrRange str, size_t i)
+		template <typename StrRange>
+		void ReadKey(StrRange str, size_t i)
 		{
 			this->key = { std::stoul(str), i };
 		}
 
-		template <typename StrRange> void ReadKey(StrRange str, StrRange str2)
+		template <typename StrRange>
+		void ReadKey(StrRange str, StrRange str2)
 		{
 			this->key = { std::stoul(str), std::stoul(str2) };
 		}
 
-		template <typename StrRange> void ReadKey(StrRange str)
+		template <typename StrRange>
+		void ReadKey(StrRange str)
 		{
 			this->key = std::stoul(str);
 		}
 
-		template <typename StrRange> void ReadVal(StrRange In)
+		template <typename StrRange>
+		void ReadVal(StrRange In)
 		{
 			this->val = std::stoul(In);
 		}
@@ -115,7 +123,8 @@ public:
 	};
 
 	// NOTE: user needs to add a layer to expose API to b_tree
-	template <typename EntryType> struct ElementWrapper {
+	template <typename EntryType>
+	struct ElementWrapper {
 		using entry_type = EntryType;
 		using key_type = typename entry_type::key_type;
 		using mapped_type = typename entry_type::mapped_type;

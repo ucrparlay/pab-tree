@@ -28,7 +28,8 @@ constexpr typename type_trait::key_type key_greatest()
 }
 
 // Identity for the box fold below: any real key widens it.
-template <typename type_trait> type_trait::box_type get_empty_box()
+template <typename type_trait>
+type_trait::box_type get_empty_box()
 {
 	return typename type_trait::box_type(key_greatest<type_trait>(),
 										 key_least<type_trait>());

@@ -148,7 +148,8 @@ auto bucketize(Seq const &data, size_t const numBuckets = 10)
 	return std::make_tuple(buckets[0], minVal, maxVal);
 }
 
-template <class Seq> auto SampleWeightedSeq(Seq &&weight_seq, size_t n)
+template <class Seq>
+auto SampleWeightedSeq(Seq &&weight_seq, size_t n)
 {
 	// std::random_device rd;      // a seed source for the random number engine
 	// std::mt19937 gen_mt(rd());  // mersenne_twister_engine seeded with rd()
@@ -189,7 +190,8 @@ auto SupplySample(Seq const &current_seq, size_t extra_n, size_t l, size_t r)
 
 constexpr size_t duplicate_ratio = 2;
 
-template <class T = double> class UniformGenerator {
+template <class T = double>
+class UniformGenerator {
 public:
 	static parlay::sequence<T> GenerateGroundSeq(double, size_t n, size_t max_k)
 	{
@@ -210,7 +212,8 @@ public:
 	}
 };
 
-template <class T = double> class ExponentialGenerator {
+template <class T = double>
+class ExponentialGenerator {
 public:
 	template <typename Param>
 	static parlay::sequence<T> Generate(Param const &param, size_t n)
@@ -231,7 +234,8 @@ public:
 	}
 };
 
-template <class T = double> class NormalGenerator {
+template <class T = double>
+class NormalGenerator {
 public:
 	template <typename Param>
 	static parlay::sequence<T> Generate(Param const &param, size_t n)
@@ -253,7 +257,8 @@ public:
 	}
 };
 
-template <class T = double> class ZipfianGenerator {
+template <class T = double>
+class ZipfianGenerator {
 	static double constexpr x_scale_fac = 0.0005;
 	static size_t constexpr supply_factor = 10;
 

@@ -3,10 +3,12 @@
 #include "baselines/cpam.h"
 #include "baselines/pam.h"
 
-template <typename TypeTrait> struct CpamWrapper {
+template <typename TypeTrait>
+struct CpamWrapper {
 	using TreeType = typename CPAMTree::CpamRaw<TypeTrait>;
 };
-template <typename TypeTrait> struct PamWrapper {
+template <typename TypeTrait>
+struct PamWrapper {
 	using TreeType = typename PAMTree::PamRaw<TypeTrait>;
 };
 

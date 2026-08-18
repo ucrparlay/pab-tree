@@ -65,12 +65,14 @@ struct sum_leaf_aug {
 
 	sum_leaf_aug() = default;
 
-	template <typename Slice> explicit sum_leaf_aug(Slice in)
+	template <typename Slice>
+	explicit sum_leaf_aug(Slice in)
 	{
 		update_aug(in);
 	}
 
-	template <typename Slice> void update_aug(Slice in)
+	template <typename Slice>
+	void update_aug(Slice in)
 	{
 		sum = 0;
 		for (auto const &e : in) {
@@ -294,7 +296,8 @@ void check_aug(node_type const *T, size_t &leaves, size_t &interiors)
 }
 
 // Contents, ordering, membership and the range queries, all against ref.
-template <typename Tree> void check_against(Tree &t, oracle const &ref)
+template <typename Tree>
+void check_against(Tree &t, oracle const &ref)
 {
 	bool const structure_ok = t.template validate<true, false>();
 	ASSERT_TRUE(structure_ok) << "validate() failed";
@@ -1062,14 +1065,16 @@ struct counting_alloc {
 	static inline std::atomic<long> live{ 0 };
 	static inline std::atomic<long> total{ 0 };
 
-	template <typename T> static T *alloc()
+	template <typename T>
+	static T *alloc()
 	{
 		live.fetch_add(1, std::memory_order_relaxed);
 		total.fetch_add(1, std::memory_order_relaxed);
 		return parlay::type_allocator<T>::alloc();
 	}
 
-	template <typename T> static void free(T *p)
+	template <typename T>
+	static void free(T *p)
 	{
 		live.fetch_sub(1, std::memory_order_relaxed);
 		parlay::type_allocator<T>::retire(p);
@@ -1230,7 +1235,8 @@ TEST(SelfTest, ReverseComparator)
 
 // ---- edge cases: the sizes where the structure changes shape ----
 
-template <unsigned KBuf> void small_sizes()
+template <unsigned KBuf>
+void small_sizes()
 {
 	for (size_t n :
 		 { 0u,	 1u,   2u,	 3u,   4u,	 5u,   7u,	 8u,	9u,
@@ -1268,7 +1274,8 @@ TEST(SelfTest, SmallSizesLeaf64)
 
 // ---- the shapes, at a size that builds a real multi-level tree ----
 
-template <unsigned KBuf> void shapes(size_t n)
+template <unsigned KBuf>
+void shapes(size_t n)
 {
 	for (int r = 0; r < g_rounds; ++r) {
 		auto const s = g_seed + static_cast<uint64_t>(r) * 7919;

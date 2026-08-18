@@ -1069,7 +1069,8 @@ void InsertOsmByTime(
 // NOTE: geometric mean of a numeric range. Entries equal to 0 are omitted
 // entirely (not clamped) so empty/idle batches do not drag the mean toward
 // zero or trip log(0).
-template <typename Range> double GeometricMean(Range const &v)
+template <typename Range>
+double GeometricMean(Range const &v)
 {
 	auto const nz = parlay::filter(v, [](auto x) { return x != 0; });
 	if (nz.size() == 0) {
@@ -1081,7 +1082,8 @@ template <typename Range> double GeometricMean(Range const &v)
 }
 
 // NOTE: sum (total) of a numeric range across all batches.
-template <typename Range> double Total(Range const &v)
+template <typename Range>
+double Total(Range const &v)
 {
 	return parlay::reduce(
 		parlay::delayed_map(v, [](auto x) { return static_cast<double>(x); }));

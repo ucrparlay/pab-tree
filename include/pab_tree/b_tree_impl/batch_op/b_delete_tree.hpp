@@ -9,7 +9,8 @@
 
 namespace pab_tree
 {
-template <typename type_trait> void btree<type_trait>::delete_tree()
+template <typename type_trait>
+void btree<type_trait>::delete_tree()
 {
 	if (this->root_ == nullptr) {
 		return;

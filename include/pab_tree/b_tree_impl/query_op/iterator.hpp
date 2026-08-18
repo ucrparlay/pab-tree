@@ -37,7 +37,8 @@ void btree<type_trait>::sort_leaves_rec(node_type *T)
 		1);
 }
 
-template <typename type_trait> void btree<type_trait>::sort_leaves() const
+template <typename type_trait>
+void btree<type_trait>::sort_leaves() const
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return;
@@ -276,7 +277,8 @@ auto btree<type_trait>::equal_range(key_type const &k) const
 	return { lo, hi };
 }
 
-template <typename type_trait> void btree<type_trait>::erase(const_iterator pos)
+template <typename type_trait>
+void btree<type_trait>::erase(const_iterator pos)
 {
 	assert(pos != this->end());
 	this->batch_delete(std::array<key_type, 1>{ entry_traits::get_key(*pos) });

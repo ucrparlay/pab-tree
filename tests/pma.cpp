@@ -3,10 +3,12 @@
 #include "baselines/pma.h"
 #include "baselines/spma.h"
 
-template <typename TypeTrait> struct PmaWrapper {
+template <typename TypeTrait>
+struct PmaWrapper {
 	using TreeType = typename PMA::PmaWrapper<TypeTrait>;
 };
-template <typename TypeTrait> struct SpmaWrapper {
+template <typename TypeTrait>
+struct SpmaWrapper {
 	using TreeType = typename SPMA::SpmaWrapper<TypeTrait>;
 };
 

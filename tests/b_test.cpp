@@ -2,7 +2,8 @@
 #include <cstdint>
 
 // NOTE: Trees
-template <typename TypeTrait> struct BTreeWrapper {
+template <typename TypeTrait>
+struct BTreeWrapper {
 	using TreeType = typename pab_tree::btree<TypeTrait>;
 };
 

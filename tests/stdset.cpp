@@ -2,7 +2,8 @@
 
 #include "baselines/stdset.h"
 
-template <typename TypeTrait> struct StdSetWrapper {
+template <typename TypeTrait>
+struct StdSetWrapper {
 	using TreeType = typename StdSetTree::StdSetRaw<TypeTrait>;
 };
 

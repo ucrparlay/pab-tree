@@ -2,7 +2,8 @@
 
 #include "baselines/tlxbtree.h"
 
-template <typename TypeTrait> struct TlxBTreeWrapper {
+template <typename TypeTrait>
+struct TlxBTreeWrapper {
 	using TreeType = typename TlxBTreeTree::TlxBTreeRaw<TypeTrait>;
 };
 

@@ -26,7 +26,8 @@
 namespace pab_tree
 {
 // Basetree
-template <class TypeTrait> class btree {
+template <class TypeTrait>
+class btree {
 public:
 	using type_trait = TypeTrait;
 	// TODO: Do we really need to define these types again?
@@ -246,15 +247,18 @@ public:
 	// build tree
 	// Keys must be distinct. Duplicates put elements on the wrong side of a
 	// split key, where no descent reaches them; debug builds assert.
-	template <typename Range> void build(Range &&In);
-	template <typename Range> void batch_insert(Range &&In);
+	template <typename Range>
+	void build(Range &&In);
+	template <typename Range>
+	void batch_insert(Range &&In);
 	template <typename Range, typename LeafSortPred = default_hybrid_pred>
 	void
 	batch_insert(Range &&In,
 				 const type_trait::pattern_type leaf_entries_pattern,
 				 const bool sorted_input,
 				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
-	template <typename Range> void batch_delete(Range &&In);
+	template <typename Range>
+	void batch_delete(Range &&In);
 	template <typename Range, typename LeafSortPred = default_hybrid_pred>
 	void
 	batch_delete(Range &&In,
@@ -266,7 +270,8 @@ public:
 	// for key order.
 	// PRECONDITION: Out holds at least size() entries. A smaller Out
 	// overruns; debug builds assert.
-	template <typename Range> void get_entries(Range &Out) const;
+	template <typename Range>
+	void get_entries(Range &Out) const;
 	template <bool CheckSize = true, bool Verbose = true>
 	[[nodiscard]] bool validate(node_type const *T = nullptr) const;
 	// Ratio of sorted leaves to total leaves in the subtree rooted at T
@@ -333,7 +338,8 @@ public:
 	}
 
 	// Same as build.
-	template <typename Range> void bulk_load(Range &&In)
+	template <typename Range>
+	void bulk_load(Range &&In)
 	{
 		this->build(std::forward<Range>(In));
 	}
@@ -583,8 +589,10 @@ private:
 				   static_cast<const interior_type *>(T)->reinsert_size;
 	}
 
-	template <typename Range> void Build_(Range In);
-	template <typename Range> node_type *build_recursive(Range In);
+	template <typename Range>
+	void Build_(Range In);
+	template <typename Range>
+	node_type *build_recursive(Range In);
 	node_type *assemble_interior_levels(type_trait::node_slice nodes,
 										type_trait::split_slice keys);
 

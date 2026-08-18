@@ -1,7 +1,8 @@
 #include "data_op.h"
 #include "test_framework.h"
 
-template <typename InputPoint> void RoundDataAndShift(commandLine &P)
+template <typename InputPoint>
+void RoundDataAndShift(commandLine &P)
 {
 	std::string input_path, output_suffix, output_path;
 	int pts_dim, multiply_offset;
@@ -45,7 +46,8 @@ template <typename InputPoint> void RoundDataAndShift(commandLine &P)
 	PrintToFile(output_path, new_wp);
 }
 
-template <typename InputPoint> void SortByCoord(commandLine &P)
+template <typename InputPoint>
+void SortByCoord(commandLine &P)
 {
 	std::string input_path, output_suffix, output_path;
 	int pts_dim, sort_dim;

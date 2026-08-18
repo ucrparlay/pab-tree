@@ -13,12 +13,14 @@ namespace pab_tree
 // A pool is what makes this fast -- the tree allocates one node per leaf
 // and per interior, so a general-purpose allocator shows up immediately.
 struct parlay_node_alloc {
-	template <typename T> static T *alloc()
+	template <typename T>
+	static T *alloc()
 	{
 		return parlay::type_allocator<T>::alloc();
 	}
 
-	template <typename T> static void free(T *p)
+	template <typename T>
+	static void free(T *p)
 	{
 		parlay::type_allocator<T>::retire(p);
 	}
@@ -42,10 +44,12 @@ struct proto_node {
 // node_has_non_trivial_aug is false and every update_aug call compiles away.
 struct empty_leaf_aug {
 	empty_leaf_aug() = default;
-	template <typename Slice> explicit empty_leaf_aug(Slice)
+	template <typename Slice>
+	explicit empty_leaf_aug(Slice)
 	{
 	}
-	template <typename Slice> void update_aug(Slice)
+	template <typename Slice>
+	void update_aug(Slice)
 	{
 	}
 	void reset()

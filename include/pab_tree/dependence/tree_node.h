@@ -30,7 +30,8 @@ namespace pab_tree
 struct alloc_normal_leaf_tag {};
 struct alloc_empty_leaf_tag {};
 
-template <typename TypeTrait> struct leaf_node : TypeTrait::node_type {
+template <typename TypeTrait>
+struct leaf_node : TypeTrait::node_type {
 	using type_trait = TypeTrait;
 	using node_type = type_trait::node_type;
 	using entry_type = typename type_trait::entry_type;
@@ -186,7 +187,8 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::node_type {
 
 	// TODO: should put this one in the aug as well and don't use the
 	// monostate
-	template <typename Range> void update_aug(Range In)
+	template <typename Range>
+	void update_aug(Range In)
 	{
 		if constexpr (node_has_non_trivial_aug<aug_type>) {
 			static_assert(leaf_aug_updatable_with<aug_type, Range>,
@@ -217,7 +219,8 @@ static leaf_type *alloc_normal_leaf_node(Range In)
 }
 
 // Alloc a empty leaf_type
-template <typename leaf_type> static leaf_type *alloc_empty_leaf_node()
+template <typename leaf_type>
+static leaf_type *alloc_empty_leaf_node()
 {
 	leaf_type *o =
 		leaf_type::type_trait::node_alloc::template alloc<leaf_type>();
@@ -236,7 +239,8 @@ static leaf_type *alloc_empty_leaf_node(typename leaf_type::aug_type const &aug)
 }
 
 // multi-way node whose children # is fixed
-template <typename TypeTrait> struct multi_way_node : TypeTrait::node_type {
+template <typename TypeTrait>
+struct multi_way_node : TypeTrait::node_type {
 	using type_trait = TypeTrait;
 	using node_type = type_trait::node_type;
 	using buf_size_type = typename type_trait::buf_size_type;
@@ -432,7 +436,8 @@ static interior_type *alloc_interior_node()
 	return o;
 }
 
-template <typename NodeType> static void free_node(auto T)
+template <typename NodeType>
+static void free_node(auto T)
 {
 	NodeType::type_trait::node_alloc::template free<NodeType>(
 		static_cast<NodeType *>(T));
