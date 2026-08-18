@@ -524,6 +524,63 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 } // namespace
 
+// ---- the trait can be configured by name, not just by position ----
+
+// Overriding a late parameter must not mean naming the earlier defaults.
+// btree_trait is an alias for btree_type_trait, so the two cannot drift:
+// these static asserts fail if the mapping is ever wrong.
+namespace trait_forms
+{
+struct desc : pab_tree::default_options {
+	using key_compare = std::greater<uint32_t>;
+};
+struct alloc_only : pab_tree::default_options {
+	using node_alloc = pab_tree::parlay_node_alloc;
+};
+
+// everything defaulted
+static_assert(std::is_same_v<pab_tree::btree_trait<ele>,
+							 pab_tree::btree_type_trait<ele>>);
+// BufferSize defaults to 64
+static_assert(std::is_same_v<pab_tree::btree_type_trait<ele>,
+							 pab_tree::btree_type_trait<ele, 64>>);
+// only the comparator overridden
+static_assert(
+	std::is_same_v<
+		pab_tree::btree_trait<ele, 32, desc>,
+		pab_tree::btree_type_trait<
+			ele, 32, pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
+			pab_tree::proto_node, std::greater<uint32_t>>>);
+// only the allocator named, explicitly equal to the default
+static_assert(std::is_same_v<pab_tree::btree_trait<ele, 8, alloc_only>,
+							 pab_tree::btree_type_trait<ele, 8>>);
+} // namespace trait_forms
+
+TEST(SelfTest, TraitByName)
+{
+	// An options struct declared inside a function: key_compare is a
+	// plain alias, not a member template, so this compiles.
+	struct desc : pab_tree::default_options {
+		using key_compare = std::greater<uint32_t>;
+	};
+	using tt = pab_tree::btree_trait<ele, 32, desc>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const keys = gen_keys(5000, dist::uniform, g_seed ^ 0x7a17);
+	tree t;
+	t.build(to_entries(keys));
+	bool const ok = t.template validate<true, false>();
+	ASSERT_TRUE(ok);
+	ASSERT_EQ(t.size(), keys.size());
+
+	// descending, because the option took effect
+	auto sorted = keys;
+	std::sort(sorted.begin(), sorted.end(), std::greater<uint32_t>());
+	auto it = t.begin();
+	for (size_t i = 0; i < 50; ++i, ++it)
+		ASSERT_EQ(it->key, sorted[i]);
+}
+
 // ---- the element adaptor is used directly, with either signature ----
 
 // By-value accessors. The library used to wrap every adaptor in a layer
@@ -923,9 +980,10 @@ static_assert(!pab_tree::node_base<const_size>);
 
 TEST(SelfTest, CustomNodeBase)
 {
-	using tt =
-		pab_tree::btree_type_trait<ele, 32, pab_tree::empty_leaf_aug,
-								   pab_tree::empty_interior_aug, tagged_node>;
+	struct opts : pab_tree::default_options {
+		using node = tagged_node;
+	};
+	using tt = pab_tree::btree_trait<ele, 32, opts>;
 	using tree = pab_tree::btree<tt>;
 
 	auto const seed = g_seed ^ 0xb45eULL;
@@ -980,9 +1038,10 @@ struct counting_alloc {
 
 TEST(SelfTest, CustomAllocator)
 {
-	using tt = pab_tree::btree_type_trait<
-		ele, 16, pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
-		pab_tree::proto_node, std::less<uint32_t>, counting_alloc>;
+	struct opts : pab_tree::default_options {
+		using node_alloc = counting_alloc;
+	};
+	using tt = pab_tree::btree_trait<ele, 16, opts>;
 	using tree = pab_tree::btree<tt>;
 
 	auto const seed = g_seed ^ 0xa110cULL;
@@ -1033,9 +1092,10 @@ TEST(SelfTest, ReverseComparator)
 {
 	// std::greater: the tree is ordered descending, so every structural
 	// invariant, the descent, the sorts and validate() must follow it.
-	using tt = pab_tree::btree_type_trait<
-		ele, 16, pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
-		pab_tree::proto_node, std::greater<uint32_t>>;
+	struct desc : pab_tree::default_options {
+		using key_compare = std::greater<uint32_t>;
+	};
+	using tt = pab_tree::btree_trait<ele, 16, desc>;
 	using tree = pab_tree::btree<tt>;
 
 	auto const seed = g_seed ^ 0x9e77ULL;

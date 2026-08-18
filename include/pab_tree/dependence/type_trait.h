@@ -95,7 +95,34 @@ public:
 	};
 };
 
-template <entry_type EleType, uint BufferSize,
+// Defaults for everything btree_type_trait does not require. Inherit and
+// override only what you need, then hand it to btree_trait below -- that way
+// setting the last parameter does not mean naming the four before it.
+struct default_options {
+	using leaf_aug = empty_leaf_aug;
+	using interior_aug = empty_interior_aug;
+	using node = proto_node;
+	using node_alloc = parlay_node_alloc;
+	// void means std::less<K>. A plain alias, not a member template, so
+	// an options struct can be declared inside a function.
+	using key_compare = void;
+};
+
+// The tree's configuration. Only EleType is required.
+//
+//   EleType         reads K and V out of your entry; see the entry_type
+//                   concept
+//   BufferSize      leaf size; a leaf holds BufferSize..4*BufferSize entries
+//   LeafAugType     per-leaf augmentation, recomputed on every leaf change
+//   InteriorAugType per-interior augmentation, recomputed on every update
+//   NodeType        common base of both node types; see the node_base concept
+//   KeyCompare      key ordering; everything in the tree goes through it
+//   NodeAllocType   where nodes come from; must be thread safe
+//
+// They are positional, so overriding a later one means naming the earlier
+// defaults. The defaults are all spelled `pab_tree::empty_leaf_aug`,
+// `empty_interior_aug`, `proto_node`, `std::less<K>`, `parlay_node_alloc`.
+template <entry_type EleType, uint BufferSize = 64,
 		  typename LeafAugType = empty_leaf_aug,
 		  typename InteriorAugType = empty_interior_aug,
 		  node_base NodeType = proto_node,
@@ -149,6 +176,23 @@ public:
 
 	static constexpr uint_fast8_t const k_split_factor = 8;
 };
+
+// btree_type_trait by name rather than by position. An alias, so the two
+// cannot drift apart:
+//
+//   struct desc : pab_tree::default_options {
+//           using key_compare = std::greater<uint64_t>;
+//   };
+//   using tt = pab_tree::btree_trait<my_ele, 64, desc>;
+template <entry_type EleType, uint BufferSize = 64,
+		  typename Options = default_options>
+using btree_trait = btree_type_trait<
+	EleType, BufferSize, typename Options::leaf_aug,
+	typename Options::interior_aug, typename Options::node,
+	std::conditional_t<std::is_void_v<typename Options::key_compare>,
+					   std::less<typename EleType::K>,
+					   typename Options::key_compare>,
+	typename Options::node_alloc>;
 
 } // namespace pab_tree
 

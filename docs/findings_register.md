@@ -1,6 +1,6 @@
 # Findings register — still open
 
-9 open library findings: 3 medium, 6 low. No high ones remain. 6 are from
+8 open library findings: 2 medium, 6 low. No high ones remain. 5 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| trait parameters positional and undocumented (medium) | `BufferSize` defaults to 64; `btree_trait` takes the rest by name |
 | element needs three wrapper layers (medium) | `ele_wrapper` deleted; the by-value copy it blamed was already elided |
 | both `GetEntries` findings (medium, low) | `to_seq()` covered ordering; the output-size precondition is now asserted |
 | deleting an absent key aborts (medium x2) | absent keys are now a documented no-op; 4 asserts replaced with stronger ones |
@@ -49,7 +50,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 3
+## MEDIUM — 2
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -98,24 +99,6 @@ drifted 96 -> 163 ms).
 sites at 8 and at 16 and keep the winner as a named constant. Do not bundle it
 with a refactor -- the two effects are separable and were confused once
 already.
-
-### Trait parameters are positional and undocumented; kSkHeightVal has no discoverable meaning
-`include/pab_tree/dependence/type_trait.h`:86 · api-usability
-**Status: partly - README documents them now**
-
-The only way to instantiate the tree is:
-
-```cpp
-template<typename EleType, uint kBufferSize, typename LeafAugType,
-         typename InteriorAugType, uint_fast8_t kSkHeightVal, typename NodeType>
-class BTreeTypeTrait
-```
-
-Six positional parameters, no defaults, no comments on the declaration, no documentation. Three of them are effectively unguessable:
-
-- **`EleType`** is not the element. It is an access layer that must expose `E`, `K`, `V` and `static GetKey(E)`/`GetVal(E)`. I only learned this by finding `EleWrapper<EleType>` at type_trait.h:93 and `Wrapper::ElementWrapper<E>` at tests/b_test.cpp:54. Passing the element struct itself — the obvious first guess — produces 204 lines of error
-
-*Suggested fix:* Give the declaration defaults and a doc comment: `template<typename EleType, uint kBufferSize = 64, typename LeafAugType = EmptyLeafAug, typename InteriorAugType = EmptyInteriorAug, uint_fast8_t kSkHeightVal = 8, typename NodeType = ProtoNode>`, so the common instantiation is `BTreeTypeTrait<MyEle>`. Rename `EleType` to `EntryAccessor` (or add `template<typename A> concept EntryAccessor = requires
 
 ## LOW — 6
 

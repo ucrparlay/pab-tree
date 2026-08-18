@@ -59,7 +59,7 @@ struct my_ele {
         static E to_entry(K const &k, V const &v) { return E{ k, v }; }
 };
 
-using tt = pab_tree::btree_type_trait<my_ele, 64>;   // 64 = leaf size
+using tt = pab_tree::btree_type_trait<my_ele>;   // leaf size defaults to 64
 using tree = pab_tree::btree<tt>;
 
 int main()
@@ -170,6 +170,41 @@ the buffer would index out of bounds.
 
 **The tree owns its nodes.** `get_root()` returns a non-owning observer.
 Lifetime ends at `delete_tree()` or the destructor.
+
+## Configuring the tree
+
+`btree_type_trait` takes seven parameters; only the first is required.
+
+| # | parameter | default |
+|---|---|---|
+| 1 | `EleType` — reads K and V out of your entry | — |
+| 2 | `BufferSize` — leaf size | `64` |
+| 3 | `LeafAugType` | `empty_leaf_aug` |
+| 4 | `InteriorAugType` | `empty_interior_aug` |
+| 5 | `NodeType` — common base of both node types | `proto_node` |
+| 6 | `KeyCompare` | `std::less<K>` |
+| 7 | `NodeAllocType` | `parlay_node_alloc` |
+
+```cpp
+using tt = pab_tree::btree_type_trait<my_ele>;   // all defaults
+```
+
+They are positional, so overriding #6 the long way means naming #3–#5 first.
+`btree_trait` takes them by name instead — inherit `default_options` and
+override only what you want:
+
+```cpp
+struct desc : pab_tree::default_options {
+        using key_compare = std::greater<uint64_t>;
+};
+using tt = pab_tree::btree_trait<my_ele, 64, desc>;
+```
+
+`default_options` has `leaf_aug`, `interior_aug`, `node`, `node_alloc` and
+`key_compare`; leaving `key_compare` as its default `void` means
+`std::less<K>`. `btree_trait` is an alias for `btree_type_trait`, so the two
+name the same type and cannot drift apart. The members are plain aliases, so
+an options struct can be declared inside a function.
 
 ## Key ordering
 

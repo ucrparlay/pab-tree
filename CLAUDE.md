@@ -298,6 +298,36 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## Trait configuration: defaults plus a by-name form (2026-08-17)
+
+`kSkHeightVal`, which the finding called unguessable, was already removed by
+the refactor. What was left is real: seven positional parameters, and setting
+the comparator meant naming three defaults first. I hit that three times
+writing `self_test`.
+
+Two changes:
+
+- **`BufferSize` now defaults to 64**, so `btree_type_trait<my_ele>` is the
+  whole declaration.
+- **`btree_trait<EleType, BufferSize, Options>`** takes the rest by name.
+  Inherit `default_options`, override only what you want. It is an **alias**
+  for `btree_type_trait`, so the two name the same type — `self_test` static
+  asserts that for four combinations, so a wrong mapping cannot compile.
+
+All three spelled-out instantiations in `self_test` are gone.
+
+### `key_compare` is a plain alias with a `void` sentinel, deliberately
+
+The first design had `template <typename K> using key_compare = std::less<K>;`
+on `default_options`. That is a **member template, which C++ forbids in a local
+class**, so an options struct could not be declared inside a function — the
+first `TEST` using it failed with "invalid declaration of member template in
+local class". It is now `using key_compare = void;`, with `void` meaning
+`std::less<K>`, resolved by `std::conditional_t` in the alias. Plain aliases
+work in a local class.
+
+Codegen unchanged: 55463 instructions, no mnemonic count changed.
+
 ## `ele_wrapper` deleted — one adaptor layer, not two (2026-08-17)
 
 `btree_type_trait` wrapped every user adaptor in `ele_wrapper`, which
