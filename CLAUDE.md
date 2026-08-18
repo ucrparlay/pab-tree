@@ -298,6 +298,59 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## Traversal skeleton: only the pure part was extracted (2026-08-17)
+
+The finding asked for a shared `for_each_touched_child` skeleton across
+`batch_insert_recursive` and `batch_delete_recursive`. Read side by side, less
+is shared than it claims:
+
+| piece | shared? |
+|---|---|
+| partitioner selection | **byte-identical**, 5 lines |
+| `#ifdef DEBUG` range assert | no — entries vs keys |
+| touched-children loop | shape only. Insert writes 1 array; delete writes 3, stores `touched_l`/`touched_r`, and calls `reset_deletion_flag()` on untouched interior children |
+| `parallel_for` body | no — different payload, and insert recomputes `l`/`r` inside the lambda while delete uses the precomputed ones |
+| aggregation | no |
+
+So only the partitioner selection came out, as `partition_batch` in
+`points_op.hpp`. It is pure and has no parallel structure, which is what makes
+it safe under the "don't change the parallel algorithm" rule.
+
+**It needed `[[gnu::always_inline]]`.** Plain extraction did not fully inline
+and cost **+33 instructions and +9 `callq`** in the hottest recursion. With
+the attribute: 55463 vs 55465 instructions and `callq` 3091 → **3087**, i.e.
+marginally better than before, and every timing delta below the noise floor.
+Measure this kind of extraction; do not assume the compiler inlines it.
+
+The parallel dispatch was deliberately left duplicated. Threading a lambda
+through the `parallel_for` in both recursions is exactly the "trick" code the
+standing rule protects, and it would unify perhaps 10 lines that are not
+actually identical.
+
+## A `-DDEBUG` build had never been run, and hid a comparator bug
+
+`b_batch_delete.hpp`'s range assertion still read
+
+```cpp
+return k >= TI->split[i - 1] && k < TI->split[i];
+```
+
+The comparator sweep could not have caught it: the block is behind `#ifdef
+DEBUG`, which nothing in the build system sets, so it never compiles. Under
+`std::greater` it aborts. Fixed, and confirmed by building `self_test` with
+`-DDEBUG -UNDEBUG` — it aborted before, 18/18 after.
+
+Build it that way by hand, since no CMake target does:
+
+```bash
+g++ -std=c++20 -O1 -pthread -DDEBUG -UNDEBUG -Iinclude \
+  -Iexternal/parlaylib/include -Iexternal/googletest/googletest/include \
+  tests/self_test.cpp build/lib/libgtest_main.a build/lib/libgtest.a -o st_debug
+```
+
+`-DDEBUG` also turns on the `get_node_box_rec` verification loops, so it is
+slow — but it is the only way any of those asserts get compiled at all.
+
 ## `default_hybrid_pred` — both review findings were wrong (2026-08-17)
 
 Two findings claimed defects here. Measured, both are false, and in opposite

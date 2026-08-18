@@ -693,6 +693,13 @@ private:
 
 	// template <typename Leaf, typename RT>
 
+	// Partition In across TI's children, picking the cheaper of the two
+	// partitioners. Both batch recursions choose the same way.
+	template <typename Range>
+	[[gnu::always_inline]] static inline void
+	partition_batch(size_buf_ub_arr &split_pos_arr, Range In,
+					Interior const *TI);
+
 	template <typename Range>
 	static void split_batch_binary_search(size_buf_ub_arr &split_pos_arr,
 										  Range In,

@@ -173,20 +173,17 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 	auto TI = static_cast<Interior *>(T);
 
 	size_buf_ub_arr split_pos_seq;
-	if (In.size() > TT::k_split_factor * TI->get_split_n()) {
-		split_batch_binary_search(split_pos_seq, In, TI->get_split_slice());
-	} else {
-		split_batch_merge(split_pos_seq, In, TI->get_split_slice());
-	}
+	partition_batch(split_pos_seq, In, TI);
 
 #ifdef DEBUG
 	// Ensure all elements between two splits are correct
 	// i.e., less than the split value
 	for (int i = 1; i < TI->get_split_n(); i++) {
-		assert(parlay::all_of(
-			In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](K const k) {
-				return k >= TI->split[i - 1] && k < TI->split[i];
-			}));
+		assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
+							  [&](K const k) {
+								  return !TT::key_less(k, TI->split[i - 1]) &&
+										 TT::key_less(k, TI->split[i]);
+							  }));
 	}
 #endif // DEBUG
 

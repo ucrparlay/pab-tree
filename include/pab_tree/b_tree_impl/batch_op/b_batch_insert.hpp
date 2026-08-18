@@ -139,11 +139,7 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 
 	size_buf_ub_arr split_pos_seq;
 	assert(TI->get_node_n() > 0);
-	if (In.size() > TT::k_split_factor * TI->get_split_n()) {
-		split_batch_binary_search(split_pos_seq, In, TI->get_split_slice());
-	} else {
-		split_batch_merge(split_pos_seq, In, TI->get_split_slice());
-	}
+	partition_batch(split_pos_seq, In, TI);
 
 	//   // SplitBatchSieve(split_pos_seq, In, TI->get_split_slice());
 	// } else {

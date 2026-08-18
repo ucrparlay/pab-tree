@@ -1,6 +1,6 @@
 # Findings register — still open
 
-16 open library findings: 9 medium, 7 low. No high ones remain. 13 are from
+15 open library findings: 8 medium, 7 low. No high ones remain. 12 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| no reusable traversal skeleton (medium) | partly — the pure half extracted; the parallel dispatch deliberately left |
 | both `DefaultHybridPred` findings (medium) | **refuted by measurement**, not fixed — see below |
 | `NodeType` unconstrained, `EleAssignTag` dead (medium) | `node_base` concept; dead parameter removed |
 | no allocator customization point (high) | `NodeAllocType` trait parameter, codegen-identical |
@@ -44,7 +45,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 9
+## MEDIUM — 8
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -70,24 +71,6 @@ and `interior_aug::force_parallel(size_t, size_t) -> bool`.
 and apply them at the call sites in `leaf_node::update_aug` and
 `btree_interior_node::update_aug`, where the range type is known, rather than
 on the trait.
-
-### No reusable traversal skeleton: every batch op re-implements partition-recurse-reassemble
-`include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:127 · extensibility
-**Status: structural**
-
-`BatchInsertRecursive` (`b_batch_insert.hpp:127-192`) and `BatchDeleteRecursive` (`b_batch_delete.hpp:165-229`) share ~40 near-identical lines: the `static_cast<Interior*>(T)`, the identical partitioner selection
-
-```cpp
-if (In.size() > TT::kSplitFactor * TI->GetSplitN()) {
-  SplitBatchBinarySearch(split_pos_seq, In, TI->GetSplitSlice());
-} else {
-  SplitBatchMerge(split_pos_seq, In, TI->GetSplitSlice());
-}
-```
-
-the `#ifdef DEBUG` range assertion, the touched-children loop computing `l`/`r` from `split_pos_seq` and filling `nodes_map[cnt++]`, and the `parlay::parallel_for(0, cnt, ..., 1)` dispatch. Only the per-child payload and the aggregation differ. The key-vs-entry difference is handled
-
-*Suggested fix:* Extract the shared skeleton as `template<typename Range, typename ChildFn> static BufSizeT ForEachTouchedChild(Interior* TI, Range In, SizeBufUBArr& split_pos_arr, ChildFn&& fn)` in `points_op.hpp`, where `fn(BufSizeT child_idx, BufSizeT slot, SizeT l, SizeT r)` runs inside the `parallel_for`; have both recursions call it. Replace the duplicated `if constexpr` with one `static K KeyOf(auto const&
 
 ### BatchInsert reserves 2 pairs (32 bytes) of scratch per input element regardless of splits
 `include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:77 · performance

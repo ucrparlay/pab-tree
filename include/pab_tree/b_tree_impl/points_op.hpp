@@ -68,6 +68,22 @@ void btree<TT>::split_batch_binary_search(size_buf_ub_arr &split_pos_arr,
 
 template <typename TT>
 template <typename Range>
+[[gnu::always_inline]] inline void
+btree<TT>::partition_batch(size_buf_ub_arr &split_pos_arr, Range In,
+						   Interior const *TI)
+{
+	// Binary search costs O(split_n log(n/split_n)), the merge O(n +
+	// split_n); the merge wins once the batch is small relative to the
+	// number of children.
+	if (In.size() > TT::k_split_factor * TI->get_split_n()) {
+		split_batch_binary_search(split_pos_arr, In, TI->get_split_slice());
+	} else {
+		split_batch_merge(split_pos_arr, In, TI->get_split_slice());
+	}
+}
+
+template <typename TT>
+template <typename Range>
 void btree<TT>::split_batch_merge(size_buf_ub_arr &split_pos_arr, Range In,
 								  TT::split_slice_const split_slice)
 {
