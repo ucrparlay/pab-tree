@@ -73,13 +73,28 @@ and apply them at the call sites in `leaf_node::update_aug` and
 `btree_interior_node::update_aug`, where the range type is known, rather than
 on the trait.
 
-### The branchless binary search is hand-inlined four times with a hardcoded base of 8
-`include/pab_tree/b_tree_impl/query_op/range_report.hpp`:98 · standards
-**Status: open**
+### The interior binary-search base is 8, not the tuned 16
+`include/pab_tree/b_tree_impl/query_op/range_count.hpp`:37,79 ·
+`range_report.hpp`:46,98 · performance
+**Status: open, narrowed 2026-08-17 — the dedup half was measured and rejected**
 
-`BinarySearch<_binary_search_base>` (binary_search.h:41-76) exists precisely as the shared primitive, and the node types expose a tuned `kBinarySearchBase` derived from `std::hardware_constructive_interference_size` (tree_node.h:57-64 and :276-283). Yet the right-boundary search is copy-pasted inline four times with a literal cutoff: `while (hi - lo > 8)` at range_report.hpp:98 (interior splits) and :46 (leaf entries), and range_count.hpp:79 and :34. The bodies are identical modulo the accessor. The hardcoded 8 also throws away the cache-line tuning the rest of the library goes to some trouble to compute (for `kBuf=64` with 8-byte entries the leaf base is 8, but for 16-byte entries it is 4).
+The original finding bundled two things. The dedup half is settled: routing
+the four inlined right-boundary searches through `detail::binary_search` cost
++90 instructions and 35-54% on `range_count` via a slice, and +60 instructions
+with no win via a pointer+count primitive. The sites now carry a comment
+recording that. See CLAUDE.md.
 
-*Suggested fix:* Replace all four inlined loops with the primitive, adding an offset-taking overload so the narrowing is preserved: `template<size_t base, typename Seq, typename F> size_t BinarySearchFrom(Seq const& I, size_t lo, F const& less)` in `binary_search.h`, then call `TI->GetSplitSlice()`-based `BinarySearchFrom<Interior::kBinarySearchBase>(split_slice, l, [&](K key){ return key < query_box.second; })` i
+What is left is only the constant. The literal 8 is the tuned value for the
+*leaf* search (`64 / sizeof(E)` = 8 for an 8-byte entry) but half the tuned
+value for the *interior* split search, where `64 / sizeof(K)` = 16 for a
+4-byte key. Whether 16 actually beats 8 there is unmeasured: it is worth a few
+percent at most and the machine used could not resolve that (identical runs
+drifted 96 -> 163 ms).
+
+*Suggested fix:* on a quiet machine, measure `range_count` with the interior
+sites at 8 and at 16 and keep the winner as a named constant. Do not bundle it
+with a refactor -- the two effects are separable and were confused once
+already.
 
 ### Deleting a key that is not in the tree aborts in Debug builds; the precondition is undocumented
 `include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:140 · api-usability

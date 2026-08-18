@@ -298,6 +298,42 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## The four inlined binary searches stay inlined (measured 2026-08-17)
+
+The finding asked to replace the four hand-inlined right-boundary searches
+in `range_count`/`range_report` with `detail::binary_search`. **Tried twice,
+rejected on measurement.** The four sites now carry a comment saying so, so
+nobody redoes it.
+
+| version | instructions | measured |
+|---|---|---|
+| inlined (HEAD) | 55463 | baseline |
+| via `binary_search` over a slice | 55553 (+90, +21 `cmp`) | `range_count` **+35% small boxes, +54% large** |
+| via a new pointer+count `binary_search_n`, base 8 | 55523 (+60, +21 `cmp`) | inconclusive |
+
+The slice version is clearly bad — `parlay::slice` indexing does not optimize
+like the raw-pointer loop the sites already use. Adding a pointer+count
+primitive recovered most but not all of it: still +60 instructions and 21
+extra compares, with no timing win to pay for them. That primitive was removed
+again rather than left as dead code.
+
+**The base is a separate question from the dedup, and the finding conflates
+them.** Switching from the literal 8 to the node's `k_binary_search_base`
+accounts for +21 `cmp` on its own, because the interior base is
+`64 / sizeof(K)` = **16** for a 4-byte key — double the linear tail. For the
+*leaf* the tuned base is `64 / sizeof(E)` = 8, so the literal already is the
+tuned value there. The claim only bites for interior splits with small keys,
+and whether 16 beats 8 is unresolved: this machine could not resolve a few
+percent (see below).
+
+### The timing floor moved mid-session — check before trusting a number
+
+Repeated identical runs drifted 96 → 129 → 149 → 163 ms, and min-of-10 paired
+runs gave contradictory signs (−6.8% / +2.8% / +0.7%). The box is shared. When
+that happens the disassembly diff is the only reliable evidence; a few percent
+is simply not measurable. Re-measure the base question on a quiet machine
+before acting on it.
+
 ## The `2n` scratch buffer stays — re-verified 2026-08-17
 
 Re-checked rather than taken on faith, because it was already on the frozen
