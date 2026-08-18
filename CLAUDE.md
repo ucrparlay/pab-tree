@@ -280,6 +280,119 @@ included it, and the BwTree the workload actually drives lives in
   they are labels, not identifiers.
 - `tests/common/` is vendored PBBS and was excluded, as in every earlier pass.
 
+## The `-DDEBUG` build is warning-clean now (2026-08-18)
+
+`option(DEBUG)` is what compiles the `#ifdef DEBUG` blocks, and nothing had
+ever built them, so their warnings appeared the first time anyone configured
+`-DDEBUG=ON`. Nine were real:
+
+| where | warning | fix |
+|---|---|---|
+| `b_batch_delete.hpp` | `validate()` result dropped -- it is `[[nodiscard]]` | assign to `[[maybe_unused]] tree_ok`, then `assert` it. Keeping the call outside the assert means it still runs under `-DDEBUG -DNDEBUG` |
+| `b_batch_delete/insert.hpp`, `node_op.hpp` x2 | `int i` vs `buf_size_type` in four `#ifdef DEBUG` loops | `buf_size_type`. All four count **forward**, so the CLAUDE.md warning about backward loops does not apply |
+| `node_op.hpp:156` | `auto node = ...` never read | deleted |
+
+### The sign change was checked against the `i--` trap
+
+Turning `int i` into `buf_size_type i` is the one edit in that list that could
+introduce a bug, so it was verified rather than assumed:
+
+- **All four loops count forward** (`i++`), read in full, and nothing in a body
+  decrements `i`. The library has exactly **one** backward loop, in
+  `balance_over_leaves`; it was `int` at the time and untouched by that pass,
+  and was converted separately (below).
+- **Every `- 1` is guarded.** In the two `get_split_n()` loops `i` starts at 1,
+  so `i - 1 >= 0`. In the two `get_node_n()` loops `i - 1` appears only in the
+  `else` branch, which requires `i != 0`; `get_node_n() - 1` and
+  `get_split_n() - 1` are reachable only once `node_n >= 2`, because `node_n ==
+  1` hits `continue` and `node_n == 0` never enters the loop.
+- The only other decrement, `const_iterator::operator--`, guards with
+  `if (this->idx_ > 0)`.
+- **Runtime proof**: `self_test` is 22/22 under `-DDEBUG -UNDEBUG`, the build
+  that actually compiles these loops and their asserts. An unsigned backward
+  loop would hang; a bad index would trip the box-vs-split asserts beside it.
+
+**Running the suite caught something compiling could not.**
+`SelfTest.GetEntriesOutputSize` uses `EXPECT_DEATH(..., "Out.size\\(\\) >=")`,
+matching the assert's *text*. Renaming `Out` to `out` changed the message, the
+regex stopped matching, and the test failed even though the assert fired
+correctly. The identifier was inside a **string literal**, which the rename
+tool skips on purpose -- so no compiler could have flagged it. After any
+rename, grep the string literals too:
+
+```bash
+grep -rnoE '"[^"]*\b(Out|In|TypeTrait|Range)\b[^"]*"' tests/*.cpp tests/*.h
+```
+
+That sweep also found `"Range: ["` in `data_op.h`, which is output text about a
+numeric range and correctly stays.
+
+The rest were in `tests/`: unused `key_type`/`mapped_type` aliases in the four
+baseline drivers (now `[[maybe_unused]]`, matching `b_test.cpp`), a dead
+placeholder `test_func` lambda in three of them (deleted; `pma.cpp` keeps its
+copy `[[maybe_unused]]` because it holds commented-out PMA reference code), two
+sign comparisons, and `parse_param`'s `defaultValue` parameter, which every
+caller passed and the body never read -- dropped, matching
+`incre_data_generate.cpp`'s signature.
+
+**Release codegen is unaffected**: every library fix is inside `#ifdef DEBUG`,
+and `b_test` at `-O3` is 140798 instructions before and after.
+
+What is left is not ours and is deliberately untouched: 43 warnings from
+`external/Packed-Memory-Array`, 11 from `external/CPAM`, 14 from
+`tests/common` (vendored PBBS).
+
+## The one backward loop, and what large nodes exposed (2026-08-18)
+
+`balance_over_leaves` had
+
+```cpp
+/* WARN: signed; --i from 0 is safe */
+for (int i = interior->get_node_n() - 1; i >= 0; --i) {
+```
+
+**The comment named the wrong hazard.** `--i` from 0 is indeed fine; the
+*initializer* is the problem. `get_node_n() - 1` is evaluated in **unsigned**
+arithmetic before the conversion to `int`, so at `node_n == 0` it wraps first:
+
+| `buf_size_type` | `node_n - 1` | as `int` | first index |
+|---|---|---|---|
+| `uint_fast8_t` (BufferSize ≤ 63) | 255 | **255** | out of bounds — array is 128 |
+| `uint_fast16_t`/`uint_fast32_t` | 2^64−1 | −1 | loop skipped, safe by luck |
+
+The narrow case is a real out-of-bounds walk, not a hang. Replaced with the
+test-then-decrement idiom, which removes the signed/unsigned mixing at all five
+uses of `i` in the body:
+
+```cpp
+for (buf_size_type i = interior->get_node_n(); i-- > 0;) {
+```
+
+Measured, not assumed: `b_test` at `-O3` goes 140798 → **140768** instructions,
+with 4 fewer `cmp` and 2 fewer `js` — the signed compare is gone. This is the
+one fix in the warning pass that is **not** inside `#ifdef DEBUG`, so it is the
+only one that touches release codegen.
+
+### `uint_fast16_t` is 8 bytes here
+
+Worth knowing before reasoning about widths: on this platform `uint_fast8_t` is
+1 byte but `uint_fast16_t` and `uint_fast32_t` are both **8**. So BufferSize 64
+and up all get a 64-bit `buf_size_type`, and only BufferSize ≤ 63 gets the
+narrow one.
+
+### Leaf 1024 (`k_buf_ub` 4096) is not covered by `self_test`
+
+`self_test` runs leaf sizes 2–256. A standalone probe at BufferSize 1024 under
+`-DDEBUG -UNDEBUG` (build, delete 90%, reinsert, validate, membership) passes at
+1024, 256, 32 and 2.
+
+**That probe was wrong the first time and looked like a tree bug.** It
+reinserted *every* entry after deleting 90%, so the 10% survivors were inserted
+twice; the tree is a set and forbids that. The `#ifdef DEBUG` box-vs-split
+assert caught it and aborted — which is the assert doing its job, not a defect.
+Reinsert only the deleted keys. Before concluding a large-leaf bug exists,
+check the probe against the distinct-keys contract.
+
 ## `external/` consumers were stale; all of them build again
 
 Every consumer of the library outside `tests/` predated the
@@ -1073,9 +1186,16 @@ So `kBuf=64` → `kBufUB=256` → `uint_fast16_t`; `kBuf=32` → `kBufUB=128` �
 `uint_fast8_t`. Consequences for anyone editing node code:
 
 - A backward loop `for (BufSizeT i = n-1; i >= 0; --i)` **never terminates**.
-  The library's one backward loop (`node_op.hpp:440`) is explicitly `int` and
-  carries a `// WARN: signed` comment — keep it that way, and use `int` for any
-  new one.
+  Use the test-then-decrement idiom instead of falling back to `int`:
+
+  ```cpp
+  for (buf_size_type i = n; i-- > 0;) { /* i is n-1 .. 0 */ }
+  ```
+
+  It needs no signed/unsigned mixing, never computes `n - 1`, and runs zero
+  times at `n == 0`. The library's one backward loop (`node_op.hpp`, in
+  `balance_over_leaves`) was converted to it on 2026-08-18; there are now no
+  signed reverse loops left.
 - Every `- 1` on a count must be guarded. Existing sites are
   (`GetSplitN()` returns `node_n == 0 ? 0 : node_n - 1`); match that pattern.
 - `BinarySearch` returns `size_t`; assigning to `BufSizeT` narrows silently

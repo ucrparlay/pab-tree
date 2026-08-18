@@ -117,7 +117,8 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 			TT::entry_seq::uninitialized(reinsert_entry_num);
 
 #ifdef DEBUG
-		this->validate<false>();
+		[[maybe_unused]] const bool tree_ok = this->validate<false>();
+		assert(tree_ok);
 		puts(">>> pass tree aug after delete");
 #endif /* DEBUG */
 
@@ -188,7 +189,7 @@ btree<TT>::batch_delete_recursive(node_type *node, TT::const_key_slice in,
 	 * Ensure all elements between two splits are correct
 	 * i.e., less than the split value
 	 */
-	for (int i = 1; i < interior->get_split_n(); i++) {
+	for (buf_size_type i = 1; i < interior->get_split_n(); i++) {
 		assert(parlay::all_of(in.cut(split_pos_seq[i - 1], split_pos_seq[i]),
 							  [&](key_type const k) {
 								  return !TT::key_less(

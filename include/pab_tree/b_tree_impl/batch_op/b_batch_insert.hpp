@@ -151,7 +151,7 @@ btree<TT>::batch_insert_recursive(node_type *node, R in,
 	 * } else {
 	 */
 #ifdef DEBUG
-	for (int i = 1; i < interior->get_split_n(); i++) {
+	for (buf_size_type i = 1; i < interior->get_split_n(); i++) {
 		assert(parlay::all_of(in.cut(split_pos_seq[i - 1], split_pos_seq[i]),
 							  [&](entry_type const e) {
 								  return !TT::key_less(

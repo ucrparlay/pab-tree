@@ -119,13 +119,13 @@ public:
   template<typename R, typename M>
   auto map_insert(R P, M&& mmp)
   {
-    return std::move(zmap::multi_insert(std::forward<M>(mmp), P));
+    return zmap::multi_insert(std::forward<M>(mmp), P);
   }
 
   template<typename R, typename M>
   auto map_delete(R P, M&& mmp)
   {
-    return std::move(zmap::multi_delete(std::forward<M>(mmp), P));
+    return zmap::multi_delete(std::forward<M>(mmp), P);
   }
   //
   // int mbr_mbr_relation(box_type const& a, box_type const& b) {

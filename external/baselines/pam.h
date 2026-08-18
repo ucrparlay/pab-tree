@@ -51,7 +51,7 @@ public:
     {
       return 0;
     }
-    static aug_t from_entry(key_t k, val_t v)
+    static aug_t from_entry(key_t, val_t)
     {
       return 1;
     }
@@ -117,13 +117,13 @@ public:
   template<typename R, typename M>
   auto map_insert(R P, M&& mmp)
   {
-    return std::move(zmap::multi_insert(std::forward<M>(mmp), P));
+    return zmap::multi_insert(std::forward<M>(mmp), P);
   }
 
   template<typename R, typename M>
   auto map_delete(R P, M&& mmp)
   {
-    return std::move(zmap::multi_delete(std::forward<M>(mmp), P));
+    return zmap::multi_delete(std::forward<M>(mmp), P);
   }
   //
   // template <typename PT, typename M>

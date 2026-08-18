@@ -2,8 +2,7 @@
 
 #include "data_op.h"
 
-parlay::sequence<double> parse_param(std::string const &input,
-									 double defaultValue = 1.0)
+parlay::sequence<double> parse_param(std::string const &input)
 {
 	if (input.empty()) {
 		return {};
@@ -66,8 +65,8 @@ int main(int argc, char *argv[])
 	batch_param = cmd.getOptionValue("-batch_param");
 	base_param = cmd.getOptionValue("-base_param");
 
-	parlay::sequence<double> batch_param_seq = parse_param(batch_param, 1.0);
-	parlay::sequence<double> base_param_seq = parse_param(base_param, 1.0);
+	parlay::sequence<double> batch_param_seq = parse_param(batch_param);
+	parlay::sequence<double> base_param_seq = parse_param(base_param);
 
 	std::cout << "base_n: " << base_n << " batch_n: " << batch_n
 			  << " pts_dim: " << val_n << " file_num: " << file_n
@@ -104,7 +103,7 @@ int main(int argc, char *argv[])
 
 	auto generate = [&]<typename entry_type>(std::string const &new_path) {
 		using entry_seq = parlay::sequence<entry_type>;
-		using key_type = typename entry_type::key_type;
+		using key_type [[maybe_unused]] = typename entry_type::key_type;
 		std::cout << "Generating... " << std::endl;
 		entry_seq base_seq, batch_seq;
 		std::tie(base_seq, batch_seq) =

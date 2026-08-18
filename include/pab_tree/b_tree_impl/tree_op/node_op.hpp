@@ -148,12 +148,11 @@ TT::node_type *btree<TT>::batch_insert_update_interior(
 	interior->node_n = new_node_n;
 
 #ifdef DEBUG
-	for (int i = 0; i < interior->get_node_n(); i++) {
+	for (buf_size_type i = 0; i < interior->get_node_n(); i++) {
 		assert(interior->tree_nodes[i] != nullptr);
 		if (interior->get_node_n() == 1) {
 			continue;
 		}
-		auto node = interior->tree_nodes[i];
 		auto box = get_node_box_rec(interior->tree_nodes[i]);
 		if (i == 0) {
 			assert(TT::key_less(box.second, interior->split[0]));
@@ -452,8 +451,12 @@ void btree<TT>::balance_over_leaves(node_type *node,
 		buf_size_type rpidx = TT::k_buf_ub;
 		buf_size_type pivot = TT::k_buf_ub;
 
-		/* WARN: signed; --i from 0 is safe */
-		for (int i = interior->get_node_n() - 1; i >= 0; --i) {
+		/*
+		 * Reverse loop on an unsigned index: test then decrement, so
+		 * the body sees node_n-1 .. 0 and node_n == 0 runs it zero
+		 * times. Writing `node_n - 1` instead would wrap.
+		 */
+		for (buf_size_type i = interior->get_node_n(); i-- > 0;) {
 			const size_type sz = interior->tree_nodes[i]->size;
 			if (node_is_valid(interior->tree_nodes[i])) {
 				if (rpidx == TT::k_buf_ub) {
@@ -645,7 +648,7 @@ void btree<TT>::balance_over_leaves(node_type *node,
 	interior->reset_deletion_flag();
 
 #ifdef DEBUG
-	for (int i = 0; i < interior->get_node_n(); i++) {
+	for (buf_size_type i = 0; i < interior->get_node_n(); i++) {
 		assert(interior->tree_nodes[i] != nullptr);
 		if (interior->get_node_n() == 1) {
 			continue;

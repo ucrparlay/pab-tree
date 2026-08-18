@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	 */
 	std::cout << "Edges before timestamp relabeling (raw timestamps):\n";
 	std::cout << std::setprecision(17);
-	for (int i = 0; i < 5 && i < edges.size(); i++) {
+	for (size_t i = 0; i < 5 && i < edges.size(); i++) {
 		std::cout << "Edge " << i << ": src " << edges[i].src << ", dest "
 				  << edges[i].dest << ", timestamp ";
 		if (ts_integral)

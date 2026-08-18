@@ -120,7 +120,7 @@ public:
   {
     // the bounding box should be [a, b)
     auto cnt = 0;
-    auto f = [&](auto ele) { cnt++; };
+    auto f = [&](auto) { cnt++; };
     auto rt_size =
       this->pma_tree_->map_range(f, query_box.first, query_box.second);
     return rt_size;

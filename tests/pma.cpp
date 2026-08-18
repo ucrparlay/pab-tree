@@ -25,8 +25,8 @@ void apply_pma(Options const &opts, RunFunc test_func)
 	using wrapper = wrapper<uint32_t, uint32_t>;
 #endif
 
-	using key_type = wrapper::key_type;
-	using mapped_type = wrapper::mapped_type;
+	using key_type [[maybe_unused]] = wrapper::key_type;
+	using mapped_type [[maybe_unused]] = wrapper::mapped_type;
 	using entry_type = wrapper::entry_type;
 	/* using EleType = Element<uint32_t, uint32_t>; */
 	using TT = pab_tree::btree_type_trait<
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	commandLine params(argc, argv);
 	Options opts(params);
 
-	auto test_func =
+	[[maybe_unused]] auto test_func =
 		[]<class TreeDesc, typename TT, typename Options>(Options &opts) {
 			/*
 		 * using Tree = TreeDesc::tree_type;

@@ -796,7 +796,7 @@ TEST(SelfTest, GetEntriesOutputSize)
 	GTEST_FLAG_SET(death_test_style, "threadsafe");
 	parlay::sequence<entry> small(t.size() - 1);
 	EXPECT_DEATH(
-		{ t.get_entries(small); }, "Out.size\\(\\) >=")
+		{ t.get_entries(small); }, "out.size\\(\\) >=")
 		<< "an undersized output was not caught";
 #endif
 }

@@ -127,7 +127,7 @@ auto bucketize(Seq const &data, size_t const numBuckets = 10)
 
 	/* Count elements in each bucket */
 	for (auto val : data) {
-		int bucketIdx = static_cast<int>((val - minVal) / bucketWidth);
+		size_t bucketIdx = static_cast<size_t>((val - minVal) / bucketWidth);
 		/*
 		 * if (bucketIdx == 0) {
 		 *   std::cout << val << " ";

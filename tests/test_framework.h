@@ -720,11 +720,11 @@ void range_query(auto const &wp, Tree const &pkd, int const k_rounds,
 		/*
 		 * bool flag = true;
 		 *   for (size_t j = 0; j < output_size; j++) {
-		 *     if (Out[offset[i] + j] != query_box_seq[i].second.at(j)) {
+		 *     if (out[offset[i] + j] != query_box_seq[i].second.at(j)) {
 		 *       std::cout << "wrong: bounding box: " <<
 		 *       query_box_seq[i].first.first
 		 *                 << " " << query_box_seq[i].first.second << std::endl;
-		 *       std::cout << "------ " << Out[offset[i] + j] << " "
+		 *       std::cout << "------ " << out[offset[i] + j] << " "
 		 *                 << query_box_seq[i].second.at(j) << std::endl;
 		 *       flag = false;
 		 *     }
