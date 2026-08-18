@@ -225,8 +225,9 @@ public:
 		bool operator()(InputNode const *T, Range In) const noexcept
 		{
 			// Knuth multiplicative hash over (node_size +
-			// batch_size); XOR in low address bits from begin/end
-			// to break correlation across call sites.
+			// batch_size), XORed with bit 3 of each slice end.
+			// Deterministic: allocations are 16-byte aligned, so
+			// that bit is the offset's, not the address's.
 			auto const v =
 				(static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
 				(reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^

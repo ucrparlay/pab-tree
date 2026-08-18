@@ -298,6 +298,45 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## `default_hybrid_pred` — both review findings were wrong (2026-08-17)
+
+Two findings claimed defects here. Measured, both are false, and in opposite
+directions. **The code is unchanged**; only the comment was wrong.
+
+| claim | measured |
+|---|---|
+| "ASLR-nondeterministic" | **false** — identical pattern over 6 runs under full ASLR (`randomize_va_space=2`), identical again under `setarch -R`, identical at 1/2/8/32 threads |
+| "bit 3 of `begin` is zero, so the address terms achieve nothing" | **false** — `bit3(begin)`=1 in 1596 of 3124 calls; the address terms flip the result in 1534 of 3124 |
+| "the outcome is in fact stable" | true |
+
+The mechanism neither finding identified: allocation bases are at least
+16-byte aligned, so bit 3 of an address **is** bit 3 of the offset within its
+buffer. Deterministic, but not zero — it contributes about half the time.
+
+The comment did claim something false ("XOR in low address bits from
+begin/end to break correlation across call sites") and is corrected.
+
+### Testing this needs separate processes
+
+`SelfTest.DefaultHybridPredIsReproducible` re-execs itself (`readlink
+/proc/self/exe`, `PABTREE_HYBRID_CHILD=1`, `popen`) and compares the
+leaf-sortedness pattern from two fresh processes.
+
+**An in-process two-run version is worthless here** and was written first: the
+slices the predicate sees are internal parlay buffers, and the pool hands the
+second run the same addresses, so nothing varies. Proven by fault injection —
+changing the shift from 3 to 12 (a bit that does differ between allocations)
+**passed** the in-process test and **fails** the cross-process one. Shift 20
+also fails it.
+
+A second trap in the same test: the first in-process attempt compared the
+addresses of the two input `std::vector`s as a sanity guard, and they came
+back *equal* — the allocator reuses the freed block. The guard fired and
+stopped the test claiming a result it had not earned. Keep guards like that.
+
+Note `/proc/self/exe` must be resolved with `readlink` in the parent: inside
+`popen` it names the shell, not the test binary.
+
 ## Node base is a real extension point now (2026-08-17)
 
 `NodeType` was the one trait parameter with no constraint, so a wrong type

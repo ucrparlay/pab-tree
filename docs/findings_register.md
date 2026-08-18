@@ -1,6 +1,6 @@
 # Findings register — still open
 
-18 open library findings: 11 medium, 7 low. No high ones remain. 15 are from
+16 open library findings: 9 medium, 7 low. No high ones remain. 13 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,17 +23,28 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| both `DefaultHybridPred` findings (medium) | **refuted by measurement**, not fixed — see below |
 | `NodeType` unconstrained, `EleAssignTag` dead (medium) | `node_base` concept; dead parameter removed |
 | no allocator customization point (high) | `NodeAllocType` trait parameter, codegen-identical |
 | key comparison hardcoded to `operator<` (high) | `KeyCompare` trait parameter, verified codegen-neutral |
 | no comparator customization point (medium) | same change; the two were one defect |
 | plus 8 more outside the library, listed in that section |  |
 
+**The two `DefaultHybridPred` findings were closed as wrong, not as fixed.**
+"ASLR-nondeterministic" is false: the leaf-sortedness pattern is identical
+over 6 runs under full ASLR, under `setarch -R`, and at 1/2/8/32 threads. "Bit
+3 of `begin` is zero so the address terms achieve nothing" is also false:
+`bit3(begin)` is 1 in 1596 of 3124 calls and the terms flip the result in 1534
+of them. Both missed that allocation bases are 16-byte aligned, which makes
+bit 3 of an address the offset's bit 3 — deterministic, but not zero. The one
+true part, that the comment described something the code does not do, is
+fixed. The code is unchanged.
+
 Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 11
+## MEDIUM — 9
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -59,47 +70,6 @@ and `interior_aug::force_parallel(size_t, size_t) -> bool`.
 and apply them at the call sites in `leaf_node::update_aug` and
 `btree_interior_node::update_aug`, where the range type is known, rather than
 on the trait.
-
-### DefaultHybridPred's address hashing does not do what its comment claims, and leaf sort state leaks into RangeReport ordering
-`include/pab_tree/b_tree.h`:271 · api-usability
-**Status: same as above**
-
-```cpp
-auto const v = (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
-               (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
-               (reinterpret_cast<uintptr_t>(In.end()) >> 3);
-return v & 1;
-```
-
-Only bit 0 of `v` is used, so the address terms contribute only bit 3 of `begin` and bit 3 of `end`. For the 16-byte-aligned allocations parlay hands out, bit 3 of `begin` is zero and bit 3 of `end` degenerates to a parity of the slice length — so the comment's "XOR in low address bits from begin/end to break correlation across call sites" achieves essentially nothing. I verified the outcome is in fact stable: the same binary run six times produced an identical `Sorted
-
-*Suggested fix:* Drop the address terms from `DefaultHybridPred` — keep `return ((static_cast<size_t>(T->size) + batch_sz) * 2654435761ULL) >> 63;` (use a high bit, not bit 0, of the multiplicative hash) — which removes the `reinterpret_cast` and makes the behaviour obviously deterministic. Change the predicate contract to `bool(Node const* T, size_t batch_size)` to match the documentation and to remove the per-ca
-
-### DefaultHybridPred hashes heap addresses, making the default insert/delete path ASLR-nondeterministic
-`include/pab_tree/b_tree.h`:279 · testing
-**Status: insert/delete leaf ordering is ASLR-dependent**
-
-```cpp
-struct DefaultHybridPred {
-  template<typename InputNode, typename Range>
-  bool operator()(InputNode const* T, Range In) const noexcept {
-    auto const v = (static_cast<size_t>(T->size) + In.size()) * 2654435761ULL ^
-                   (reinterpret_cast<uintptr_t>(In.begin()) >> 3) ^
-                   (reinterpret_cast<uintptr_t>(In.end()) >> 3);
-    return v & 1;
-  }
-};
-```
-
-The parameterless overloads use it: `BatchInsert(Range&& In)` (b_batch_insert.hpp:27-29) hardcodes `kHybrid` + `DefaultHybridPred{}`, and `BatchDelete` does the same. So *every* default-path update decides per leaf whether to sort based on heap addresses, which vary run to run under ASLR. Consequently `Leaf::i
-
-*Suggested fix:* Remove the address terms from `DefaultHybridPred` so the decision is a pure function of `(T->size, In.size())`:
-
-```cpp
-return ((static_cast<size_t>(T->size) + In.size()) * 2654435761ULL) & 1;
-```
-
-(The address XOR was there to decorrelate call sites; a second multiply-shift round on the size sum achieves that without nondeterminism.) Then add a regression test that runs the same batch sequence tw
 
 ### No reusable traversal skeleton: every batch op re-implements partition-recurse-reassemble
 `include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:127 · extensibility

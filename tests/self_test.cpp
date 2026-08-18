@@ -11,6 +11,9 @@
 #include <cstdio>
 #include <iterator>
 #include <atomic>
+#include <cstdlib>
+#include <unistd.h>
+#include <cstring>
 #include <functional>
 #include <map>
 #include <numeric>
@@ -520,6 +523,99 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 }
 
 } // namespace
+
+// ---- the default leaf-sort decision is reproducible ----
+
+// FNV over every leaf's is_sorted flag, in tree order.
+template <typename Tree, typename Node>
+void hash_leaf_sortedness(Node const *T, uint64_t &h, size_t &leaves)
+{
+	using Leaf = typename Tree::Leaf;
+	using Interior = typename Tree::Interior;
+
+	if (T->is_leaf) {
+		auto const *TL = static_cast<Leaf const *>(T);
+		h = (h ^ (TL->is_sorted ? 1u : 0u)) * 1099511628211ULL;
+		leaves++;
+		return;
+	}
+	auto const *TI = static_cast<Interior const *>(T);
+	for (size_t i = 0; i < TI->get_node_n(); ++i)
+		hash_leaf_sortedness<Tree>(TI->tree_nodes[i], h, leaves);
+}
+
+// Runs the default insert/delete path and prints the leaf-sortedness
+// pattern. Called in the child process; see the test below.
+static void print_hybrid_pattern()
+{
+	using tt = pab_tree::btree_type_trait<ele, 32>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const keys = gen_keys(60000, dist::uniform, g_seed ^ 0xdec1de);
+	auto const all = to_entries(keys);
+	std::vector<entry> base(all.begin(), all.begin() + all.size() / 2);
+	std::vector<entry> rest(all.begin() + all.size() / 2, all.end());
+	std::vector<uint32_t> del(keys.begin(), keys.begin() + keys.size() / 4);
+	std::sort(del.begin(), del.end());
+
+	tree t;
+	t.build(base);
+	t.batch_insert(rest); // default path: hybrid + default_hybrid_pred
+	t.batch_delete(del);
+
+	uint64_t h = 1469598103934665603ULL;
+	size_t leaves = 0;
+	hash_leaf_sortedness<tree>(t.get_root(), h, leaves);
+	std::printf("PATTERN %016llx %zu\n", (unsigned long long)h, leaves);
+	std::fflush(stdout);
+}
+
+// default_hybrid_pred mixes bit 3 of each end of the input slice into its
+// coin flip. That bit comes from the slice's offset inside its buffer, not
+// from the address -- allocations are 16-byte aligned, so bit 3 of the base
+// is 0 -- so the decision is the same from run to run.
+//
+// This has to be checked across processes. Inside one process the slices
+// the predicate sees are internal buffers that the pool hands back at the
+// same address every time, so two runs prove nothing; only a fresh process
+// gets a different ASLR base. Verified: with the shift changed from 3 to 12
+// the in-process version still passed, this one fails.
+TEST(SelfTest, DefaultHybridPredIsReproducible)
+{
+	// Resolve our own path here: inside popen, /proc/self/exe is the
+	// shell, not this binary.
+	char exe[4096];
+	ssize_t const len = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+	ASSERT_GT(len, 0) << "cannot resolve /proc/self/exe";
+	exe[len] = '\0';
+
+	auto read_pattern = [&](std::string &out) -> bool {
+		std::string const cmd =
+			std::string("PABTREE_HYBRID_CHILD=1 ") + exe +
+			" --gtest_filter=SelfTest.DefaultHybridPredIsReproducible"
+			" 2>/dev/null";
+		FILE *f = popen(cmd.c_str(), "r");
+		if (f == nullptr)
+			return false;
+		char buf[256];
+		bool found = false;
+		while (std::fgets(buf, sizeof(buf), f) != nullptr) {
+			if (std::strncmp(buf, "PATTERN ", 8) == 0) {
+				out = buf;
+				found = true;
+			}
+		}
+		pclose(f);
+		return found;
+	};
+
+	std::string a, b;
+	ASSERT_TRUE(read_pattern(a)) << "child process produced no pattern";
+	ASSERT_TRUE(read_pattern(b)) << "child process produced no pattern";
+	EXPECT_EQ(a, b)
+		<< "the default leaf-sort decision differs between two processes; "
+		   "it depends on the address layout, not just the input";
+}
 
 // ---- a custom node base ----
 
@@ -1141,6 +1237,13 @@ TEST(SelfTest, EmptyTree)
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);
+
+	// Child mode for SelfTest.DefaultHybridPredIsReproducible: print the
+	// pattern and exit, so the parent can compare two fresh processes.
+	if (std::getenv("PABTREE_HYBRID_CHILD") != nullptr) {
+		print_hybrid_pattern();
+		return 0;
+	}
 
 	for (int i = 1; i < argc; ++i) {
 		std::string const arg = argv[i];
