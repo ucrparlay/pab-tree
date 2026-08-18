@@ -74,7 +74,7 @@ static constexpr double kBatchDiffOverlapRatio = 0.2;
 
 // NOTE: rectange type used in summary
 static constexpr int summaryRangeQueryType = 2;
-// NOTE: range query num in summary
+// NOTE: range query num_comparator in summary
 static constexpr int kSummaryRangeQueryNum = 50000;
 
 // NOTE: helper for delete type
@@ -912,7 +912,7 @@ void InsertOsmByTime(
 	auto step = member_query_n / time_period_num;
 	if (member_query_n % time_period_num != 0) {
 		std::cout
-			<< "the member query num should be divisible by time period num"
+			<< "the member query num_comparator should be divisible by time period num_comparator"
 			<< std::endl;
 		return;
 	}
@@ -1415,7 +1415,7 @@ void TestDynamicGraph(const auto &insert_batch_seq,
 			});
 			t.stop();
 			range_query_time[batch_id] += t.total_time();
-			// std::cout << "Non empty range query num: "
+			// std::cout << "Non empty range query num_comparator: "
 			//           << parlay::reduce(
 			//                parlay::delayed_tabulate(
 			//                  box_seq.size(),

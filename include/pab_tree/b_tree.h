@@ -37,13 +37,13 @@ public:
 	using Entry = TT::Entry;
 
 	using Node = TT::Node;
-	using Num = typename TT::Num;
+	using num_comparator = typename TT::num_comparator;
 	using entry_slice = typename TT::entry_slice;
-	using Split = typename TT::Split;
+	using split_type = typename TT::split_type;
 	using node_split_seq_pair =
 		std::pair<typename TT::node_seq, typename TT::split_seq>;
 
-	using node_split_pair = std::pair<Node *, Split>;
+	using node_split_pair = std::pair<Node *, split_type>;
 	using node_split_pair_seq = parlay::sequence<node_split_pair>;
 	using node_split_pair_slice =
 		parlay::slice<node_split_pair *, node_split_pair *>;
@@ -126,11 +126,11 @@ public:
 
 	// PARA: interior node type
 	struct btree_interior_node : multi_way_node<TT> {
-		using BaseNode = multi_way_node<TT>;
+		using base_node = multi_way_node<TT>;
 
 		btree_interior_node(TT::node_seq const &_tree_nodes,
 							TT::split_seq const &_split)
-			: BaseNode(_tree_nodes, _split, typename TT::interior_aug())
+			: base_node(_tree_nodes, _split, typename TT::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
@@ -139,8 +139,8 @@ public:
 
 		btree_interior_node(TT::node_slice _tree_nodes_slice,
 							TT::split_slice _split_slice)
-			: BaseNode(_tree_nodes_slice, _split_slice,
-					   typename TT::interior_aug())
+			: base_node(_tree_nodes_slice, _split_slice,
+						typename TT::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
@@ -150,7 +150,7 @@ public:
 		btree_interior_node(TT::node_seq const &_tree_nodes,
 							TT::split_seq const &_split,
 							TT::interior_aug const &_aug)
-			: BaseNode(_tree_nodes, _split, _aug)
+			: base_node(_tree_nodes, _split, _aug)
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)

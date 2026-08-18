@@ -38,10 +38,11 @@ parlay::sequence<double> ParseParam(std::string const &input,
 
 int main(int argc, char *argv[])
 {
-	commandLine P(argc, argv,
-				  "[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
-				  "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
-				  "<_insertFile>] [-s <kSummary>]");
+	commandLine P(
+		argc, argv,
+		"[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num_comparator>] [-t "
+		"<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
+		"<_insertFile>] [-s <kSummary>]");
 	std::string path;
 	int base_n, batch_n, val_n, file_n, dis_type, batch_op;
 	std::string base_param, batch_param;

@@ -75,10 +75,11 @@ template <typename InputPoint> void SortByCoord(commandLine &P)
 
 int main(int argc, char *argv[])
 {
-	commandLine P(argc, argv,
-				  "[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num>] [-t "
-				  "<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
-				  "<_insertFile>] [-s <kSummary>] [-u <usage>]");
+	commandLine P(
+		argc, argv,
+		"[-k {1,...,100}] [-d {2,3,5,7,9,10}] [-n <node num_comparator>] [-t "
+		"<parallelTag>] [-p <inFile>] [-r {1,...,5}] [-q {0,1}] [-i "
+		"<_insertFile>] [-s <kSummary>] [-u <usage>]");
 	int coord_type = P.getOptionIntValue("-coord_type", 0);
 	int pts_dim = P.getOptionIntValue("-d", 2);
 	int usage = P.getOptionIntValue("-usage", 0);

@@ -96,7 +96,7 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		// >= l, saving roughly half the binary-search work in the
 		// common case.
 		const buf_size_type split_n = TI->get_split_n();
-		const Split *sp_l = TI->split.data() + l;
+		const split_type *sp_l = TI->split.data() + l;
 		const size_t rem =
 			static_cast<size_t>(split_n) - static_cast<size_t>(l);
 		// Inlined on purpose: routing this through

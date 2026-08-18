@@ -13,7 +13,7 @@ namespace pab_tree
 //*----------- double precision comparision ----------------
 //* God made the integers, all else is the work of man.
 //* -- Leopold Kronecker
-template <typename T> class Num_Comparator {
+template <typename T> class numeric_comparator {
 public:
 	static bool gt(T const a, T const b)
 	{

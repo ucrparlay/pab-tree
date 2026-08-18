@@ -79,7 +79,7 @@ void btree<TT>::range_count_rec(Node const *T, TT::Box const &query_box,
 
 		// Right boundary: narrow search to [l, split_n) since r >= l.
 		const buf_size_type split_n = TI->get_split_n();
-		const Split *sp_l = TI->split.data() + l;
+		const split_type *sp_l = TI->split.data() + l;
 		const size_t rem =
 			static_cast<size_t>(split_n) - static_cast<size_t>(l);
 		// Inlined on purpose: routing this through

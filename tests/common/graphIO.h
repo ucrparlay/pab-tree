@@ -282,7 +282,7 @@ graph<intV, intE> readGraphFromFile(char *fname)
 //     abort();
 //   }
 
-//   // num vertices, num edges, edge offsets, edge pointers
+//   // num_comparator vertices, num_comparator edges, edge offsets, edge pointers
 //   long len = W.size() -1;
 //   long n = atol(W[1]);
 //   long m = atol(W[2]);

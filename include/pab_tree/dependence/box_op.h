@@ -11,16 +11,18 @@ namespace pab_tree
 // std::less, std::greater, any monotone order -- works.
 template <typename TT> constexpr typename TT::K key_least()
 {
-	return TT::key_less(TT::Num::min_val(), TT::Num::max_val()) ?
-			   TT::Num::min_val() :
-			   TT::Num::max_val();
+	return TT::key_less(TT::num_comparator::min_val(),
+						TT::num_comparator::max_val()) ?
+			   TT::num_comparator::min_val() :
+			   TT::num_comparator::max_val();
 }
 
 template <typename TT> constexpr typename TT::K key_greatest()
 {
-	return TT::key_less(TT::Num::min_val(), TT::Num::max_val()) ?
-			   TT::Num::max_val() :
-			   TT::Num::min_val();
+	return TT::key_less(TT::num_comparator::min_val(),
+						TT::num_comparator::max_val()) ?
+			   TT::num_comparator::max_val() :
+			   TT::num_comparator::min_val();
 }
 
 // Identity for the box fold below: any real key widens it.

@@ -38,7 +38,7 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	using Entry = TT::Entry;
 	using entry_seq = typename TT::entry_seq;
 	using entry_arr = typename TT::entry_arr;
-	using AT = typename TT::leaf_aug;
+	using aug_type = typename TT::leaf_aug;
 
 	static constexpr typename TT::buf_size_type k_binary_search_base =
 		static_cast<typename TT::buf_size_type>(
@@ -52,12 +52,12 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	// default allocator
 	leaf_node()
 		: Node{ true, static_cast<size_t>(0) }
-		, aug(AT())
+		, aug(aug_type())
 		, is_sorted{ true }
 	{
 	}
 
-	leaf_node(AT const &_aug)
+	leaf_node(aug_type const &_aug)
 		: Node{ true, static_cast<size_t>(0) }
 		, aug(_aug)
 		, is_sorted{ true }
@@ -68,11 +68,11 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	template <typename Range>
 	leaf_node(Range In, alloc_normal_leaf_tag)
 		: Node{ true, static_cast<size_t>(In.size()) }
-		, aug(AT(In))
+		, aug(aug_type(In))
 		, is_sorted{ true }
 	{
-		static_assert(!node_has_non_trivial_aug<AT> ||
-						  leaf_aug_constructible_from<AT, Range>,
+		static_assert(!node_has_non_trivial_aug<aug_type> ||
+						  leaf_aug_constructible_from<aug_type, Range>,
 					  "leaf augmentation needs a constructor taking the "
 					  "leaf's entries");
 		assert(In.size() <= TT::k_buf_ub);
@@ -167,12 +167,12 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 		this->elements = entry_arr();
 	}
 
-	AT const &get_aug() const
+	aug_type const &get_aug() const
 	{
 		return aug;
 	}
 
-	AT &get_aug()
+	aug_type &get_aug()
 	{
 		return aug;
 	}
@@ -181,8 +181,8 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	// monostate
 	template <typename Range> void update_aug(Range In)
 	{
-		if constexpr (node_has_non_trivial_aug<AT>) {
-			static_assert(leaf_aug_updatable_with<AT, Range>,
+		if constexpr (node_has_non_trivial_aug<aug_type>) {
+			static_assert(leaf_aug_updatable_with<aug_type, Range>,
 						  "leaf augmentation needs "
 						  "update_aug(range-of-entries)");
 			aug.update_aug(In);
@@ -195,7 +195,7 @@ template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	}
 
 	entry_arr elements;
-	AT aug;
+	aug_type aug;
 	bool is_sorted;
 };
 
@@ -218,7 +218,7 @@ template <typename Leaf> static Leaf *alloc_empty_leaf_node()
 
 // Alloc a empty Leaf, but set the aug by hand
 template <typename Leaf>
-static Leaf *alloc_empty_leaf_node(typename Leaf::AT const &aug)
+static Leaf *alloc_empty_leaf_node(typename Leaf::aug_type const &aug)
 {
 	Leaf *o = Leaf::TT::node_alloc::template alloc<Leaf>();
 	new (o) Leaf(aug);
@@ -243,7 +243,7 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 	}
 
 	using node_arr = std::array<Node *, TT::k_buf_ub>;
-	using split_arr = std::array<typename TT::Split, TT::k_buf_ub>;
+	using split_arr = std::array<typename TT::split_type, TT::k_buf_ub>;
 
 	static constexpr buf_size_type k_binary_search_base =
 		static_cast<buf_size_type>(
@@ -386,7 +386,7 @@ static Interior *alloc_interior_node(typename TT::node_slice tree_nodes_slice,
 	return o;
 }
 
-// TODO: maybe replace the node_arr, ST, and AT with template parameters
+// TODO: maybe replace the node_arr, ST, and aug_type with template parameters
 template <typename Interior, typename TT>
 static Interior *alloc_interior_node(typename TT::node_slice const &tree_nodes,
 									 typename TT::split_seq const &split,

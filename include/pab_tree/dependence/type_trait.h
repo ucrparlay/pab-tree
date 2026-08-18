@@ -27,7 +27,7 @@ public:
 	using Entry = EleType; // abstract type to access E
 
 	// general type
-	using Num = Num_Comparator<K>;
+	using num_comparator = numeric_comparator<K>;
 
 	// Key ordering. Every ordering decision in the tree goes through
 	// key_less; nothing compares keys with a raw operator.
@@ -132,12 +132,14 @@ class btree_type_trait
 	: public TypeTrait<EleType, BufferSize, LeafAugType, InteriorAugType,
 					   NodeType, KeyCompare, NodeAllocType> {
 public:
-	using BT = TypeTrait<EleType, BufferSize, LeafAugType, InteriorAugType,
-						 NodeType, KeyCompare, NodeAllocType>;
-	using Split = BT::K;
-	using split_seq = parlay::sequence<Split>;
-	using split_slice = parlay::slice<Split *, Split *>;
-	using split_slice_const = parlay::slice<Split const *, Split const *>;
+	using base_trait =
+		TypeTrait<EleType, BufferSize, LeafAugType, InteriorAugType, NodeType,
+				  KeyCompare, NodeAllocType>;
+	using split_type = base_trait::K;
+	using split_seq = parlay::sequence<split_type>;
+	using split_slice = parlay::slice<split_type *, split_type *>;
+	using split_slice_const =
+		parlay::slice<split_type const *, split_type const *>;
 
 	static uint const k_buf_md_fac = 2;
 	static uint const k_buf_ub_fac = 4;
@@ -166,7 +168,7 @@ public:
 	using buf_size_buf_ub_arr = std::array<buf_size_type, k_buf_ub>;
 	using boolean_buf_ub_arr = std::array<bool, k_buf_ub>;
 
-	using entry_arr = std::array<typename BT::E, k_buf_ub>;
+	using entry_arr = std::array<typename base_trait::E, k_buf_ub>;
 
 	static constexpr uint_fast8_t const k_split_factor = 8;
 };
