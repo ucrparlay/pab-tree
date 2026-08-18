@@ -298,6 +298,38 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## The `2n` scratch buffer stays — re-verified 2026-08-17
+
+Re-checked rather than taken on faith, because it was already on the frozen
+list. It stays frozen, and the finding's numbers are partly wrong.
+
+**Load-bearing, confirmed.** `batch_insert_recursive` hands each child
+`node_split_slice.cut(2 * l, 2 * r)` where `l`/`r` are *input* indices, so
+slots `2i`/`2i+1` belong to input element `i`. The function opens with
+`assert(2 * In.size() == node_split_slice.size())`. That fixed mapping is what
+makes the per-child sub-ranges provably disjoint with no coordination.
+**The suggested fix — sizing it `2 * min(n, ...)` — would index out of
+bounds.**
+
+**The size claim is right**: `sizeof(node_split_pair)` is 16 for both a 32-bit
+and a 64-bit key (pointer + key + padding), so 32 bytes per input element.
+Measured at batch 1e7: predicted 320 MB of scratch, peak RSS rose 381 MB with
+the 80 MB sorted copy included.
+
+**"Essentially all of it is untouched in the common case" is not supported.**
+The buffer is `uninitialized`, so in principle untouched pages never fault in,
+but ~94% of it is resident at batch = tree size and ~56% at batch = 10% of the
+tree. Below that the measurement is swamped by parlay's own allocations and
+says nothing — do not quote those rows.
+
+**"Allocates the same 2n scratch a second time during reinsert" is
+overstated.** `reinsert_tree_after_delete` is sized by `reinsert_entries`, not
+by the batch, and it rarely runs: over deletes of 90%, 50% and 10% of a 2e6
+tree it was called 0, 1 and 0 times, and the one call carried 51% of the batch.
+
+Action taken: documented the memory requirement in the README, which is what
+the finding asked for as its fallback. No code change.
+
 ## Traversal skeleton: only the pure part was extracted (2026-08-17)
 
 The finding asked for a shared `for_each_touched_child` skeleton across

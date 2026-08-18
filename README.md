@@ -147,6 +147,20 @@ builds assert on it.
 `range_count(box)` entries and does not check `out.size()`. A smaller `out`
 overruns; debug builds assert.
 
+**Batch updates need transient memory proportional to the batch.**
+`batch_insert` allocates a sorted copy of the input plus `32 * n` bytes of
+scratch — `2n` slots of `pair<Node*, key>`, one pair per input element per
+side of a possible split. About 40 bytes per entry in flight, both released
+when the call returns. At n = 1e9 that is roughly 40 GB, so size the batch to
+the machine. `build` and `batch_delete` need only the sorted copy; the delete
+path allocates scratch just when a rebalance has to reinsert, sized by the
+reinserted entries rather than by the batch.
+
+The `2n` is not slack that can be trimmed: slots `2i` and `2i+1` belong to
+input element `i`, and that fixed mapping is what lets the parallel recursion
+hand each child a provably disjoint sub-range without coordinating. Shrinking
+the buffer would index out of bounds.
+
 **The tree owns its nodes.** `get_root()` returns a non-owning observer.
 Lifetime ends at `delete_tree()` or the destructor.
 

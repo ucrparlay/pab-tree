@@ -1,6 +1,6 @@
 # Findings register — still open
 
-15 open library findings: 8 medium, 7 low. No high ones remain. 12 are from
+14 open library findings: 7 medium, 7 low. No high ones remain. 11 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| `2n` scratch buffer (medium) | **re-verified frozen** — the suggested fix would index out of bounds; memory cost documented instead |
 | no reusable traversal skeleton (medium) | partly — the pure half extracted; the parallel dispatch deliberately left |
 | both `DefaultHybridPred` findings (medium) | **refuted by measurement**, not fixed — see below |
 | `NodeType` unconstrained, `EleAssignTag` dead (medium) | `node_base` concept; dead parameter removed |
@@ -45,7 +46,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 8
+## MEDIUM — 7
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -71,18 +72,6 @@ and `interior_aug::force_parallel(size_t, size_t) -> bool`.
 and apply them at the call sites in `leaf_node::update_aug` and
 `btree_interior_node::update_aug`, where the range type is known, rather than
 on the trait.
-
-### BatchInsert reserves 2 pairs (32 bytes) of scratch per input element regardless of splits
-`include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:77 · performance
-**Status: NOT TO BE FIXED - the 2n addressing is load-bearing**
-
-```cpp
-NodeSplitPairSeq node_split_seq =
-  NodeSplitPairSeq::uninitialized(2 * sorted_slice.size());
-```
-`NodeSplitPair` is `std::pair<Node*, Split>` — 16 bytes with padding for a 32-bit key — so this reserves `32 * n` bytes for every batch. At the benchmarked n = 1e9 that is a **32 GB** allocation, on top of the sorted copy. The 2n factor is genuinely the worst case (a leaf at capacity receiving a single element needs 2 slots, so the ratio really is 2 at n=1), but it is the worst case for a *pathological* batch: in the common case where few or no nodes split, essentially all of it is untouched. `ReInsertTreeAfterDelete` (node_op.hpp:669) allocates the same 2n scratch a second time during re
-
-*Suggested fix:* Bound the scratch by what can actually be produced rather than by input size. The number of nodes any subtree can hand back is `(subtree_size + batch_size) / kBufMD + 1`; sizing `node_split_seq` as `2 * min(n, root_->size / TT::kBufMD + n / TT::kBufMD + 2)` covers every split path while collapsing the common case. If that analysis is not worth doing, at least document the `32*n` bytes of scratch i
 
 ### The branchless binary search is hand-inlined four times with a hardcoded base of 8
 `include/pab_tree/b_tree_impl/query_op/range_report.hpp`:98 · standards
