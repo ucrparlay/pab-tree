@@ -223,6 +223,60 @@ indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
 
 All `b_tree_impl/**/*.hpp` files are `#include`d at the bottom of `b_tree.h`; they are not compiled separately.
 
+## Two test suites (self_test added 2026-08-17)
+
+| target | data | runtime | what it is |
+|---|---|---|---|
+| `self_test` | none | ~7 s | generates keys from a seed, checks against `std::map` |
+| `unit_test` | `/ssd1/zmen002/kv_pair` | minutes | real distributions at scale, **skips** without the data |
+
+Both are `-UNDEBUG` and both are ctest tests. `self_test` is the gate that
+works anywhere; `unit_test` is unchanged.
+
+`./self_test --seed=N` reproduces a run **exactly** — verified by hashing two
+runs with the timing text stripped. Default seed is fixed (20260817), printed
+on startup. A failure prints leaf size, input size, key shape and seed via
+`SCOPED_TRACE`, plus the rerun flag.
+
+Covers build / batch_insert / batch_delete / contain / range_count /
+range_report / get_entries / to_seq / iteration / find / lower_bound /
+upper_bound / equal_range / augmentation / copy-move-swap-clear, over leaf
+sizes 2–256, five key shapes (uniform, clustered, sequential, sparse,
+boundary), and every size where the structure changes shape (0,1,2,3,…,1025).
+
+### It was validated by breaking the library, not by passing
+
+| injected fault | caught? |
+|---|---|
+| drop an `update_aug` on the delete path | yes — `Augmentation` |
+| off-by-one in the leaf delete compaction | yes — SIGABRT |
+| `range_count` skips a covered middle child | yes — 20 of 14 tests |
+| iterator skips `ensure_leaf_sorted` | yes, **after fixing the test** |
+| `range_count` right edge `<` → `<=` | no — the mutant is *equivalent* |
+
+Two things worth keeping:
+
+- **The iterator fault initially passed.** `check_against` called `to_seq()`
+  before iterating, and `to_seq` runs `flatten_rec<sorted=true>` which sorts
+  every leaf — so iteration never saw an unsorted leaf. **Iteration must be
+  checked before `to_seq`/`get_entries`.** Anything added to that function
+  that sorts leaves has to go after the iteration block.
+- **The `<`→`<=` mutant is not a coverage gap.** With `<=` the extra child
+  pulled into the middle sum lies entirely below `second`, and the child then
+  recursed into starts at `second` and contributes 0. Same answer, more work.
+
+A no-op fault injection looks exactly like a coverage gap. The first
+`range_count` attempt replaced `get_node_id_containing_key_exclusive`, a string
+that does not occur in that file, so nothing changed and the suite "passed".
+Confirm the mutant actually differs before concluding anything.
+
+### `multi_way_node` needed `get_aug()`
+
+`leaf_node` had `get_aug()`; the interior did not, so an interior augmentation
+could be written but not read back. Added both overloads. `aug` was already
+public (`multi_way_node` is a `struct`), so this is an accessor, not a change
+in access.
+
 ## STL container interface (added 2026-08-17)
 
 `btree` now carries the API common to TLX's four B+-tree containers and to

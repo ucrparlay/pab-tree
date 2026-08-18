@@ -298,6 +298,17 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		return node_n == 0 ? 0 : node_n - 1;
 	}
 
+	// Same accessors leaf_node exposes.
+	TT::interior_aug const &get_aug() const
+	{
+		return aug;
+	}
+
+	TT::interior_aug &get_aug()
+	{
+		return aug;
+	}
+
 	split_arr const &get_split() const
 	{
 		return split;

@@ -73,11 +73,17 @@ compile time.
 
 ## Gaps in the work itself
 
-**No dataset-free test.** `unit_test` reads `/ssd1/zmen002/kv_pair`; without it
-every test skips and `ctest` passes green with zero coverage. Plan step 0.4
-called for a self-contained file cross-checked against `std::set`. I gated on
-the existing suite plus standalone repros instead, so a contributor without
-your data still has no working gate. This is the most valuable thing left.
+**~~No dataset-free test.~~ Fixed.** `tests/self_test.cpp` generates its own
+keys from a seed and checks every operation against `std::map`. 14 tests, ~7
+seconds, no data files. `unit_test` is unchanged and still reads
+`/ssd1/zmen002/kv_pair`; both are registered with ctest.
+
+Verified by fault injection rather than by passing: dropping an `update_aug`
+on the delete path, an off-by-one in the leaf delete compaction, skipping a
+covered child in `range_count`, and an iterator that fails to sort the leaf it
+lands on are all caught. The last of those found a real hole in the test
+itself -- `check_against` called `to_seq()` before iterating, and `to_seq`
+sorts every leaf, which hid the bug. Iteration now runs first.
 
 **R1 and R2 share one commit.** The rename was gated on its own first, but the
 changes interleave across 43 files, so `3c2f28e` is not bisectable between

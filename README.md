@@ -187,14 +187,39 @@ satisfy one fails at your declaration naming the missing requirement.
 
 ## Tests
 
+Two suites. Both are built with `-UNDEBUG`, so the library's internal asserts
+are live, and both are registered with ctest.
+
 ```bash
-cmake --build build --target unit_test
-ctest --test-dir build
+ctest --test-dir build          # runs both
 ```
 
-`unit_test` reads datasets under `/ssd1/zmen002/kv_pair`. Without them every
-test skips, so a green run means nothing on a machine that lacks the data.
-It is built with `-UNDEBUG` so the library's internal asserts are live.
+**`self_test` — needs no data.** Generates its own keys from a seed and
+checks every operation against `std::map`: build, batch insert, batch delete,
+membership, range count, range report, ordered iteration, the lookup family,
+augmentation, and value semantics. Sweeps leaf sizes 2…256 and five key
+shapes, and covers every size where the structure changes shape. About 7
+seconds.
+
+```bash
+cmake --build build --target self_test
+./build/self_test                    # fixed seed, printed on startup
+./build/self_test --seed=12345       # reproduce a reported failure
+./build/self_test --rounds=20        # more shapes per size, for fuzzing
+```
+
+It is deterministic: the same seed reproduces a run exactly. Every failure
+prints the leaf size, input size, key shape and seed, plus the flag to rerun
+just that case.
+
+**`unit_test` — reads the benchmark datasets** under `/ssd1/zmen002/kv_pair`.
+Without them every test skips, so a green run means nothing on a machine that
+lacks the data. Keep it for checking against real distributions at scale.
+
+```bash
+cmake --build build --target unit_test
+./build/unit_test --gtest_filter='*1M*'
+```
 
 ## Benchmarks
 

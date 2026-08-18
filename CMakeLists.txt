@@ -202,11 +202,18 @@ if(NOT APPLE)
 endif()
 
 # NOTE: GoogleTest for correctness check
+# self_test generates its own data and needs no files; unit_test reads the
+# benchmark datasets and skips without them. Both are registered with ctest.
+add_executable(self_test ${PROJECT_SOURCE_DIR}/tests/self_test.cpp)
+target_link_libraries(self_test PUBLIC pab_tree gtest_main)
+# Undo the build type's -DNDEBUG so asserts run. Not -DDEBUG=ON, which also
+# enables the slow GetNodeBoxRec checks.
+target_compile_options(self_test PRIVATE -UNDEBUG)
+add_test(NAME SelfTest COMMAND self_test)
+
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
 target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
 target_include_directories(unit_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
-# Undo the build type's -DNDEBUG so asserts run. Not -DDEBUG=ON, which also
-# enables the slow GetNodeBoxRec checks.
 target_compile_options(unit_test PRIVATE -UNDEBUG)
 add_test(NAME UnitTest COMMAND unit_test)
 # ctest -R BCCPTest -V
