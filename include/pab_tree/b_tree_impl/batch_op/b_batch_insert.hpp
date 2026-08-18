@@ -85,7 +85,7 @@ void btree<TT>::BatchInsert_(Range In,
 	// Keys must be distinct, in the batch and against the tree. Only the
 	// batch is checkable here.
 	assert(parlay::is_sorted(sorted_slice, [](E const &a, E const &b) {
-		return Entry::get_key(a) <= Entry::get_key(b);
+		return !TT::entry_less(b, a);
 	}));
 
 	// begin insert
@@ -151,8 +151,8 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	for (int i = 1; i < TI->get_split_n(); i++) {
 		assert(parlay::all_of(
 			In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](E const e) {
-				return Entry::get_key(e) >= TI->split[i - 1] &&
-					   Entry::get_key(e) < TI->split[i];
+				return !TT::key_less(Entry::get_key(e), TI->split[i - 1]) &&
+					   TT::key_less(Entry::get_key(e), TI->split[i]);
 			}));
 	}
 #endif // DEBUG

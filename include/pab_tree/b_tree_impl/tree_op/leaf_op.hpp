@@ -99,11 +99,10 @@ btree<TT>::handling_leaf_split_overflow(Node *T, Range In,
 	if (TL->is_sorted) {
 		// In is always sorted (sorted by BatchInsert_ before descent).
 		// Both halves sorted: O(n) merge instead of O(n log n) sort.
-		std::ranges::merge(TL->get_ele_begin_iter(), TL->get_ele_end_iter(),
-						   In.begin(), In.end(), entry_seq.begin(),
-						   [](E const &a, E const &b) {
-							   return Entry::get_key(a) < Entry::get_key(b);
-						   });
+		std::ranges::merge(
+			TL->get_ele_begin_iter(), TL->get_ele_end_iter(), In.begin(),
+			In.end(), entry_seq.begin(),
+			[](E const &a, E const &b) { return TT::entry_less(a, b); });
 		free_node<Leaf>(T);
 	} else {
 		std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size,
@@ -138,7 +137,7 @@ btree<TT>::delete_points_4_leaf(Node *T, TT::const_key_slice In,
 	assert(parlay::all_of(In, [&](auto a) {
 		return std::find_if(TL->elements.begin(),
 							TL->elements.begin() + TL->size, [&](auto const e) {
-								return Entry::get_key(e) == a;
+								return TT::key_equal(Entry::get_key(e), a);
 							}) != TL->elements.begin() + TL->size;
 	}));
 
@@ -148,7 +147,7 @@ btree<TT>::delete_points_4_leaf(Node *T, TT::const_key_slice In,
 	for (size_type i = 0; i < In.size(); i++) {
 		it =
 			std::ranges::find_if(TL->elements.begin(), end, [&](auto const &e) {
-				return Entry::get_key(e) == In[i];
+				return TT::key_equal(Entry::get_key(e), In[i]);
 			});
 		if (it != end) {
 			std::ranges::iter_swap(it, --end);

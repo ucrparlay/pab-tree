@@ -1,7 +1,9 @@
 #ifndef PABTREE_DEPENDENCE_TYPE_TRAIT_H_
 #define PABTREE_DEPENDENCE_TYPE_TRAIT_H_
 
+#include <concepts>
 #include <cstdint>
+#include <functional>
 #include <type_traits>
 #include <utility>
 
@@ -33,7 +35,7 @@ template <class EleType> struct ele_wrapper : EleType {
 };
 
 template <typename EleType, uint BufferSize, typename LeafAugType,
-		  typename InteriorAugType, typename NodeType>
+		  typename InteriorAugType, typename NodeType, typename KeyCompare>
 class TypeTrait {
 public:
 	// element type
@@ -44,6 +46,38 @@ public:
 
 	// general type
 	using Num = Num_Comparator<K>;
+
+	// Key ordering. Every ordering decision in the tree goes through
+	// key_less; nothing compares keys with a raw operator.
+	using key_compare = KeyCompare;
+
+	static bool key_less(K const &a, K const &b)
+	{
+		return KeyCompare{}(a, b);
+	}
+
+	// a == b under key_compare. Two comparisons in general, but the
+	// default and any comparator supplying a static equal() get one.
+	static bool key_equal(K const &a, K const &b)
+	{
+		if constexpr (requires {
+						  {
+							  KeyCompare::equal(a, b)
+						  } -> std::convertible_to<bool>;
+					  }) {
+			return KeyCompare::equal(a, b);
+		} else if constexpr (std::same_as<KeyCompare, std::less<K>>) {
+			return a == b;
+		} else {
+			return !KeyCompare{}(a, b) && !KeyCompare{}(b, a);
+		}
+	}
+
+	// Order entries by their keys.
+	static bool entry_less(E const &a, E const &b)
+	{
+		return key_less(Entry::get_key(a), Entry::get_key(b));
+	}
 
 	using entry_seq = parlay::sequence<E>;
 	using entry_slice = parlay::slice<E *, E *>;
@@ -80,13 +114,14 @@ public:
 template <entry_type EleType, uint BufferSize,
 		  typename LeafAugType = empty_leaf_aug,
 		  typename InteriorAugType = empty_interior_aug,
-		  typename NodeType = proto_node>
+		  typename NodeType = proto_node,
+		  typename KeyCompare = std::less<typename EleType::K>>
 class btree_type_trait
 	: public TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-					   InteriorAugType, NodeType> {
+					   InteriorAugType, NodeType, KeyCompare> {
 public:
 	using BT = TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-						 InteriorAugType, NodeType>;
+						 InteriorAugType, NodeType, KeyCompare>;
 	using Split = BT::K;
 	using split_seq = parlay::sequence<Split>;
 	using split_slice = parlay::slice<Split *, Split *>;

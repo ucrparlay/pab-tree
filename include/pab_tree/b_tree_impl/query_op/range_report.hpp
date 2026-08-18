@@ -18,8 +18,8 @@ template <typename Range>
 auto btree<TT>::range_report(TT::Box const query_box, Range &&out) const
 	-> size_type
 {
-	if (this->root_ == nullptr || query_box.first >= query_box.second)
-		[[unlikely]] {
+	if (this->root_ == nullptr ||
+		!TT::key_less(query_box.first, query_box.second)) [[unlikely]] {
 		return 0;
 	}
 
@@ -43,13 +43,16 @@ void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
 		size_t lo = 0, hi = static_cast<size_t>(rem);
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go = Entry::get_key(elems[mid]) < query_box.second;
+			bool const go =
+				TT::key_less(Entry::get_key(elems[mid]), query_box.second);
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += (Entry::get_key(elems[i]) < query_box.second) ? 1 : 0;
+			cnt += TT::key_less(Entry::get_key(elems[i]), query_box.second) ?
+					   1 :
+					   0;
 		}
 		const auto r = l + static_cast<decltype(l)>(lo + cnt);
 		assert(l <= r && r <= TL->size);
@@ -96,13 +99,13 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		size_t lo = 0, hi = rem;
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go = (sp_l[mid] < query_box.second);
+			bool const go = TT::key_less(sp_l[mid], query_box.second);
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += (sp_l[i] < query_box.second) ? 1 : 0;
+			cnt += TT::key_less(sp_l[i], query_box.second) ? 1 : 0;
 		}
 		const buf_size_type r = l + static_cast<buf_size_type>(lo + cnt);
 
@@ -110,7 +113,7 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		assert(r < TI->get_node_n());
 		assert(TI->validate_key_in_node(l, query_box.first));
 		assert(TI->validate_key_in_node(r, query_box.second) ||
-			   TI->split[r] == query_box.second);
+			   TT::key_equal(TI->split[r], query_box.second));
 
 		if (l == r) {
 			// Entire query falls in one child — keep descending
@@ -195,7 +198,7 @@ void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
 	assert(r < TI->get_node_n());
 	assert(TI->validate_key_in_node(l, query_box.first));
 	assert(TI->validate_key_in_node(r, query_box.second) ||
-		   TI->split[r] == query_box.second);
+		   TT::key_equal(TI->split[r], query_box.second));
 
 	// visit nodes [l, r]
 

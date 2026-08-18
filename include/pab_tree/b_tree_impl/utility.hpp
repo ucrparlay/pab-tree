@@ -54,7 +54,7 @@ template <typename TT> bool btree<TT>::operator==(btree const &other) const
 	auto const a = this->to_seq();
 	auto const b = other.to_seq();
 	return std::ranges::equal(a, b, [](E const &x, E const &y) {
-		return Entry::get_key(x) == Entry::get_key(y) &&
+		return TT::key_equal(Entry::get_key(x), Entry::get_key(y)) &&
 			   Entry::get_val(x) == Entry::get_val(y);
 	});
 }

@@ -209,21 +209,16 @@ public:
 	using value_type = E;
 	using difference_type = std::ptrdiff_t;
 
-	// Order two entries by key. Element types need not define operator<.
+	// Order two entries by key, using the trait's comparator.
 	struct value_compare {
 		bool operator()(E const &a, E const &b) const
 		{
-			return Entry::get_key(a) < Entry::get_key(b);
+			return TT::entry_less(a, b);
 		}
 	};
 
-	// Order two keys.
-	struct key_compare {
-		bool operator()(K const &a, K const &b) const
-		{
-			return a < b;
-		}
-	};
+	// The trait's key comparator.
+	using key_compare = typename TT::key_compare;
 
 	struct default_hybrid_pred {
 		template <typename InputNode, typename Range>
@@ -511,7 +506,7 @@ private:
 
 	// Order by key. Element types are not required to define operator<.
 	static constexpr auto key_less = [](E const &a, E const &b) {
-		return Entry::get_key(a) < Entry::get_key(b);
+		return TT::entry_less(a, b);
 	};
 
 	// helper function to decide the bucket number and range

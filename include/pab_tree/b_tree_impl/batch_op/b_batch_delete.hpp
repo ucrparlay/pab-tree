@@ -70,7 +70,7 @@ void btree<TT>::BatchDelete_(Range In,
 	typename TT::key_seq sorted_seq;
 	parlay::slice<const K *, const K *> sorted_slice{ nullptr, nullptr };
 	if (!sorted_input) {
-		sorted_seq = parlay::sort(In);
+		sorted_seq = parlay::sort(In, typename TT::key_compare{});
 		sorted_slice =
 			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	} else if constexpr (std::contiguous_iterator<decltype(std::begin(In))>) {

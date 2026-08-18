@@ -39,7 +39,7 @@ void btree<TT>::Build_(Range In)
 	// Keys must be distinct. is_sorted with <= is strict increase, so this
 	// catches duplicates; with < it would tolerate them.
 	assert(parlay::is_sorted(sort_seq, [](E const &a, E const &b) {
-		return Entry::get_key(a) <= Entry::get_key(b);
+		return !TT::entry_less(b, a);
 	}));
 	this->root_ = build_recursive(parlay::make_slice(sort_seq));
 	assert(this->root_ != nullptr);
@@ -73,8 +73,8 @@ TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
 				.set_node = [&](size_type i,
 								auto node) { node_out[i] = node; } });
 		swap_key_node(interior_bkt_n);
-		assert(
-			parlay::is_sorted(key_in, [&](TT::K a, TT::K b) { return a < b; }));
+		assert(parlay::is_sorted(
+			key_in, [&](TT::K a, TT::K b) { return TT::key_less(a, b); }));
 	}
 
 	auto *node = alloc_interior_node<Interior, TT>(node_in, key_in);
@@ -106,8 +106,9 @@ TT::Node *btree<TT>::build_recursive(Range In)
 		gen_nodes_output_handler{
 			.set_key = [&](size_type i, auto key) { key_out[i] = key; },
 			.set_node = [&](size_type i, auto node) { node_out[i] = node; } });
-	assert(parlay::is_sorted(key_out.cut(0, bkt_n - 1),
-							 [&](TT::K a, TT::K b) { return a < b; }));
+	assert(parlay::is_sorted(key_out.cut(0, bkt_n - 1), [&](TT::K a, TT::K b) {
+		return TT::key_less(a, b);
+	}));
 
 	this->root_ = assemble_interior_levels(node_out.cut(0, bkt_n),
 										   key_out.cut(0, bkt_n - 1));

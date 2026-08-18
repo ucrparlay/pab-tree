@@ -150,6 +150,47 @@ overruns; debug builds assert.
 **The tree owns its nodes.** `get_root()` returns a non-owning observer.
 Lifetime ends at `delete_tree()` or the destructor.
 
+## Key ordering
+
+`btree_type_trait`'s sixth parameter is the key comparator, defaulting to
+`std::less<K>`. Every ordering decision in the tree goes through it — the
+descent, the leaf searches, the batch partitioners, all the sorts, the range
+boxes and `validate()`. Nothing compares keys with a raw operator.
+
+```cpp
+using descending = pab_tree::btree_type_trait<
+        my_ele, 64,
+        pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
+        pab_tree::proto_node,
+        std::greater<uint64_t> >;      // the tree is ordered high to low
+```
+
+Iteration, `to_seq`, `lower_bound`/`upper_bound` and the range boxes all follow
+the comparator, so a `range_count({a, b})` on a descending tree takes `a`
+greater than `b`.
+
+The comparator must be stateless and default-constructible; it is instantiated
+where it is used rather than stored, so the tree stays 8 bytes. It costs
+nothing: with `std::less` the generated code is instruction-for-instruction
+what the hard-coded operators produced.
+
+Equality is derived as `!less(a,b) && !less(b,a)`, which is two comparisons.
+`std::less` is special-cased to one, and any comparator supplying a static
+`equal(a, b)` gets the same treatment:
+
+```cpp
+struct my_cmp {
+        bool operator()(K const &a, K const &b) const { return ...; }
+        static bool equal(K const &a, K const &b) { return ...; }  // optional
+};
+```
+
+One caveat: `validate()` derives the least and greatest key from the numeric
+limits of `K`, so a comparator that leaves neither limit extreme (ordering by a
+hash, say) needs those bounds supplied before `validate()` will agree with it.
+Ordinary orders — `std::less`, `std::greater`, any monotone transform — are
+fine.
+
 ## Augmentation
 
 `btree_type_trait` takes two optional augmentation types. They default to

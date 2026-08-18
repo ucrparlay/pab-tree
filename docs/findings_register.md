@@ -1,8 +1,8 @@
 # Findings register — still open
 
-26 open library findings: 3 high, 16 medium, 7 low. 23 of them are from the
+24 open library findings: 2 high, 15 medium, 7 low. 21 of them are from the
 2026-08-17 review, 3 were found since. The review raised 89 library findings
-in all, so 66 are now fixed and were removed from this file; they are
+in all, so 68 are now fixed and were removed from this file; they are
 recoverable from `git log 376e067..HEAD`, which names each defect, and from
 this file's own history.
 
@@ -22,13 +22,15 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| key comparison hardcoded to `operator<` (high) | `KeyCompare` trait parameter, verified codegen-neutral |
+| no comparator customization point (medium) | same change; the two were one defect |
 | plus 8 more outside the library, listed in that section |  |
 
 Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## HIGH — 3
+## HIGH — 2
 
 ### Bogus DEBUG assertion aborts any sorted-input BatchInsert that splits the root
 `include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:86 · correctness
@@ -52,23 +54,6 @@ assert(!sorted_input || parlay::is_sorted(sorted_slice,
 ```
 and add a sorted-input case to `tests/unit_test.cpp`.
 
-### Key comparison is hardcoded to operator< on K and operator< on E; no comparator can be supplied
-`include/pab_tree/dependence/tree_node.h`:112 · extensibility
-**Status: deferred (4.7) - a feature, not debt**
-
-`TypeTrait` exposes `using Num = Num_Comparator<K>` (`type_trait.h:51`) but `Num` is used only by `box_op.h` (min/max/limits for validation boxes) — never for ordering. Every ordering decision is a raw operator:
-
-- `tree_node.h:112,122` `Entry::GetKey(e) < k` / `<= k` (leaf binary search)
-- `tree_node.h:131,136` `== k` (leaf membership)
-- `tree_node.h:357,371` `key <= k` / `key < k` (interior descent)
-- `tree_node.h:382-386` `ValidateKeyInNode`
-- `points_op.hpp:128,130,190,196` (both batch partitioners)
-- `range_report.hpp:48,54` and `range_count.hpp:36,42`
-- `node_op.hpp:406,554` and `leaf_op.hpp:109,144,153`
-- `leaf_op.hpp:31,37,56` `std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter())` a
-
-*Suggested fix:* Add a seventh trait parameter `typename KeyCompare = std::less<K>` to `TypeTrait`/`BTreeTypeTrait`, expose it as `TT::KeyLess`, and route every site above through it (`TT::KeyLess{}(a,b)` for `<`, `!less(a,b) && !less(b,a)` for `==`). Replace the element sorts with key-projected sorts — `parlay::sort(In, [](E const& a, E const& b){ return TT::KeyLess{}(Entry::GetKey(a), Entry::GetKey(b)); })` — wh
-
 ### No allocator customization point: parlay::type_allocator is hard-coded, and Node* ownership is documented nowhere
 `include/pab_tree/dependence/tree_node.h`:229 · extensibility
 **Status: deferred (4.8) - a feature, not debt**
@@ -88,7 +73,7 @@ Every node allocation and deallocation names one concrete allocator, in eight pl
 
 *Suggested fix:* Add an allocator to the trait: `using NodeAlloc = NodeAllocType;` on `BTreeTypeTrait` defaulting to a `ParlayTypeAllocator` adaptor exposing `template<class T> static T* Alloc()` / `static void Free(T*)`, and route all eight sites through `TT::NodeAlloc`. Drop the unused `Range` parameter from `AllocEmptyLeafNode`, delete the `AllocInteriorNode<Interior,TT>()` overload. Add a README section statin
 
-## MEDIUM — 16
+## MEDIUM — 15
 
 ### NodeType is a near-vestigial knob: Leaf and Interior are hardcoded
 `include/pab_tree/b_tree.h`:204 · extensibility
@@ -178,25 +163,6 @@ NodeSplitPairSeq node_split_seq =
 `NodeSplitPair` is `std::pair<Node*, Split>` — 16 bytes with padding for a 32-bit key — so this reserves `32 * n` bytes for every batch. At the benchmarked n = 1e9 that is a **32 GB** allocation, on top of the sorted copy. The 2n factor is genuinely the worst case (a leaf at capacity receiving a single element needs 2 slots, so the ratio really is 2 at n=1), but it is the worst case for a *pathological* batch: in the common case where few or no nodes split, essentially all of it is untouched. `ReInsertTreeAfterDelete` (node_op.hpp:669) allocates the same 2n scratch a second time during re
 
 *Suggested fix:* Bound the scratch by what can actually be produced rather than by input size. The number of nodes any subtree can hand back is `(subtree_size + batch_size) / kBufMD + 1`; sizing `node_split_seq` as `2 * min(n, root_->size / TT::kBufMD + n / TT::kBufMD + 2)` covers every split path while collapsing the common case. If that analysis is not worth doing, at least document the `32*n` bytes of scratch i
-
-### No comparator customization point: sorts use E::operator< while navigation uses Entry::GetKey, with no check they agree
-`include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:72 · extensibility
-**Status: deferred (4.7) - a feature, not debt**
-
-The tree's structural invariants are all expressed in terms of `Entry::GetKey` — `MultiWayNode::GetNodeIdContainingKey` (tree_node.h:352), `LeafNode::BinarySearchKey` (106), `RangeCountLeaf`, `RangeReportLeaf`, `GetBox`. But every sort in the library uses the *element's* default `operator<` with no comparator:
-
-```
-b_batch_insert.hpp:72   sorted_seq = parlay::sort(In);
-b_batch_delete.hpp:74   sorted_seq = parlay::sort(In);
-b_build_tree.hpp:36     auto sort_seq = parlay::sort(In);
-leaf_op.hpp:31,37,56    std::sort(TL->GetEleBeginIter(), TL->GetEleEndIter());
-leaf_op.hpp:117         entry_seq = parlay::sort(entry_seq);
-node_op.hpp:551         std::sort(entry_buf.begin(), ...);
-```
-
-So an exten
-
-*Suggested fix:* Sort by key explicitly everywhere: `parlay::sort(In, [](E const& a, E const& b){ return Entry::GetKey(a) < Entry::GetKey(b); })` and the equivalent for the four `std::sort` calls, which removes the dependency on `E::operator<` entirely. Alternatively add a `using KeyLess = KeyLessType;` to `BTreeTypeTrait` (defaulting to `std::less<K>`) and thread it through all nine sort sites plus `BinarySearchK
 
 ### AssembleInteriorLevels silently overwrites the caller's nodes/keys buffers
 `include/pab_tree/b_tree_impl/batch_op/b_build_tree.hpp`:43 · extensibility

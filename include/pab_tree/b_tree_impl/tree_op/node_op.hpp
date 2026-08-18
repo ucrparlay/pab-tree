@@ -150,11 +150,12 @@ TT::Node *btree<TT>::batch_insert_update_interior(
 		auto node = TI->tree_nodes[i];
 		auto box = get_node_box_rec(TI->tree_nodes[i]);
 		if (i == 0) {
-			assert(box.second < TI->split[0]);
+			assert(TT::key_less(box.second, TI->split[0]));
 		} else if (i == TI->get_node_n() - 1) {
-			assert(box.first >= TI->split[TI->get_split_n() - 1]);
+			assert(!TT::key_less(box.first, TI->split[TI->get_split_n() - 1]));
 		} else {
-			assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
+			assert(!TT::key_less(box.first, TI->split[i - 1]) &&
+				   TT::key_less(box.second, TI->split[i]));
 		}
 	}
 #endif // DEBUG
@@ -212,8 +213,9 @@ TT::size_type btree<TT>::handling_interior_split_overflow(
 	}
 
 	assert(node_idx == split_idx + 1);
-	assert(parlay::is_sorted(flatten_split_seq,
-							 [&](TT::K a, TT::K b) { return a < b; }));
+	assert(parlay::is_sorted(flatten_split_seq, [&](TT::K a, TT::K b) {
+		return TT::key_less(a, b);
+	}));
 
 	// launch rebuild
 	free_node<Interior>(T);
@@ -395,8 +397,8 @@ void btree<TT>::fetch_invalid_subtree_nodes(
 			return Entry::get_val(entry) == 0;
 		}));
 		assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
-			return Entry::get_key(a) < Entry::get_key(b) &&
-				   Entry::get_key(a) != Entry::get_key(b);
+			return TT::entry_less(a, b) &&
+				   !TT::key_equal(Entry::get_key(a), Entry::get_key(b));
 		}));
 		reinsert_tree_after_delete(T, reinsert_entries, leaf_entries_pattern,
 								   leaf_sort_pred);
@@ -478,13 +480,13 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 			if (split_idx == 0) { // one tree node for the entire array
 				return true;
 			}
-			return box.second < TI->split[split_idx - 1];
+			return TT::key_less(box.second, TI->split[split_idx - 1]);
 		}
 		if (g == rightmost_pivot_idx) {
-			return box.first >= TI->split[split_idx - 1];
+			return !TT::key_less(box.first, TI->split[split_idx - 1]);
 		}
-		return box.first >= TI->split[split_idx - 2] &&
-			   box.second < TI->split[split_idx - 1];
+		return !TT::key_less(box.first, TI->split[split_idx - 2]) &&
+			   TT::key_less(box.second, TI->split[split_idx - 1]);
 	};
 
 	// Case A: group is a single valid node — slide its pointer/split
@@ -545,10 +547,9 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		}
 		const auto item_n = static_cast<size_type>(ep - entry_buf.begin());
 
-		std::sort(entry_buf.begin(), entry_buf.begin() + item_n,
-				  [](auto const &a, auto const &b) {
-					  return Entry::get_key(a) < Entry::get_key(b);
-				  });
+		std::sort(
+			entry_buf.begin(), entry_buf.begin() + item_n,
+			[](auto const &a, auto const &b) { return TT::entry_less(a, b); });
 
 		const buf_size_type bkt_n = get_bkt_num(item_n);
 		assert(bkt_n <= j - i);
@@ -613,11 +614,12 @@ void btree<TT>::balance_over_leaves(Node *T, const size_type reinsert_size,
 		}
 		const auto box = get_node_box_rec(TI->tree_nodes[i]);
 		if (i == 0) {
-			assert(box.second < TI->split[0]);
+			assert(TT::key_less(box.second, TI->split[0]));
 		} else if (i == TI->get_node_n() - 1) {
-			assert(box.first >= TI->split[TI->get_split_n() - 1]);
+			assert(!TT::key_less(box.first, TI->split[TI->get_split_n() - 1]));
 		} else {
-			assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
+			assert(!TT::key_less(box.first, TI->split[i - 1]) &&
+				   TT::key_less(box.second, TI->split[i]));
 		}
 	}
 #endif // DEBUG

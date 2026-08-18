@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
+#include <functional>
 #include <map>
 #include <numeric>
 #include <random>
@@ -518,6 +519,107 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 }
 
 } // namespace
+
+// ---- a custom key comparator orders the whole tree ----
+
+TEST(SelfTest, ReverseComparator)
+{
+	// std::greater: the tree is ordered descending, so every structural
+	// invariant, the descent, the sorts and validate() must follow it.
+	using tt = pab_tree::btree_type_trait<
+		ele, 16, pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
+		pab_tree::proto_node, std::greater<uint32_t>>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x9e77ULL;
+	SCOPED_TRACE("reverse comparator seed=" + std::to_string(seed));
+
+	auto const keys = gen_keys(20000, dist::uniform, seed);
+	auto const all = to_entries(keys);
+	std::vector<entry> base(all.begin(), all.begin() + all.size() / 2);
+	std::vector<entry> rest(all.begin() + all.size() / 2, all.end());
+
+	// The oracle uses the same order.
+	std::map<uint32_t, uint32_t, std::greater<uint32_t>> ref;
+	auto add = [&](std::vector<entry> const &v) {
+		for (auto const &e : v)
+			ref[e.key] = e.val;
+	};
+
+	tree t;
+	t.build(base);
+	add(base);
+
+	auto check = [&](char const *stage) {
+		SCOPED_TRACE(stage);
+		bool const ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok) << "validate() failed under std::greater";
+		ASSERT_EQ(t.size(), ref.size());
+
+		// Iteration follows the comparator, so it runs high to low.
+		auto rt = ref.begin();
+		size_t cnt = 0;
+		for (auto it = t.begin(); it != t.end(); ++it, ++rt, ++cnt) {
+			ASSERT_NE(rt, ref.end());
+			ASSERT_EQ(it->key, rt->first) << "order diverged at " << cnt;
+		}
+		ASSERT_EQ(cnt, ref.size());
+
+		// to_seq is descending.
+		auto const seq = t.to_seq();
+		ASSERT_EQ(seq.size(), ref.size());
+		for (size_t i = 1; i < seq.size(); ++i)
+			ASSERT_GT(ele::get_key(seq[i - 1]), ele::get_key(seq[i]))
+				<< "to_seq not descending at " << i;
+
+		// Membership and the ordered lookups.
+		for (size_t i = 0; i < keys.size(); i += 97) {
+			auto const k = keys[i];
+			ASSERT_EQ(t.contain(k), ref.count(k) != 0);
+			auto const lb = t.lower_bound(k);
+			auto const rlb = ref.lower_bound(k);
+			ASSERT_EQ(lb == t.end(), rlb == ref.end());
+			if (rlb != ref.end()) {
+				ASSERT_EQ(lb->key, rlb->first);
+			}
+		}
+	};
+
+	ASSERT_NO_FATAL_FAILURE(check("after build"));
+
+	t.batch_insert(rest);
+	add(rest);
+	ASSERT_NO_FATAL_FAILURE(check("after batch_insert"));
+
+	// range_count takes its box in comparator order: [hi, lo) descending.
+	{
+		std::vector<uint32_t> sorted_keys = keys;
+		std::sort(sorted_keys.begin(), sorted_keys.end());
+		std::mt19937_64 rng(seed);
+		for (int b = 0; b < 20; ++b) {
+			auto lo = sorted_keys[rng() % sorted_keys.size()];
+			auto hi = sorted_keys[rng() % sorted_keys.size()];
+			if (lo < hi)
+				std::swap(lo, hi); // first is the greater under std::greater
+			auto const want = static_cast<size_t>(
+				std::distance(ref.lower_bound(lo), ref.lower_bound(hi)));
+			ASSERT_EQ(t.range_count({ lo, hi }), want)
+				<< "range_count [" << lo << ", " << hi << ")";
+		}
+	}
+
+	// Deleting still rebalances correctly under the comparator.
+	{
+		std::vector<uint32_t> live = keys;
+		std::mt19937_64 rng(seed ^ 7);
+		std::shuffle(live.begin(), live.end(), rng);
+		live.resize(live.size() / 2);
+		t.batch_delete(live);
+		for (auto k : live)
+			ref.erase(k);
+	}
+	ASSERT_NO_FATAL_FAILURE(check("after batch_delete"));
+}
 
 // ---- edge cases: the sizes where the structure changes shape ----
 

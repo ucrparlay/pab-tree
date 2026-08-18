@@ -74,9 +74,8 @@ struct leaf_node : TypeTrait::Node {
 		, is_sorted{ true }
 	{
 		assert(In.size() <= TT::k_buf_ub);
-		assert(parlay::is_sorted(In, [](auto a, auto b) {
-			return Entry::get_key(a) < Entry::get_key(b);
-		}));
+		assert(parlay::is_sorted(
+			In, [](auto a, auto b) { return TT::entry_less(a, b); }));
 		// elements is left default-initialised: copy_n fills [0, size)
 		// and nothing reads past it. Value-initialising the whole
 		// k_buf_ub array here cost more than the copy.
@@ -95,7 +94,7 @@ struct leaf_node : TypeTrait::Node {
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			parlay::make_slice(this->elements.begin(),
 							   this->elements.begin() + this->size),
-			[k](E const e) { return Entry::get_key(e) < k; });
+			[k](E const e) { return TT::key_less(Entry::get_key(e), k); });
 	}
 
 	// return the first idx s.t. Entry::get_key(elements[idx]) > k
@@ -105,7 +104,7 @@ struct leaf_node : TypeTrait::Node {
 		return pab_tree::detail::binary_search<k_binary_search_base>(
 			parlay::make_slice(this->elements.begin(),
 							   this->elements.begin() + this->size),
-			[k](E const e) { return Entry::get_key(e) <= k; });
+			[k](E const e) { return !TT::key_less(k, Entry::get_key(e)); });
 	}
 
 	bool contain(K const &k) const
@@ -114,12 +113,13 @@ struct leaf_node : TypeTrait::Node {
 				   ([&] {
 					   auto idx = this->binary_search_key(k);
 					   return idx < this->size &&
-							  (Entry::get_key(this->elements[idx]) == k);
+							  TT::key_equal(Entry::get_key(this->elements[idx]),
+											k);
 				   })() :
 				   (std::ranges::find_if(
 						this->elements.begin(),
 						this->elements.begin() + this->size, [&](E const &e) {
-							return Entry::get_key(e) == k;
+							return TT::key_equal(Entry::get_key(e), k);
 						}) != this->elements.begin() + this->size);
 	}
 
@@ -330,7 +330,8 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		// return the first idx s.t. split[idx] > k
 		// i.e.: if split[1] == k, then k belongs to tree_nodes[2]
 		return pab_tree::detail::binary_search<k_binary_search_base>(
-			this->get_split_slice(), [&](TT::K const key) { return key <= k; });
+			this->get_split_slice(),
+			[&](TT::K const key) { return !TT::key_less(k, key); });
 	}
 
 	TT::buf_size_type get_node_id_containing_key_exclusive(TT::K const k) const
@@ -338,7 +339,8 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		// return the first idx s.t. split[idx] >= k
 		// i.e.: if split[1] == k, then k belongs to tree_nodes[1]
 		return pab_tree::detail::binary_search<k_binary_search_base>(
-			this->get_split_slice(), [&](TT::K const key) { return key < k; });
+			this->get_split_slice(),
+			[&](TT::K const key) { return TT::key_less(key, k); });
 	}
 
 	bool validate_key_in_node(TT::buf_size_type node_idx, TT::K const k) const
@@ -346,11 +348,13 @@ template <typename TypeTrait> struct multi_way_node : TypeTrait::Node {
 		if (this->get_split_n() == 0) {
 			return true; // one child: every key belongs to it
 		}
-		return node_idx == 0 ? k < this->split.front() :
-							   (node_idx == this->get_split_n() ?
-									k >= this->split[this->get_split_n() - 1] :
-									(k >= this->split[node_idx - 1] &&
-									 k < this->split[node_idx]));
+		// a >= b is !(a < b); a < b is key_less directly.
+		return node_idx == 0 ?
+				   TT::key_less(k, this->split.front()) :
+				   (node_idx == this->get_split_n() ?
+						!TT::key_less(k, this->split[this->get_split_n() - 1]) :
+						(!TT::key_less(k, this->split[node_idx - 1]) &&
+						 TT::key_less(k, this->split[node_idx])));
 	}
 
 	TT::buf_size_type node_n;

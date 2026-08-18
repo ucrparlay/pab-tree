@@ -223,6 +223,81 @@ indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
 
 All `b_tree_impl/**/*.hpp` files are `#include`d at the bottom of `b_tree.h`; they are not compiled separately.
 
+## Key comparator (added 2026-08-17)
+
+`btree_type_trait`'s sixth parameter, `KeyCompare = std::less<K>`. The trait
+exposes three helpers and **every ordering decision in the library goes through
+them** — ~55 sites across 13 files:
+
+```cpp
+using key_compare = KeyCompare;
+static bool key_less(K const &a, K const &b);    // KeyCompare{}(a, b)
+static bool key_equal(K const &a, K const &b);   // see below
+static bool entry_less(E const &a, E const &b);  // key_less on the keys
+```
+
+Rewrites used: `a <= b` → `!key_less(b, a)`, `a >= b` → `!key_less(a, b)`,
+`a > b` → `key_less(b, a)`. All one comparison, so nothing got slower.
+
+`key_equal` would be two comparisons in general (`!less(a,b) && !less(b,a)`).
+It is one for `std::less` (special-cased to `a == b`) and one for any
+comparator supplying a static `equal(a, b)`, detected with a `requires`.
+
+### Performance was verified by codegen, not by timing
+
+The timing noise floor swamps the effect. `rcount` measured **+2.8%**, but
+splitting the *baseline* runs in half and comparing them to each other gives
+**3.5%** — the "regression" is smaller than the measurement's own spread.
+`rreport`'s noise floor is 8.7%.
+
+What settles it: compile the same benchmark against both libraries and diff the
+disassembly with addresses normalised. **Every comparison and branch
+instruction count is identical** — cmp 2727, test 1755, and all of
+`setb/setbe/seta/setae/sete/setne/cmovb/cmovbe/cmova/cmovae/jb/jbe/ja/jae/je/jne`
+unchanged. Total instructions 55461 → 55465; the four are register-allocation
+churn (`%rcx`↔`%rdi`, operand order in `lea`). Almost the whole binary diff is
+mangled names, since the trait now carries `St4lessIjE`.
+
+Do this rather than trusting a 2 ms benchmark:
+
+```bash
+objdump -d --no-show-raw-insn X | sed -E 's/^\s*[0-9a-f]+:\s*//; s/0x[0-9a-f]+/HEX/g;
+    s/<[^>]*\+0x[0-9a-f]+>/<SYM>/g; s/\b[0-9a-f]{4,}\b/ADDR/g'
+```
+
+### `SelfTest.ReverseComparator` found five sites that a green suite did not
+
+Instantiating with `std::greater` and checking against
+`std::map<K, V, std::greater<K>>` caught, one per rebuild:
+
+1. `b_build_tree.hpp` sortedness assert still `a < b`
+2. the **key** branches of `if constexpr` in both partitioners
+   (`points_op.hpp`) — the entry branches had been routed, the `K` ones not
+3. the empty-range early-out `query_box.first >= query_box.second` in
+   `range_count`/`range_report`
+4. `balance_over_leaves`' `quick_check` box-vs-split asserts
+5. four more box-vs-split asserts in `node_op.hpp`
+
+None of these fire under `std::less`, so the default suite stayed green
+throughout. **A comparator that is not `std::less` is the only thing that
+tests this.** Keep that test.
+
+### `get_box` had to move too
+
+It is used only by `validate()`, and took numeric `Num::min/max`, which
+disagrees with the tree under a reversed comparator. Now folds with
+`key_less`. `get_empty_box` needs the comparator-extreme keys, derived as
+`key_less(min_val, max_val) ? ... : ...` — correct for `std::less`,
+`std::greater` and any monotone order, wrong only for a comparator where
+neither numeric limit is extreme (a hash order). Documented in the README.
+
+### Existing asserts
+
+Six sortedness asserts and eight box-vs-split asserts were rewritten to use
+`key_less`. They assert the same propositions — sorted, and within the split
+range — just in the tree's order rather than the numeric one. No assert was
+removed or weakened.
+
 ## Two test suites (self_test added 2026-08-17)
 
 | target | data | runtime | what it is |

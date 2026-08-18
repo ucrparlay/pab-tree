@@ -246,7 +246,7 @@ auto btree<TT>::upper_bound(K const &k) const -> const_iterator
 template <typename TT> auto btree<TT>::find(K const &k) const -> const_iterator
 {
 	auto const it = this->lower_bound(k);
-	if (it == this->end() || !(Entry::get_key(*it) == k)) {
+	if (it == this->end() || !TT::key_equal(Entry::get_key(*it), k)) {
 		return this->end();
 	}
 	return it;
@@ -257,7 +257,7 @@ auto btree<TT>::equal_range(K const &k) const
 	-> std::pair<const_iterator, const_iterator>
 {
 	auto const lo = this->lower_bound(k);
-	if (lo == this->end() || !(Entry::get_key(*lo) == k)) {
+	if (lo == this->end() || !TT::key_equal(Entry::get_key(*lo), k)) {
 		return { lo, lo };
 	}
 	auto hi = lo;

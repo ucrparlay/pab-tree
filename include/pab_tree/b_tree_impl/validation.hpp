@@ -33,15 +33,15 @@ btree<TT>::verify_tree_property(Node const *T) const
 						(TL->size >= TT::k_buf_lb && TL->size <= TT::k_buf_ub));
 		}
 		assert(!TL->is_sorted ||
-			   parlay::is_sorted(
-				   TL->get_ele(), [&](auto const &e1, auto const &e2) {
-					   return Entry::get_key(e1) < Entry::get_key(e2);
-				   }));
+			   parlay::is_sorted(TL->get_ele(),
+								 [&](auto const &e1, auto const &e2) {
+									 return TT::entry_less(e1, e2);
+								 }));
 		ok = ok && (!TL->is_sorted ||
-					parlay::is_sorted(TL->get_ele_slice(), [&](auto const &e1,
-															   auto const &e2) {
-						return Entry::get_key(e1) < Entry::get_key(e2);
-					}));
+					parlay::is_sorted(TL->get_ele_slice(),
+									  [&](auto const &e1, auto const &e2) {
+										  return TT::entry_less(e1, e2);
+									  }));
 		return { pab_tree::get_box<TT>(TL->get_ele_slice()), ok };
 	}
 
@@ -52,14 +52,16 @@ btree<TT>::verify_tree_property(Node const *T) const
 								TI->get_node_n() <= TT::k_buf_ub));
 
 	// ensure the split is increasing
-	assert(parlay::is_sorted(TI->get_split_slice(),
-							 [&](TT::K a, TT::K b) { return a < b; }));
+	assert(parlay::is_sorted(TI->get_split_slice(), [&](TT::K a, TT::K b) {
+		return TT::key_less(a, b);
+	}));
 
-	bool node_ok = (T == this->root_ || (TI->get_node_n() >= TT::k_buf_lb &&
-										 TI->get_node_n() <= TT::k_buf_ub)) &&
-				   TI->get_node_n() > 0 &&
-				   parlay::is_sorted(TI->get_split_slice(),
-									 [&](TT::K a, TT::K b) { return a < b; });
+	bool node_ok =
+		(T == this->root_ || (TI->get_node_n() >= TT::k_buf_lb &&
+							  TI->get_node_n() <= TT::k_buf_ub)) &&
+		TI->get_node_n() > 0 &&
+		parlay::is_sorted(TI->get_split_slice(),
+						  [&](TT::K a, TT::K b) { return TT::key_less(a, b); });
 
 	// check the box of each child node falls within the split between
 	parlay::sequence<typename TT::Box> box_seq(TI->get_node_n());
@@ -83,22 +85,25 @@ btree<TT>::verify_tree_property(Node const *T) const
 		}
 
 		if (i == 0) {
-			assert(box.second < TI->split[0]);
-			ok_seq[i] = ok_seq[i] && box.second < TI->split[0];
+			assert(TT::key_less(box.second, TI->split[0]));
+			ok_seq[i] = ok_seq[i] && TT::key_less(box.second, TI->split[0]);
 		} else if (i == static_cast<size_t>(TI->get_node_n()) - 1) {
-			assert(box.first >= TI->split[i - 1]);
-			ok_seq[i] = ok_seq[i] && box.first >= TI->split[i - 1];
+			assert(!TT::key_less(box.first, TI->split[i - 1]));
+			ok_seq[i] = ok_seq[i] && !TT::key_less(box.first, TI->split[i - 1]);
 		} else {
-			if (box.first < TI->split[i - 1] || box.second >= TI->split[i]) {
+			if (TT::key_less(box.first, TI->split[i - 1]) ||
+				!TT::key_less(box.second, TI->split[i])) {
 				std::cout << "validate: box outside split" << std::endl;
 				std::cout << "Box: [" << box.first << ", " << box.second
 						  << "], Splits: [" << TI->split[i - 1] << ", "
 						  << TI->split[i] << "]" << std::endl;
 				assert(false);
 			}
-			assert(box.first >= TI->split[i - 1] && box.second < TI->split[i]);
-			ok_seq[i] = ok_seq[i] && box.first >= TI->split[i - 1] &&
-						box.second < TI->split[i];
+			assert(!TT::key_less(box.first, TI->split[i - 1]) &&
+				   TT::key_less(box.second, TI->split[i]));
+			ok_seq[i] = ok_seq[i] &&
+						!TT::key_less(box.first, TI->split[i - 1]) &&
+						TT::key_less(box.second, TI->split[i]);
 		}
 	});
 
