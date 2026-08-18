@@ -1,9 +1,10 @@
 # Findings register — still open
 
-The findings from the 2026-08-17 review that the refactor did **not** close.
-25 of the original 89 library findings; the other 64 are fixed and were
-removed from this file. They are recoverable from `git log 376e067..HEAD`,
-which names each defect, and from this file's own history.
+26 open library findings: 3 high, 16 medium, 7 low. 23 of them are from the
+2026-08-17 review, 3 were found since. The review raised 89 library findings
+in all, so 66 are now fixed and were removed from this file; they are
+recoverable from `git log 376e067..HEAD`, which names each defect, and from
+this file's own history.
 
 `docs/open_issues.md` is the short, ranked version. This one carries the
 reviewer's full detail and suggested fix for each.
@@ -12,32 +13,22 @@ Paths are as reviewed (`include/pb_tree/`, old identifier names); the library
 is now `include/pab_tree/` with STL-style names, so line numbers predate the
 rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 
-## HIGH — 4
+## Closed since the last revision (2026-08-17)
 
-### BatchInsert/BatchDelete reject std::vector despite static_asserts promising any random-access range
-`include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:69 · api-usability
-**Status: batch ops still require a parlay range**
+| finding | closed by |
+|---|---|
+| batch ops reject `std::vector` (high) | `96aba15` — contiguous ranges borrowed, others materialised |
+| no `size`/`empty`/`swap`/`clear`, no iteration, no single-key ops (medium) | `fc51224` — the STL container interface |
+| no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
+| `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
+| no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| plus 8 more outside the library, listed in that section |  |
 
-`BatchInsert` opens with `static_assert(parlay::is_random_access_range_v<Range>)` and two more permissive checks, then the body does:
-```cpp
-parlay::slice<const E*, const E*> sorted_slice{ In.begin(), In.end() };
-```
-This silently requires the range's iterator to be a raw `const E*`. Verified: `t.BatchInsert(std::vector<E>)` fails with
-```
-b_batch_insert.hpp:69: error: no matching function for call to
-  'parlay::slice<const E*, const E*>::slice(<brace-enclosed initializer list>)'
-  note: no known conversion for argument 1 from '__gnu_cxx::__normal_iterator<E*, std::vector<E>>' to 'const E*'
-```
-while `t.Build(std::vector<E>)` and `t.BatchInsert(parlay::sequence<E>)` both compile fine. `Batch
+Three findings were **added**: an interior augmentation cannot read its
+children's augmentations (medium), the dead `std::monostate` clause (low), and
+the unreachable 3-argument interior allocator (low).
 
-*Suggested fix:* Materialise instead of reinterpreting. Replace lines 69-74 with:
-```cpp
-typename TT::EntrySeq sorted_seq;
-if (!sorted_input) { sorted_seq = parlay::sort(In); }
-else                { sorted_seq = parlay::to_sequence(In); }
-auto sorted_slice = parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
-```
-(the `sorted_input` branch costs one O(n) copy, which is what the pointer aliasing was avoidin
+## HIGH — 3
 
 ### Bogus DEBUG assertion aborts any sorted-input BatchInsert that splits the root
 `include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:86 · correctness
@@ -98,20 +89,6 @@ Every node allocation and deallocation names one concrete allocator, in eight pl
 *Suggested fix:* Add an allocator to the trait: `using NodeAlloc = NodeAllocType;` on `BTreeTypeTrait` defaulting to a `ParlayTypeAllocator` adaptor exposing `template<class T> static T* Alloc()` / `static void Free(T*)`, and route all eight sites through `TT::NodeAlloc`. Drop the unused `Range` parameter from `AllocEmptyLeafNode`, delete the `AllocInteriorNode<Interior,TT>()` overload. Add a README section statin
 
 ## MEDIUM — 16
-
-### No size()/empty()/swap()/clear(), no iteration, no single-key ops, and no documented extension contract
-`include/pab_tree/b_tree.h`:596 · api-usability
-**Status: no std-container conveniences**
-
-The container-shaped vocabulary an ordered-set user reaches for is entirely absent — `grep -nE '\b(begin|end|size|empty|swap|insert|erase|find|clear)\s*\(' include/pb_tree/b_tree.h` matches only the hash lambdas at lines 279-281 and 418-420. What exists instead is `GetSize()` (non-const, see the const-correctness finding), `DeleteTree()` as the de facto `clear()`, and `GetEntries(Range&)` as the only way to read contents — which requires the caller to pre-size a buffer from `GetSize()`, cannot be called on a `const` tree, and crashes on an empty one.
-
-Which absences are defensible: no `begin()/end()`, no `operator[]`, no `insert(k)`/`erase(k)`. This is a batch-parallel bulk structure; per-el
-
-*Suggested fix:* Add the four cheap members — `size_t size() const`, `bool empty() const`, `void clear() { DeleteTree(); }`, `void Swap(BTree&) noexcept` — keeping `GetSize`/`DeleteTree` as aliases so the benchmark harness is unaffected. Turn the augmentation contract into two concepts in `dependence/concepts.h` and constrain the class head:
-
-```cpp
-template<typename A, typename Slice>
-concept LeafAugmentation = r
 
 ### NodeType is a near-vestigial knob: Leaf and Interior are hardcoded
 `include/pab_tree/b_tree.h`:204 · extensibility
@@ -245,9 +222,13 @@ After the first swap, `node_out`/`key_out` alias the *caller's* `nodes`/`keys`, 
 
 *Suggested fix:* Replace all four inlined loops with the primitive, adding an offset-taking overload so the narrowing is preserved: `template<size_t base, typename Seq, typename F> size_t BinarySearchFrom(Seq const& I, size_t lo, F const& less)` in `binary_search.h`, then call `TI->GetSplitSlice()`-based `BinarySearchFrom<Interior::kBinarySearchBase>(split_slice, l, [&](K key){ return key < query_box.second; })` i
 
-### No RAII and no exception guarantee: a throwing allocation mid-insert leaves the tree double-freeable
+### No exception guarantee: a throwing allocation mid-insert leaves the tree double-freeable
 `include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:111 · standards
-**Status: no exception safety**
+**Status: reduced — the RAII half is done, exception safety is not**
+
+The tree itself is now RAII: copy/move constructor, copy/move assignment
+and destructor all exist, so a `btree` owns and releases its nodes. What
+remains is the guarantee *during* an operation, described below.
 
 Every node is a raw `Node*` from `parlay::type_allocator<...>::alloc()` + placement new, released only by explicit `FreeNode<T>` calls; there is no owning handle anywhere. The insert path frees before it has a replacement:
 ```cpp
@@ -264,6 +245,35 @@ SizeT rt_bkt_n = GenerateLeafNodes(...);   // allocates; may throw
 If `parlay::sort` or `GenerateLeafNodes` throws, `T` has already been retired while the parent's `tree
 
 *Suggested fix:* Two concrete steps. (1) Reorder so no node is freed before its replacement exists: in `HandlingLeafSplitOverflow` move `FreeNode<Leaf>(T)` to after the `GenerateLeafNodes` call, and likewise move `FreeNode<Interior>(T)` in `HandlingInteriorSplitOverflow` to after `GenerateInteriorNodes` returns. (2) State the guarantee in the class comment on `BTree` in `b_tree.h` — e.g. "no-throw element and augm
+
+### An interior augmentation cannot read its children's augmentations
+`include/pab_tree/dependence/node_base.h`:41 · api-usability
+**Status: open — found 2026-08-17 while writing self_test**
+
+`interior_aug::update(nodes, splits)` receives the children as `Node *`, and
+`proto_node` exposes only `is_leaf` and `size`. Reading a child's own
+augmentation needs the concrete `Leaf`/`Interior` types, which are members of
+`btree<TT>` and so are not nameable where the augmentation is defined — the
+trait takes the augmentation as a parameter, so the dependency is circular.
+
+Consequence: an interior augmentation can aggregate anything reachable from
+`proto_node` (subtree entry counts, child counts, the split keys), but the
+usual case — sum/min/max of the children's augmentations — is not expressible.
+`tests/self_test.cpp` uses `subtree_size_aug`, which sums `n->size`, precisely
+because that is what the signature allows.
+
+This is the residue of the review's "InteriorAug cannot be implemented at all".
+The refactor fixed the missing `update_aug` calls and passes real arguments, so
+an interior augmentation now works and stays current; what remains is that it
+cannot see below one level.
+
+*Suggested fix:* pass the children as a slice of a CRTP or tag type that
+exposes `get_aug()`, or template `update` on the child type so the aug can be
+written generically:
+```cpp
+template <typename Child, typename Splits>
+void update(parlay::slice<Child *const *, Child *const *> nodes, Splits const &);
+```
 
 ### Deleting a key that is not in the tree aborts in Debug builds; the precondition is undocumented
 `include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:140 · api-usability
@@ -316,7 +326,12 @@ The same program compiled `-O2 -D
 
 ### GetEntries returns unsorted output, has no size check, and its ordering contract is undocumented
 `include/pab_tree/b_tree_impl/utility.hpp`:22 · api-usability
-**Status: partly - guard added, ordering still undocumented**
+**Status: reduced — `to_seq()` added, `get_entries` still unchecked**
+
+`to_seq()` (fc51224) returns the entries in key order as a new sequence,
+which is the ordered, allocating accessor this asked for, and the README
+documents that `get_entries` is unordered. Still open: `get_entries(Out)`
+does not check `Out.size() >= size()`.
 
 `GetEntries(Range& Out)` calls `FlattenRec<TT::EntrySlice, false, /*sorted=*/false>` over `Out.begin() .. Out.begin() + root_->size`. With `sorted == false`, `ExtractPointsInLeaf` (leaf_op.hpp:51-62) copies each leaf verbatim, so any leaf with `is_sorted == false` contributes its entries in arbitrary order. It also silently assumes `Out.size() >= GetSize()` with no check (only a debug `assert(Out.size() >= TL->size)` per leaf, leaf_op.hpp:60), and dereferences a null root (see the null-root finding). The same applies to `RangeReport`'s output, whose order is 'sorted across leaves, arbitrary within an unsorted leaf'.
 
@@ -356,7 +371,7 @@ Six positional parameters, no defaults, no comments on the declaration, no docum
 
 *Suggested fix:* Give the declaration defaults and a doc comment: `template<typename EleType, uint kBufferSize = 64, typename LeafAugType = EmptyLeafAug, typename InteriorAugType = EmptyInteriorAug, uint_fast8_t kSkHeightVal = 8, typename NodeType = ProtoNode>`, so the common instantiation is `BTreeTypeTrait<MyEle>`. Rename `EleType` to `EntryAccessor` (or add `template<typename A> concept EntryAccessor = requires
 
-## LOW — 5
+## LOW — 7
 
 ### LeafSortPred contract is undocumented, inconsistent between insert and delete, and CLAUDE.md states it wrong
 `include/pab_tree/b_tree.h`:271 · docs
@@ -398,7 +413,11 @@ I traced the reachability and it is currently blocked: `BalanceOverLeaves` is ca
 
 ### GetEntries requires a caller-sized output and dereferences root_ unconditionally
 `include/pab_tree/b_tree_impl/utility.hpp`:24 · api-usability
-**Status: partly - guard added, sizing documented in README**
+**Status: reduced — null guard added, `to_seq()` is the allocating overload**
+
+The null guard is in (`utility.hpp`), and `to_seq()` is the
+`auto get_entries() const -> entry_seq` this suggested. Still open: the
+`Out.size()` precondition is documented but not checked.
 
 ```cpp
 // utility.hpp:19-25
@@ -414,6 +433,38 @@ void BTree<TT>::GetEntries(Range& Out)
 Two issues. First, `this->root_->size` is dereferenced with no null check, so `GetEntries` on a default-constructed tree segfaults (same family as the Contain/RangeCount/RangeReport finding). Second, the signature `void GetEntries(Range& Out)` gives no hint that `Out` must already have at least `GetSize()` elements — it takes a non-const reference, which reads like it will resize. It does not; it slices `Out.begin()` to `Out.begin() + size` and `Fl
 
 *Suggested fix:* Add the null guard (`if (this->root_ == nullptr) return;`) and either resize in the function (`Out.resize(this->GetSize());` before the slice, since `Range&` is already non-const) or, better, add an allocating overload `auto GetEntries() const -> typename TT::EntrySeq` and document the existing one as requiring `Out.size() >= GetSize()`. Also rename or document the `sorted` template argument, whic
+
+### `node_has_non_trivial_aug`'s `std::monostate` clause is dead
+`include/pab_tree/dependence/concepts.h`:15 · dead-code
+**Status: open — found 2026-08-17**
+
+```cpp
+template <typename T>
+concept node_has_non_trivial_aug =
+	(!std::is_empty_v<T>) && (!std::same_as<T, std::monostate>);
+```
+
+`std::monostate` is an empty type, so `!std::is_empty_v<T>` already rejects it
+and the second conjunct can never change the result. Nothing in the library
+uses `std::monostate` as an augmentation — the defaults are `empty_leaf_aug`
+and `empty_interior_aug` (`node_base.h`), both empty structs. The clause and
+the "don't use the monostate" half of the TODO at `tree_node.h`:178 are
+leftovers from an earlier design.
+
+*Suggested fix:* drop the clause and the `<variant>` include it needs.
+
+### The 3-argument interior allocator and constructor have no callers
+`include/pab_tree/dependence/tree_node.h`:371 · dead-code
+**Status: open — found 2026-08-17**
+
+`alloc_interior_node(nodes, split, aug)` and the matching
+`btree_interior_node(nodes, split, aug)` constructor take an explicit
+augmentation. All three allocation sites (`b_build_tree.hpp`:80,
+`node_op.hpp`:69, `node_op.hpp`:699) use the 2-argument form and then call
+`node->update_aug()`, so neither is reachable.
+
+Left in place deliberately: it is plausible API for someone constructing a
+node with a precomputed augmentation. Delete it if that never materialises.
 
 ### `uint` is not a standard C++ type but appears in BTreeTypeTrait's template parameter list
 `include/pab_tree/dependence/type_trait.h`:36 · standards
@@ -435,30 +486,22 @@ Because `kBufferSize` is a template *parame
 
 *Suggested fix:* Change both template parameter declarations to `std::uint32_t kBufferSize` and both factors to `static constexpr std::uint32_t kBufMDFac = 2;` / `kBufUBFac = 4;` (also making them `constexpr` rather than `const`, matching `kBuf`/`kBufLB`/`kBufMD`/`kBufUB` on lines 124-127). Add `#include <array>` to type_trait.h.
 
-## Outside the library — 23
+## Outside the library — 13
 
-Excluded from the review's scope; listed so nothing is lost.
+Excluded from the review's scope; listed so nothing is lost. 10 were closed
+by the refactor and the test work and have been removed; each was re-checked
+against the current tree first.
 
-- **[critical]** `CMakeLists.txt` — Library is not installable or findable: no install(), no export, no Config.cmake, no namespaced alias
-- **[critical]** `CMakeLists.txt` — All correctness checks are assert(), compiled out by -DNDEBUG in the default build
-- **[critical]** `tests/unit_test.cpp` — unit_test executes zero tree code: argv built from dangling c_str() of temporaries
 - **[high]** `.gitmodules` — `fast-cpp-csv-parser` submodule uses a `git@github.com:` SSH URL, breaking the README's own clone step
 - **[high]** `CMakeLists.txt` — Default configure fails without jemalloc: `option(JEMA "" ON)` + `pkg_check_modules(JEMALLOC REQUIRED)`
 - **[high]** `CMakeLists.txt` — CMakeLists mixes the library with the benchmark harness: 12 research drivers always built, no BUILD_TESTING/BUILD_BENCHMARKS
 - **[high]** `CMakeLists.txt` — No CI, no sanitizer or coverage configuration, and the strict .clang-tidy is never executed
-- **[high]** `README.md` — README has zero usage code, no API overview, and its one runnable command is broken
-- **[high]** `README.md` — README documents requirements and build, but nothing about actually using the library
 - **[high]** `tests/test_framework.h` — b_test's query path has its correctness comparison commented out, so the driver that actually runs validates nothing
-- **[high]** `tests/unit_test.cpp` — The only CTest test hardcodes `/ssd1/zmen002/kv_pair`, so `ctest` cannot pass on any other machine
-- **[high]** `tests/unit_test.cpp` — unit_test requires a hard-coded absolute dataset path and silently skips (reported as pass) without it
-- **[medium]** `CMakeLists.txt` — CMakeLists.txt sets -w, hiding real warnings including a -Wreorder in both LeafNode constructors
+- **[medium]** `tests/unit_test.cpp` — unit_test still needs `/ssd1/zmen002/kv_pair` and silently skips without it; `self_test` now supplies the data-free coverage, so a green `ctest` means something again
 - **[medium]** `CMakeLists.txt` — `-march=native` and forced CMAKE_BUILD_TYPE make the build non-portable and un-overridable
 - **[medium]** `CMakeLists.txt` — Configure step executes a python script that writes `.clangd` into the source tree from a hardcoded `build/` path
 - **[medium]** `CMakeLists.txt` — No release engineering: unused `VERSION 0.1`, no semver tag, no CHANGELOG, no version header
-- **[medium]** `README.md` — No documentation of the extension points anywhere: no API reference, no usage example
-- **[medium]** `README.md` — README has no API documentation at all — nothing describes how to instantiate BTreeTypeTrait or write an augmentation
 - **[medium]** `scripts/gen_graph.sh` — Benchmark scripts and drivers hardcode the author's data volumes; no configurable data root
 - **[medium]** `tests/test_framework.h` — No sanitizer, race-detector or fuzz configuration; the one memory-check build (-DMEMCHECK=ON) does not compile
-- **[medium]** `tests/unit_test.cpp` — No edge-case coverage: smallest tested input is 1e6; empty tree, single element, delete-everything, duplicates and small kBufferSize are untested
 - **[low]** `CMakeLists.txt` — Dead `CMAKE_MODULE_PATH` entry pointing at a nonexistent `cmake/` directory
 - **[low]** `tests/unit_test.cpp` — unit_test's only failure vehicle is EXPECT_NO_THROW, which cannot observe the failures the library produces
