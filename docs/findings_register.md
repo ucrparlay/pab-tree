@@ -1,7 +1,7 @@
 # Findings register — still open
 
-18 open library findings: 11 medium, 7 low. No high ones remain. 16 are from
-the 2026-08-17 review, 2 were found since.
+18 open library findings: 11 medium, 7 low. No high ones remain. 15 are from
+the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
 fixed -- `git log 376e067..HEAD` names each defect -- or reviewed and dropped
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| `NodeType` unconstrained, `EleAssignTag` dead (medium) | `node_base` concept; dead parameter removed |
 | no allocator customization point (high) | `NodeAllocType` trait parameter, codegen-identical |
 | key comparison hardcoded to `operator<` (high) | `KeyCompare` trait parameter, verified codegen-neutral |
 | no comparator customization point (medium) | same change; the two were one defect |
@@ -34,13 +35,30 @@ the unreachable 3-argument interior allocator (low).
 
 ## MEDIUM — 11
 
-### NodeType is a near-vestigial knob: Leaf and Interior are hardcoded
-`include/pab_tree/b_tree.h`:204 · extensibility
-**Status: partly - defaulted to proto_node, not removed**
+### The augmentation concepts are declared but never applied
+`include/pab_tree/dependence/concepts.h`:39,46 · extensibility
+**Status: open — found 2026-08-17 while constraining NodeType**
 
-`NodeType` is the sixth trait parameter and is bound to `pb_tree::ProtoNode` at every one of the six instantiation sites in the repo (`tests/b_test.cpp:59`, `unit_test.cpp:64`, `cpam.cpp:38`, `pma.cpp:40`, `stdset.cpp:31`, `tlxbtree.cpp:31`). What it actually controls is only the common base of the two node structs (`LeafNode : TypeTrait::Node`, `MultiWayNode : TypeTrait::Node`), and the base must expose a `(bool is_leaf, size_t size)` constructor plus public `is_leaf`/`size` fields, because `b_tree.h:224-257` (`NodeHasLeafChildren`, `GetNodeInvalidStatus`, `NodeContainInvalidSubtree`, `GetNodeReinsertSize`) and every `static_cast<Interior*>(T)` in the impl depend on exactly that shape. The
+`leaf_augmentation` and `interior_augmentation` have existed since the
+refactor and nothing references them. A concept that is never applied
+enforces nothing, so a malformed augmentation still fails deep inside a
+header rather than at the user's declaration.
 
-*Suggested fix:* Either drop the parameter and hardcode `ProtoNode` (documenting `Leaf`/`Interior` as fixed), or make it real: add `template<typename T> concept NodeBase = std::constructible_from<T, bool, size_t> && requires(T t){ {t.is_leaf} -> std::convertible_to<bool>; {t.size} -> std::convertible_to<size_t>; };` and constrain `NodeType` with it. Remove the unused `EleAssignTag` parameter from `LeafNode` or use
+They cannot be attached to the trait as written. Both are parameterised on a
+`Slice` type, and the library calls the leaf augmentation's constructor and
+`update_aug` with more than one range type — `entry_slice` at the two
+`update_aug` call sites, and whatever range `build` holds at the constructor.
+Pinning the concept to a single slice type would reject valid augmentations.
+
+Partly mitigated: `btree_type_trait` now `static_assert`s the requirements
+that do not depend on a range type — both augmentations default-constructible,
+and `interior_aug::force_parallel(size_t, size_t) -> bool`.
+
+*Suggested fix:* restate both concepts over a generic range
+(`template <typename A, typename R> concept leaf_augmentation = ... requires(A a, R r)`)
+and apply them at the call sites in `leaf_node::update_aug` and
+`btree_interior_node::update_aug`, where the range type is known, rather than
+on the trait.
 
 ### DefaultHybridPred's address hashing does not do what its comment claims, and leaf sort state leaks into RangeReport ordering
 `include/pab_tree/b_tree.h`:271 · api-usability

@@ -30,8 +30,7 @@ namespace pab_tree
 struct alloc_normal_leaf_tag {};
 struct alloc_empty_leaf_tag {};
 
-template <typename TypeTrait, typename EleAssignTag = parlay::copy_assign_tag>
-struct leaf_node : TypeTrait::Node {
+template <typename TypeTrait> struct leaf_node : TypeTrait::Node {
 	using TT = TypeTrait;
 	using Node = TT::Node;
 	using E = typename TT::E;
@@ -40,7 +39,6 @@ struct leaf_node : TypeTrait::Node {
 	using entry_seq = typename TT::entry_seq;
 	using entry_arr = typename TT::entry_arr;
 	using AT = typename TT::leaf_aug;
-	using ele_assign_tag_type = EleAssignTag;
 
 	static constexpr typename TT::buf_size_type k_binary_search_base =
 		static_cast<typename TT::buf_size_type>(

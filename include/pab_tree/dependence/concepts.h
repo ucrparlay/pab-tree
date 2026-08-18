@@ -2,6 +2,7 @@
 #define PABTREE_DEPENDENCE_CONCEPTS_H_
 
 #include <concepts>
+#include <cstddef>
 #include <type_traits>
 #include <variant>
 
@@ -13,6 +14,17 @@ namespace pab_tree
 template <typename T>
 concept node_has_non_trivial_aug =
 	(!std::is_empty_v<T>) && (!std::same_as<T, std::monostate>);
+
+// What the node base must provide. Both node types derive from it: the tree
+// reads is_leaf to pick the downcast and size to answer range queries without
+// descending, and rebalancing writes size.
+template <typename T>
+concept node_base =
+	std::constructible_from<T, bool, size_t> && requires(T t, size_t n) {
+		{ t.is_leaf } -> std::convertible_to<bool>;
+		{ t.size } -> std::convertible_to<size_t>;
+		t.size = n;
+	};
 
 // Tags a pab_tree so generic test code can detect one.
 template <typename T>

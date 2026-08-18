@@ -226,6 +226,42 @@ using tt = pab_tree::btree_type_trait<my_ele, 64,
 The contracts are concepts in `dependence/concepts.h`, so a type that does not
 satisfy one fails at your declaration naming the missing requirement.
 
+## Node base
+
+`btree_type_trait`'s fifth parameter is the common base of both node types,
+defaulting to `pab_tree::proto_node`. It is constrained by the `node_base`
+concept, so a type that will not work is rejected at your declaration rather
+than deep inside a header:
+
+```cpp
+template <typename T>
+concept node_base =
+        std::constructible_from<T, bool, size_t> && requires(T t, size_t n) {
+                { t.is_leaf } -> std::convertible_to<bool>;
+                { t.size }    -> std::convertible_to<size_t>;
+                t.size = n;
+        };
+```
+
+`is_leaf` picks the downcast between leaf and interior; `size` is the subtree
+entry count, which the range queries read without descending and which
+rebalancing writes. Carry extra fields if you want them — they are present on
+every node the tree builds:
+
+```cpp
+struct tagged_node {
+        tagged_node() : is_leaf(false), size(0), tag(0) {}
+        tagged_node(bool l, size_t s) : is_leaf(l), size(s), tag(0xAB) {}
+        bool is_leaf;
+        size_t size;
+        unsigned tag;          // yours
+};
+```
+
+A plain aggregate works too — C++20 parenthesized aggregate initialization
+means `struct { bool is_leaf; size_t size; };` is constructible from
+`(bool, size_t)` with no constructor written.
+
 ## Node allocation
 
 `btree_type_trait`'s seventh parameter is the node allocator, defaulting to

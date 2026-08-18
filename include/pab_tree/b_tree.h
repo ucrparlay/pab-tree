@@ -198,7 +198,7 @@ public:
 		size_type reinsert_size;
 	};
 
-	using Leaf = leaf_node<TT, parlay::move_assign_tag>;
+	using Leaf = leaf_node<TT>;
 	using Interior = btree_interior_node;
 
 	// ---- public API ----

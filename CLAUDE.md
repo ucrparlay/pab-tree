@@ -298,6 +298,55 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## Node base is a real extension point now (2026-08-17)
+
+`NodeType` was the one trait parameter with no constraint, so a wrong type
+failed somewhere inside a header instead of at the user's declaration. It is
+now `node_base NodeType = proto_node`:
+
+```cpp
+template <typename T>
+concept node_base =
+	std::constructible_from<T, bool, size_t> && requires(T t, size_t n) {
+		{ t.is_leaf } -> std::convertible_to<bool>;
+		{ t.size } -> std::convertible_to<size_t>;
+		t.size = n;
+	};
+```
+
+`t.size = n` is in there because rebalancing writes `size` (`leaf_op.hpp:164`,
+`node_op.hpp:99,141,255,390,518,565`); a `const size_t size` compiles as a
+member but breaks the tree.
+
+**A plain aggregate satisfies it.** C++20 parenthesized aggregate
+initialization (P0960) makes `struct { bool is_leaf; size_t size; };`
+constructible from `(bool, size_t)` with no constructor written — verified, it
+builds and validates. A test case written expecting it to be *rejected* was
+wrong, not the concept.
+
+### `EleAssignTag` was dead and is gone
+
+`leaf_node`'s second template parameter, aliased to `ele_assign_tag_type` and
+**never read**. `b_tree.h` passed `parlay::move_assign_tag` for it. Removed;
+`Leaf` is now `leaf_node<TT>`.
+
+### The augmentation concepts were declared and never applied
+
+`leaf_augmentation` and `interior_augmentation` have existed in `concepts.h`
+since the refactor and **nothing used them** — a concept that is never applied
+enforces nothing. They cannot simply be attached to the trait, because they
+are parameterised on a `Slice` type and the library calls `update_aug`/the
+augmentation constructor with more than one range type; pinning them to one
+would reject valid augmentations.
+
+What went in instead: the trait now `static_assert`s the parts that do not
+depend on a range type — both augmentations default-constructible, and
+`interior_aug::force_parallel(size_t, size_t) -> bool`. The range-dependent
+half is still unenforced and is recorded as a finding.
+
+Compile-time only: instruction count 55465 before and after, no mnemonic count
+changed.
+
 ## Node allocator (added 2026-08-17)
 
 `btree_type_trait`'s seventh parameter, `NodeAllocType = parlay_node_alloc`

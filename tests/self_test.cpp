@@ -521,6 +521,97 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 } // namespace
 
+// ---- a custom node base ----
+
+// Same shape proto_node has, plus a field of its own. node_base is what
+// the tree requires: constructible from (bool, size_t), with public
+// is_leaf and a writable size.
+struct tagged_node {
+	tagged_node()
+		: is_leaf(false)
+		, size(0)
+		, tag(0)
+	{
+	}
+
+	tagged_node(bool l, size_t s)
+		: is_leaf(l)
+		, size(s)
+		, tag(0xAB)
+	{
+	}
+
+	bool is_leaf;
+	size_t size;
+	unsigned tag;
+};
+
+// An aggregate qualifies too: C++20 parenthesized aggregate init (P0960)
+// makes this constructible from (bool, size_t) without a constructor.
+struct aggregate_node {
+	bool is_leaf = false;
+	size_t size = 0;
+};
+
+static_assert(pab_tree::node_base<pab_tree::proto_node>);
+static_assert(pab_tree::node_base<tagged_node>);
+static_assert(pab_tree::node_base<aggregate_node>);
+
+// And the ones the tree could not work with are rejected.
+struct no_size {
+	no_size(bool l, size_t)
+		: is_leaf(l)
+	{
+	}
+	bool is_leaf;
+};
+struct const_size {
+	const_size(bool l, size_t s)
+		: is_leaf(l)
+		, size(s)
+	{
+	}
+	bool is_leaf;
+	size_t const size;
+};
+static_assert(!pab_tree::node_base<no_size>);
+static_assert(!pab_tree::node_base<const_size>);
+
+TEST(SelfTest, CustomNodeBase)
+{
+	using tt =
+		pab_tree::btree_type_trait<ele, 32, pab_tree::empty_leaf_aug,
+								   pab_tree::empty_interior_aug, tagged_node>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0xb45eULL;
+	auto const keys = gen_keys(20000, dist::uniform, seed);
+	auto const all = to_entries(keys);
+	std::vector<entry> base(all.begin(), all.begin() + all.size() / 2);
+	std::vector<entry> rest(all.begin() + all.size() / 2, all.end());
+
+	oracle ref;
+	tree t;
+	t.build(base);
+	add_to_oracle(ref, base);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	t.batch_insert(rest);
+	add_to_oracle(ref, rest);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	// The custom field survives on every node the tree built.
+	ASSERT_NE(t.get_root(), nullptr);
+	ASSERT_EQ(t.get_root()->tag, 0xABu) << "custom node field lost";
+
+	std::vector<uint32_t> half(keys.begin(), keys.begin() + keys.size() / 2);
+	std::sort(half.begin(), half.end());
+	t.batch_delete(half);
+	for (auto k : half)
+		ref.erase(k);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+}
+
 // ---- a custom node allocator is used for every node ----
 
 // Counts allocations and frees. Also a leak check: the tree must return
