@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
+#include <atomic>
 #include <functional>
 #include <map>
 #include <numeric>
@@ -519,6 +520,77 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 }
 
 } // namespace
+
+// ---- a custom node allocator is used for every node ----
+
+// Counts allocations and frees. Also a leak check: the tree must return
+// every node it took by the time it is destroyed.
+struct counting_alloc {
+	static inline std::atomic<long> live{ 0 };
+	static inline std::atomic<long> total{ 0 };
+
+	template <typename T> static T *alloc()
+	{
+		live.fetch_add(1, std::memory_order_relaxed);
+		total.fetch_add(1, std::memory_order_relaxed);
+		return parlay::type_allocator<T>::alloc();
+	}
+
+	template <typename T> static void free(T *p)
+	{
+		live.fetch_sub(1, std::memory_order_relaxed);
+		parlay::type_allocator<T>::retire(p);
+	}
+};
+
+TEST(SelfTest, CustomAllocator)
+{
+	using tt = pab_tree::btree_type_trait<
+		ele, 16, pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
+		pab_tree::proto_node, std::less<uint32_t>, counting_alloc>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0xa110cULL;
+	SCOPED_TRACE("custom allocator seed=" + std::to_string(seed));
+
+	counting_alloc::live = 0;
+	counting_alloc::total = 0;
+
+	auto const keys = gen_keys(20000, dist::uniform, seed);
+	auto const all = to_entries(keys);
+	std::vector<entry> base(all.begin(), all.begin() + all.size() / 2);
+	std::vector<entry> rest(all.begin() + all.size() / 2, all.end());
+
+	{
+		tree t;
+		t.build(base);
+		ASSERT_GT(counting_alloc::total.load(), 0)
+			<< "the custom allocator was never called";
+		ASSERT_GT(counting_alloc::live.load(), 0);
+
+		t.batch_insert(rest);
+		bool ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok);
+		ASSERT_EQ(t.size(), keys.size());
+
+		// A tree of n entries with leaf size 16 holds at least n/k_buf_ub
+		// leaves, so the count has to be in a sane range.
+		ASSERT_GE(counting_alloc::live.load(),
+				  static_cast<long>(keys.size() / (4 * 16)));
+
+		std::vector<uint32_t> half(keys.begin(),
+								   keys.begin() + keys.size() / 2);
+		std::sort(half.begin(), half.end());
+		t.batch_delete(half);
+		ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok);
+	}
+
+	// The tree is gone; every node it took must have come back.
+	EXPECT_EQ(counting_alloc::live.load(), 0)
+		<< "leaked " << counting_alloc::live.load() << " nodes of "
+		<< counting_alloc::total.load();
+}
 
 // ---- a custom key comparator orders the whole tree ----
 

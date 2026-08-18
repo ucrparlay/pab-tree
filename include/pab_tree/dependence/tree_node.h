@@ -198,24 +198,24 @@ struct leaf_node : TypeTrait::Node {
 template <typename Range, typename Leaf>
 static Leaf *alloc_normal_leaf_node(Range In)
 {
-	Leaf *o = parlay::type_allocator<Leaf>::alloc();
+	Leaf *o = Leaf::TT::node_alloc::template alloc<Leaf>();
 	new (o) Leaf(In, alloc_normal_leaf_tag());
 	return o;
 }
 
 // Alloc a empty Leaf
-template <typename Range, typename Leaf> static Leaf *alloc_empty_leaf_node()
+template <typename Leaf> static Leaf *alloc_empty_leaf_node()
 {
-	Leaf *o = parlay::type_allocator<Leaf>::alloc();
+	Leaf *o = Leaf::TT::node_alloc::template alloc<Leaf>();
 	new (o) Leaf();
 	return o;
 }
 
 // Alloc a empty Leaf, but set the aug by hand
-template <typename Range, typename Leaf>
+template <typename Leaf>
 static Leaf *alloc_empty_leaf_node(typename Leaf::AT const &aug)
 {
-	Leaf *o = parlay::type_allocator<Leaf>::alloc();
+	Leaf *o = Leaf::TT::node_alloc::template alloc<Leaf>();
 	new (o) Leaf(aug);
 	return o;
 }
@@ -367,7 +367,7 @@ template <typename Interior, typename TT>
 static Interior *alloc_interior_node(typename TT::node_seq const &tree_nodes,
 									 typename TT::split_seq const &split)
 {
-	Interior *o = parlay::type_allocator<Interior>::alloc();
+	Interior *o = Interior::TT::node_alloc::template alloc<Interior>();
 	new (o) Interior(tree_nodes, split);
 	return o;
 }
@@ -376,7 +376,7 @@ template <typename Interior, typename TT>
 static Interior *alloc_interior_node(typename TT::node_slice tree_nodes_slice,
 									 typename TT::split_slice split_slice)
 {
-	Interior *o = parlay::type_allocator<Interior>::alloc();
+	Interior *o = Interior::TT::node_alloc::template alloc<Interior>();
 	new (o) Interior(tree_nodes_slice, split_slice);
 	return o;
 }
@@ -387,21 +387,22 @@ static Interior *alloc_interior_node(typename TT::node_slice const &tree_nodes,
 									 typename TT::split_seq const &split,
 									 typename TT::interior_aug const &aug)
 {
-	Interior *o = parlay::type_allocator<Interior>::alloc();
+	Interior *o = Interior::TT::node_alloc::template alloc<Interior>();
 	new (o) Interior(tree_nodes, split, aug);
 	return o;
 }
 
 template <typename Interior, typename TT> static Interior *alloc_interior_node()
 {
-	Interior *o = parlay::type_allocator<Interior>::alloc();
+	Interior *o = Interior::TT::node_alloc::template alloc<Interior>();
 	new (o) Interior();
 	return o;
 }
 
 template <typename NodeType> static void free_node(auto T)
 {
-	parlay::type_allocator<NodeType>::retire(static_cast<NodeType *>(T));
+	NodeType::TT::node_alloc::template free<NodeType>(
+		static_cast<NodeType *>(T));
 }
 
 } // namespace pab_tree

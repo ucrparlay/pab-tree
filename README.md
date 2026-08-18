@@ -226,6 +226,39 @@ using tt = pab_tree::btree_type_trait<my_ele, 64,
 The contracts are concepts in `dependence/concepts.h`, so a type that does not
 satisfy one fails at your declaration naming the missing requirement.
 
+## Node allocation
+
+`btree_type_trait`'s seventh parameter is the node allocator, defaulting to
+`pab_tree::parlay_node_alloc`, which is `parlay::type_allocator` — a pool.
+Every node the tree takes or releases goes through it; nothing names an
+allocator directly.
+
+```cpp
+struct my_node_alloc {
+        template <typename T> static T *alloc();       // raw storage
+        template <typename T> static void free(T *p);  // after the dtor
+};
+
+using tt = pab_tree::btree_type_trait<
+        my_ele, 64,
+        pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
+        pab_tree::proto_node, std::less<uint64_t>,
+        my_node_alloc>;
+```
+
+`alloc<T>` returns raw storage of the right size and alignment for `T`; the
+tree placement-news into it. `free<T>` is called after the destructor has run.
+Both must be callable from several threads at once, since the batch operations
+build nodes in parallel. Keep it pooled: the tree allocates one node per leaf
+and per interior, so a general-purpose allocator is visible immediately.
+
+The indirection is free. Against the default the generated code is identical —
+same instruction count, same instruction mix.
+
+**The tree owns every node it allocates.** `get_root()` hands back a
+non-owning observer; ownership ends at `clear()`/`delete_tree()` or the
+destructor, which release every node through the same allocator.
+
 ## Tests
 
 Two suites. Both are built with `-UNDEBUG`, so the library's internal asserts

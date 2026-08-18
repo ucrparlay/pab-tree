@@ -1,10 +1,11 @@
 # Findings register — still open
 
-24 open library findings: 2 high, 15 medium, 7 low. 21 of them are from the
-2026-08-17 review, 3 were found since. The review raised 89 library findings
-in all, so 68 are now fixed and were removed from this file; they are
-recoverable from `git log 376e067..HEAD`, which names each defect, and from
-this file's own history.
+18 open library findings: 11 medium, 7 low. No high ones remain. 16 are from
+the 2026-08-17 review, 2 were found since.
+
+The review raised 89 library findings. The 73 not listed here were either
+fixed -- `git log 376e067..HEAD` names each defect -- or reviewed and dropped
+as not worth doing. This file's own history distinguishes the two.
 
 `docs/open_issues.md` is the short, ranked version. This one carries the
 reviewer's full detail and suggested fix for each.
@@ -22,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| no allocator customization point (high) | `NodeAllocType` trait parameter, codegen-identical |
 | key comparison hardcoded to `operator<` (high) | `KeyCompare` trait parameter, verified codegen-neutral |
 | no comparator customization point (medium) | same change; the two were one defect |
 | plus 8 more outside the library, listed in that section |  |
@@ -30,50 +32,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## HIGH — 2
-
-### Bogus DEBUG assertion aborts any sorted-input BatchInsert that splits the root
-`include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:86 · correctness
-**Status: KEPT by your decision; correct check added beside it**
-
-```cpp
-#ifdef DEBUG
-  assert(!sorted_input || new_node_n == 0);
-#endif // DEBUG
-```
-This asserts that when the caller says the input is already sorted, the root never splits. There is no such relationship — `new_node_n > 0` means the root overflowed, which depends only on batch size, not on whether the caller pre-sorted. Confirmed: kBufferSize=32, a 200-entry tree, then `BatchInsert(b, kSorted, /*sorted_input=*/true)` with 200 000 sorted entries, compiled `-DDEBUG`:
-```
-Assertion `!sorted_input || new_node_n == 0' failed.
-```
-The same call with `sorted_input=false` succeeds. The `-DDEBUG` build is what `CMakeLists.txt:85-87` produces with `-DDEBUG=ON`.
-
-*Suggested fix:* Delete the assertion. If the intent was to check that pre-sorted input really is sorted, replace it with the check that actually says that, placed before the descent:
-```cpp
-assert(!sorted_input || parlay::is_sorted(sorted_slice,
-         [](E const& a, E const& b){ return Entry::GetKey(a) < Entry::GetKey(b); }));
-```
-and add a sorted-input case to `tests/unit_test.cpp`.
-
-### No allocator customization point: parlay::type_allocator is hard-coded, and Node* ownership is documented nowhere
-`include/pab_tree/dependence/tree_node.h`:229 · extensibility
-**Status: deferred (4.8) - a feature, not debt**
-
-Every node allocation and deallocation names one concrete allocator, in eight places in tree_node.h with no indirection:
-
-```cpp
-  Leaf* o = parlay::type_allocator<Leaf>::alloc();   // 229, 239, 249
-  new (o) Leaf(In, AllocNormalLeafTag());
-  ...
-  Interior* o = parlay::type_allocator<Interior>::alloc();  // 400, 410, 422, 431
-  ...
-  parlay::type_allocator<NodeType>::retire(static_cast<NodeType*>(T));  // 440
-```
-
-`BTreeTypeTrait` (type_trait.h:86-148) parameterises the element type, leaf size, two augmentation types, skeleton height and node base type — but not the allocator. There is no `Alloc` template parameter, no `TT::NodeAllocator` alias, and no allocator hook on `BTree`. A user want
-
-*Suggested fix:* Add an allocator to the trait: `using NodeAlloc = NodeAllocType;` on `BTreeTypeTrait` defaulting to a `ParlayTypeAllocator` adaptor exposing `template<class T> static T* Alloc()` / `static void Free(T*)`, and route all eight sites through `TT::NodeAlloc`. Drop the unused `Range` parameter from `AllocEmptyLeafNode`, delete the `AllocInteriorNode<Interior,TT>()` overload. Add a README section statin
-
-## MEDIUM — 15
+## MEDIUM — 11
 
 ### NodeType is a near-vestigial knob: Leaf and Interior are hardcoded
 `include/pab_tree/b_tree.h`:204 · extensibility
@@ -124,16 +83,6 @@ return ((static_cast<size_t>(T->size) + In.size()) * 2654435761ULL) & 1;
 
 (The address XOR was there to decorrelate call sites; a second multiply-shift round on the size sum achieves that without nondeterminism.) Then add a regression test that runs the same batch sequence tw
 
-### DEBUG is an unprefixed configuration macro that changes template bodies — ODR hazard and a stdout-printing surprise
-`include/pab_tree/b_tree_impl/batch_op/b_batch_delete.hpp`:111 · standards
-**Status: PABTREE_DEBUG rename planned, not done**
-
-The library reads exactly one user-settable macro, `DEBUG`, at five sites (b_batch_delete.hpp:111,174; b_batch_insert.hpp:85,143; node_op.hpp:140,464,609), and all of them sit inside the bodies of `BTree<TT>` member templates. Two consequences.
-
-**ODR.** Because these are templates in a header-only library, TU A compiled with `-DDEBUG` and TU B without it emit *different definitions of the same entity*. The linker keeps one arbitrarily. Nothing warns. CMakeLists.txt:97 makes this easy to hit: `if(DEBUG) add_compile_options(-g -march=native -DDEBUG)` applies to the whole project, so a mixed build (this library in a DEBUG consumer linked against a Release-built one) silently gets whichever bod
-
-*Suggested fix:* Rename the macro to a namespaced one — `PBTREE_DEBUG_CHECKS` — at all seven sites and in CMakeLists.txt:97 (`add_compile_options(-DPBTREE_DEBUG_CHECKS)`). Remove the `puts(">>> pass tree aug after delete")` entirely, or route it through a caller-supplied logger. Document `PBTREE_DEBUG_CHECKS` in README.md, stating explicitly that all TUs linked together must agree on it. Note that `SIEVE`, `MEMCHE
-
 ### No reusable traversal skeleton: every batch op re-implements partition-recurse-reassemble
 `include/pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp`:127 · extensibility
 **Status: structural**
@@ -164,22 +113,6 @@ NodeSplitPairSeq node_split_seq =
 
 *Suggested fix:* Bound the scratch by what can actually be produced rather than by input size. The number of nodes any subtree can hand back is `(subtree_size + batch_size) / kBufMD + 1`; sizing `node_split_seq` as `2 * min(n, root_->size / TT::kBufMD + n / TT::kBufMD + 2)` covers every split path while collapsing the common case. If that analysis is not worth doing, at least document the `32*n` bytes of scratch i
 
-### AssembleInteriorLevels silently overwrites the caller's nodes/keys buffers
-`include/pab_tree/b_tree_impl/batch_op/b_build_tree.hpp`:43 · extensibility
-**Status: open**
-
-`AssembleInteriorLevels(TT::NodeSlice nodes, TT::SplitSlice keys)` allocates one auxiliary buffer pair and then ping-pongs:
-```cpp
-auto swap_key_node = [&](SizeT bkt_n) {
-  key_in  = key_in.cut(0, bkt_n - 1);   key_out = key_out.cut(0, bkt_n - 1);
-  node_in = node_in.cut(0, bkt_n);      node_out = node_out.cut(0, bkt_n);
-  std::ranges::swap(key_in, key_out);   std::ranges::swap(node_in, node_out);
-};
-```
-After the first swap, `node_out`/`key_out` alias the *caller's* `nodes`/`keys`, so from the second iteration onward the function writes over its own input. Both current callers happen to pass throwaway scratch (`node_seq`/`key_seq` in `BuildRecursive`, `parlay::tabulate` results in `BatchIns
-
-*Suggested fix:* Either document and rename to make ownership explicit — `Node* AssembleInteriorLevelsInPlace(TT::NodeSlice scratch_nodes, TT::SplitSlice scratch_keys)` with a comment stating both slices are clobbered — or take ownership by value: `Node* AssembleInteriorLevels(TT::NodeSeq nodes, TT::SplitSeq keys)` and have the two callers `std::move` their sequences in. The second is cheaper to reason about and c
-
 ### The branchless binary search is hand-inlined four times with a hardcoded base of 8
 `include/pab_tree/b_tree_impl/query_op/range_report.hpp`:98 · standards
 **Status: open**
@@ -187,59 +120,6 @@ After the first swap, `node_out`/`key_out` alias the *caller's* `nodes`/`keys`, 
 `BinarySearch<_binary_search_base>` (binary_search.h:41-76) exists precisely as the shared primitive, and the node types expose a tuned `kBinarySearchBase` derived from `std::hardware_constructive_interference_size` (tree_node.h:57-64 and :276-283). Yet the right-boundary search is copy-pasted inline four times with a literal cutoff: `while (hi - lo > 8)` at range_report.hpp:98 (interior splits) and :46 (leaf entries), and range_count.hpp:79 and :34. The bodies are identical modulo the accessor. The hardcoded 8 also throws away the cache-line tuning the rest of the library goes to some trouble to compute (for `kBuf=64` with 8-byte entries the leaf base is 8, but for 16-byte entries it is 4).
 
 *Suggested fix:* Replace all four inlined loops with the primitive, adding an offset-taking overload so the narrowing is preserved: `template<size_t base, typename Seq, typename F> size_t BinarySearchFrom(Seq const& I, size_t lo, F const& less)` in `binary_search.h`, then call `TI->GetSplitSlice()`-based `BinarySearchFrom<Interior::kBinarySearchBase>(split_slice, l, [&](K key){ return key < query_box.second; })` i
-
-### No exception guarantee: a throwing allocation mid-insert leaves the tree double-freeable
-`include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:111 · standards
-**Status: reduced — the RAII half is done, exception safety is not**
-
-The tree itself is now RAII: copy/move constructor, copy/move assignment
-and destructor all exist, so a `btree` owns and releases its nodes. What
-remains is the guarantee *during* an operation, described below.
-
-Every node is a raw `Node*` from `parlay::type_allocator<...>::alloc()` + placement new, released only by explicit `FreeNode<T>` calls; there is no owning handle anywhere. The insert path frees before it has a replacement:
-```cpp
-if (TL->is_sorted) {
-  std::ranges::merge(..., entry_seq.begin(), ...);
-  FreeNode<Leaf>(T);                       // line 111 — parent still points at T
-} else {
-  ...
-  FreeNode<Leaf>(T);                       // line 116
-  entry_seq = parlay::sort(entry_seq);     // may throw std::bad_alloc
-}
-SizeT rt_bkt_n = GenerateLeafNodes(...);   // allocates; may throw
-```
-If `parlay::sort` or `GenerateLeafNodes` throws, `T` has already been retired while the parent's `tree
-
-*Suggested fix:* Two concrete steps. (1) Reorder so no node is freed before its replacement exists: in `HandlingLeafSplitOverflow` move `FreeNode<Leaf>(T)` to after the `GenerateLeafNodes` call, and likewise move `FreeNode<Interior>(T)` in `HandlingInteriorSplitOverflow` to after `GenerateInteriorNodes` returns. (2) State the guarantee in the class comment on `BTree` in `b_tree.h` — e.g. "no-throw element and augm
-
-### An interior augmentation cannot read its children's augmentations
-`include/pab_tree/dependence/node_base.h`:41 · api-usability
-**Status: open — found 2026-08-17 while writing self_test**
-
-`interior_aug::update(nodes, splits)` receives the children as `Node *`, and
-`proto_node` exposes only `is_leaf` and `size`. Reading a child's own
-augmentation needs the concrete `Leaf`/`Interior` types, which are members of
-`btree<TT>` and so are not nameable where the augmentation is defined — the
-trait takes the augmentation as a parameter, so the dependency is circular.
-
-Consequence: an interior augmentation can aggregate anything reachable from
-`proto_node` (subtree entry counts, child counts, the split keys), but the
-usual case — sum/min/max of the children's augmentations — is not expressible.
-`tests/self_test.cpp` uses `subtree_size_aug`, which sums `n->size`, precisely
-because that is what the signature allows.
-
-This is the residue of the review's "InteriorAug cannot be implemented at all".
-The refactor fixed the missing `update_aug` calls and passes real arguments, so
-an interior augmentation now works and stays current; what remains is that it
-cannot see below one level.
-
-*Suggested fix:* pass the children as a slice of a CRTP or tag type that
-exposes `get_aug()`, or template `update` on the child type so the aug can be
-written generically:
-```cpp
-template <typename Child, typename Splits>
-void update(parlay::slice<Child *const *, Child *const *> nodes, Splits const &);
-```
 
 ### Deleting a key that is not in the tree aborts in Debug builds; the precondition is undocumented
 `include/pab_tree/b_tree_impl/tree_op/leaf_op.hpp`:140 · api-usability
@@ -452,22 +332,3 @@ Because `kBufferSize` is a template *parame
 
 *Suggested fix:* Change both template parameter declarations to `std::uint32_t kBufferSize` and both factors to `static constexpr std::uint32_t kBufMDFac = 2;` / `kBufUBFac = 4;` (also making them `constexpr` rather than `const`, matching `kBuf`/`kBufLB`/`kBufMD`/`kBufUB` on lines 124-127). Add `#include <array>` to type_trait.h.
 
-## Outside the library — 13
-
-Excluded from the review's scope; listed so nothing is lost. 10 were closed
-by the refactor and the test work and have been removed; each was re-checked
-against the current tree first.
-
-- **[high]** `.gitmodules` — `fast-cpp-csv-parser` submodule uses a `git@github.com:` SSH URL, breaking the README's own clone step
-- **[high]** `CMakeLists.txt` — Default configure fails without jemalloc: `option(JEMA "" ON)` + `pkg_check_modules(JEMALLOC REQUIRED)`
-- **[high]** `CMakeLists.txt` — CMakeLists mixes the library with the benchmark harness: 12 research drivers always built, no BUILD_TESTING/BUILD_BENCHMARKS
-- **[high]** `CMakeLists.txt` — No CI, no sanitizer or coverage configuration, and the strict .clang-tidy is never executed
-- **[high]** `tests/test_framework.h` — b_test's query path has its correctness comparison commented out, so the driver that actually runs validates nothing
-- **[medium]** `tests/unit_test.cpp` — unit_test still needs `/ssd1/zmen002/kv_pair` and silently skips without it; `self_test` now supplies the data-free coverage, so a green `ctest` means something again
-- **[medium]** `CMakeLists.txt` — `-march=native` and forced CMAKE_BUILD_TYPE make the build non-portable and un-overridable
-- **[medium]** `CMakeLists.txt` — Configure step executes a python script that writes `.clangd` into the source tree from a hardcoded `build/` path
-- **[medium]** `CMakeLists.txt` — No release engineering: unused `VERSION 0.1`, no semver tag, no CHANGELOG, no version header
-- **[medium]** `scripts/gen_graph.sh` — Benchmark scripts and drivers hardcode the author's data volumes; no configurable data root
-- **[medium]** `tests/test_framework.h` — No sanitizer, race-detector or fuzz configuration; the one memory-check build (-DMEMCHECK=ON) does not compile
-- **[low]** `CMakeLists.txt` — Dead `CMAKE_MODULE_PATH` entry pointing at a nonexistent `cmake/` directory
-- **[low]** `tests/unit_test.cpp` — unit_test's only failure vehicle is EXPECT_NO_THROW, which cannot observe the failures the library produces

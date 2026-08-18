@@ -87,7 +87,7 @@ template <typename Range>
 TT::Node *btree<TT>::build_recursive(Range In)
 {
 	if (In.size() == 0) {
-		return alloc_empty_leaf_node<Range, Leaf>();
+		return alloc_empty_leaf_node<Leaf>();
 	}
 
 	if (In.size() < TT::k_buf_ub) {

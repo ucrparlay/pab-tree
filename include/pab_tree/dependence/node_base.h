@@ -3,8 +3,26 @@
 
 #include <cstddef>
 
+#include <parlay/alloc.h>
+
 namespace pab_tree
 {
+
+// How nodes are obtained and released. alloc returns raw storage; the
+// caller placement-news into it, and free is called after the destructor.
+// A pool is what makes this fast -- the tree allocates one node per leaf
+// and per interior, so a general-purpose allocator shows up immediately.
+struct parlay_node_alloc {
+	template <typename T> static T *alloc()
+	{
+		return parlay::type_allocator<T>::alloc();
+	}
+
+	template <typename T> static void free(T *p)
+	{
+		parlay::type_allocator<T>::retire(p);
+	}
+};
 
 // Base of every node. is_leaf selects the downcast; size is the subtree entry
 // count, which the range queries read without descending.

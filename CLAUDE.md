@@ -298,6 +298,48 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## Node allocator (added 2026-08-17)
+
+`btree_type_trait`'s seventh parameter, `NodeAllocType = parlay_node_alloc`
+(`node_base.h`), which wraps `parlay::type_allocator`. All **8** allocation
+sites in `tree_node.h` route through `TT::node_alloc`; nothing in the library
+names `parlay::type_allocator` except that one adaptor.
+
+```cpp
+Leaf *o = Leaf::TT::node_alloc::template alloc<Leaf>();
+NodeType::TT::node_alloc::template free<NodeType>(static_cast<NodeType *>(T));
+```
+
+**No signature changed.** The alloc helpers are templated on `Leaf`/`Interior`
+rather than on `TT`, but both node types expose `::TT` (`leaf_node` and
+`multi_way_node` each declare `using TT = TypeTrait;`), so the allocator is
+reachable from the node type alone. `free_node<NodeType>` likewise — every
+call site already names `Leaf` or `Interior`.
+
+Also dropped the unused `Range` template parameter from
+`alloc_empty_leaf_node`, which the finding called out. One call site.
+
+### Zero cost, and this one is provable
+
+Stronger than the comparator result: **no mnemonic count changed at all**, and
+total instructions are 55465 before and after. The `.text` bytes differ only
+because the mangled names got longer (`NS_17parlay_node_allocE`); every
+non-symbol diff line is the same instruction on both sides, shifted. No timing
+run was needed.
+
+### `SelfTest.CustomAllocator` is also a leak check
+
+It instantiates with a `counting_alloc` that tracks live and total nodes, then
+asserts `live == 0` once the tree is destroyed. That catches both a bypassed
+allocation site and a node the tree forgets to release.
+
+Fault-injected to confirm it works: reverting one leaf site to
+`parlay::type_allocator` directly makes `live` go **negative** (−129), since
+frees still count but those allocs do not, and the test fails.
+
+The allocator must be thread-safe — batch operations build nodes inside
+`parlay::parallel_for`. `counting_alloc` uses `std::atomic` for that reason.
+
 ## Two test suites (self_test added 2026-08-17)
 
 | target | data | runtime | what it is |

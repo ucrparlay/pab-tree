@@ -35,7 +35,8 @@ template <class EleType> struct ele_wrapper : EleType {
 };
 
 template <typename EleType, uint BufferSize, typename LeafAugType,
-		  typename InteriorAugType, typename NodeType, typename KeyCompare>
+		  typename InteriorAugType, typename NodeType, typename KeyCompare,
+		  typename NodeAllocType>
 class TypeTrait {
 public:
 	// element type
@@ -98,6 +99,8 @@ public:
 	using interior_aug = InteriorAugType;
 
 	using Node = NodeType;
+	// Where nodes come from. See parlay_node_alloc in node_base.h.
+	using node_alloc = NodeAllocType;
 	using node_seq = parlay::sequence<Node *>;
 	using node_slice = parlay::slice<Node **, Node **>;
 	using const_node_slice = parlay::slice<Node *const *, Node *const *>;
@@ -115,13 +118,14 @@ template <entry_type EleType, uint BufferSize,
 		  typename LeafAugType = empty_leaf_aug,
 		  typename InteriorAugType = empty_interior_aug,
 		  typename NodeType = proto_node,
-		  typename KeyCompare = std::less<typename EleType::K>>
+		  typename KeyCompare = std::less<typename EleType::K>,
+		  typename NodeAllocType = parlay_node_alloc>
 class btree_type_trait
 	: public TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-					   InteriorAugType, NodeType, KeyCompare> {
+					   InteriorAugType, NodeType, KeyCompare, NodeAllocType> {
 public:
 	using BT = TypeTrait<ele_wrapper<EleType>, BufferSize, LeafAugType,
-						 InteriorAugType, NodeType, KeyCompare>;
+						 InteriorAugType, NodeType, KeyCompare, NodeAllocType>;
 	using Split = BT::K;
 	using split_seq = parlay::sequence<Split>;
 	using split_slice = parlay::slice<Split *, Split *>;
