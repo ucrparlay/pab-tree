@@ -253,6 +253,10 @@ public:
 				 const bool sorted_input,
 				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 	void delete_tree();
+	// Writes every entry into Out, in no particular order. Use to_seq()
+	// for key order.
+	// PRECONDITION: Out holds at least size() entries. A smaller Out
+	// overruns; debug builds assert.
 	template <typename Range> void get_entries(Range &Out) const;
 	template <bool CheckSize = true, bool Verbose = true>
 	[[nodiscard]] bool validate(Node const *T = nullptr) const;

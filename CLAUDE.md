@@ -298,6 +298,28 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## `get_entries`' output-size precondition is now checked (2026-08-17)
+
+`assert(Out.size() >= root_->size)` at the top of `get_entries`. It has to be
+**there and not deeper**: the existing `flatten.hpp:32`
+`assert(T->size == Out.size())` sees a slice built as
+`Out.begin() + root_->size`, and forming that iterator is already out of
+bounds when `Out` is short — the assert can never fire first.
+
+`range_report` was already covered; CLAUDE.md's claim that its contract is
+"documented and asserted" checks out — `range_report.hpp` has bounds asserts
+at lines 62, 73, 146 and 175.
+
+`SelfTest.GetEntriesOutputSize` covers exact size, oversized (asserting the
+tail past `size()` is untouched), an empty tree, and a one-short buffer via
+`EXPECT_DEATH`. The death test needs
+`GTEST_FLAG_SET(death_test_style, "threadsafe")` because parlay's thread pool
+is already running, and is guarded by `#ifndef NDEBUG`. Verified by removing
+the assert: the test fails.
+
+This closes both halves of the two `GetEntries` findings; the ordering and
+allocating halves were already handled by `to_seq()`.
+
 ## Deleting an absent key is a no-op (settled 2026-08-17)
 
 Your call, and it is what `std::set::erase` does. Release builds already

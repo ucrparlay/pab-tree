@@ -524,6 +524,65 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 } // namespace
 
+// ---- get_entries' output-size contract ----
+
+TEST(SelfTest, GetEntriesOutputSize)
+{
+	using tt = pab_tree::btree_type_trait<ele, 32>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const all = to_entries(gen_keys(5000, dist::uniform, g_seed ^ 0x9e7));
+	tree t;
+	t.build(all);
+	ASSERT_EQ(t.size(), all.size());
+
+	// Exactly sized: every entry lands, none past the end.
+	{
+		parlay::sequence<entry> out(t.size());
+		t.get_entries(out);
+		std::vector<uint32_t> got;
+		for (auto const &e : out)
+			got.push_back(e.key);
+		std::sort(got.begin(), got.end());
+		std::vector<uint32_t> want;
+		for (auto const &e : all)
+			want.push_back(e.key);
+		std::sort(want.begin(), want.end());
+		EXPECT_EQ(got, want);
+	}
+
+	// Oversized is fine; the tail is left alone.
+	{
+		parlay::sequence<entry> out(t.size() + 100);
+		for (size_t i = t.size(); i < out.size(); ++i)
+			out[i] = entry{ 0xDEADBEEFu, 0xDEADBEEFu };
+		t.get_entries(out);
+		for (size_t i = t.size(); i < out.size(); ++i)
+			ASSERT_EQ(out[i].key, 0xDEADBEEFu)
+				<< "get_entries wrote past size()";
+	}
+
+	// An empty tree writes nothing and does not dereference a null root.
+	{
+		tree e;
+		parlay::sequence<entry> out(4);
+		out[0] = entry{ 7u, 7u };
+		e.get_entries(out);
+		EXPECT_EQ(out[0].key, 7u);
+	}
+
+	// One short must be caught rather than overrun. Asserts are live in
+	// this build (-UNDEBUG); in a release build the call is undefined,
+	// which is what the README says.
+#ifndef NDEBUG
+	GTEST_FLAG_SET(death_test_style, "threadsafe");
+	parlay::sequence<entry> small(t.size() - 1);
+	EXPECT_DEATH(
+		{ t.get_entries(small); }, "Out.size\\(\\) >=")
+		<< "an undersized output was not caught";
+#endif
+}
+
 // ---- deleting a key that is not there does nothing ----
 
 TEST(SelfTest, DeleteAbsentKeys)

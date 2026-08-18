@@ -23,6 +23,9 @@ void btree<TT>::get_entries(Range &Out) const
 	if (this->root_ == nullptr) [[unlikely]] {
 		return;
 	}
+	// Checked here, not deeper: Out.begin() + size is already out of
+	// bounds by the time flatten_rec sees it.
+	assert(Out.size() >= this->root_->size);
 	this->flatten_rec<typename TT::entry_slice, false, false>(
 		this->root_,
 		parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));

@@ -1,6 +1,6 @@
 # Findings register — still open
 
-12 open library findings: 5 medium, 7 low. No high ones remain. 9 are from
+10 open library findings: 4 medium, 6 low. No high ones remain. 7 are from
 the 2026-08-17 review, 3 were found since.
 
 The review raised 89 library findings. The 73 not listed here were either
@@ -23,6 +23,7 @@ rename. `VERIFIED` means an adversarial verifier could not refute the claim.
 | no RAII (part of the exception-safety finding) | already done; the entry is reduced to exception safety alone |
 | `ctest` cannot pass without the author's datasets (high, outside) | `dd43327` — `self_test` |
 | no edge-case coverage below 1e6 (medium, outside) | `dd43327` — sizes 0…1025, leaf sizes 2…256 |
+| both `GetEntries` findings (medium, low) | `to_seq()` covered ordering; the output-size precondition is now asserted |
 | deleting an absent key aborts (medium x2) | absent keys are now a documented no-op; 4 asserts replaced with stronger ones |
 | `2n` scratch buffer (medium) | **re-verified frozen** — the suggested fix would index out of bounds; memory cost documented instead |
 | no reusable traversal skeleton (medium) | partly — the pure half extracted; the parallel dispatch deliberately left |
@@ -47,7 +48,7 @@ Three findings were **added**: an interior augmentation cannot read its
 children's augmentations (medium), the dead `std::monostate` clause (low), and
 the unreachable 3-argument interior allocator (low).
 
-## MEDIUM — 5
+## MEDIUM — 4
 
 ### The augmentation concepts are declared but never applied
 `include/pab_tree/dependence/concepts.h`:39,46 · extensibility
@@ -97,19 +98,6 @@ sites at 8 and at 16 and keep the winner as a named constant. Do not bundle it
 with a refactor -- the two effects are separable and were confused once
 already.
 
-### GetEntries returns unsorted output, has no size check, and its ordering contract is undocumented
-`include/pab_tree/b_tree_impl/utility.hpp`:22 · api-usability
-**Status: reduced — `to_seq()` added, `get_entries` still unchecked**
-
-`to_seq()` (fc51224) returns the entries in key order as a new sequence,
-which is the ordered, allocating accessor this asked for, and the README
-documents that `get_entries` is unordered. Still open: `get_entries(Out)`
-does not check `Out.size() >= size()`.
-
-`GetEntries(Range& Out)` calls `FlattenRec<TT::EntrySlice, false, /*sorted=*/false>` over `Out.begin() .. Out.begin() + root_->size`. With `sorted == false`, `ExtractPointsInLeaf` (leaf_op.hpp:51-62) copies each leaf verbatim, so any leaf with `is_sorted == false` contributes its entries in arbitrary order. It also silently assumes `Out.size() >= GetSize()` with no check (only a debug `assert(Out.size() >= TL->size)` per leaf, leaf_op.hpp:60), and dereferences a null root (see the null-root finding). The same applies to `RangeReport`'s output, whose order is 'sorted across leaves, arbitrary within an unsorted leaf'.
-
-*Suggested fix:* Either make it sorted — `GetEntries` should call `FlattenRec<..., /*sorted=*/true>` (which sorts each leaf in place and is already used by the delete path) — or rename/document it, e.g. `void GetEntriesUnordered(Range& Out)` plus a `GetEntriesSorted`. Whichever is chosen, add the precondition `Out.size() >= GetSize()` to the declaration in `b_tree.h:505-506` and check it, and document `RangeReport
-
 ### Element type needs three wrapper layers, and the library's own layer forces a by-value copy on every key access
 `include/pab_tree/dependence/type_trait.h`:21 · api-usability
 **Status: open**
@@ -144,7 +132,7 @@ Six positional parameters, no defaults, no comments on the declaration, no docum
 
 *Suggested fix:* Give the declaration defaults and a doc comment: `template<typename EleType, uint kBufferSize = 64, typename LeafAugType = EmptyLeafAug, typename InteriorAugType = EmptyInteriorAug, uint_fast8_t kSkHeightVal = 8, typename NodeType = ProtoNode>`, so the common instantiation is `BTreeTypeTrait<MyEle>`. Rename `EleType` to `EntryAccessor` (or add `template<typename A> concept EntryAccessor = requires
 
-## LOW — 7
+## LOW — 6
 
 ### LeafSortPred contract is undocumented, inconsistent between insert and delete, and CLAUDE.md states it wrong
 `include/pab_tree/b_tree.h`:271 · docs
@@ -183,29 +171,6 @@ If no child is valid, `rpidx` and every `tree_group[i]` stay at the sentinel `TT
 I traced the reachability and it is currently blocked: `BalanceOverLeaves` is called only from the `SelfBalanceNode(T,
 
 *Suggested fix:* Make the sentinel unrepresentable as an index and fail loudly. Use `static constexpr BufSizeT kNoPivot = std::numeric_limits<BufSizeT>::max();` for `rpidx`/`pivot`, and open `BalanceOverLeaves` with an unconditional guard rather than an assert: `if (TI->GetNodeN() == 0) return;` followed by, after the lambda, `if (rightmost_pivot_idx == kNoPivot) { /* caller violated the NodeIsValid precondition *
-
-### GetEntries requires a caller-sized output and dereferences root_ unconditionally
-`include/pab_tree/b_tree_impl/utility.hpp`:24 · api-usability
-**Status: reduced — null guard added, `to_seq()` is the allocating overload**
-
-The null guard is in (`utility.hpp`), and `to_seq()` is the
-`auto get_entries() const -> entry_seq` this suggested. Still open: the
-`Out.size()` precondition is documented but not checked.
-
-```cpp
-// utility.hpp:19-25
-template<typename Range>
-void BTree<TT>::GetEntries(Range& Out)
-{
-  this->FlattenRec<typename TT::EntrySlice, false, false>(
-    this->root_,
-    parlay::make_slice(Out.begin(), Out.begin() + this->root_->size));
-}
-```
-
-Two issues. First, `this->root_->size` is dereferenced with no null check, so `GetEntries` on a default-constructed tree segfaults (same family as the Contain/RangeCount/RangeReport finding). Second, the signature `void GetEntries(Range& Out)` gives no hint that `Out` must already have at least `GetSize()` elements — it takes a non-const reference, which reads like it will resize. It does not; it slices `Out.begin()` to `Out.begin() + size` and `Fl
-
-*Suggested fix:* Add the null guard (`if (this->root_ == nullptr) return;`) and either resize in the function (`Out.resize(this->GetSize());` before the slice, since `Range&` is already non-const) or, better, add an allocating overload `auto GetEntries() const -> typename TT::EntrySeq` and document the existing one as requiring `Out.size() >= GetSize()`. Also rename or document the `sorted` template argument, whic
 
 ### `node_has_non_trivial_aug`'s `std::monostate` clause is dead
 `include/pab_tree/dependence/concepts.h`:15 · dead-code
