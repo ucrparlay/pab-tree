@@ -13,13 +13,13 @@
 namespace pab_tree
 {
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-auto btree<TT>::range_report(TT::Box const query_box, Range &&out) const
-	-> size_type
+auto btree<type_trait>::range_report(type_trait::box_type const query_box,
+									 Range &&out) const -> size_type
 {
 	if (this->root_ == nullptr ||
-		!TT::key_less(query_box.first, query_box.second)) [[unlikely]] {
+		!type_trait::key_less(query_box.first, query_box.second)) [[unlikely]] {
 		return 0;
 	}
 
@@ -28,12 +28,13 @@ auto btree<TT>::range_report(TT::Box const query_box, Range &&out) const
 	return rt_size;
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
-								  size_type &offset, Range out) const
+void btree<type_trait>::range_report_leaf(node_type const *T,
+										  type_trait::box_type const &query_box,
+										  size_type &offset, Range out) const
 {
-	auto const *TL = static_cast<Leaf const *>(T);
+	auto const *TL = static_cast<leaf_type const *>(T);
 	if (TL->is_sorted) {
 		const auto l = TL->binary_search_key(query_box.first);
 		// Narrow: search for r only in [l, size) since r >= l.
@@ -46,14 +47,15 @@ void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
 		size_t lo = 0, hi = static_cast<size_t>(rem);
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go =
-				TT::key_less(Entry::get_key(elems[mid]), query_box.second);
+			bool const go = type_trait::key_less(
+				entry_traits::get_key(elems[mid]), query_box.second);
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += TT::key_less(Entry::get_key(elems[i]), query_box.second) ?
+			cnt += type_trait::key_less(entry_traits::get_key(elems[i]),
+										query_box.second) ?
 					   1 :
 					   0;
 		}
@@ -68,7 +70,7 @@ void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
 
 	// Unsorted leaf: linear scan
 	for (buf_size_type i = 0; i < static_cast<buf_size_type>(TL->size); i++) {
-		auto const k = Entry::get_key(TL->elements[i]);
+		auto const k = entry_traits::get_key(TL->elements[i]);
 		if (k >= query_box.first && k < query_box.second) {
 			assert(offset < out.size() &&
 				   "out is too small; size it with range_count");
@@ -77,18 +79,19 @@ void btree<TT>::range_report_leaf(Node const *T, TT::Box const &query_box,
 	}
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
-								  size_type &offset, Range out) const
+void btree<type_trait>::range_report_iter(node_type const *T,
+										  type_trait::box_type const &query_box,
+										  size_type &offset, Range out) const
 {
 	// Iterative descent: avoids O(height) recursive-call overhead for
 	// narrow queries that fall inside a single child at each interior
 	// level.
 	while (!T->is_leaf) {
-		auto const *TI = static_cast<Interior const *>(T);
+		auto const *TI = static_cast<interior_type const *>(T);
 		auto *const *nodes =
-			TI->tree_nodes.data(); // Node* const* → nodes[i] is Node*
+			TI->tree_nodes.data(); // node_type* const* → nodes[i] is node_type*
 
 		const buf_size_type l = TI->get_node_id_containing_key(query_box.first);
 
@@ -105,13 +108,13 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		size_t lo = 0, hi = rem;
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go = TT::key_less(sp_l[mid], query_box.second);
+			bool const go = type_trait::key_less(sp_l[mid], query_box.second);
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += TT::key_less(sp_l[i], query_box.second) ? 1 : 0;
+			cnt += type_trait::key_less(sp_l[i], query_box.second) ? 1 : 0;
 		}
 		const buf_size_type r = l + static_cast<buf_size_type>(lo + cnt);
 
@@ -119,7 +122,7 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 		assert(r < TI->get_node_n());
 		assert(TI->validate_key_in_node(l, query_box.first));
 		assert(TI->validate_key_in_node(r, query_box.second) ||
-			   TT::key_equal(TI->split[r], query_box.second));
+			   type_trait::key_equal(TI->split[r], query_box.second));
 
 		if (l == r) {
 			// Entire query falls in one child — keep descending
@@ -165,13 +168,14 @@ void btree<TT>::range_report_iter(Node const *T, TT::Box const &query_box,
 }
 
 // Sequential full-subtree flatten.
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::range_report_flatten_rec(Node const *T, size_type &offset,
-										 Range out) const
+void btree<type_trait>::range_report_flatten_rec(node_type const *T,
+												 size_type &offset,
+												 Range out) const
 {
 	if (T->is_leaf) {
-		auto const *TL = static_cast<Leaf const *>(T);
+		auto const *TL = static_cast<leaf_type const *>(T);
 		assert(offset + TL->size <= out.size() &&
 			   "out is too small; size it with range_count");
 		std::copy_n(TL->elements.begin(), TL->size, out.begin() + offset);
@@ -179,24 +183,25 @@ void btree<TT>::range_report_flatten_rec(Node const *T, size_type &offset,
 		return;
 	}
 
-	auto const *TI = static_cast<Interior const *>(T);
+	auto const *TI = static_cast<interior_type const *>(T);
 	const buf_size_type node_n = TI->get_node_n();
 	for (buf_size_type i = 0; i < node_n; i++) {
 		range_report_flatten_rec(TI->tree_nodes[i], offset, out);
 	}
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
-								 size_type &offset, Range out) const
+void btree<type_trait>::range_report_rec(node_type const *T,
+										 type_trait::box_type const &query_box,
+										 size_type &offset, Range out) const
 {
 	if (T->is_leaf) {
 		range_report_leaf(T, query_box, offset, out);
 		return;
 	}
 
-	auto const *TI = static_cast<Interior const *>(T);
+	auto const *TI = static_cast<interior_type const *>(T);
 	auto l = TI->get_node_id_containing_key(query_box.first);
 	auto r = TI->get_node_id_containing_key_exclusive(query_box.second);
 
@@ -204,7 +209,7 @@ void btree<TT>::range_report_rec(Node const *T, TT::Box const &query_box,
 	assert(r < TI->get_node_n());
 	assert(TI->validate_key_in_node(l, query_box.first));
 	assert(TI->validate_key_in_node(r, query_box.second) ||
-		   TT::key_equal(TI->split[r], query_box.second));
+		   type_trait::key_equal(TI->split[r], query_box.second));
 
 	// visit nodes [l, r]
 

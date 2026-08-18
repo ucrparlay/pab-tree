@@ -13,7 +13,7 @@ template <typename TypeTrait> struct SpmaWrapper {
 template <typename Options, typename RunFunc>
 void ApplyPMA(Options const &opts, RunFunc test_func)
 {
-	// using K = std::pair<uint32_t, uint32_t>;
+	// using key_type = std::pair<uint32_t, uint32_t>;
 
 #if defined(DYNAMIC_GRAPH)
 	using Wrapper = Wrapper<uint64_t, uint32_t>;
@@ -23,12 +23,12 @@ void ApplyPMA(Options const &opts, RunFunc test_func)
 	using Wrapper = Wrapper<uint32_t, uint32_t>;
 #endif
 
-	using K = Wrapper::K;
-	using V = Wrapper::V;
-	using E = Wrapper::E;
+	using key_type = Wrapper::key_type;
+	using mapped_type = Wrapper::mapped_type;
+	using entry_type = Wrapper::entry_type;
 	// using EleType = Element<uint32_t, uint32_t>;
 	using TypeTrait = pab_tree::btree_type_trait<
-		Wrapper::ElementWrapper<E>, 16, Wrapper::LeafAugEmpty,
+		Wrapper::ElementWrapper<entry_type>, 16, Wrapper::LeafAugEmpty,
 		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
 
 	if (opts.tree_type == 3) {
@@ -46,17 +46,19 @@ int main(int argc, char *argv[])
 	auto test_func = []<class TreeDesc, typename TypeTrait, typename Options>(
 						 Options &opts) {
 		// using Tree = TreeDesc::TreeType;
-		// using TT = TypeTrait;
-		// using entry_seq = TT::entry_seq;
+		// using type_trait = TypeTrait;
+		// using entry_seq = type_trait::entry_seq;
 		// entry_seq wp;
 		// entry_seq wi;
 		//
-		// using PmaLeaf = uncompressed_leaf<typename TT::K, typename TT::V>;
+		// using PmaLeaf = uncompressed_leaf<typename type_trait::key_type, typename
+		// type_trait::mapped_type>;
 		// using PmosPmaSettings = PMA_traits<PmaLeaf, InPlace, 0, false, false>;
 		// using PmaPointer = PmaLeaf::element_ptr_type;
 		// using PMA = CPMA<PmosPmaSettings>;
 		//
-		// ReadEntries<typename TT::E>(opts.input_file_path.c_str(), wp, 0);
+		// ReadEntries<typename type_trait::entry_type>(opts.input_file_path.c_str(),
+		// wp, 0);
 		//
 		// parlay::internal::timer t("PMA Batch Insert Test");
 		// for (int i = 0; i < 4; i++) {
@@ -76,8 +78,10 @@ int main(int argc, char *argv[])
 		// auto [base_path, batch_path] =
 		// opts.ParseInsertBatchPath(opts.batch_ratio);
 		// // std::cout << base_path << " " << batch_path << std::endl;
-		// auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
-		// auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
+		// auto [n, d] = read_points<typename
+		// type_trait::entry_type>(base_path.c_str(), wp, 0);
+		// auto [n2, d2] = read_points<typename
+		// type_trait::entry_type>(batch_path.c_str(), wi, n);
 
 		// for (int i = 0; i < 4; i++) {
 		//   auto WP = Tree::parse_input(wp).first;

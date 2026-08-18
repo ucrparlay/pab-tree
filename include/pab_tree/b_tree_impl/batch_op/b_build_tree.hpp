@@ -16,9 +16,9 @@
 
 namespace pab_tree
 {
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::build(Range &&In)
+void btree<type_trait>::build(Range &&In)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
@@ -29,28 +29,30 @@ void btree<TT>::build(Range &&In)
 	Build_(A);
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::Build_(Range In)
+void btree<type_trait>::Build_(Range In)
 {
 	// Release the old tree; a second build would otherwise leak it.
 	this->delete_tree();
 	auto sort_seq = parlay::sort(In, key_less);
 	// Keys must be distinct. is_sorted with <= is strict increase, so this
 	// catches duplicates; with < it would tolerate them.
-	assert(parlay::is_sorted(sort_seq, [](E const &a, E const &b) {
-		return !TT::entry_less(b, a);
-	}));
+	assert(parlay::is_sorted(sort_seq,
+							 [](entry_type const &a, entry_type const &b) {
+								 return !type_trait::entry_less(b, a);
+							 }));
 	this->root_ = build_recursive(parlay::make_slice(sort_seq));
 	assert(this->root_ != nullptr);
 }
 
-template <typename TT>
-TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
-											  TT::split_slice keys)
+template <typename type_trait>
+type_trait::node_type *
+btree<type_trait>::assemble_interior_levels(type_trait::node_slice nodes,
+											type_trait::split_slice keys)
 {
-	auto aux_node_seq = TT::node_seq::uninitialized(nodes.size());
-	auto aux_key_seq = TT::key_seq::uninitialized(keys.size());
+	auto aux_node_seq = type_trait::node_seq::uninitialized(nodes.size());
+	auto aux_key_seq = type_trait::key_seq::uninitialized(keys.size());
 	auto node_in = nodes;
 	auto node_out = parlay::make_slice(aux_node_seq);
 	auto key_in = keys;
@@ -65,7 +67,7 @@ TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
 		std::ranges::swap(node_in, node_out);
 	};
 
-	while (node_in.size() >= TT::k_buf_ub) {
+	while (node_in.size() >= type_trait::k_buf_ub) {
 		size_type interior_bkt_n = generate_interior_nodes(
 			node_in, key_in,
 			gen_nodes_output_handler{
@@ -74,30 +76,35 @@ TT::Node *btree<TT>::assemble_interior_levels(TT::node_slice nodes,
 								auto node) { node_out[i] = node; } });
 		swap_key_node(interior_bkt_n);
 		assert(parlay::is_sorted(
-			key_in, [&](TT::K a, TT::K b) { return TT::key_less(a, b); }));
+			key_in, [&](type_trait::key_type a, type_trait::key_type b) {
+				return type_trait::key_less(a, b);
+			}));
 	}
 
-	auto *node = alloc_interior_node<Interior, TT>(node_in, key_in);
+	auto *node =
+		alloc_interior_node<interior_type, type_trait>(node_in, key_in);
 	node->update_aug();
 	return node;
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-TT::Node *btree<TT>::build_recursive(Range In)
+type_trait::node_type *btree<type_trait>::build_recursive(Range In)
 {
 	if (In.size() == 0) {
-		return alloc_empty_leaf_node<Leaf>();
+		return alloc_empty_leaf_node<leaf_type>();
 	}
 
-	if (In.size() < TT::k_buf_ub) {
-		return alloc_normal_leaf_node<Range, Leaf>(In);
+	if (In.size() < type_trait::k_buf_ub) {
+		return alloc_normal_leaf_node<Range, leaf_type>(In);
 	}
 
-	size_type estimated_bkt_n = (In.size() / TT::k_buf_md) + 1;
-	auto node_seq = parlay::sequence<Node *>::uninitialized(estimated_bkt_n);
+	size_type estimated_bkt_n = (In.size() / type_trait::k_buf_md) + 1;
+	auto node_seq =
+		parlay::sequence<node_type *>::uninitialized(estimated_bkt_n);
 	auto key_seq =
-		parlay::sequence<typename TT::K>::uninitialized(estimated_bkt_n);
+		parlay::sequence<typename type_trait::key_type>::uninitialized(
+			estimated_bkt_n);
 	auto node_out = parlay::make_slice(node_seq);
 	auto key_out = parlay::make_slice(key_seq);
 
@@ -106,9 +113,11 @@ TT::Node *btree<TT>::build_recursive(Range In)
 		gen_nodes_output_handler{
 			.set_key = [&](size_type i, auto key) { key_out[i] = key; },
 			.set_node = [&](size_type i, auto node) { node_out[i] = node; } });
-	assert(parlay::is_sorted(key_out.cut(0, bkt_n - 1), [&](TT::K a, TT::K b) {
-		return TT::key_less(a, b);
-	}));
+	assert(
+		parlay::is_sorted(key_out.cut(0, bkt_n - 1),
+						  [&](type_trait::key_type a, type_trait::key_type b) {
+							  return type_trait::key_less(a, b);
+						  }));
 
 	this->root_ = assemble_interior_levels(node_out.cut(0, bkt_n),
 										   key_out.cut(0, bkt_n - 1));

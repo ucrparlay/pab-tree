@@ -16,9 +16,9 @@
 
 namespace pab_tree
 {
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::batch_insert(Range &&In)
+void btree<type_trait>::batch_insert(Range &&In)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
@@ -27,17 +27,17 @@ void btree<TT>::batch_insert(Range &&In)
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 
-	constexpr auto leaf_entries_pattern = TT::leaf_entries_pattern::hybrid;
+	constexpr auto leaf_entries_pattern =
+		type_trait::leaf_entries_pattern::hybrid;
 	constexpr bool sorted_input = false;
 	BatchInsert_(A, leaf_entries_pattern, sorted_input, default_hybrid_pred{});
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-void btree<TT>::batch_insert(Range &&In,
-							 const TT::pattern_type leaf_entries_pattern,
-							 const bool sorted_input,
-							 LeafSortPred const &leaf_sort_pred)
+void btree<type_trait>::batch_insert(
+	Range &&In, const type_trait::pattern_type leaf_entries_pattern,
+	const bool sorted_input, LeafSortPred const &leaf_sort_pred)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
@@ -49,13 +49,13 @@ void btree<TT>::batch_insert(Range &&In,
 	BatchInsert_(A, leaf_entries_pattern, sorted_input, leaf_sort_pred);
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-	requires std::predicate<LeafSortPred, typename btree<TT>::Node *, Range>
-void btree<TT>::BatchInsert_(Range In,
-							 const TT::pattern_type leaf_entries_pattern,
-							 const bool sorted_input,
-							 LeafSortPred const &leaf_sort_pred)
+	requires std::predicate<LeafSortPred,
+							typename btree<type_trait>::node_type *, Range>
+void btree<type_trait>::BatchInsert_(
+	Range In, const type_trait::pattern_type leaf_entries_pattern,
+	const bool sorted_input, LeafSortPred const &leaf_sort_pred)
 {
 	if (this->root_ == nullptr) {
 		return Build_(In);
@@ -67,8 +67,10 @@ void btree<TT>::BatchInsert_(Range In,
 
 	// Accept any random-access range. A contiguous one is borrowed as is;
 	// anything else is materialised, which is also what the sort does.
-	typename TT::entry_seq sorted_seq;
-	parlay::slice<const E *, const E *> sorted_slice{ nullptr, nullptr };
+	typename type_trait::entry_seq sorted_seq;
+	parlay::slice<const entry_type *, const entry_type *> sorted_slice{
+		nullptr, nullptr
+	};
 	if (!sorted_input) {
 		sorted_seq = parlay::sort(In, key_less);
 		sorted_slice =
@@ -84,9 +86,10 @@ void btree<TT>::BatchInsert_(Range In,
 
 	// Keys must be distinct, in the batch and against the tree. Only the
 	// batch is checkable here.
-	assert(parlay::is_sorted(sorted_slice, [](E const &a, E const &b) {
-		return !TT::entry_less(b, a);
-	}));
+	assert(parlay::is_sorted(sorted_slice,
+							 [](entry_type const &a, entry_type const &b) {
+								 return !type_trait::entry_less(b, a);
+							 }));
 
 	// begin insert
 	node_split_pair_seq node_split_seq =
@@ -109,13 +112,12 @@ void btree<TT>::BatchInsert_(Range In,
 	}
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-TT::size_type
-btree<TT>::batch_insert_recursive(Node *T, Range In,
-								  node_split_pair_slice node_split_slice,
-								  const TT::pattern_type leaf_entries_pattern,
-								  LeafSortPred const &leaf_sort_pred)
+type_trait::size_type btree<type_trait>::batch_insert_recursive(
+	node_type *T, Range In, node_split_pair_slice node_split_slice,
+	const type_trait::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
 {
 	assert(2 * In.size() == node_split_slice.size());
 
@@ -125,9 +127,9 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	}
 
 	if (T->is_leaf) {
-		Leaf *TL = static_cast<Leaf *>(T);
-		if (TL->size + n <= TT::k_buf_ub) {
-			[[maybe_unused]] Node *updated_node = insert_points_2_leaf(
+		leaf_type *TL = static_cast<leaf_type *>(T);
+		if (TL->size + n <= type_trait::k_buf_ub) {
+			[[maybe_unused]] node_type *updated_node = insert_points_2_leaf(
 				T, In, leaf_entries_pattern, leaf_sort_pred);
 			assert(updated_node == T);
 			return 0;
@@ -135,7 +137,7 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 		return handling_leaf_split_overflow(T, In, node_split_slice);
 	}
 
-	auto TI = static_cast<Interior *>(T);
+	auto TI = static_cast<interior_type *>(T);
 
 	size_buf_ub_arr split_pos_seq;
 	assert(TI->get_node_n() > 0);
@@ -146,9 +148,12 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 #ifdef DEBUG
 	for (int i = 1; i < TI->get_split_n(); i++) {
 		assert(parlay::all_of(
-			In.cut(split_pos_seq[i - 1], split_pos_seq[i]), [&](E const e) {
-				return !TT::key_less(Entry::get_key(e), TI->split[i - 1]) &&
-					   TT::key_less(Entry::get_key(e), TI->split[i]);
+			In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
+			[&](entry_type const e) {
+				return !type_trait::key_less(entry_traits::get_key(e),
+											 TI->split[i - 1]) &&
+					   type_trait::key_less(entry_traits::get_key(e),
+											TI->split[i]);
 			}));
 	}
 #endif // DEBUG
@@ -193,8 +198,8 @@ btree<TT>::batch_insert_recursive(Node *T, Range In,
 	}
 
 	// the interior node can be updated without split
-	if (new_node_n <= TT::k_buf_ub) {
-		[[maybe_unused]] Node *new_inter_node =
+	if (new_node_n <= type_trait::k_buf_ub) {
+		[[maybe_unused]] node_type *new_inter_node =
 			batch_insert_update_interior(T, node_split_slice, split_pos_seq,
 										 new_node_n, new_split_node_n_arr);
 		return 0;

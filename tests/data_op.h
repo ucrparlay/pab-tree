@@ -36,10 +36,12 @@ void PrintPoints(auto const &wp)
 
 void PrintToFile(std::string const &path, auto const &wp)
 {
-	using E = typename std::remove_reference_t<decltype(wp)>::value_type;
+	using entry_type =
+		typename std::remove_reference_t<decltype(wp)>::value_type;
 
 	size_t const gen_num = wp.size();
-	auto constexpr gen_dim = 1 + std::tuple_size_v<typename E::V>;
+	auto constexpr gen_dim =
+		1 + std::tuple_size_v<typename entry_type::mapped_type>;
 
 	auto header = toString(gen_num) + " " + toString(gen_dim);
 
@@ -48,7 +50,7 @@ void PrintToFile(std::string const &path, auto const &wp)
 		std::string str;
 		str += std::to_string(wp[i].key) + " ";
 		if constexpr (std::tuple_size<typename std::remove_reference_t<
-						  decltype(wp)>::value_type::V>::value == 1) {
+						  decltype(wp)>::value_type::mapped_type>::value == 1) {
 			str += std::to_string(std::get<0>(wp[i].val)) + " ";
 		}
 		// for (int j = 0; std::cmp_less(j, gen_dim); j++) {
@@ -84,11 +86,13 @@ void PrintToFile(std::string const &path, auto const &wp)
 // data range fits).
 void PrintToBinaryFile(std::string const &path, auto const &wp)
 {
-	using E = typename std::remove_reference_t<decltype(wp)>::value_type;
+	using entry_type =
+		typename std::remove_reference_t<decltype(wp)>::value_type;
 
 	uint64_t const gen_num = wp.size();
-	uint64_t constexpr gen_dim = 1 + std::tuple_size_v<typename E::V>;
-	static_assert(std::tuple_size_v<typename E::V> == 1,
+	uint64_t constexpr gen_dim =
+		1 + std::tuple_size_v<typename entry_type::mapped_type>;
+	static_assert(std::tuple_size_v<typename entry_type::mapped_type> == 1,
 				  "PrintToBinaryFile: only key + 1 value column is supported.");
 
 	auto payload = parlay::sequence<uint64_t>(gen_num * gen_dim);
@@ -262,10 +266,10 @@ public:
 	}
 };
 
-template <typename E, typename BaseDisFunc, typename BatchDisFunc>
+template <typename entry_type, typename BaseDisFunc, typename BatchDisFunc>
 class Generator {
 public:
-	using entry_seq = parlay::sequence<E>;
+	using entry_seq = parlay::sequence<entry_type>;
 
 	static void validate(int batch_op, size_t base_n, size_t batch_n,
 						 auto const &base_k_seq, auto const &batch_k_seq)
@@ -314,14 +318,16 @@ public:
 		// shuffle keys
 		auto rand_seq = parlay::random_shuffle(parlay::make_slice(key_seq));
 		return parlay::tabulate(key_seq.size(), [&](size_t i) {
-			if constexpr (std::is_same_v<typename E::V, std::tuple<>>) {
-				return E{ .key = rand_seq[i] };
-			} else if constexpr (std::tuple_size_v<typename E::V> == 1) {
-				return E{ .key = rand_seq[i], .val = { i } };
+			if constexpr (std::is_same_v<typename entry_type::mapped_type,
+										 std::tuple<>>) {
+				return entry_type{ .key = rand_seq[i] };
+			} else if constexpr (std::tuple_size_v<
+									 typename entry_type::mapped_type> == 1) {
+				return entry_type{ .key = rand_seq[i], .val = { i } };
 			} else {
 				static_assert(
 					false,
-					"Generator::to_entry: Unsupported Entry value type.");
+					"Generator::to_entry: Unsupported entry_traits value type.");
 			}
 		});
 	}

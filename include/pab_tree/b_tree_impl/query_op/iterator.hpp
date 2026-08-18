@@ -12,7 +12,8 @@
 namespace pab_tree
 {
 
-template <typename TT> void btree<TT>::ensure_leaf_sorted(Leaf *TL)
+template <typename type_trait>
+void btree<type_trait>::ensure_leaf_sorted(leaf_type *TL)
 {
 	if (!TL->is_sorted) {
 		std::sort(TL->elements.begin(), TL->elements.begin() + TL->size,
@@ -21,21 +22,22 @@ template <typename TT> void btree<TT>::ensure_leaf_sorted(Leaf *TL)
 	}
 }
 
-template <typename TT> void btree<TT>::sort_leaves_rec(Node *T)
+template <typename type_trait>
+void btree<type_trait>::sort_leaves_rec(node_type *T)
 {
 	if (T->is_leaf) {
-		ensure_leaf_sorted(static_cast<Leaf *>(T));
+		ensure_leaf_sorted(static_cast<leaf_type *>(T));
 		return;
 	}
 
-	auto TI = static_cast<Interior *>(T);
+	auto TI = static_cast<interior_type *>(T);
 	auto const node_n = TI->get_node_n();
 	parlay::parallel_for(
 		0, node_n, [&](buf_size_type i) { sort_leaves_rec(TI->tree_nodes[i]); },
 		1);
 }
 
-template <typename TT> void btree<TT>::sort_leaves() const
+template <typename type_trait> void btree<type_trait>::sort_leaves() const
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return;
@@ -43,54 +45,58 @@ template <typename TT> void btree<TT>::sort_leaves() const
 	sort_leaves_rec(this->root_);
 }
 
-template <typename TT> auto btree<TT>::leftmost_leaf() const -> Leaf *
+template <typename type_trait>
+auto btree<type_trait>::leftmost_leaf() const -> leaf_type *
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return nullptr;
 	}
 
-	Node *T = this->root_;
+	node_type *T = this->root_;
 	while (!T->is_leaf) {
-		T = static_cast<Interior *>(T)->tree_nodes[0];
+		T = static_cast<interior_type *>(T)->tree_nodes[0];
 	}
-	auto TL = static_cast<Leaf *>(T);
+	auto TL = static_cast<leaf_type *>(T);
 	ensure_leaf_sorted(TL);
 	return TL;
 }
 
-template <typename TT> auto btree<TT>::rightmost_leaf() const -> Leaf *
+template <typename type_trait>
+auto btree<type_trait>::rightmost_leaf() const -> leaf_type *
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return nullptr;
 	}
 
-	Node *T = this->root_;
+	node_type *T = this->root_;
 	while (!T->is_leaf) {
-		auto TI = static_cast<Interior *>(T);
+		auto TI = static_cast<interior_type *>(T);
 		T = TI->tree_nodes[TI->get_node_n() - 1];
 	}
-	auto TL = static_cast<Leaf *>(T);
+	auto TL = static_cast<leaf_type *>(T);
 	ensure_leaf_sorted(TL);
 	return TL;
 }
 
-template <typename TT> auto btree<TT>::leaf_covering(K const &k) const -> Leaf *
+template <typename type_trait>
+auto btree<type_trait>::leaf_covering(key_type const &k) const -> leaf_type *
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return nullptr;
 	}
 
-	Node *T = this->root_;
+	node_type *T = this->root_;
 	while (!T->is_leaf) {
-		auto TI = static_cast<Interior *>(T);
+		auto TI = static_cast<interior_type *>(T);
 		T = TI->tree_nodes[TI->get_node_id_containing_key(k)];
 	}
-	auto TL = static_cast<Leaf *>(T);
+	auto TL = static_cast<leaf_type *>(T);
 	ensure_leaf_sorted(TL);
 	return TL;
 }
 
-template <typename TT> auto btree<TT>::next_leaf(K const &k) const -> Leaf *
+template <typename type_trait>
+auto btree<type_trait>::next_leaf(key_type const &k) const -> leaf_type *
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return nullptr;
@@ -98,10 +104,10 @@ template <typename TT> auto btree<TT>::next_leaf(K const &k) const -> Leaf *
 
 	// Descend to k, remembering the deepest node that still had a child
 	// to the right. That child's leftmost leaf is the next one.
-	Node *candidate = nullptr;
-	Node *T = this->root_;
+	node_type *candidate = nullptr;
+	node_type *T = this->root_;
 	while (!T->is_leaf) {
-		auto TI = static_cast<Interior *>(T);
+		auto TI = static_cast<interior_type *>(T);
 		auto const i = TI->get_node_id_containing_key(k);
 		if (i + 1 < TI->get_node_n()) {
 			candidate = TI->tree_nodes[i + 1];
@@ -113,23 +119,24 @@ template <typename TT> auto btree<TT>::next_leaf(K const &k) const -> Leaf *
 		return nullptr;
 	}
 	while (!candidate->is_leaf) {
-		candidate = static_cast<Interior *>(candidate)->tree_nodes[0];
+		candidate = static_cast<interior_type *>(candidate)->tree_nodes[0];
 	}
-	auto TL = static_cast<Leaf *>(candidate);
+	auto TL = static_cast<leaf_type *>(candidate);
 	ensure_leaf_sorted(TL);
 	return TL;
 }
 
-template <typename TT> auto btree<TT>::prev_leaf(K const &k) const -> Leaf *
+template <typename type_trait>
+auto btree<type_trait>::prev_leaf(key_type const &k) const -> leaf_type *
 {
 	if (this->root_ == nullptr) [[unlikely]] {
 		return nullptr;
 	}
 
-	Node *candidate = nullptr;
-	Node *T = this->root_;
+	node_type *candidate = nullptr;
+	node_type *T = this->root_;
 	while (!T->is_leaf) {
-		auto TI = static_cast<Interior *>(T);
+		auto TI = static_cast<interior_type *>(T);
 		auto const i = TI->get_node_id_containing_key(k);
 		if (i > 0) {
 			candidate = TI->tree_nodes[i - 1];
@@ -141,16 +148,16 @@ template <typename TT> auto btree<TT>::prev_leaf(K const &k) const -> Leaf *
 		return nullptr;
 	}
 	while (!candidate->is_leaf) {
-		auto TI = static_cast<Interior *>(candidate);
+		auto TI = static_cast<interior_type *>(candidate);
 		candidate = TI->tree_nodes[TI->get_node_n() - 1];
 	}
-	auto TL = static_cast<Leaf *>(candidate);
+	auto TL = static_cast<leaf_type *>(candidate);
 	ensure_leaf_sorted(TL);
 	return TL;
 }
 
-template <typename TT>
-auto btree<TT>::const_iterator::operator++() -> const_iterator &
+template <typename type_trait>
+auto btree<type_trait>::const_iterator::operator++() -> const_iterator &
 {
 	assert(this->leaf_ != nullptr);
 
@@ -160,14 +167,14 @@ auto btree<TT>::const_iterator::operator++() -> const_iterator &
 	}
 
 	auto const last =
-		Entry::get_key(this->leaf_->elements[this->leaf_->size - 1]);
+		entry_traits::get_key(this->leaf_->elements[this->leaf_->size - 1]);
 	this->leaf_ = this->tree_->next_leaf(last);
 	this->idx_ = 0;
 	return *this;
 }
 
-template <typename TT>
-auto btree<TT>::const_iterator::operator--() -> const_iterator &
+template <typename type_trait>
+auto btree<type_trait>::const_iterator::operator--() -> const_iterator &
 {
 	if (this->leaf_ == nullptr) {
 		// Stepping back from end().
@@ -182,16 +189,17 @@ auto btree<TT>::const_iterator::operator--() -> const_iterator &
 		return *this;
 	}
 
-	auto const first = Entry::get_key(this->leaf_->elements[0]);
+	auto const first = entry_traits::get_key(this->leaf_->elements[0]);
 	this->leaf_ = this->tree_->prev_leaf(first);
 	assert(this->leaf_ != nullptr);
 	this->idx_ = static_cast<buf_size_type>(this->leaf_->size) - 1;
 	return *this;
 }
 
-template <typename TT> auto btree<TT>::begin() const -> const_iterator
+template <typename type_trait>
+auto btree<type_trait>::begin() const -> const_iterator
 {
-	Leaf *leaf = this->leftmost_leaf();
+	leaf_type *leaf = this->leftmost_leaf();
 	// An empty tree, or a root leaf holding nothing, is already end().
 	if (leaf == nullptr || leaf->size == 0) {
 		return this->end();
@@ -199,10 +207,10 @@ template <typename TT> auto btree<TT>::begin() const -> const_iterator
 	return const_iterator(this, leaf, 0);
 }
 
-template <typename TT>
-auto btree<TT>::lower_bound(K const &k) const -> const_iterator
+template <typename type_trait>
+auto btree<type_trait>::lower_bound(key_type const &k) const -> const_iterator
 {
-	Leaf *leaf = this->leaf_covering(k);
+	leaf_type *leaf = this->leaf_covering(k);
 	if (leaf == nullptr) {
 		return this->end();
 	}
@@ -216,15 +224,15 @@ auto btree<TT>::lower_bound(K const &k) const -> const_iterator
 	if (leaf->size == 0) [[unlikely]] {
 		return this->end();
 	}
-	Leaf *next =
-		this->next_leaf(Entry::get_key(leaf->elements[leaf->size - 1]));
+	leaf_type *next =
+		this->next_leaf(entry_traits::get_key(leaf->elements[leaf->size - 1]));
 	return next == nullptr ? this->end() : const_iterator(this, next, 0);
 }
 
-template <typename TT>
-auto btree<TT>::upper_bound(K const &k) const -> const_iterator
+template <typename type_trait>
+auto btree<type_trait>::upper_bound(key_type const &k) const -> const_iterator
 {
-	Leaf *leaf = this->leaf_covering(k);
+	leaf_type *leaf = this->leaf_covering(k);
 	if (leaf == nullptr) {
 		return this->end();
 	}
@@ -238,26 +246,29 @@ auto btree<TT>::upper_bound(K const &k) const -> const_iterator
 	if (leaf->size == 0) [[unlikely]] {
 		return this->end();
 	}
-	Leaf *next =
-		this->next_leaf(Entry::get_key(leaf->elements[leaf->size - 1]));
+	leaf_type *next =
+		this->next_leaf(entry_traits::get_key(leaf->elements[leaf->size - 1]));
 	return next == nullptr ? this->end() : const_iterator(this, next, 0);
 }
 
-template <typename TT> auto btree<TT>::find(K const &k) const -> const_iterator
+template <typename type_trait>
+auto btree<type_trait>::find(key_type const &k) const -> const_iterator
 {
 	auto const it = this->lower_bound(k);
-	if (it == this->end() || !TT::key_equal(Entry::get_key(*it), k)) {
+	if (it == this->end() ||
+		!type_trait::key_equal(entry_traits::get_key(*it), k)) {
 		return this->end();
 	}
 	return it;
 }
 
-template <typename TT>
-auto btree<TT>::equal_range(K const &k) const
+template <typename type_trait>
+auto btree<type_trait>::equal_range(key_type const &k) const
 	-> std::pair<const_iterator, const_iterator>
 {
 	auto const lo = this->lower_bound(k);
-	if (lo == this->end() || !TT::key_equal(Entry::get_key(*lo), k)) {
+	if (lo == this->end() ||
+		!type_trait::key_equal(entry_traits::get_key(*lo), k)) {
 		return { lo, lo };
 	}
 	auto hi = lo;
@@ -265,24 +276,24 @@ auto btree<TT>::equal_range(K const &k) const
 	return { lo, hi };
 }
 
-template <typename TT> void btree<TT>::erase(const_iterator pos)
+template <typename type_trait> void btree<type_trait>::erase(const_iterator pos)
 {
 	assert(pos != this->end());
-	this->batch_delete(std::array<K, 1>{ Entry::get_key(*pos) });
+	this->batch_delete(std::array<key_type, 1>{ entry_traits::get_key(*pos) });
 }
 
-template <typename TT>
-void btree<TT>::erase(const_iterator first, const_iterator last)
+template <typename type_trait>
+void btree<type_trait>::erase(const_iterator first, const_iterator last)
 {
-	typename TT::key_seq keys;
+	typename type_trait::key_seq keys;
 	for (auto it = first; it != last; ++it) {
-		keys.push_back(Entry::get_key(*it));
+		keys.push_back(entry_traits::get_key(*it));
 	}
 	if (keys.empty()) {
 		return;
 	}
 	// The keys came out in order.
-	this->batch_delete(keys, TT::leaf_entries_pattern::hybrid, true,
+	this->batch_delete(keys, type_trait::leaf_entries_pattern::hybrid, true,
 					   default_hybrid_pred{});
 }
 

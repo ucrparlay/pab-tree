@@ -32,17 +32,18 @@ concept is_pab_tree = requires(T t) {
 	{ t.pab_tree_tag() } -> std::same_as<void>;
 };
 
-// What a user's element adaptor must provide. E is the stored entry, K the key
-// it is ordered by, V the payload.
+// What a user's element adaptor must provide. entry_type is the stored
+// entry, key_type the key it is ordered by, mapped_type the payload.
 template <typename T>
-concept entry_type =
-	requires(typename T::E e, typename T::K k, typename T::V v) {
-		typename T::E;
-		typename T::K;
-		typename T::V;
-		{ T::get_key(e) } -> std::convertible_to<typename T::K>;
-		{ T::get_val(e) } -> std::convertible_to<typename T::V>;
-		{ T::to_entry(k, v) } -> std::convertible_to<typename T::E>;
+concept entry_adaptor =
+	requires(typename T::entry_type e, typename T::key_type k,
+			 typename T::mapped_type v) {
+		typename T::entry_type;
+		typename T::key_type;
+		typename T::mapped_type;
+		{ T::get_key(e) } -> std::convertible_to<typename T::key_type>;
+		{ T::get_val(e) } -> std::convertible_to<typename T::mapped_type>;
+		{ T::to_entry(k, v) } -> std::convertible_to<typename T::entry_type>;
 		{ k < k } -> std::convertible_to<bool>;
 	};
 

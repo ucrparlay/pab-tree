@@ -15,24 +15,25 @@
 
 namespace pab_tree
 {
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-TT::Node *
-btree<TT>::post_process_leaf_change(Node *T, Range In,
-									const TT::pattern_type leaf_entries_pattern,
-									LeafSortPred const &leaf_sort_pred)
+type_trait::node_type *btree<type_trait>::post_process_leaf_change(
+	node_type *T, Range In, const type_trait::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
 {
 	// WARN: does not know whether the T->elements are sorted or not,
 	// so might mark it as unsorted if the leaf entries pattern is
 	// unsort/hybrid, even if the entries are actually sorted.
 	assert(T->is_leaf);
-	auto TL = static_cast<Leaf *>(T);
-	if (leaf_entries_pattern == TT::leaf_entries_pattern::sorted) {
+	auto TL = static_cast<leaf_type *>(T);
+	if (leaf_entries_pattern == type_trait::leaf_entries_pattern::sorted) {
 		std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter(), key_less);
 		TL->is_sorted = true;
-	} else if (leaf_entries_pattern == TT::leaf_entries_pattern::unsorted) {
+	} else if (leaf_entries_pattern ==
+			   type_trait::leaf_entries_pattern::unsorted) {
 		TL->is_sorted = false;
-	} else if (leaf_entries_pattern == TT::leaf_entries_pattern::hybrid) {
+	} else if (leaf_entries_pattern ==
+			   type_trait::leaf_entries_pattern::hybrid) {
 		if (leaf_sort_pred(T, In)) {
 			std::sort(TL->get_ele_begin_iter(), TL->get_ele_end_iter(),
 					  key_less);
@@ -46,11 +47,11 @@ btree<TT>::post_process_leaf_change(Node *T, Range In,
 	return T;
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, bool sorted>
-void btree<TT>::extract_points_in_leaf(Node *T, Range Out)
+void btree<type_trait>::extract_points_in_leaf(node_type *T, Range Out)
 {
-	auto TL = static_cast<Leaf *>(T);
+	auto TL = static_cast<leaf_type *>(T);
 	if constexpr (sorted) {
 		if (!TL->is_sorted) {
 			std::sort(TL->elements.begin(), TL->elements.begin() + TL->size,
@@ -62,20 +63,20 @@ void btree<TT>::extract_points_in_leaf(Node *T, Range Out)
 	std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size, Out.begin());
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-TT::Node *btree<TT>::insert_points_2_leaf(Node *T, Range In,
-										  TT::pattern_type leaf_entries_pattern,
-										  LeafSortPred const &leaf_sort_pred)
+type_trait::node_type *btree<type_trait>::insert_points_2_leaf(
+	node_type *T, Range In, type_trait::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
 {
-	Leaf *TL = static_cast<Leaf *>(T);
+	leaf_type *TL = static_cast<leaf_type *>(T);
 
-	assert(T->size + In.size() <= TT::k_buf_ub);
+	assert(T->size + In.size() <= type_trait::k_buf_ub);
 	assert(T->size == TL->get_ele().size());
 	if (TL->elements.size() == 0) {
 		assert(TL->size == 0);
 		TL->initialize_ele_seq();
-		assert(TL->elements.size() == TT::k_buf_ub);
+		assert(TL->elements.size() == type_trait::k_buf_ub);
 	}
 	// PERF: buf_size_type should be enough since total size fits within
 	std::ranges::copy_n(In.begin(), In.size(), TL->get_ele_end_iter());
@@ -87,29 +88,29 @@ TT::Node *btree<TT>::insert_points_2_leaf(Node *T, Range In,
 									leaf_sort_pred);
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-TT::size_type
-btree<TT>::handling_leaf_split_overflow(Node *T, Range In,
-										node_split_pair_slice node_split_slice)
+type_trait::size_type btree<type_trait>::handling_leaf_split_overflow(
+	node_type *T, Range In, node_split_pair_slice node_split_slice)
 {
-	Leaf *TL = static_cast<Leaf *>(T);
-	auto entry_seq = TT::entry_seq::uninitialized(T->size + In.size());
+	leaf_type *TL = static_cast<leaf_type *>(T);
+	auto entry_seq = type_trait::entry_seq::uninitialized(T->size + In.size());
 
 	if (TL->is_sorted) {
 		// In is always sorted (sorted by BatchInsert_ before descent).
 		// Both halves sorted: O(n) merge instead of O(n log n) sort.
-		std::ranges::merge(
-			TL->get_ele_begin_iter(), TL->get_ele_end_iter(), In.begin(),
-			In.end(), entry_seq.begin(),
-			[](E const &a, E const &b) { return TT::entry_less(a, b); });
-		free_node<Leaf>(T);
+		std::ranges::merge(TL->get_ele_begin_iter(), TL->get_ele_end_iter(),
+						   In.begin(), In.end(), entry_seq.begin(),
+						   [](entry_type const &a, entry_type const &b) {
+							   return type_trait::entry_less(a, b);
+						   });
+		free_node<leaf_type>(T);
 	} else {
 		std::ranges::copy_n(TL->get_ele_begin_iter(), TL->size,
 							entry_seq.begin());
 		parlay::copy(In, parlay::make_slice(entry_seq.begin() + TL->size,
 											entry_seq.end()));
-		free_node<Leaf>(T);
+		free_node<leaf_type>(T);
 		entry_seq = parlay::sort(entry_seq, key_less);
 	}
 
@@ -124,14 +125,14 @@ btree<TT>::handling_leaf_split_overflow(Node *T, Range In,
 	return rt_bkt_n;
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename LeafSortPred>
-TT::Node *
-btree<TT>::delete_points_4_leaf(Node *T, TT::const_key_slice In,
-								const TT::pattern_type leaf_entries_pattern,
-								LeafSortPred const &leaf_sort_pred)
+type_trait::node_type *btree<type_trait>::delete_points_4_leaf(
+	node_type *T, type_trait::const_key_slice In,
+	const type_trait::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
 {
-	auto TL = static_cast<Leaf *>(T);
+	auto TL = static_cast<leaf_type *>(T);
 
 	// Keys that are not here are skipped, so In may be longer than the
 	// leaf and may name keys it does not hold.
@@ -142,7 +143,7 @@ btree<TT>::delete_points_4_leaf(Node *T, TT::const_key_slice In,
 	for (size_type i = 0; i < In.size(); i++) {
 		it =
 			std::ranges::find_if(TL->elements.begin(), end, [&](auto const &e) {
-				return TT::key_equal(Entry::get_key(e), In[i]);
+				return type_trait::key_equal(entry_traits::get_key(e), In[i]);
 			});
 		if (it != end) {
 			std::ranges::iter_swap(it, --end);

@@ -11,8 +11,8 @@ enum InputType : std::uint8_t {
 
 template <typename Key, typename Val> class Wrapper {
 public:
-	using K = Key;
-	using V = Val;
+	using key_type = Key;
+	using mapped_type = Val;
 
 	struct LeafAugEmpty {
 		LeafAugEmpty() = default;
@@ -59,15 +59,15 @@ public:
 
 	// NOTE: the element we use
 	template <typename KeyType, typename ValType> struct Element {
-		using K = KeyType;
-		using V = ValType;
+		using key_type = KeyType;
+		using mapped_type = ValType;
 
-		K get_key() const
+		key_type get_key() const
 		{
 			return key;
 		}
 
-		V get_val() const
+		mapped_type get_val() const
 		{
 			return val;
 		}
@@ -110,30 +110,30 @@ public:
 			return o;
 		}
 
-		K key;
-		V val;
+		key_type key;
+		mapped_type val;
 	};
 
 	// NOTE: user needs to add a layer to expose API to b_tree
 	template <typename EntryType> struct ElementWrapper {
-		using E = EntryType;
-		using K = typename E::K;
-		using V = typename E::V;
+		using entry_type = EntryType;
+		using key_type = typename entry_type::key_type;
+		using mapped_type = typename entry_type::mapped_type;
 
 		// differs from different entry, interface for pmos structure
-		static auto get_key(E const &e)
+		static auto get_key(entry_type const &e)
 		{
 			return e.get_key();
 		}
-		static auto get_val(E const &e)
+		static auto get_val(entry_type const &e)
 		{
 			return e.get_val();
 		}
-		static E to_entry(K const &k, V const &v)
+		static entry_type to_entry(key_type const &k, mapped_type const &v)
 		{
-			return E{ .key = k, .val = v };
+			return entry_type{ .key = k, .val = v };
 		};
 	};
 
-	using E = Element<K, V>;
+	using entry_type = Element<key_type, mapped_type>;
 };

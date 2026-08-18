@@ -14,9 +14,9 @@
 
 namespace pab_tree
 {
-template <typename TT>
+template <typename type_trait>
 template <typename Range>
-void btree<TT>::batch_delete(Range &&In)
+void btree<type_trait>::batch_delete(Range &&In)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
@@ -25,17 +25,17 @@ void btree<TT>::batch_delete(Range &&In)
 
 	auto A = parlay::make_slice(std::forward<Range>(In));
 
-	constexpr auto leaf_entries_pattern = TT::leaf_entries_pattern::hybrid;
+	constexpr auto leaf_entries_pattern =
+		type_trait::leaf_entries_pattern::hybrid;
 	constexpr bool sorted_input = false;
 	BatchDelete_(A, leaf_entries_pattern, sorted_input, default_hybrid_pred{});
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-void btree<TT>::batch_delete(Range &&In,
-							 const TT::pattern_type leaf_entries_pattern,
-							 const bool sorted_input,
-							 LeafSortPred const &leaf_sort_pred)
+void btree<type_trait>::batch_delete(
+	Range &&In, const type_trait::pattern_type leaf_entries_pattern,
+	const bool sorted_input, LeafSortPred const &leaf_sort_pred)
 {
 	static_assert(parlay::is_random_access_range_v<Range>);
 	static_assert(
@@ -47,13 +47,13 @@ void btree<TT>::batch_delete(Range &&In,
 	BatchDelete_(A, leaf_entries_pattern, sorted_input, leaf_sort_pred);
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, typename LeafSortPred>
-	requires std::predicate<LeafSortPred, typename btree<TT>::Node *, Range>
-void btree<TT>::BatchDelete_(Range In,
-							 const TT::pattern_type leaf_entries_pattern,
-							 const bool sorted_input,
-							 LeafSortPred const &leaf_sort_pred)
+	requires std::predicate<LeafSortPred,
+							typename btree<type_trait>::node_type *, Range>
+void btree<type_trait>::BatchDelete_(
+	Range In, const type_trait::pattern_type leaf_entries_pattern,
+	const bool sorted_input, LeafSortPred const &leaf_sort_pred)
 {
 	if (this->root_ == nullptr) {
 		return;
@@ -63,14 +63,15 @@ void btree<TT>::BatchDelete_(Range In,
 		return;
 	}
 
-	static_assert(
-		std::same_as<typename decltype(In)::value_type, typename TT::K>);
+	static_assert(std::same_as<typename decltype(In)::value_type,
+							   typename type_trait::key_type>);
 
 	// Accept any random-access range, as batch_insert does.
-	typename TT::key_seq sorted_seq;
-	parlay::slice<const K *, const K *> sorted_slice{ nullptr, nullptr };
+	typename type_trait::key_seq sorted_seq;
+	parlay::slice<const key_type *, const key_type *> sorted_slice{ nullptr,
+																	nullptr };
 	if (!sorted_input) {
-		sorted_seq = parlay::sort(In, typename TT::key_compare{});
+		sorted_seq = parlay::sort(In, typename type_trait::key_compare{});
 		sorted_slice =
 			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	} else if constexpr (std::contiguous_iterator<decltype(std::begin(In))>) {
@@ -107,13 +108,13 @@ void btree<TT>::BatchDelete_(Range In,
 	}
 
 	if (invalid_subtree_num) {
-		if (this->root_->size < TT::k_buf_ub &&
+		if (this->root_->size < type_trait::k_buf_ub &&
 			!this->root_->is_leaf) { // fits in one leaf directly use leaf
 			this->rebuild_from_flatten();
 			return;
 		}
 		auto reinsert_entries =
-			TT::entry_seq::uninitialized(reinsert_entry_num);
+			type_trait::entry_seq::uninitialized(reinsert_entry_num);
 
 #ifdef DEBUG
 		this->validate<false>();
@@ -128,9 +129,9 @@ void btree<TT>::BatchDelete_(Range In,
 }
 
 // Flatten the whole tree and rebuild it from the surviving entries.
-template <typename TT> void btree<TT>::rebuild_from_flatten()
+template <typename type_trait> void btree<type_trait>::rebuild_from_flatten()
 {
-	auto tree_entries = TT::entry_seq::uninitialized(this->root_->size);
+	auto tree_entries = type_trait::entry_seq::uninitialized(this->root_->size);
 	flatten_rec(this->root_, parlay::make_slice(tree_entries));
 	this->delete_tree_rec<true>(this->root_);
 	this->root_ = nullptr; // Build_ releases root_, which is already freed
@@ -140,17 +141,18 @@ template <typename TT> void btree<TT>::rebuild_from_flatten()
 // Returns (invalid_flag, needs_fetch, reinsert_entry_num).
 // needs_fetch: any descendant needs fetch_invalid_subtree_nodes (not stored in
 // node).
-template <typename TT>
+template <typename type_trait>
 template <typename LeafSortPred>
-std::tuple<bool, bool, typename TT::size_type>
-btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
-								  const TT::pattern_type leaf_entries_pattern,
-								  LeafSortPred const &leaf_sort_pred)
+std::tuple<bool, bool, typename type_trait::size_type>
+btree<type_trait>::batch_delete_recursive(
+	node_type *T, type_trait::const_key_slice In,
+	const type_trait::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
 {
 	if (In.size() == 0) {
 		// stop here, than all subtree is valid
 		if (!T->is_leaf) {
-			static_cast<Interior *>(T)->reset_deletion_flag();
+			static_cast<interior_type *>(T)->reset_deletion_flag();
 		}
 		assert(node_is_valid(T) && node_contain_invalid_subtree(T) == 0 &&
 			   get_node_reinsert_size(T) == 0);
@@ -165,14 +167,14 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 		// Absent keys are skipped, so at most In.size() came out.
 		assert(new_node->size <= old_size);
 		assert(old_size - new_node->size <= In.size());
-		// return std::make_tuple(T->size < TT::k_buf_lb,
-		//                        T->size < TT::k_buf_lb ? 1 : 0,
+		// return std::make_tuple(T->size < type_trait::k_buf_lb,
+		//                        T->size < type_trait::k_buf_lb ? 1 : 0,
 		return std::make_tuple(get_node_invalid_status(T),
 							   node_contain_invalid_subtree(T),
 							   get_node_reinsert_size(T));
 	}
 
-	auto TI = static_cast<Interior *>(T);
+	auto TI = static_cast<interior_type *>(T);
 
 	size_buf_ub_arr split_pos_seq;
 	partition_batch(split_pos_seq, In, TI);
@@ -182,9 +184,10 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 	// i.e., less than the split value
 	for (int i = 1; i < TI->get_split_n(); i++) {
 		assert(parlay::all_of(In.cut(split_pos_seq[i - 1], split_pos_seq[i]),
-							  [&](K const k) {
-								  return !TT::key_less(k, TI->split[i - 1]) &&
-										 TT::key_less(k, TI->split[i]);
+							  [&](key_type const k) {
+								  return !type_trait::key_less(
+											 k, TI->split[i - 1]) &&
+										 type_trait::key_less(k, TI->split[i]);
 							  }));
 	}
 #endif // DEBUG
@@ -217,7 +220,7 @@ btree<TT>::batch_delete_recursive(Node *T, TT::const_key_slice In,
 			// the reinsertion phase needs to access the reinsert
 			// information from the tree node directly
 			if (children_are_interior) {
-				static_cast<Interior *>(TI->tree_nodes[i])
+				static_cast<interior_type *>(TI->tree_nodes[i])
 					->reset_deletion_flag();
 			}
 		}

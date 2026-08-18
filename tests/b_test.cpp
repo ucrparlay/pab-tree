@@ -45,11 +45,11 @@ static void ApplyOrthogonal(Options const &opts, RunFunc test_func)
 	using Wrapper = Wrapper<uint32_t, uint32_t>;
 #endif
 
-	using K [[maybe_unused]] = Wrapper::K;
-	using V [[maybe_unused]] = Wrapper::V;
-	using E = Wrapper::E;
+	using key_type [[maybe_unused]] = Wrapper::key_type;
+	using mapped_type [[maybe_unused]] = Wrapper::mapped_type;
+	using entry_type = Wrapper::entry_type;
 	using TypeTrait = pab_tree::btree_type_trait<
-		Wrapper::ElementWrapper<E>, k_buf, Wrapper::LeafAugEmpty,
+		Wrapper::ElementWrapper<entry_type>, k_buf, Wrapper::LeafAugEmpty,
 		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
 	if (opts.tree_type == 0) {
 		Run<BTreeWrapper<TypeTrait>>(opts, test_func);

@@ -21,11 +21,11 @@ template <typename TypeTrait> struct BTreeWrapper {
 template <typename Options, typename RunFunc>
 static void CheckOrthogonal(Options const &opts, RunFunc test_func)
 {
-	// using K = std::pair<uint32_t, uint32_t>;
+	// using key_type = std::pair<uint32_t, uint32_t>;
 	using Wrapper = Wrapper<uint32_t, uint32_t>;
-	using K [[maybe_unused]] = Wrapper::K;
-	using V [[maybe_unused]] = Wrapper::V;
-	using E = Wrapper::E;
+	using key_type [[maybe_unused]] = Wrapper::key_type;
+	using mapped_type [[maybe_unused]] = Wrapper::mapped_type;
+	using entry_type = Wrapper::entry_type;
 	// using EleType = Element<uint32_t, uint32_t>;
 #ifdef LEAF1
 	static constexpr uint const k_buf = 1;
@@ -54,7 +54,7 @@ static void CheckOrthogonal(Options const &opts, RunFunc test_func)
 #endif // LEAF1
 
 	using TypeTrait = pab_tree::btree_type_trait<
-		Wrapper::ElementWrapper<E>, k_buf, Wrapper::LeafAugEmpty,
+		Wrapper::ElementWrapper<entry_type>, k_buf, Wrapper::LeafAugEmpty,
 		Wrapper::InteriorAugEmpty, pab_tree::proto_node>;
 	if (opts.tree_type == 0) {
 		Run<BTreeWrapper<TypeTrait>>(opts, test_func);
@@ -90,11 +90,11 @@ protected:
 	std::vector<std::string> distributions{ "uni", "exp", "norm", "dual_norm" };
 	std::vector<std::string> batch_ops{ "ins" };
 
-	template <typename TT, typename TreeDesc>
+	template <typename type_trait, typename TreeDesc>
 	static void CheckCorrectness(Options opts)
 	{
 		using Tree = TreeDesc::TreeType;
-		using entry_seq = typename TT::entry_seq;
+		using entry_seq = typename type_trait::entry_seq;
 
 		Tree tree;
 		constexpr bool kTestTime = false;
@@ -103,10 +103,11 @@ protected:
 		auto [base_path, batch_path] =
 			opts.ParseInsertBatchPath(opts.batch_ratio);
 		[[maybe_unused]] auto [n, d] =
-			ReadEntries<typename TT::E>(base_path.c_str(), wp);
+			ReadEntries<typename type_trait::entry_type>(base_path.c_str(), wp);
 		[[maybe_unused]] auto [n2, d2] =
-			ReadEntries<typename TT::E>(batch_path.c_str(), wi);
-		BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+			ReadEntries<typename type_trait::entry_type>(batch_path.c_str(),
+														 wi);
+		BuildTree<type_trait, Tree, kTestTime, 2>(wp, opts.rounds, tree);
 		if (redirect_output) {
 			ASSERT_TRUE((tree.template validate<true, false>()));
 		} else {
@@ -120,7 +121,7 @@ protected:
 		}
 
 		if (opts.tag & (1 << 0)) {
-			batch_insert<TT, Tree, kTestTime>(tree, wp, wi, 2);
+			batch_insert<type_trait, Tree, kTestTime>(tree, wp, wi, 2);
 			ASSERT_EQ(tree.get_size(), wp.size() + wi.size());
 			if (redirect_output) {
 				ASSERT_TRUE((tree.template validate<true, false>()));
@@ -139,7 +140,7 @@ protected:
 
 		if (opts.tag & (1 << 1)) {
 			// WARN: must happen after the insertion
-			batch_delete<TT, Tree, kTestTime>(tree, wp, wi, 2);
+			batch_delete<type_trait, Tree, kTestTime>(tree, wp, wi, 2);
 			assert(tree.get_size() == wp.size());
 			if (redirect_output) {
 				ASSERT_TRUE((tree.template validate<true, false>()));
@@ -167,26 +168,27 @@ protected:
 			auto query_ele =
 				parlay::random_shuffle(new_wp).subseq(0, batch_size);
 			auto res = parlay::sequence<bool>(query_ele.size(), false);
-			Membership<TT>(tree, query_ele, opts.rounds, res);
+			Membership<type_trait>(tree, query_ele, opts.rounds, res);
 			assert(parlay::all_of(res, [&](auto r) { return r == true; }));
 			if (opts.tag & (1 << 1)) { // specifically for delete
 				query_ele = wi;
 				auto res = parlay::sequence<bool>(query_ele.size(), true);
-				Membership<TT>(tree, query_ele, opts.rounds, res);
+				Membership<type_trait>(tree, query_ele, opts.rounds, res);
 				assert(parlay::all_of(res, [&](auto r) { return r == false; }));
 			}
 		}
 
 		if (opts.query_type & (1 << 1)) {
 			for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-				RangeQuery<TT>(new_wp, tree, kRounds, kRangeQueryNum, rec_type);
+				RangeQuery<type_trait>(new_wp, tree, kRounds, kRangeQueryNum,
+									   rec_type);
 			}
 		}
 
 		if (opts.query_type & (1 << 2)) {
 			for (int rec_type = 0; rec_type < kRangeQueryType; rec_type++) {
-				range_count<TT>(new_wp, tree, kRounds, kRangeQueryNum,
-								rec_type);
+				range_count<type_trait>(new_wp, tree, kRounds, kRangeQueryNum,
+										rec_type);
 			}
 		}
 

@@ -10,23 +10,25 @@
 namespace pab_tree
 {
 
-template <typename TT>
-auto btree<TT>::range_count(TT::Box const query_box) const -> size_type
+template <typename type_trait>
+auto btree<type_trait>::range_count(type_trait::box_type const query_box) const
+	-> size_type
 {
 	size_type rt_size = 0;
 	if (this->root_ == nullptr ||
-		!TT::key_less(query_box.first, query_box.second)) [[unlikely]] {
+		!type_trait::key_less(query_box.first, query_box.second)) [[unlikely]] {
 		return 0;
 	}
 	range_count_rec(this->root_, query_box, rt_size);
 	return rt_size;
 }
 
-template <typename TT>
-void btree<TT>::range_count_leaf(Node const *T, TT::Box const &query_box,
-								 size_type &offset) const
+template <typename type_trait>
+void btree<type_trait>::range_count_leaf(node_type const *T,
+										 type_trait::box_type const &query_box,
+										 size_type &offset) const
 {
-	auto const *TL = static_cast<Leaf const *>(T);
+	auto const *TL = static_cast<leaf_type const *>(T);
 	if (TL->is_sorted) {
 		const auto l = TL->binary_search_key(query_box.first);
 		// Narrow: search for r only in [l, size) since r >= l.
@@ -39,14 +41,15 @@ void btree<TT>::range_count_leaf(Node const *T, TT::Box const &query_box,
 		size_t lo = 0, hi = static_cast<size_t>(rem);
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go =
-				TT::key_less(Entry::get_key(elems[mid]), query_box.second);
+			bool const go = type_trait::key_less(
+				entry_traits::get_key(elems[mid]), query_box.second);
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += TT::key_less(Entry::get_key(elems[i]), query_box.second) ?
+			cnt += type_trait::key_less(entry_traits::get_key(elems[i]),
+										query_box.second) ?
 					   1 :
 					   0;
 		}
@@ -59,20 +62,21 @@ void btree<TT>::range_count_leaf(Node const *T, TT::Box const &query_box,
 	// Unsorted leaf: branchless count
 	size_type cnt = 0;
 	for (buf_size_type i = 0; i < static_cast<buf_size_type>(TL->size); i++) {
-		auto const k = Entry::get_key(TL->elements[i]);
+		auto const k = entry_traits::get_key(TL->elements[i]);
 		cnt += (k >= query_box.first && k < query_box.second) ? 1 : 0;
 	}
 	offset += cnt;
 }
 
-template <typename TT>
-void btree<TT>::range_count_rec(Node const *T, TT::Box const &query_box,
-								size_type &offset) const
+template <typename type_trait>
+void btree<type_trait>::range_count_rec(node_type const *T,
+										type_trait::box_type const &query_box,
+										size_type &offset) const
 {
 	// Iterative descent for single-child levels (avoids O(height) call
 	// overhead).
 	while (!T->is_leaf) {
-		auto const *TI = static_cast<Interior const *>(T);
+		auto const *TI = static_cast<interior_type const *>(T);
 
 		// Left boundary child
 		const buf_size_type l = TI->get_node_id_containing_key(query_box.first);
@@ -88,13 +92,13 @@ void btree<TT>::range_count_rec(Node const *T, TT::Box const &query_box,
 		size_t lo = 0, hi = rem;
 		while (hi - lo > 8) {
 			size_t const mid = lo + ((hi - lo) >> 1);
-			bool const go = TT::key_less(sp_l[mid], query_box.second);
+			bool const go = type_trait::key_less(sp_l[mid], query_box.second);
 			lo = go ? mid + 1 : lo;
 			hi = go ? hi : mid;
 		}
 		size_t cnt = 0;
 		for (size_t i = lo; i < hi; ++i) {
-			cnt += TT::key_less(sp_l[i], query_box.second) ? 1 : 0;
+			cnt += type_trait::key_less(sp_l[i], query_box.second) ? 1 : 0;
 		}
 		const buf_size_type r = l + static_cast<buf_size_type>(lo + cnt);
 
@@ -102,7 +106,7 @@ void btree<TT>::range_count_rec(Node const *T, TT::Box const &query_box,
 		assert(r < TI->get_node_n());
 		assert(TI->validate_key_in_node(l, query_box.first));
 		assert(TI->validate_key_in_node(r, query_box.second) ||
-			   TT::key_equal(TI->split[r], query_box.second));
+			   type_trait::key_equal(TI->split[r], query_box.second));
 
 		if (l == r) {
 			T = TI->tree_nodes[l];

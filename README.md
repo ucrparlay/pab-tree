@@ -51,12 +51,15 @@ struct entry {
 // Tells the tree how to read your entry. The tree calls these directly --
 // take the entry by reference or by value, whichever you prefer.
 struct my_ele {
-        using E = entry;
-        using K = uint64_t;
-        using V = uint64_t;
-        static K get_key(E const &e) { return e.key; }
-        static V get_val(E const &e) { return e.val; }
-        static E to_entry(K const &k, V const &v) { return E{ k, v }; }
+        using entry_type  = entry;
+        using key_type    = uint64_t;
+        using mapped_type = uint64_t;
+        static key_type get_key(entry_type const &e) { return e.key; }
+        static mapped_type get_val(entry_type const &e) { return e.val; }
+        static entry_type to_entry(key_type const &k, mapped_type const &v)
+        {
+                return entry_type{ k, v };
+        }
 };
 
 using tt = pab_tree::btree_type_trait<my_ele>;   // leaf size defaults to 64
@@ -117,7 +120,7 @@ The names `std::set` and `tlx::btree_set` use also work:
 | modifiers | `bulk_load` `insert` `erase` (range, single entry/key, or iterator) |
 | compare | `==` `!=` `<` `<=` `>` `>=` |
 | observers | `key_comp` `value_comp` |
-| types | `key_type` `mapped_type` `value_type` `size_type` `iterator` … |
+| types | `key_type` `mapped_type` `value_type` `entry_type` `size_type` `iterator` … |
 
 ```cpp
 tree t(data);                        // build from any range
@@ -177,7 +180,7 @@ Lifetime ends at `delete_tree()` or the destructor.
 
 | # | parameter | default |
 |---|---|---|
-| 1 | `EleType` — reads K and V out of your entry | — |
+| 1 | `EleType` — reads the key and value out of your entry | — |
 | 2 | `BufferSize` — leaf size | `64` |
 | 3 | `LeafAugType` | `empty_leaf_aug` |
 | 4 | `InteriorAugType` | `empty_interior_aug` |

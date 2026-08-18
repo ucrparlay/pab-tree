@@ -298,6 +298,52 @@ Six sortedness asserts and eight box-vs-split asserts were rewritten to use
 range — just in the tree's order rather than the numeric one. No assert was
 removed or weakened.
 
+## Alias names now follow the convention (2026-08-18)
+
+Every CamelCase type alias is gone. `TT` alone was 712 sites; the pass touched
+~1500 across the library and the test drivers.
+
+| was | now | | was | now |
+|---|---|---|---|---|
+| `TT` | `type_trait` | | `E` | `entry_type` |
+| `Node` | `node_type` | | `K` | `key_type` |
+| `Leaf` | `leaf_type` | | `V` | `mapped_type` |
+| `Interior` | `interior_type` | | `Entry` | `entry_traits` |
+| `Box` | `box_type` | | `BaseNode` | `base_node` |
+| `Split` | `split_type` | | `AT` / `BT` | `aug_type` / `base_trait` |
+| `Num` | `num_comparator` | | `Num_Comparator` | `numeric_comparator` |
+
+Two of the requested names collided and were resolved:
+
+- **`E` -> `entry_type` collided with the concept `entry_type`.** The concept
+  is now `entry_adaptor`, which is what it actually constrains.
+- **`V` -> `value_type` collided with `value_type = E`**, and
+  `const_iterator::value_type` must stay the entry or `std::iterator_traits`
+  breaks. `V` is `mapped_type` instead — already present, and the STL name for
+  a map's value. `value_type` still means the stored entry.
+
+`class TypeTrait` became `type_trait_base`; the *template parameters* named
+`TypeTrait` stay CamelCase, which the convention wants.
+
+**This changed the user-facing adaptor contract.** A user now writes
+`entry_type` / `key_type` / `mapped_type`, not `E` / `K` / `V`. README updated.
+
+### Three traps in a blanket word-boundary rename
+
+- **`tests/common/` is vendored PBBS** and uses bare `E` 66 times and `V` 16
+  times. Excluded, or the rename would have wrecked it.
+- **Prose gets renamed too.** `// x = K/lambda is e^-K of the total` became
+  `e^-key_type` in `incre_data_generate.cpp`, where K is a mathematical
+  variable. Three comment lines and two in commented-out code in `b_ccp.cpp`
+  had to be put back by hand. Grep the diff for the new names in comments.
+- **Template parameters must stay CamelCase.** The pass turned
+  `template <typename E>` into `template <typename entry_type>` in two helpers
+  in `incre_data_generate.cpp`, which is both against the convention and
+  shadowing. Reverted to `Entry`; only the *member access* (`E::K` ->
+  `Entry::key_type`) should follow the contract rename.
+
+Codegen identical: 55463 instructions, no mnemonic count changed.
+
 ## The augmentation concepts are applied now (2026-08-17)
 
 I opened this one while constraining `NodeType`: `leaf_augmentation` and

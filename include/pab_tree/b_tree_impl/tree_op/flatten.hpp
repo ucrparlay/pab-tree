@@ -15,9 +15,9 @@
 namespace pab_tree
 {
 
-template <typename TT>
+template <typename type_trait>
 template <bool granularity>
-inline bool btree<TT>::force_parallel_recursion(Interior const *TI)
+inline bool btree<type_trait>::force_parallel_recursion(interior_type const *TI)
 {
 	// return true -> force parallel
 	// return false -> serial
@@ -25,9 +25,9 @@ inline bool btree<TT>::force_parallel_recursion(Interior const *TI)
 		   (!granularity && TI->force_parallel());
 }
 
-template <typename TT>
+template <typename type_trait>
 template <typename Range, bool granularity, bool sorted>
-void btree<TT>::flatten_rec(Node *T, Range Out)
+void btree<type_trait>::flatten_rec(node_type *T, Range Out)
 {
 	assert(T->size == Out.size());
 
@@ -40,16 +40,17 @@ void btree<TT>::flatten_rec(Node *T, Range Out)
 		return;
 	}
 
-	auto TI = static_cast<Interior *>(T);
+	auto TI = static_cast<interior_type *>(T);
 
 	assert(TI->size ==
-		   std::accumulate(
-			   TI->tree_nodes.begin(),
-			   TI->tree_nodes.begin() + TI->get_node_n(),
-			   static_cast<size_t>(0),
-			   [](size_t acc, Node *n) -> size_t { return acc + n->size; }));
+		   std::accumulate(TI->tree_nodes.begin(),
+						   TI->tree_nodes.begin() + TI->get_node_n(),
+						   static_cast<size_t>(0),
+						   [](size_t acc, node_type *n) -> size_t {
+							   return acc + n->size;
+						   }));
 
-	std::array<size_type, TT::k_buf_ub + 1> child_offsets;
+	std::array<size_type, type_trait::k_buf_ub + 1> child_offsets;
 	child_offsets[0] = 0;
 	auto node_n = TI->get_node_n();
 	for (buf_size_type i = 0; i < node_n; ++i) {
@@ -66,7 +67,9 @@ void btree<TT>::flatten_rec(Node *T, Range Out)
 		// In our btree when we flatten the tree, the size is
 		// always match the corresponding size, so we can use it as the
 		// granularity indicator
-		force_parallel_recursion<granularity>(TI) ? 1 : Interior::TT::k_buf_ub);
+		force_parallel_recursion<granularity>(TI) ?
+			1 :
+			interior_type::type_trait::k_buf_ub);
 }
 
 } // namespace pab_tree

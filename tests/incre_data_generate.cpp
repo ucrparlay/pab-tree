@@ -485,14 +485,14 @@ parlay::sequence<bool> SelectBatchFlags(size_t const win_n, size_t const pool_n,
 
 // NOTE: the whole key space, emitted as batches back to back in generation
 // order.  Consecutive windows of `batch_n` entries are the batches.
-template <typename E>
-parlay::sequence<E>
+template <typename Entry>
+parlay::sequence<Entry>
 GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 					  int const dis_type, parlay::sequence<double> const &param)
 {
-	using K = typename E::K;
+	using key_type = typename Entry::key_type;
 
-	auto out = parlay::sequence<E>::uninitialized(base_n);
+	auto out = parlay::sequence<Entry>::uninitialized(base_n);
 
 	size_t const batch_num = (base_n + batch_n - 1) / batch_n;
 	size_t const report_every = std::max<size_t>(batch_num / 10, 1);
@@ -531,7 +531,8 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 			parlay::tabulate(base_n, [](size_t i) -> size_t { return i; }),
 			parlay::random(seed0));
 		parlay::parallel_for(0, base_n, [&](size_t i) {
-			out[i] = E{ .key = static_cast<K>(perm[i]), .val = { i } };
+			out[i] =
+				Entry{ .key = static_cast<key_type>(perm[i]), .val = { i } };
 		});
 		for (size_t b = 0; b < batch_num; b++) {
 			if (b % report_every == 0 || b + 1 == batch_num) {
@@ -590,8 +591,8 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 			picked, parlay::random(seed0 + (b * 64ULL) + 33));
 		parlay::parallel_for(0, batch_rank.size(), [&](size_t i) {
 			out[written + i] =
-				E{ .key = static_cast<K>(pool[lo + batch_rank[i]]),
-				   .val = { written + i } };
+				Entry{ .key = static_cast<key_type>(pool[lo + batch_rank[i]]),
+					   .val = { written + i } };
 		});
 
 		size_t const took = batch_rank.size();
@@ -670,9 +671,9 @@ GenIncrementalBatches(size_t const base_n, size_t const batch_n,
 // pin that down for every error this generator can realistically make (a lost
 // or duplicated claim shows up in the sum); -validate 1 adds the full
 // distinctness check, which costs a hash pass over the whole key space.
-template <typename E>
-void ValidatePermutation(parlay::sequence<E> const &seq, size_t const base_n,
-						 bool const full)
+template <typename Entry>
+void ValidatePermutation(parlay::sequence<Entry> const &seq,
+						 size_t const base_n, bool const full)
 {
 	if (seq.size() != base_n) {
 		throw std::runtime_error("validate: wrong number of entries.");
@@ -854,7 +855,8 @@ int main(int argc, char *argv[])
 	std::string const stem = ".batch";
 	std::string const ext = binary ? ".bin" : ".in";
 
-	using E = Wrapper<Axis, std::tuple<Axis>>::Element<Axis, std::tuple<Axis>>;
+	using entry_type =
+		Wrapper<Axis, std::tuple<Axis>>::Element<Axis, std::tuple<Axis>>;
 
 	for (int i = 0; i < file_n; i++) {
 		std::string const out_path = path + toString(i + 1) + stem + ext;
@@ -862,8 +864,8 @@ int main(int argc, char *argv[])
 		rand_seed = i;
 
 		std::cout << "Generating... " << std::endl;
-		auto const seq = GenIncrementalBatches<E>(base_n, batch_n, dis_type,
-												  batch_param_seq);
+		auto const seq = GenIncrementalBatches<entry_type>(
+			base_n, batch_n, dis_type, batch_param_seq);
 
 		ValidatePermutation(seq, base_n, validate);
 

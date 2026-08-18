@@ -18,29 +18,29 @@ namespace pab_tree
 template <typename EleType, uint BufferSize, typename LeafAugType,
 		  typename InteriorAugType, typename NodeType, typename KeyCompare,
 		  typename NodeAllocType>
-class TypeTrait {
+class type_trait_base {
 public:
 	// element type
-	using E = EleType::E;
-	using K = typename EleType::K;
-	using V = typename EleType::V;
-	using Entry = EleType; // abstract type to access E
+	using entry_type = EleType::entry_type;
+	using key_type = typename EleType::key_type;
+	using mapped_type = typename EleType::mapped_type;
+	using entry_traits = EleType; // abstract type to access entry_type
 
 	// general type
-	using num_comparator = numeric_comparator<K>;
+	using num_comparator = numeric_comparator<key_type>;
 
 	// Key ordering. Every ordering decision in the tree goes through
 	// key_less; nothing compares keys with a raw operator.
 	using key_compare = KeyCompare;
 
-	static bool key_less(K const &a, K const &b)
+	static bool key_less(key_type const &a, key_type const &b)
 	{
 		return KeyCompare{}(a, b);
 	}
 
 	// a == b under key_compare. Two comparisons in general, but the
 	// default and any comparator supplying a static equal() get one.
-	static bool key_equal(K const &a, K const &b)
+	static bool key_equal(key_type const &a, key_type const &b)
 	{
 		if constexpr (requires {
 						  {
@@ -48,7 +48,7 @@ public:
 						  } -> std::convertible_to<bool>;
 					  }) {
 			return KeyCompare::equal(a, b);
-		} else if constexpr (std::same_as<KeyCompare, std::less<K>>) {
+		} else if constexpr (std::same_as<KeyCompare, std::less<key_type>>) {
 			return a == b;
 		} else {
 			return !KeyCompare{}(a, b) && !KeyCompare{}(b, a);
@@ -56,35 +56,37 @@ public:
 	}
 
 	// Order entries by their keys.
-	static bool entry_less(E const &a, E const &b)
+	static bool entry_less(entry_type const &a, entry_type const &b)
 	{
-		return key_less(Entry::get_key(a), Entry::get_key(b));
+		return key_less(entry_traits::get_key(a), entry_traits::get_key(b));
 	}
 
-	using entry_seq = parlay::sequence<E>;
-	using entry_slice = parlay::slice<E *, E *>;
-	using const_entry_slice = parlay::slice<E const *, E const *>;
-	using const_entry_seq = parlay::sequence<E> const;
-	using entry_iter = typename parlay::sequence<E>::iterator;
+	using entry_seq = parlay::sequence<entry_type>;
+	using entry_slice = parlay::slice<entry_type *, entry_type *>;
+	using const_entry_slice =
+		parlay::slice<entry_type const *, entry_type const *>;
+	using const_entry_seq = parlay::sequence<entry_type> const;
+	using entry_iter = typename parlay::sequence<entry_type>::iterator;
 
-	using key_seq = parlay::sequence<K>;
-	using const_key_seq = parlay::sequence<K> const;
-	using key_slice = parlay::slice<K *, K *>;
-	using const_key_slice = parlay::slice<K const *, K const *>;
-	using key_iter = typename parlay::sequence<K>::iterator;
+	using key_seq = parlay::sequence<key_type>;
+	using const_key_seq = parlay::sequence<key_type> const;
+	using key_slice = parlay::slice<key_type *, key_type *>;
+	using const_key_slice = parlay::slice<key_type const *, key_type const *>;
+	using key_iter = typename parlay::sequence<key_type>::iterator;
 
-	using Box = std::pair<K, K>;
-	using box_seq = parlay::sequence<Box>;
+	using box_type = std::pair<key_type, key_type>;
+	using box_seq = parlay::sequence<box_type>;
 
 	using leaf_aug = LeafAugType;
 	using interior_aug = InteriorAugType;
 
-	using Node = NodeType;
+	using node_type = NodeType;
 	// Where nodes come from. See parlay_node_alloc in node_base.h.
 	using node_alloc = NodeAllocType;
-	using node_seq = parlay::sequence<Node *>;
-	using node_slice = parlay::slice<Node **, Node **>;
-	using const_node_slice = parlay::slice<Node *const *, Node *const *>;
+	using node_seq = parlay::sequence<node_type *>;
+	using node_slice = parlay::slice<node_type **, node_type **>;
+	using const_node_slice =
+		parlay::slice<node_type *const *, node_type *const *>;
 
 	using pattern_type = std::uint8_t;
 
@@ -103,15 +105,15 @@ struct default_options {
 	using interior_aug = empty_interior_aug;
 	using node = proto_node;
 	using node_alloc = parlay_node_alloc;
-	// void means std::less<K>. A plain alias, not a member template, so
+	// void means std::less<key_type>. A plain alias, not a member template, so
 	// an options struct can be declared inside a function.
 	using key_compare = void;
 };
 
 // The tree's configuration. Only EleType is required.
 //
-//   EleType         reads K and V out of your entry; see the entry_type
-//                   concept
+//   EleType         reads the key and value out of your entry; see the
+//                   entry_adaptor concept
 //   BufferSize      leaf size; a leaf holds BufferSize..4*BufferSize entries
 //   LeafAugType     per-leaf augmentation, recomputed on every leaf change
 //   InteriorAugType per-interior augmentation, recomputed on every update
@@ -121,21 +123,22 @@ struct default_options {
 //
 // They are positional, so overriding a later one means naming the earlier
 // defaults. The defaults are all spelled `pab_tree::empty_leaf_aug`,
-// `empty_interior_aug`, `proto_node`, `std::less<K>`, `parlay_node_alloc`.
-template <entry_type EleType, uint BufferSize = 64,
+// `empty_interior_aug`, `proto_node`, `std::less<key_type>` and
+// `parlay_node_alloc`.
+template <entry_adaptor EleType, uint BufferSize = 64,
 		  typename LeafAugType = empty_leaf_aug,
 		  typename InteriorAugType = empty_interior_aug,
 		  node_base NodeType = proto_node,
-		  typename KeyCompare = std::less<typename EleType::K>,
+		  typename KeyCompare = std::less<typename EleType::key_type>,
 		  typename NodeAllocType = parlay_node_alloc>
 class btree_type_trait
-	: public TypeTrait<EleType, BufferSize, LeafAugType, InteriorAugType,
-					   NodeType, KeyCompare, NodeAllocType> {
+	: public type_trait_base<EleType, BufferSize, LeafAugType, InteriorAugType,
+							 NodeType, KeyCompare, NodeAllocType> {
 public:
 	using base_trait =
-		TypeTrait<EleType, BufferSize, LeafAugType, InteriorAugType, NodeType,
-				  KeyCompare, NodeAllocType>;
-	using split_type = base_trait::K;
+		type_trait_base<EleType, BufferSize, LeafAugType, InteriorAugType,
+						NodeType, KeyCompare, NodeAllocType>;
+	using split_type = base_trait::key_type;
 	using split_seq = parlay::sequence<split_type>;
 	using split_slice = parlay::slice<split_type *, split_type *>;
 	using split_slice_const =
@@ -168,7 +171,7 @@ public:
 	using buf_size_buf_ub_arr = std::array<buf_size_type, k_buf_ub>;
 	using boolean_buf_ub_arr = std::array<bool, k_buf_ub>;
 
-	using entry_arr = std::array<typename base_trait::E, k_buf_ub>;
+	using entry_arr = std::array<typename base_trait::entry_type, k_buf_ub>;
 
 	static constexpr uint_fast8_t const k_split_factor = 8;
 };
@@ -180,13 +183,13 @@ public:
 //           using key_compare = std::greater<uint64_t>;
 //   };
 //   using tt = pab_tree::btree_trait<my_ele, 64, desc>;
-template <entry_type EleType, uint BufferSize = 64,
+template <entry_adaptor EleType, uint BufferSize = 64,
 		  typename Options = default_options>
 using btree_trait = btree_type_trait<
 	EleType, BufferSize, typename Options::leaf_aug,
 	typename Options::interior_aug, typename Options::node,
 	std::conditional_t<std::is_void_v<typename Options::key_compare>,
-					   std::less<typename EleType::K>,
+					   std::less<typename EleType::key_type>,
 					   typename Options::key_compare>,
 	typename Options::node_alloc>;
 

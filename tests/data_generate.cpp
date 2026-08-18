@@ -100,28 +100,32 @@ int main(int argc, char *argv[])
 	path += toString(base_n / batch_n) + "/";
 	std::filesystem::create_directory(path);
 
-	auto generate = [&]<typename E>(std::string const &new_path) {
-		using entry_seq = parlay::sequence<E>;
-		using K = typename E::K;
+	auto generate = [&]<typename entry_type>(std::string const &new_path) {
+		using entry_seq = parlay::sequence<entry_type>;
+		using key_type = typename entry_type::key_type;
 		std::cout << "Generating... " << std::endl;
 		entry_seq base_seq, batch_seq;
 		std::tie(base_seq, batch_seq) =
 			dis_type == 0 ?
-				Generator<E, UniformGenerator<>, UniformGenerator<>>::GenBatch(
-					batch_op, base_n, batch_n, base_param_seq,
-					batch_param_seq) :
+				Generator<entry_type, UniformGenerator<>,
+						  UniformGenerator<>>::GenBatch(batch_op, base_n,
+														batch_n, base_param_seq,
+														batch_param_seq) :
 			dis_type == 1 ?
-				Generator<E, UniformGenerator<>,
+				Generator<entry_type, UniformGenerator<>,
 						  ExponentialGenerator<>>::GenBatch(batch_op, base_n,
 															batch_n,
 															base_param_seq,
 															batch_param_seq) :
 			dis_type == 2 ?
-				Generator<E, UniformGenerator<>, NormalGenerator<>>::GenBatch(
-					batch_op, base_n, batch_n, base_param_seq,
-					batch_param_seq) :
-				Generator<E, NormalGenerator<>, NormalGenerator<>>::GenBatch(
-					batch_op, base_n, batch_n, base_param_seq, batch_param_seq);
+				Generator<entry_type, UniformGenerator<>,
+						  NormalGenerator<>>::GenBatch(batch_op, base_n,
+													   batch_n, base_param_seq,
+													   batch_param_seq) :
+				Generator<entry_type, NormalGenerator<>,
+						  NormalGenerator<>>::GenBatch(batch_op, base_n,
+													   batch_n, base_param_seq,
+													   batch_param_seq);
 		std::cout << "Writing... " << std::endl;
 		if (binary) {
 			PrintToBinaryFile(new_path + ".base.bin", base_seq);

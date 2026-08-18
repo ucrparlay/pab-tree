@@ -12,11 +12,11 @@ double const kBatchInsertCheckRatio = 0.1;
 double const kCCPBatchDiffTotalRatio = 1.0;
 double const kCCPBatchDiffOverlapRatio = 0.5;
 
-template <typename TT, typename TreeDesc>
+template <typename type_trait, typename TreeDesc>
 void CheckCorrectness(Wrapper::Options opts)
 {
 	using Tree = TreeDesc::TreeType;
-	using entry_seq = typename TT::entry_seq;
+	using entry_seq = typename type_trait::entry_seq;
 
 	Tree tree;
 	constexpr bool kTestTime = false;
@@ -27,8 +27,10 @@ void CheckCorrectness(Wrapper::Options opts)
 			opts.ParseInsertBatchPath(opts.batch_ratio);
 		std::cout << "base path: " << base_path << "\n";
 		std::cout << "batch path: " << batch_path << "\n";
-		auto [n, d] = read_points<typename TT::E>(base_path.c_str(), wp, 0);
-		auto [n2, d2] = read_points<typename TT::E>(batch_path.c_str(), wi, n);
+		auto [n, d] = read_points<typename type_trait::entry_type>(
+			base_path.c_str(), wp, 0);
+		auto [n2, d2] = read_points<typename type_trait::entry_type>(
+			batch_path.c_str(), wi, n);
 		// parlay::sort_inplace(
 		//     wp, [](auto const& a, auto const& b) { return a.key < b.key; });
 		// for (int i = 0; i < 10 && i < wp.size(); i++) {
@@ -36,13 +38,15 @@ void CheckCorrectness(Wrapper::Options opts)
 		// }
 		// return;
 
-		BuildTree<TT, Tree, kTestTime, 2>(wp, opts.rounds, tree);
-		tree.template validate<typename Tree::Leaf, typename Tree::Interior>();
+		BuildTree<type_trait, Tree, kTestTime, 2>(wp, opts.rounds, tree);
+		tree.template validate<typename Tree::leaf_type,
+							   typename Tree::interior_type>();
 		puts("---------------finish build insert tree---------------");
 
-		batch_insert<TT, Tree, kTestTime>(tree, wp, wi, 2);
+		batch_insert<type_trait, Tree, kTestTime>(tree, wp, wi, 2);
 		assert(tree.get_size() == wp.size() + wi.size());
-		tree.template validate<typename Tree::Leaf, typename Tree::Interior>();
+		tree.template validate<typename Tree::leaf_type,
+							   typename Tree::interior_type>();
 		std::cout << "---------------finish insert----------------\n"
 				  << std::flush;
 	}
@@ -50,8 +54,8 @@ void CheckCorrectness(Wrapper::Options opts)
 	// if (tag &
 	//     (1 << 1)) {  // NOTE: without tag & (1<<0), this will remove no points
 	//   batch_delete<Point, Tree, kTestTime>(tree, wp, wi, 2,
-	//   batchInsertCheckRatio); tree.template validate<typename Tree::Leaf,
-	//   typename Tree::Interior,
+	//   batchInsertCheckRatio); tree.template validate<typename Tree::leaf_type,
+	//   typename Tree::interior_type,
 	//                          typename Tree::SplitRuleType>();
 	//   std::cout << "---------------finish delete----------------\n" <<
 	//   std::flush;
@@ -61,7 +65,8 @@ void CheckCorrectness(Wrapper::Options opts)
 	//   BatchDiff<Point, Tree, kTestTime>(tree, wp, 2, kCCPBatchDiffTotalRatio,
 	//                                     kCCPBatchDiffOverlapRatio);
 	//   // BatchDiff<Point, Tree, kTestTime>(tree, wp, 2, 0.5, 1.0);
-	//   tree.template validate<typename Tree::Leaf, typename Tree::Interior,
+	// tree.template validate<typename Tree::leaf_type, typename
+	// Tree::interior_type,
 	//                          typename Tree::SplitRuleType>();
 	//   assert(tree.get_root()->size ==
 	//          wp.size() - static_cast<size_t>(wp.size() *
@@ -97,7 +102,8 @@ void CheckCorrectness(Wrapper::Options opts)
 	//     BatchInsertByStep<Point, Tree, true>(tree, wp, rounds, rat);
 	//     std::cout << "root size: " << tree.get_root()->size << std::endl;
 	//   }
-	//   tree.template validate<typename Tree::Leaf, typename Tree::Interior,
+	// tree.template validate<typename Tree::leaf_type, typename
+	// Tree::interior_type,
 	//                          typename Tree::SplitRuleType>();
 	//   std::cout << "---------------finish incre build------------------\n"
 	//             << std::flush;
@@ -112,7 +118,8 @@ void CheckCorrectness(Wrapper::Options opts)
 	//   for (auto rat : ratios) {
 	//     BatchDeleteByStep<Point, Tree, true>(tree, wp, rounds, rat);
 	//   }
-	//   tree.template validate<typename Tree::Leaf, typename Tree::Interior,
+	// tree.template validate<typename Tree::leaf_type, typename
+	// Tree::interior_type,
 	//                          typename Tree::SplitRuleType>();
 	//   std::cout << "---------------finish incre delete------------------\n"
 	//             << std::flush;
@@ -158,7 +165,7 @@ void CheckCorrectness(Wrapper::Options opts)
 			static_cast<size_t>(wp.size() * kBatchInsertCheckRatio);
 		auto query_ele = parlay::random_shuffle(new_wp).subseq(0, batch_size);
 		auto res = parlay::sequence<bool>(query_ele.size(), false);
-		Membership<TT>(tree, query_ele, opts.rounds, res);
+		Membership<type_trait>(tree, query_ele, opts.rounds, res);
 		assert(parlay::all_of(res, [&](auto r) { return r == true; }));
 		std::cout << "\n--------------finish membership------------------\n"
 				  << std::flush;

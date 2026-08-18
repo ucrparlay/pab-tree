@@ -37,23 +37,23 @@ struct entry {
 };
 
 struct ele {
-	using E = entry;
-	using K = uint32_t;
-	using V = uint32_t;
+	using entry_type = entry;
+	using key_type = uint32_t;
+	using mapped_type = uint32_t;
 
-	static K get_key(E const &e)
+	static key_type get_key(entry_type const &e)
 	{
 		return e.key;
 	}
 
-	static V get_val(E const &e)
+	static mapped_type get_val(entry_type const &e)
 	{
 		return e.val;
 	}
 
-	static E to_entry(K const &k, V const &v)
+	static entry_type to_entry(key_type const &k, mapped_type const &v)
 	{
-		return E{ k, v };
+		return entry_type{ k, v };
 	}
 };
 
@@ -261,14 +261,14 @@ void add_to_oracle(oracle &ref, std::vector<entry> const &v)
 // Every leaf's augmentation equals the sum of the keys it holds, and every
 // interior's equals the entries below it. Catches an update_aug that a
 // rebalance forgot.
-template <typename Tree, typename Node>
-void check_aug(Node const *T, size_t &leaves, size_t &interiors)
+template <typename Tree, typename node_type>
+void check_aug(node_type const *T, size_t &leaves, size_t &interiors)
 {
-	using Leaf = typename Tree::Leaf;
-	using Interior = typename Tree::Interior;
+	using leaf_type = typename Tree::leaf_type;
+	using interior_type = typename Tree::interior_type;
 
 	if (T->is_leaf) {
-		auto const *TL = static_cast<Leaf const *>(T);
+		auto const *TL = static_cast<leaf_type const *>(T);
 		uint64_t want = 0;
 		for (size_t i = 0; i < TL->size; ++i) {
 			want += TL->elements[i].key;
@@ -278,7 +278,7 @@ void check_aug(Node const *T, size_t &leaves, size_t &interiors)
 		return;
 	}
 
-	auto const *TI = static_cast<Interior const *>(T);
+	auto const *TI = static_cast<interior_type const *>(T);
 	uint64_t want = 0;
 	for (size_t i = 0; i < TI->get_node_n(); ++i) {
 		want += TI->tree_nodes[i]->size;
@@ -626,21 +626,21 @@ TEST(SelfTest, TraitByName)
 // By-value accessors. The library used to wrap every adaptor in a layer
 // that forced this signature; it now calls the adaptor as written.
 struct ele_by_value {
-	using E = entry;
-	using K = uint32_t;
-	using V = uint32_t;
+	using entry_type = entry;
+	using key_type = uint32_t;
+	using mapped_type = uint32_t;
 
-	static K get_key(E e)
+	static key_type get_key(entry_type e)
 	{
 		return e.key;
 	}
-	static V get_val(E e)
+	static mapped_type get_val(entry_type e)
 	{
 		return e.val;
 	}
-	static E to_entry(K k, V v)
+	static entry_type to_entry(key_type k, mapped_type v)
 	{
-		return E{ k, v };
+		return entry_type{ k, v };
 	}
 };
 
@@ -651,29 +651,29 @@ struct big_entry {
 };
 
 struct ele_big {
-	using E = big_entry;
-	using K = uint32_t;
-	using V = uint32_t;
+	using entry_type = big_entry;
+	using key_type = uint32_t;
+	using mapped_type = uint32_t;
 
-	static K get_key(E const &e)
+	static key_type get_key(entry_type const &e)
 	{
 		return e.key;
 	}
-	static V get_val(E const &e)
+	static mapped_type get_val(entry_type const &e)
 	{
 		return e.key;
 	}
-	static E to_entry(K const &k, V const &)
+	static entry_type to_entry(key_type const &k, mapped_type const &)
 	{
-		E e{};
+		entry_type e{};
 		e.key = k;
 		return e;
 	}
 };
 
-static_assert(pab_tree::entry_type<ele>);
-static_assert(pab_tree::entry_type<ele_by_value>);
-static_assert(pab_tree::entry_type<ele_big>);
+static_assert(pab_tree::entry_adaptor<ele>);
+static_assert(pab_tree::entry_adaptor<ele_by_value>);
+static_assert(pab_tree::entry_adaptor<ele_big>);
 
 TEST(SelfTest, ElementAdaptorSignatures)
 {
@@ -872,19 +872,19 @@ TEST(SelfTest, DeleteAbsentKeys)
 // ---- the default leaf-sort decision is reproducible ----
 
 // FNV over every leaf's is_sorted flag, in tree order.
-template <typename Tree, typename Node>
-void hash_leaf_sortedness(Node const *T, uint64_t &h, size_t &leaves)
+template <typename Tree, typename node_type>
+void hash_leaf_sortedness(node_type const *T, uint64_t &h, size_t &leaves)
 {
-	using Leaf = typename Tree::Leaf;
-	using Interior = typename Tree::Interior;
+	using leaf_type = typename Tree::leaf_type;
+	using interior_type = typename Tree::interior_type;
 
 	if (T->is_leaf) {
-		auto const *TL = static_cast<Leaf const *>(T);
+		auto const *TL = static_cast<leaf_type const *>(T);
 		h = (h ^ (TL->is_sorted ? 1u : 0u)) * 1099511628211ULL;
 		leaves++;
 		return;
 	}
-	auto const *TI = static_cast<Interior const *>(T);
+	auto const *TI = static_cast<interior_type const *>(T);
 	for (size_t i = 0; i < TI->get_node_n(); ++i)
 		hash_leaf_sortedness<Tree>(TI->tree_nodes[i], h, leaves);
 }

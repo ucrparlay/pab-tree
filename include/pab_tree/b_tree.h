@@ -28,39 +28,39 @@ namespace pab_tree
 // Basetree
 template <class TypeTrait> class btree {
 public:
-	using TT = TypeTrait;
+	using type_trait = TypeTrait;
 	// TODO: Do we really need to define these types again?
 
-	using E = typename TT::E;
-	using K = typename TT::K;
-	using V = typename TT::V;
-	using Entry = TT::Entry;
+	using entry_type = typename type_trait::entry_type;
+	using key_type = typename type_trait::key_type;
+	using mapped_type = typename type_trait::mapped_type;
+	using entry_traits = type_trait::entry_traits;
 
-	using Node = TT::Node;
-	using num_comparator = typename TT::num_comparator;
-	using entry_slice = typename TT::entry_slice;
-	using split_type = typename TT::split_type;
-	using node_split_seq_pair =
-		std::pair<typename TT::node_seq, typename TT::split_seq>;
+	using node_type = type_trait::node_type;
+	using num_comparator = typename type_trait::num_comparator;
+	using entry_slice = typename type_trait::entry_slice;
+	using split_type = typename type_trait::split_type;
+	using node_split_seq_pair = std::pair<typename type_trait::node_seq,
+										  typename type_trait::split_seq>;
 
-	using node_split_pair = std::pair<Node *, split_type>;
+	using node_split_pair = std::pair<node_type *, split_type>;
 	using node_split_pair_seq = parlay::sequence<node_split_pair>;
 	using node_split_pair_slice =
 		parlay::slice<node_split_pair *, node_split_pair *>;
-	using node_seq_list = parlay::sequence<typename TT::node_seq>;
-	using split_seq_list = parlay::sequence<typename TT::split_seq>;
+	using node_seq_list = parlay::sequence<typename type_trait::node_seq>;
+	using split_seq_list = parlay::sequence<typename type_trait::split_seq>;
 
-	using leaf_aug = typename TT::leaf_aug;
-	using interior_aug = typename TT::interior_aug;
+	using leaf_aug = typename type_trait::leaf_aug;
+	using interior_aug = typename type_trait::interior_aug;
 
-	using input_range_type = TT::entry_seq;
-	using input_delete_range_type = TT::key_seq;
+	using input_range_type = type_trait::entry_seq;
+	using input_delete_range_type = type_trait::key_seq;
 
-	using size_buf_ub_arr = typename TT::size_buf_ub_arr;
-	using buf_size_buf_ub_arr = typename TT::buf_size_buf_ub_arr;
-	using boolean_buf_ub_arr = typename TT::boolean_buf_ub_arr;
-	using buf_size_type = TT::buf_size_type;
-	using size_type = TT::size_type;
+	using size_buf_ub_arr = typename type_trait::size_buf_ub_arr;
+	using buf_size_buf_ub_arr = typename type_trait::buf_size_buf_ub_arr;
+	using boolean_buf_ub_arr = typename type_trait::boolean_buf_ub_arr;
+	using buf_size_type = type_trait::buf_size_type;
+	using size_type = type_trait::size_type;
 
 	// tree structure
 	static constexpr uint_fast16_t const k_serial_build_cutoff = 512;
@@ -125,31 +125,32 @@ public:
 	}
 
 	// PARA: interior node type
-	struct btree_interior_node : multi_way_node<TT> {
-		using base_node = multi_way_node<TT>;
+	struct btree_interior_node : multi_way_node<type_trait> {
+		using base_node = multi_way_node<type_trait>;
 
-		btree_interior_node(TT::node_seq const &_tree_nodes,
-							TT::split_seq const &_split)
-			: base_node(_tree_nodes, _split, typename TT::interior_aug())
+		btree_interior_node(type_trait::node_seq const &_tree_nodes,
+							type_trait::split_seq const &_split)
+			: base_node(_tree_nodes, _split,
+						typename type_trait::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
 		{
 		}
 
-		btree_interior_node(TT::node_slice _tree_nodes_slice,
-							TT::split_slice _split_slice)
+		btree_interior_node(type_trait::node_slice _tree_nodes_slice,
+							type_trait::split_slice _split_slice)
 			: base_node(_tree_nodes_slice, _split_slice,
-						typename TT::interior_aug())
+						typename type_trait::interior_aug())
 			, valid(true)
 			, contain_invalid_subtree(0)
 			, reinsert_size(0)
 		{
 		}
 
-		btree_interior_node(TT::node_seq const &_tree_nodes,
-							TT::split_seq const &_split,
-							TT::interior_aug const &_aug)
+		btree_interior_node(type_trait::node_seq const &_tree_nodes,
+							type_trait::split_seq const &_split,
+							type_trait::interior_aug const &_aug)
 			: base_node(_tree_nodes, _split, _aug)
 			, valid(true)
 			, contain_invalid_subtree(0)
@@ -160,10 +161,11 @@ public:
 		// Gated so an empty augmentation compiles to nothing.
 		void update_aug()
 		{
-			if constexpr (node_has_non_trivial_aug<typename TT::interior_aug>) {
+			if constexpr (node_has_non_trivial_aug<
+							  typename type_trait::interior_aug>) {
 				static_assert(
 					interior_aug_updatable_with<
-						typename TT::interior_aug,
+						typename type_trait::interior_aug,
 						decltype(this->get_node_slice()),
 						decltype(this->get_split_slice())>,
 					"interior augmentation needs update(children, splits)");
@@ -204,27 +206,26 @@ public:
 		size_type reinsert_size;
 	};
 
-	using Leaf = leaf_node<TT>;
-	using Interior = btree_interior_node;
+	using leaf_type = leaf_node<type_trait>;
+	using interior_type = btree_interior_node;
 
 	// ---- public API ----
 
-	// STL container type names.
-	using key_type = K;
-	using mapped_type = V;
-	using value_type = E;
+	// STL container type names. key_type / mapped_type come from the
+	// trait; value_type is the stored element, which here is the entry.
+	using value_type = entry_type;
 	using difference_type = std::ptrdiff_t;
 
 	// Order two entries by key, using the trait's comparator.
 	struct value_compare {
-		bool operator()(E const &a, E const &b) const
+		bool operator()(entry_type const &a, entry_type const &b) const
 		{
-			return TT::entry_less(a, b);
+			return type_trait::entry_less(a, b);
 		}
 	};
 
 	// The trait's key comparator.
-	using key_compare = typename TT::key_compare;
+	using key_compare = typename type_trait::key_compare;
 
 	struct default_hybrid_pred {
 		template <typename InputNode, typename Range>
@@ -249,13 +250,15 @@ public:
 	template <typename Range> void batch_insert(Range &&In);
 	template <typename Range, typename LeafSortPred = default_hybrid_pred>
 	void
-	batch_insert(Range &&In, const TT::pattern_type leaf_entries_pattern,
+	batch_insert(Range &&In,
+				 const type_trait::pattern_type leaf_entries_pattern,
 				 const bool sorted_input,
 				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 	template <typename Range> void batch_delete(Range &&In);
 	template <typename Range, typename LeafSortPred = default_hybrid_pred>
 	void
-	batch_delete(Range &&In, const TT::pattern_type leaf_entries_pattern,
+	batch_delete(Range &&In,
+				 const type_trait::pattern_type leaf_entries_pattern,
 				 const bool sorted_input,
 				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 	void delete_tree();
@@ -265,17 +268,18 @@ public:
 	// overruns; debug builds assert.
 	template <typename Range> void get_entries(Range &Out) const;
 	template <bool CheckSize = true, bool Verbose = true>
-	[[nodiscard]] bool validate(Node const *T = nullptr) const;
+	[[nodiscard]] bool validate(node_type const *T = nullptr) const;
 	// Ratio of sorted leaves to total leaves in the subtree rooted at T
 	// (defaults to the whole tree). Returns 0.0 for an empty tree.
-	double sorted_leaf_ratio(Node const *T = nullptr) const;
-	auto contain(K const &k) const -> bool;
-	auto range_count(TT::Box query_box) const -> size_type;
+	double sorted_leaf_ratio(node_type const *T = nullptr) const;
+	auto contain(key_type const &k) const -> bool;
+	auto range_count(type_trait::box_type query_box) const -> size_type;
 	// Writes the entries in [first, second) into out and returns how many.
 	// PRECONDITION: out holds at least range_count(query_box) entries. A
 	// smaller out overruns; debug builds assert.
 	template <typename Range>
-	auto range_report(TT::Box query_box, Range &&out) const -> size_type;
+	auto range_report(type_trait::box_type query_box, Range &&out) const
+		-> size_type;
 
 	// ---- STL container interface ----
 	// Names from std::set. build/batch_insert/batch_delete stay the
@@ -302,13 +306,13 @@ public:
 		this->delete_tree();
 	}
 
-	bool contains(K const &k) const
+	bool contains(key_type const &k) const
 	{
 		return this->contain(k);
 	}
 
 	// Keys are distinct, so this is 0 or 1.
-	size_type count(K const &k) const
+	size_type count(key_type const &k) const
 	{
 		return this->contain(k) ? 1 : 0;
 	}
@@ -352,23 +356,23 @@ public:
 
 	// Insert or erase one entry. Both go through the batch path, so a
 	// loop over them is much slower than one batch call.
-	void insert(E const &e)
+	void insert(entry_type const &e)
 	{
-		this->batch_insert(std::array<E, 1>{ e });
+		this->batch_insert(std::array<entry_type, 1>{ e });
 	}
 
 	// Returns whether the key was present.
-	bool erase(K const &k)
+	bool erase(key_type const &k)
 	{
 		if (!this->contain(k)) {
 			return false;
 		}
-		this->batch_delete(std::array<K, 1>{ k });
+		this->batch_delete(std::array<key_type, 1>{ k });
 		return true;
 	}
 
 	// Entries in key order. Sorts any unsorted leaf as a side effect.
-	TT::entry_seq to_seq() const;
+	type_trait::entry_seq to_seq() const;
 
 	// ---- iteration ----
 	// Leaves are ordered against each other but a leaf's own entries may
@@ -392,10 +396,10 @@ public:
 	class const_iterator {
 	public:
 		using iterator_category = std::bidirectional_iterator_tag;
-		using value_type = E;
+		using value_type = entry_type;
 		using difference_type = std::ptrdiff_t;
-		using pointer = E const *;
-		using reference = E const &;
+		using pointer = entry_type const *;
+		using reference = entry_type const &;
 
 		const_iterator() = default;
 
@@ -434,7 +438,7 @@ public:
 	private:
 		friend class btree;
 
-		const_iterator(btree const *tree, Leaf *leaf, buf_size_type idx)
+		const_iterator(btree const *tree, leaf_type *leaf, buf_size_type idx)
 			: tree_(tree)
 			, leaf_(leaf)
 			, idx_(idx)
@@ -443,7 +447,7 @@ public:
 
 		btree const *tree_ = nullptr;
 		// nullptr marks end().
-		Leaf *leaf_ = nullptr;
+		leaf_type *leaf_ = nullptr;
 		buf_size_type idx_ = 0;
 	};
 
@@ -479,13 +483,14 @@ public:
 	}
 
 	// end() when the key is absent.
-	const_iterator find(K const &k) const;
+	const_iterator find(key_type const &k) const;
 	// First entry with key >= k.
-	const_iterator lower_bound(K const &k) const;
+	const_iterator lower_bound(key_type const &k) const;
 	// First entry with key > k.
-	const_iterator upper_bound(K const &k) const;
+	const_iterator upper_bound(key_type const &k) const;
 	// Keys are distinct, so this spans 0 or 1 entries.
-	std::pair<const_iterator, const_iterator> equal_range(K const &k) const;
+	std::pair<const_iterator, const_iterator>
+	equal_range(key_type const &k) const;
 
 	// Erase what pos points at, or everything in [first, last). Both
 	// read the keys out first, then run one batch_delete, so no
@@ -500,30 +505,31 @@ public:
 
 	// ---- implementation ----
 private:
-	// Leaf navigation for const_iterator. All four return nullptr when
+	// leaf_type navigation for const_iterator. All four return nullptr when
 	// there is no such leaf.
-	Leaf *leftmost_leaf() const;
-	Leaf *rightmost_leaf() const;
+	leaf_type *leftmost_leaf() const;
+	leaf_type *rightmost_leaf() const;
 	// First leaf holding keys > k / last leaf holding keys < k, where k
 	// is a key of the leaf being left.
-	Leaf *next_leaf(K const &k) const;
-	Leaf *prev_leaf(K const &k) const;
-	// Leaf whose key range covers k, nullptr if the tree is empty.
-	Leaf *leaf_covering(K const &k) const;
+	leaf_type *next_leaf(key_type const &k) const;
+	leaf_type *prev_leaf(key_type const &k) const;
+	// leaf_type whose key range covers k, nullptr if the tree is empty.
+	leaf_type *leaf_covering(key_type const &k) const;
 	// Sort a leaf if it is not already. Every leaf handed to an iterator
 	// goes through here.
-	static void ensure_leaf_sorted(Leaf *TL);
-	static void sort_leaves_rec(Node *T);
+	static void ensure_leaf_sorted(leaf_type *TL);
+	static void sort_leaves_rec(node_type *T);
 
 	// Order by key. Element types are not required to define operator<.
-	static constexpr auto key_less = [](E const &a, E const &b) {
-		return TT::entry_less(a, b);
+	static constexpr auto key_less = [](entry_type const &a,
+										entry_type const &b) {
+		return type_trait::entry_less(a, b);
 	};
 
 	// helper function to decide the bucket number and range
 	static size_type get_bkt_num(size_type const item_n)
 	{
-		return item_n / TT::k_buf_md;
+		return item_n / type_trait::k_buf_md;
 	}
 
 	static size_type get_bkt_st_idx(size_type const i, size_type const bkt_n,
@@ -539,72 +545,75 @@ private:
 	};
 
 	// PARA: return whether a node is invalid
-	static bool node_has_leaf_children(const Node *T)
+	static bool node_has_leaf_children(const node_type *T)
 	{
-		return T->is_leaf ?
-				   false :
-				   static_cast<const Interior *>(T)->tree_nodes[0]->is_leaf;
+		return T->is_leaf ? false :
+							static_cast<const interior_type *>(T)
+								->tree_nodes[0]
+								->is_leaf;
 	}
 
-	static bool self_balance_node(const Node *T, const bool tomb)
+	static bool self_balance_node(const node_type *T, const bool tomb)
 	{
 		return node_has_leaf_children(T) && tomb && node_is_valid(T);
 	}
 
-	static bool get_node_invalid_status(const Node *T)
+	static bool get_node_invalid_status(const node_type *T)
 	{
-		return T->is_leaf ? (T->size < TT::k_buf_lb) :
-							(!static_cast<const Interior *>(T)->valid);
+		return T->is_leaf ? (T->size < type_trait::k_buf_lb) :
+							(!static_cast<const interior_type *>(T)->valid);
 	}
 
-	static bool node_is_valid(const Node *T)
+	static bool node_is_valid(const node_type *T)
 	{
 		return !get_node_invalid_status(T);
 	}
 
-	static bool node_contain_invalid_subtree(const Node *T)
+	static bool node_contain_invalid_subtree(const node_type *T)
 	{
-		return T->is_leaf ?
-				   (T->size < TT::k_buf_lb ? true : false) :
-				   static_cast<const Interior *>(T)->contain_invalid_subtree;
+		return T->is_leaf ? (T->size < type_trait::k_buf_lb ? true : false) :
+							static_cast<const interior_type *>(T)
+								->contain_invalid_subtree;
 	}
 
-	static size_type get_node_reinsert_size(const Node *T)
+	static size_type get_node_reinsert_size(const node_type *T)
 	{
-		return T->is_leaf ? (T->size < TT::k_buf_lb ? T->size : 0) :
-							static_cast<const Interior *>(T)->reinsert_size;
+		return T->is_leaf ?
+				   (T->size < type_trait::k_buf_lb ? T->size : 0) :
+				   static_cast<const interior_type *>(T)->reinsert_size;
 	}
 
 	template <typename Range> void Build_(Range In);
-	template <typename Range> Node *build_recursive(Range In);
-	Node *assemble_interior_levels(TT::node_slice nodes, TT::split_slice keys);
+	template <typename Range> node_type *build_recursive(Range In);
+	node_type *assemble_interior_levels(type_trait::node_slice nodes,
+										type_trait::split_slice keys);
 
 	template <typename Range, typename LeafSortPred>
-		requires std::predicate<LeafSortPred, Node *, Range>
-	void BatchInsert_(Range In, const TT::pattern_type leaf_entries_pattern,
-					  const bool sorted_input,
-					  LeafSortPred const &leaf_sort_pred);
+		requires std::predicate<LeafSortPred, node_type *, Range>
+	void
+	BatchInsert_(Range In, const type_trait::pattern_type leaf_entries_pattern,
+				 const bool sorted_input, LeafSortPred const &leaf_sort_pred);
 
 	template <typename Range, typename LeafSortPred>
 	size_type
-	batch_insert_recursive(Node *T, Range In,
+	batch_insert_recursive(node_type *T, Range In,
 						   node_split_pair_slice node_split_slice,
-						   const TT::pattern_type leaf_entries_pattern,
+						   const type_trait::pattern_type leaf_entries_pattern,
 						   LeafSortPred const &leaf_sort_pred);
 
 	template <typename Range, typename LeafSortPred>
-		requires std::predicate<LeafSortPred, Node *, Range>
-	void BatchDelete_(Range In, const TT::pattern_type leaf_entries_pattern,
-					  const bool sorted_input,
-					  LeafSortPred const &leaf_sort_pred);
+		requires std::predicate<LeafSortPred, node_type *, Range>
+	void
+	BatchDelete_(Range In, const type_trait::pattern_type leaf_entries_pattern,
+				 const bool sorted_input, LeafSortPred const &leaf_sort_pred);
 
 	// Returns (invalid_flag, needs_fetch, reinsert_entry_num).
 	// needs_fetch: any subtree needs fetch_invalid_subtree_nodes (not
 	// stored in node).
 	template <typename LeafSortPred>
 	std::tuple<bool, bool, size_type>
-	batch_delete_recursive(Node *T, TT::const_key_slice In,
-						   const TT::pattern_type leaf_entries_pattern,
+	batch_delete_recursive(node_type *T, type_trait::const_key_slice In,
+						   const type_trait::pattern_type leaf_entries_pattern,
 						   LeafSortPred const &leaf_sort_pred);
 
 	// Remove the invalid subtree and put it in flatten_node_slice
@@ -612,42 +621,43 @@ private:
 	// the interior node size and valid flag after the compaction Return the
 	// total number entries in the tree that needs to rebuild
 	template <typename LeafSortPred>
-	void
-	fetch_invalid_subtree_nodes(Node *T, entry_slice reinsert_entries,
-								bool has_tomb,
-								const TT::pattern_type leaf_entries_pattern,
-								LeafSortPred const &leaf_sort_pred);
+	void fetch_invalid_subtree_nodes(
+		node_type *T, entry_slice reinsert_entries, bool has_tomb,
+		const type_trait::pattern_type leaf_entries_pattern,
+		LeafSortPred const &leaf_sort_pred);
 
 	template <typename LeafSortPred>
-	void reinsert_tree_after_delete(Node *T, entry_slice reinsert_entries,
-									const TT::pattern_type leaf_entries_pattern,
-									LeafSortPred const &leaf_sort_pred);
+	void reinsert_tree_after_delete(
+		node_type *T, entry_slice reinsert_entries,
+		const type_trait::pattern_type leaf_entries_pattern,
+		LeafSortPred const &leaf_sort_pred);
 
-	void prune_out_empty_tree(Node *T);
+	void prune_out_empty_tree(node_type *T);
 
 	void rebuild_from_flatten();
 
 	template <typename LeafSortPred>
-	void balance_over_leaves(Node *T, const size_type reinsert_size,
-							 const TT::pattern_type leaf_entries_pattern,
-							 LeafSortPred const &leaf_sort_pred);
+	void
+	balance_over_leaves(node_type *T, const size_type reinsert_size,
+						const type_trait::pattern_type leaf_entries_pattern,
+						LeafSortPred const &leaf_sort_pred);
 
-	static Node *batch_insert_update_interior(
-		Node *T, node_split_pair_slice node_split_slice,
+	static node_type *batch_insert_update_interior(
+		node_type *T, node_split_pair_slice node_split_slice,
 		size_buf_ub_arr const &split_pos_arr, size_type new_node_n,
 		size_buf_ub_arr const &return_node_n_arr);
 
 	std::tuple<bool, bool, size_type> batch_delete_update_interior_size(
-		Node *T, boolean_buf_ub_arr const &invalid_subtree_num_arr,
+		node_type *T, boolean_buf_ub_arr const &invalid_subtree_num_arr,
 		boolean_buf_ub_arr const &invalid_subtree_flag_arr,
 		size_buf_ub_arr const &reinsert_entries_num_arr);
 
 	// PARA: return bucket_num
-	static size_type generate_leaf_nodes(TT::entry_slice key_in,
-										 TT::split_slice key_out,
-										 TT::node_slice node_out);
+	static size_type generate_leaf_nodes(type_trait::entry_slice key_in,
+										 type_trait::split_slice key_out,
+										 type_trait::node_slice node_out);
 
-	static size_type generate_leaf_nodes(TT::entry_slice key_in,
+	static size_type generate_leaf_nodes(type_trait::entry_slice key_in,
 										 node_split_pair_slice node_split_out);
 
 	// PARA: return bucket_num
@@ -658,25 +668,25 @@ private:
 	};
 
 	template <typename OutputHandler>
-	static size_type generate_leaf_nodes(TT::entry_slice key_in,
+	static size_type generate_leaf_nodes(type_trait::entry_slice key_in,
 										 OutputHandler &&output_handler);
 
 	template <typename OutputHandler>
-	static size_type generate_interior_nodes(TT::node_slice node_in,
-											 TT::split_slice key_in,
+	static size_type generate_interior_nodes(type_trait::node_slice node_in,
+											 type_trait::split_slice key_in,
 											 OutputHandler &&output_handler);
 
 	template <typename Range, typename LeafSortPred>
-	static TT::Node *
-	post_process_leaf_change(Node *T, Range In,
-							 const TT::pattern_type leaf_entries_pattern,
-							 LeafSortPred const &leaf_sort_pred);
+	static type_trait::node_type *post_process_leaf_change(
+		node_type *T, Range In,
+		const type_trait::pattern_type leaf_entries_pattern,
+		LeafSortPred const &leaf_sort_pred);
 
 	// batch insert
 	template <typename Range, typename LeafSortPred>
-	static Node *
-	insert_points_2_leaf(Node *T, Range In,
-						 const TT::pattern_type leaf_entries_pattern,
+	static node_type *
+	insert_points_2_leaf(node_type *T, Range In,
+						 const type_trait::pattern_type leaf_entries_pattern,
 						 LeafSortPred const &leaf_sort_pred);
 
 	static void
@@ -687,128 +697,140 @@ private:
 
 	template <typename Range>
 	static size_type
-	handling_leaf_split_overflow(Node *T, Range In,
+	handling_leaf_split_overflow(node_type *T, Range In,
 								 node_split_pair_slice node_split_slice);
 
 	static size_type handling_interior_split_overflow(
-		Node *T, node_split_pair_slice node_split_slice,
+		node_type *T, node_split_pair_slice node_split_slice,
 		size_buf_ub_arr const &split_pos_arr, size_type new_node_n,
 		size_buf_ub_arr const &return_node_n_arr);
 
 	template <typename LeafSortPred>
-	static TT::Node *
-	delete_points_4_leaf(Node *T, TT::const_key_slice In,
-						 const TT::pattern_type leaf_entries_pattern,
+	static type_trait::node_type *
+	delete_points_4_leaf(node_type *T, type_trait::const_key_slice In,
+						 const type_trait::pattern_type leaf_entries_pattern,
 						 LeafSortPred const &leaf_sort_pred);
 
-	// template <typename Leaf, typename RT>
+	// template <typename leaf_type, typename RT>
 
 	// Partition In across TI's children, picking the cheaper of the two
 	// partitioners. Both batch recursions choose the same way.
 	template <typename Range>
 	[[gnu::always_inline]] static inline void
 	partition_batch(size_buf_ub_arr &split_pos_arr, Range In,
-					Interior const *TI);
+					interior_type const *TI);
 
 	template <typename Range>
-	static void split_batch_binary_search(size_buf_ub_arr &split_pos_arr,
-										  Range In,
-										  TT::split_slice_const split_slice);
+	static void
+	split_batch_binary_search(size_buf_ub_arr &split_pos_arr, Range In,
+							  type_trait::split_slice_const split_slice);
 
 	template <typename Range>
 	static void split_batch_merge(size_buf_ub_arr &split_pos_arr, Range In,
-								  TT::split_slice_const split_slice);
+								  type_trait::split_slice_const split_slice);
 
 	// delete tree
-	// template <SupportsForceParallel Interior, bool granularity>
+	// template <SupportsForceParallel interior_type, bool granularity>
 	template <bool granularity>
-	inline static bool force_parallel_recursion(Interior const *T);
+	inline static bool force_parallel_recursion(interior_type const *T);
 
-	static Node *copy_tree_recursive(Node const *T);
+	static node_type *copy_tree_recursive(node_type const *T);
 
-	template <bool granularity = true> static void delete_tree_rec(Node *T);
+	template <bool granularity = true>
+	static void delete_tree_rec(node_type *T);
 	// utility
 	// TODO: better evaluate the parallel recursion function
 	template <typename Range, bool granularity = true, bool sorted = false>
-	static void flatten_rec(Node *T, Range Out);
+	static void flatten_rec(node_type *T, Range Out);
 
 	template <typename Range, bool sorted = false>
-	static void extract_points_in_leaf(Node *T, Range Out);
+	static void extract_points_in_leaf(node_type *T, Range Out);
 
 	// validations
 
-	static TT::Box get_node_box_rec(Node const *T);
+	static type_trait::box_type get_node_box_rec(node_type const *T);
 
-	static TT::Box get_node_slice_box(TT::node_slice node_slice);
+	static type_trait::box_type
+	get_node_slice_box(type_trait::node_slice node_slice);
 
-	static TT::Box get_node_slice_box(TT::const_node_slice node_slice);
+	static type_trait::box_type
+	get_node_slice_box(type_trait::const_node_slice node_slice);
 
 	// Returns {subtree box, all checked properties held}.
 	template <bool CheckSize = true>
-	std::pair<typename TT::Box, bool> verify_tree_property(Node const *T) const;
+	std::pair<typename type_trait::box_type, bool>
+	verify_tree_property(node_type const *T) const;
 
-	bool verify_unoverlapped_tree(Node const *T,
-								  TT::node_slice node_slice) const;
+	bool verify_unoverlapped_tree(node_type const *T,
+								  type_trait::node_slice node_slice) const;
 
-	TT::height_type check_height(Node const *T) const;
+	type_trait::height_type check_height(node_type const *T) const;
 
-	bool check_contain_node(Node const *T, Node const *P) const;
+	bool check_contain_node(node_type const *T, node_type const *P) const;
 
-	template <typename Leaf, typename Interior> int get_height(Node const *T);
+	template <typename leaf_type, typename interior_type>
+	int get_height(node_type const *T);
 
-	template <typename Leaf, typename Interior>
-	int get_tree_nodes_num(Node const *T);
+	template <typename leaf_type, typename interior_type>
+	int get_tree_nodes_num(node_type const *T);
 
 	// Returns {sorted_leaf_num, total_leaf_num} for the subtree rooted at
 	// T.
-	static std::pair<size_type, size_type> count_sorted_leaves(Node const *T);
+	static std::pair<size_type, size_type>
+	count_sorted_leaves(node_type const *T);
 
-	std::tuple<bool, bool, typename TT::size_type>
-	check_tree_aug_after_delete(Node *T);
+	std::tuple<bool, bool, typename type_trait::size_type>
+	check_tree_aug_after_delete(node_type *T);
 
-	bool contain_iter(Node const *T, K const &k) const;
+	bool contain_iter(node_type const *T, key_type const &k) const;
 
-	void range_count_leaf(Node const *T, TT::Box const &query_box,
+	void range_count_leaf(node_type const *T,
+						  type_trait::box_type const &query_box,
 						  size_type &offset) const;
 
-	void range_count_rec(Node const *T, TT::Box const &query_box,
+	void range_count_rec(node_type const *T,
+						 type_trait::box_type const &query_box,
 						 size_type &offset) const;
 
 	template <typename Range>
-	void range_report_leaf(Node const *T, TT::Box const &query_box,
+	void range_report_leaf(node_type const *T,
+						   type_trait::box_type const &query_box,
 						   size_type &offset, Range out) const;
 
 	template <typename Range>
-	void range_report_iter(Node const *T, TT::Box const &query_box,
+	void range_report_iter(node_type const *T,
+						   type_trait::box_type const &query_box,
 						   size_type &offset, Range out) const;
 
 	template <typename Range>
-	void range_report_rec(Node const *T, TT::Box const &query_box,
+	void range_report_rec(node_type const *T,
+						  type_trait::box_type const &query_box,
 						  size_type &offset, Range out) const;
 
 	template <typename Range>
-	void range_report_flatten_rec(Node const *T, size_type &offset,
+	void range_report_flatten_rec(node_type const *T, size_type &offset,
 								  Range out) const;
 
 public:
-	static auto parse_input(TT::entry_seq const &input_seq) -> input_range_type
+	static auto parse_input(type_trait::entry_seq const &input_seq)
+		-> input_range_type
 	{
 		return input_seq;
 	}
 
-	static auto parse_delete_input(TT::entry_seq const &input_seq)
+	static auto parse_delete_input(type_trait::entry_seq const &input_seq)
 		-> input_delete_range_type
 	{
 		return parlay::map(input_seq,
-						   [&](auto e) { return Entry::get_key(e); });
+						   [&](auto e) { return entry_traits::get_key(e); });
 	}
 
-	Node *get_root()
+	node_type *get_root()
 	{
 		return this->root_;
 	}
 
-	Node const *get_root() const
+	node_type const *get_root() const
 	{
 		return this->root_;
 	}
@@ -825,7 +847,7 @@ public:
 
 	constexpr static int get_leaf_size()
 	{
-		return TT::k_buf;
+		return type_trait::k_buf;
 	}
 
 	void pab_tree_tag()
@@ -833,7 +855,7 @@ public:
 	}
 
 private:
-	Node *root_ = nullptr;
+	node_type *root_ = nullptr;
 };
 
 } // namespace pab_tree
