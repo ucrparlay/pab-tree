@@ -923,7 +923,7 @@ public:
 
 	constexpr static char const *get_tree_name()
 	{
-		return "btree";
+		return "BTree";
 	}
 
 	constexpr static int get_leaf_size()

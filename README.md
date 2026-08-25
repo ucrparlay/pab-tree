@@ -44,25 +44,12 @@ Everything a user writes:
 ```cpp
 #include "pab_tree/b_tree.h"
 
+// Public key and val members are all the tree needs.
 struct entry {
         uint64_t key, val;
 };
 
-// Tells the tree how to read your entry. The tree calls these directly --
-// take the entry by reference or by value, whichever you prefer.
-struct my_ele {
-        using entry_type  = entry;
-        using key_type    = uint64_t;
-        using mapped_type = uint64_t;
-        static key_type get_key(entry_type const &e) { return e.key; }
-        static mapped_type get_val(entry_type const &e) { return e.val; }
-        static entry_type to_entry(key_type const &k, mapped_type const &v)
-        {
-                return entry_type{ k, v };
-        }
-};
-
-using tt = pab_tree::btree_type_trait<my_ele>;   // leaf size defaults to 64
+using tt = pab_tree::btree_type_trait<entry>;    // leaf size defaults to 64
 using tree = pab_tree::btree<tt>;
 
 int main()
@@ -180,7 +167,7 @@ Lifetime ends at `delete_tree()` or the destructor.
 
 | # | parameter | default |
 |---|---|---|
-| 1 | `EleType` — reads the key and value out of your entry | — |
+| 1 | `EleType` — your entry, or an adaptor that reads one | — |
 | 2 | `BufferSize` — leaf size | `64` |
 | 3 | `LeafAugType` | `empty_leaf_aug` |
 | 4 | `InteriorAugType` | `empty_interior_aug` |
@@ -189,7 +176,7 @@ Lifetime ends at `delete_tree()` or the destructor.
 | 7 | `NodeAllocType` | `parlay_node_alloc` |
 
 ```cpp
-using tt = pab_tree::btree_type_trait<my_ele>;   // all defaults
+using tt = pab_tree::btree_type_trait<entry>;   // all defaults
 ```
 
 They are positional, so overriding #6 the long way means naming #3–#5 first.
@@ -200,7 +187,7 @@ override only what you want:
 struct desc : pab_tree::default_options {
         using key_compare = std::greater<uint64_t>;
 };
-using tt = pab_tree::btree_trait<my_ele, 64, desc>;
+using tt = pab_tree::btree_trait<entry, 64, desc>;
 ```
 
 `default_options` has `leaf_aug`, `interior_aug`, `node`, `node_alloc` and
@@ -208,6 +195,39 @@ using tt = pab_tree::btree_trait<my_ele, 64, desc>;
 `std::less<K>`. `btree_trait` is an alias for `btree_type_trait`, so the two
 name the same type and cannot drift apart. The members are plain aliases, so
 an options struct can be declared inside a function.
+
+### An entry the tree cannot read on its own
+
+Parameter #1 is your entry type when it has public `key` and `val` members.
+When it does not — different names, accessors instead of members, a key
+computed from several fields — pass an adaptor in its place. The tree calls
+these directly, so take the entry by reference or by value, whichever you
+prefer:
+
+```cpp
+struct record {
+        uint64_t id;
+        uint64_t payload;
+};
+
+struct record_traits {
+        using entry_type  = record;
+        using key_type    = uint64_t;
+        using mapped_type = uint64_t;
+        static key_type get_key(entry_type const &e) { return e.id; }
+        static mapped_type get_val(entry_type const &e) { return e.payload; }
+        static entry_type to_entry(key_type const &k, mapped_type const &v)
+        {
+                return entry_type{ k, v };
+        }
+};
+
+using tt = pab_tree::btree_type_trait<record_traits>;
+```
+
+`entry_adaptor` is the concept it has to satisfy, so a mistake is reported at
+your declaration rather than inside a header. Either way `tt::entry_traits`
+is how the tree reads an entry, and `tt::entry_type` is what it stores.
 
 ## Key ordering
 
@@ -218,7 +238,7 @@ boxes and `validate()`. Nothing compares keys with a raw operator.
 
 ```cpp
 using descending = pab_tree::btree_type_trait<
-        my_ele, 64,
+        entry, 64,
         pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
         pab_tree::proto_node,
         std::greater<uint64_t> >;      // the tree is ordered high to low
@@ -278,7 +298,7 @@ struct sum_interior_aug {
         void reset() { sum = 0; }
 };
 
-using tt = pab_tree::btree_type_trait<my_ele, 64,
+using tt = pab_tree::btree_type_trait<entry, 64,
                                       sum_leaf_aug, sum_interior_aug>;
 ```
 
@@ -335,7 +355,7 @@ struct my_node_alloc {
 };
 
 using tt = pab_tree::btree_type_trait<
-        my_ele, 64,
+        entry, 64,
         pab_tree::empty_leaf_aug, pab_tree::empty_interior_aug,
         pab_tree::proto_node, std::less<uint64_t>,
         my_node_alloc>;

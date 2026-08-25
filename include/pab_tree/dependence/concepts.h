@@ -54,6 +54,20 @@ concept entry_adaptor =
 	};
 
 /*
+ * An entry the tree can read by itself: public key and val members. Hand one
+ * straight to the trait -- plain_entry_adaptor supplies the accessors.
+ */
+template <typename T>
+concept keyed_entry = requires(T e) {
+	e.key;
+	e.val;
+};
+
+/* What the trait's first parameter may be: such an entry, or an adaptor. */
+template <typename T>
+concept entry_spec = entry_adaptor<T> || keyed_entry<T>;
+
+/*
  * What an augmentation must provide regardless of the range it is handed.
  * The range-dependent halves are separate below, because the constructor and
  * update_aug are called with different range types.

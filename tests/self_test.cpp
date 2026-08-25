@@ -33,11 +33,13 @@ namespace
 
 /* ---- the element the tree stores ---- */
 
+/* Public key and val, so the tree reads it with no adaptor written. */
 struct entry {
 	uint32_t key;
 	uint32_t val;
 };
 
+/* The same entry reached through an adaptor -- the other way in. */
 struct ele {
 	using entry_type = entry;
 	using key_type = uint32_t;
@@ -58,6 +60,16 @@ struct ele {
 		return entry_type{ k, v };
 	}
 };
+
+/* The two describe the same tree; only the way in differs. */
+static_assert(pab_tree::keyed_entry<entry>);
+static_assert(!pab_tree::entry_adaptor<entry>);
+static_assert(std::is_same_v<pab_tree::btree_type_trait<entry>::entry_type,
+							 pab_tree::btree_type_trait<ele>::entry_type>);
+static_assert(std::is_same_v<pab_tree::btree_type_trait<entry>::key_type,
+							 pab_tree::btree_type_trait<ele>::key_type>);
+static_assert(std::is_same_v<pab_tree::btree_type_trait<entry>::mapped_type,
+							 pab_tree::btree_type_trait<ele>::mapped_type>);
 
 /* ---- augmentations, checked against the tree they annotate ---- */
 
@@ -489,7 +501,8 @@ int g_rounds = 1;
 template <unsigned KBuf>
 void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 {
-	using tt = pab_tree::btree_type_trait<ele, KBuf>;
+	/* No adaptor: the whole matrix runs on the entry itself. */
+	using tt = pab_tree::btree_type_trait<entry, KBuf>;
 	using tree = pab_tree::btree<tt>;
 
 	SCOPED_TRACE("k_buf=" + std::to_string(KBuf) + " n=" + std::to_string(n) +

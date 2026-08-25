@@ -10,7 +10,6 @@ struct btree_wrapper {
 template <typename Options, typename RunFunc>
 static void apply_orthogonal(Options const &opts, RunFunc test_func)
 {
-	/* using EleType = Element<uint32_t, uint32_t>; */
 #ifdef LEAF1
 	static constexpr uint const k_buf = 1;
 #elif defined(LEAF2)
@@ -38,20 +37,15 @@ static void apply_orthogonal(Options const &opts, RunFunc test_func)
 #endif /* LEAF1 */
 
 #if defined(DYNAMIC_GRAPH)
-	using wrapper = wrapper<uint64_t, uint32_t>;
+	using entry_type = element<uint64_t, uint32_t>;
 #elif defined(OSM)
-	/* using wrapper = wrapper<std::pair<uint64_t, uint64_t>, uint32_t>; */
-	using wrapper = wrapper<uint64_t, uint32_t>;
+	/* using entry_type = element<std::pair<uint64_t, uint64_t>, uint32_t>; */
+	using entry_type = element<uint64_t, uint32_t>;
 #else
-	using wrapper = wrapper<uint32_t, uint32_t>;
+	using entry_type = element<uint32_t, uint32_t>;
 #endif
 
-	using key_type [[maybe_unused]] = wrapper::key_type;
-	using mapped_type [[maybe_unused]] = wrapper::mapped_type;
-	using entry_type = wrapper::entry_type;
-	using TT = pab_tree::btree_type_trait<
-		wrapper::element_wrapper<entry_type>, k_buf, wrapper::leaf_aug_empty,
-		wrapper::interior_aug_empty, pab_tree::proto_node>;
+	using TT = pab_tree::btree_type_trait<entry_type, k_buf>;
 	if (opts.tree_type == 0) {
 		Run<btree_wrapper<TT>>(opts, test_func);
 	}

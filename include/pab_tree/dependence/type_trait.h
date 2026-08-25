@@ -15,16 +15,56 @@
 
 namespace pab_tree
 {
+/*
+ * Accessors for an entry that already exposes key and val. The tree picks
+ * this up on its own, so such an entry needs no adaptor written for it.
+ */
+template <typename EntryType>
+struct plain_entry_adaptor {
+	static_assert(keyed_entry<EntryType>,
+				  "the entry needs public key and val members");
+
+	using entry_type = EntryType;
+	using key_type = decltype(EntryType::key);
+	using mapped_type = decltype(EntryType::val);
+
+	static key_type get_key(entry_type const &e)
+	{
+		return e.key;
+	}
+
+	static mapped_type get_val(entry_type const &e)
+	{
+		return e.val;
+	}
+
+	static entry_type to_entry(key_type const &k, mapped_type const &v)
+	{
+		entry_type e{};
+		e.key = k;
+		e.val = v;
+		return e;
+	}
+};
+
+/*
+ * How the tree reads an entry: the type itself when it is already an
+ * adaptor, else the plain accessors above.
+ */
+template <entry_spec EleType>
+using entry_traits_of = std::conditional_t<entry_adaptor<EleType>, EleType,
+										   plain_entry_adaptor<EleType>>;
+
 template <typename EleType, uint BufferSize, typename LeafAugType,
 		  typename InteriorAugType, typename NodeType, typename KeyCompare,
 		  typename NodeAllocType>
 class type_trait_base {
 public:
 	/* element type */
-	using entry_type = EleType::entry_type;
-	using key_type = typename EleType::key_type;
-	using mapped_type = typename EleType::mapped_type;
-	using entry_traits = EleType; /* abstract type to access entry_type */
+	using entry_traits = entry_traits_of<EleType>; /* reads an entry */
+	using entry_type = typename entry_traits::entry_type;
+	using key_type = typename entry_traits::key_type;
+	using mapped_type = typename entry_traits::mapped_type;
 
 	/* general type */
 	using num_comparator = numeric_comparator<key_type>;
@@ -121,7 +161,8 @@ struct default_options {
 /*
  * The tree's configuration. Only EleType is required.
  *
- *   EleType         reads the key and value out of your entry; see the
+ *   EleType         your entry type, if it has public key and val members;
+ *                   otherwise an adaptor that reads them, see the
  *                   entry_adaptor concept
  *   BufferSize      leaf size; a leaf holds BufferSize..4*BufferSize entries
  *   LeafAugType     per-leaf augmentation, recomputed on every leaf change
@@ -135,11 +176,12 @@ struct default_options {
  * `empty_interior_aug`, `proto_node`, `std::less<key_type>` and
  * `parlay_node_alloc`.
  */
-template <entry_adaptor EleType, uint BufferSize = 64,
+template <entry_spec EleType, uint BufferSize = 64,
 		  typename LeafAugType = empty_leaf_aug,
 		  typename InteriorAugType = empty_interior_aug,
 		  node_base NodeType = proto_node,
-		  typename KeyCompare = std::less<typename EleType::key_type>,
+		  typename KeyCompare =
+			  std::less<typename entry_traits_of<EleType>::key_type>,
 		  typename NodeAllocType = parlay_node_alloc>
 class btree_type_trait
 	: public type_trait_base<EleType, BufferSize, LeafAugType, InteriorAugType,
@@ -195,15 +237,15 @@ public:
  *   struct desc : pab_tree::default_options {
  *           using key_compare = std::greater<uint64_t>;
  *   };
- *   using tt = pab_tree::btree_trait<my_ele, 64, desc>;
+ *   using tt = pab_tree::btree_trait<my_entry, 64, desc>;
  */
-template <entry_adaptor EleType, uint BufferSize = 64,
+template <entry_spec EleType, uint BufferSize = 64,
 		  typename Options = default_options>
 using btree_trait = btree_type_trait<
 	EleType, BufferSize, typename Options::leaf_aug,
 	typename Options::interior_aug, typename Options::node,
 	std::conditional_t<std::is_void_v<typename Options::key_compare>,
-					   std::less<typename EleType::key_type>,
+					   std::less<typename entry_traits_of<EleType>::key_type>,
 					   typename Options::key_compare>,
 	typename Options::node_alloc>;
 

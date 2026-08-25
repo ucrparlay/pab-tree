@@ -2,12 +2,24 @@
 
 ## Working conventions (for Claude)
 
+- When writing something intended for human consumption, (comment, commit message, reply to prompt) use as few words as possible. Pick every word meticulously to reduce the volume to a strict minimum. Be down to the point. Less is more.
+
 - **Keep this file updated.** After any session where new files are read, new functions are understood, or new design decisions are uncovered, append or update the relevant section here. This file is the persistent knowledge store for this project and travels across machines.
 
 - **Check `.claude/` for memory.** At the start of each session, also check `.claude/MEMORY.md` and the memory files under `.claude/projects/` for additional persistent context (user preferences, feedback, project decisions) that supplements this file.
 
 
 - Don't need to run the unit_test after the updates. just make sure the compilation is passed.
+
+- **Never run a bare `git stash pop` in this repo.** It carries two long-lived
+  `autostash` entries (`stash@{0}` holds `.claude/settings.local.json`), so a
+  pop meant for your own stash consumes one of those instead. To A/B a change
+  against HEAD, copy `tests/` and `include/` to a scratch dir and overwrite the
+  changed files with `git show HEAD:<path>` — no git state to unwind.
+
+- **The shell is zsh: it does not word-split unquoted variables.**
+  `git stash push -- $FILES` sends one giant pathspec, not a list. Use an array
+  or `${=FILES}`, and never chain a destructive command after it with `;`.
 
 ## What this project is
 
@@ -502,7 +514,7 @@ indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
 | `include/pb_tree/b_tree_impl/batch_op/b_build_tree.hpp` | `Build`, `BuildRecursive` |
 | `tests/b_test.cpp` | Main benchmark/test driver |
 | `tests/unit_test.cpp` | Unit tests (uses GoogleTest) |
-| `tests/wrapper.h` | Concrete element/augmentation types for tests |
+| `tests/wrapper.h` | `element<Key, Val>` — the entry the tests store, plus the `input_type` enum |
 
 All `b_tree_impl/**/*.hpp` files are `#include`d at the bottom of `b_tree.h`; they are not compiled separately.
 
@@ -695,6 +707,10 @@ Codegen unchanged: 55463 instructions, no mnemonic count changed.
 
 ## `ele_wrapper` deleted — one adaptor layer, not two (2026-08-17)
 
+Superseded by "The entry needs no adaptor at all" below, which removed the
+remaining layer for the common case. This note is why the *library-side*
+wrapper went.
+
 `btree_type_trait` wrapped every user adaptor in `ele_wrapper`, which
 inherited it and re-declared the three accessors with **by-value** parameters:
 
@@ -732,6 +748,207 @@ floor before believing it.
 `E const &` and one taking `E` by value, plus a 64-byte entry type, and static
 asserts all three satisfy `entry_type`. Removing the wrapper does not break
 adaptors written for the old by-value signature.
+
+## The entry needs no adaptor at all (2026-08-20)
+
+Three types stood between a key/val pair and the tree, all in `tests/wrapper.h`:
+`wrapper<K,V>` (a class holding everything else), `wrapper::element<K,V>` (the
+entry), `wrapper::element_wrapper<E>` (the adaptor). All three are gone. An
+entry with public `key` and `val` members is now the whole declaration:
+
+```cpp
+struct entry { uint64_t key, val; };
+using tt = pab_tree::btree_type_trait<entry>;
+```
+
+**What went into the library.** `plain_entry_adaptor<E>` (`type_trait.h`)
+derives `key_type`/`mapped_type` from `decltype(E::key)`/`decltype(E::val)`
+and supplies `get_key`/`get_val`/`to_entry`. `entry_traits_of<E>` picks it, or
+`E` itself when `E` already satisfies `entry_adaptor` — so a hand-written
+adaptor still works exactly as before, and a *self*-adaptor entry (both member
+`key`/`val` and static `get_key`) resolves to itself, not to the plain one.
+Two concepts back it in `concepts.h`: `keyed_entry` (has `.key` and `.val`)
+and `entry_spec = entry_adaptor || keyed_entry`, which replaces `entry_adaptor`
+as the constraint on the trait's first parameter and on `btree_trait`.
+
+**The test-side declaration went from 5 explicit arguments to 1.**
+`wrapper::leaf_aug_empty` and `wrapper::interior_aug_empty` were duplicates of
+`pab_tree::empty_leaf_aug`/`empty_interior_aug`, and `proto_node` was being
+named only to reach past them, so all six drivers (`b_test`, `unit_test`,
+`stdset`, `tlxbtree`, `cpam`, `pma`, plus both in `workload.cpp`) now read
+`btree_type_trait<entry_type, k_buf>`.
+
+### Zero cost, and this is the strongest form of that proof yet
+
+Checked again on 2026-08-24 across **12 binaries** -- gcc 15.1.1 and clang 21.1.8,
+LEAF 2/32/64/1024, `-DDYNAMIC_GRAPH=ON`, `-DOSM=ON`, and the baselines
+(`stdset`, `tlxbtree`, `cpam`, `pma`) plus `index_microbench_workload`. Every
+one: same instruction count, same `.text` size, **0 differing lines** once
+addresses are normalised. `stdset`/`tlxbtree` matter because `key_probe` calls
+`to_entry` per query and `to_entry`'s body is the one function body this change
+rewrote (designated aggregate init -> value-init + two assignments); gcc emits
+the identical instruction sequence for both forms, at 8 and at 64 bytes.
+
+`b_test` at `-O3 -march=native`, before vs after:
+
+| | before | after |
+|---|---|---|
+| `.text` | 570725 B | **570725 B** |
+| instructions | 136531 | 136531 |
+| disassembly diff, symbol names normalised away | — | **0 lines** |
+| `.rodata` | 101376 B | 97600 B (−3776) |
+
+Not just the same mnemonic histogram — the *same instruction stream, in the
+same order*. The only section that moves is `.rodata`, and it shrinks because
+the mangled type names got shorter. No timing run was needed or would have
+meant anything.
+
+Build both sides from the same build dir (swap the sources, `make b_test`) and
+compare with the symbol operands erased, not just normalised:
+
+```bash
+objdump -d --no-show-raw-insn X | grep -E '^\s+[0-9a-f]+:' \
+  | sed -E 's/^\s*[0-9a-f]+:\s*//; s/<[^>]*>/<S>/g; s/0x[0-9a-f]+/HEX/g;
+            s/\b[0-9a-f]{4,}\b/ADDR/g'
+```
+
+`s/<[^>]*>/<S>/g` is what makes this stricter than the recipe under "Key
+comparator" — that one keeps the symbol and so still diffs on every renamed
+type, which is 21694 lines of noise here.
+
+### `.text` bytes differ; that is relocation, not code
+
+`sha256` of the extracted `.text` differs for all 12 binaries even though the
+size is identical. Every differing byte is an address: `$0x4bdb90` -> `$0x4bcb90`
+absolute immediates, `0x4bed80(%rax)` displacements, and `lea 0xeca6(%rip)`
+under clang. The deltas are a **constant per binary** -- gcc `b_test` −4096 and
+−3776 (the `.rodata` shrink), clang −70, and the shift on all 22 clang lines is
+exactly −70. So compare disassembly, never section hashes.
+
+**Calibration for how sensitive this is**: changing `get_tree_name`'s return
+from `"btree"` to `"BTree"` -- five characters to five characters, in a
+function called once for printing -- moves **11707 disassembly lines and 19
+instructions**. Basic-block layout is that twitchy. A *0*-line diff is
+therefore a very strong statement.
+
+### A constrained alias cannot be a `conditional_t` branch
+
+The first `entry_traits_of` had `template <keyed_entry E> struct
+plain_entry_adaptor`, and then
+
+```cpp
+std::conditional_t<entry_adaptor<T>, T, plain_entry_adaptor<T>>
+```
+
+**hard-errors** for an adaptor `T` — forming the template-id checks the
+constraint even in the branch that is not taken. Verified with a standalone
+probe, not assumed. The constraint is a `static_assert` in the class body
+instead, which is only instantiated on use, and the user-facing message comes
+from `entry_spec` on the trait parameter — it names the failing disjunction
+and points at the user's own `using tt = ...` line.
+
+### What the two test suites cover now
+
+`self_test`'s whole matrix (leaf 2–256, five key shapes, every size where the
+structure changes) runs the **no-adaptor** path, since that is the new code;
+`ele` stays and still drives the augmentation, comparator, allocator,
+trait-by-name and adaptor-signature tests, so both paths are exercised. Three
+`static_assert`s beside the two declarations check that
+`btree_type_trait<entry>` and `btree_type_trait<ele>` agree on `entry_type`,
+`key_type` and `mapped_type`. 22/22 at `-O3` and again under
+`-DDEBUG -UNDEBUG`.
+
+### Measured too, at 1e9, with the real benchmark command
+
+Static equality settles it, but the sweep was run anyway (2026-08-24), since a
+benchmark comparison had raised the question. Exactly what
+`scripts/incre_updates.sh` runs -- `numactl -i all b_test -p
+kv_pair_incre/uni/1000000000_1/ins/100/1.batch.bin -r 3 -s 0 -t 224 -q 0
+-b 0.01 -T 0 -D uni` -- interleaved old/new, two runs each:
+
+| | build | ins .01% | ins .1% | ins 1% | ins 10% | del .01% | del .1% | del 1% | del 10% |
+|---|---|---|---|---|---|---|---|---|---|
+| new vs old | +0.8% | +0.6% | +0.3% | +0.2% | +0.2% | −0.2% | +0.2% | +0.4% | −0.1% |
+
+Repeatability within a side is 0.0--1.0%, so this bounds any effect at **under
+1% with no consistent sign** -- which is what identical machine code predicts.
+Note these columns are 3-round `time_loop` averages (`batch_delete_by_step`
+honours `-r`), not the single shots the concurrent driver produces; they are
+much steadier than the 1e8 `-r 20` runs, where the same binary's own runs
+spread 5--74% and a null split of one binary against itself manufactures
+"effects" up to 56%.
+
+**`element` lost its member `get_key()`/`get_val()`.** `workload.cpp` was the
+only caller (6 sites) and reads `.key`/`.val` now. Keeping them would also have
+put a 0-arg non-static `get_key` next to the concept's `T::get_key(e)` probe,
+which is a needlessly subtle thing to leave lying around.
+
+## The incremental delete columns: `2a2d2ed`, and the old numbers were fake
+
+Bisected 2026-08-24, from the 2026-08-02 committed log to HEAD (70 commits).
+The entry-wrapper change is **not** involved; one commit is.
+
+Probe: `numactl -i all b_test -p kv_pair_incre/uni/1000000000_1/ins/100/1.batch.bin
+-r 1 -s 0 -t 128 -q 0 -b 0.01 -T 0 -D uni` -- the delete block alone, 227 s a run.
+
+| commit | del 0.01% | del 0.1% | del 1% | del 10% |
+|---|---|---|---|---|
+| `3faa9c6` the committed log | 33.54 | 13.89 | 3.849 | 1.370 |
+| `bd02b63` its parent | 33.31 | 13.98 | 3.832 | 1.371 |
+| **`2a2d2ed`** | **35.49** | **14.70** | **6.771** | **2.574** |
+| HEAD + the wrapper change | 35.51 | 14.63 | 6.653 | 2.514 |
+
+`2a2d2ed` is "BatchDelete freed the whole tree when every root child was
+underfull". The 57 commits after it, the wrapper change included, are flat.
+
+### The old code was destroying the tree mid-chain
+
+Not inferred from the diff -- reproduced. A ~25-line probe (build n random
+keys, delete them in equal batches, print `size()` and the time after each)
+compiled against both header sets at `-O3 -march=native -DNDEBUG`, which is how
+the benchmark is built:
+
+| n = 1e8, leaf 64 | old: entries lost at | live entries destroyed | old | new | ratio |
+|---|---|---|---|---|---|
+| 10 batches (= del 10%) | batch 6 of 10 | 40 000 000 | 0.209 s | 0.348 s | **1.67x** |
+| 100 batches (= del 1%) | batch 53 of 100 | 48 000 000 | 0.534 s | 0.955 s | **1.79x** |
+| 1000 batches (= del 0.1%) | batch 990 of 1000 | 1 100 000 | 2.003 s | 1.980 s | 0.99x |
+
+Once the tree is freed and `root_` nulled, every remaining batch returns in
+**0.0000 s**. So the old del 1% and del 10% numbers were timing a chain that
+deleted about half the tree and then measured nothing, and the "regression" is
+the cost of the batches that now actually run. The ratio-dependence matches the
+benchmark exactly: a big batch invalidates enough subtrees to make the root
+invalid while tens of millions of entries are still live, a small one only
+manages it when the tree is nearly empty -- which is why del 0.01%/0.1% moved
+5-6% and del 1%/10% moved 77-88%.
+
+**Build the old code with asserts and it simply aborts**: `assert(root_->size
+== 0)` at `b_batch_delete.hpp:89`, the assert `2a2d2ed` removed for asserting
+the condition the fix disproves. `-DNDEBUG` is what turned an abort into
+silent data loss.
+
+### Method notes
+
+- **Old commits build without touching the working tree**: `git archive <sha> |
+  tar -x` into a scratch dir, then symlink `external/{parlaylib,googletest,
+  libmorton,fast-cpp-csv-parser,tlx}` from the real worktree -- every submodule
+  pointer is identical across this whole window, so the links are sound.
+  Roughly 3 minutes a commit to build `b_test`.
+- **Pre-rename commits need two include roots**: `-Iinclude` *and*
+  `-Iinclude/pb_tree`, because `box_op.h` spells its include
+  `"dependence/type_trait.h"`. That is the "2 roots, three spellings" the
+  refactor removed.
+- **A small probe proves nothing here.** At n = 2e6 the old code loses nothing
+  at all; the root only goes invalid with entries still live once the tree is
+  big enough that one batch can invalidate every root child. Reproduce at 1e8
+  or above.
+
+All 14 targets build with no warning from our own code under `-Wall -Wextra`,
+plus `-DDYNAMIC_GRAPH=ON` and `-DOSM=ON` (both arms of the `#if` in every
+driver). The `-Wshadow` set over `self_test`/`b_test` is byte-identical to
+HEAD's — 3 warnings, all pre-existing and all in files this change never
+touched.
 
 ## `get_entries`' output-size precondition is now checked (2026-08-17)
 
@@ -1524,9 +1741,10 @@ C++ requires default template arguments to reference names already declared at t
 
 ## Concrete element type in tests
 
-Default: `Wrapper<uint32_t, uint32_t>::Element` → key=uint32_t (4B), val=uint32_t (4B) → E is 8 bytes.
-OSM variant: key=uint64_t.
-Dynamic graph: key=tuple<uint32_t,uint32_t,uint32_t>.
+Default: `element<uint32_t, uint32_t>` (`tests/wrapper.h`) → key=uint32_t (4B),
+val=uint32_t (4B) → E is 8 bytes. It goes to `btree_type_trait` directly; there
+is no adaptor. OSM variant: key=uint64_t. Dynamic graph: key=uint64_t packed as
+`(u << 32) | v`.
 
 ## Benchmark dataset files (`/data/zmen002/kv_pair/...`)
 

@@ -566,7 +566,7 @@ ConDelete(auto num_thread, auto idx, const auto& wp)
 
     int gc_counter = 0;
     for (size_t i = start_index; i < end_index; i++) {
-      idx->remove(wp[i].get_key(), wp[i].get_val(), ti);
+      idx->remove(wp[i].key, wp[i].val, ti);
       gc_counter++;
       if (gc_counter % 4096 == 0) {
         ti->rcu_quiesce();
@@ -601,7 +601,7 @@ ConInsert(auto num_thread, auto idx, const auto& wp)
 
     int gc_counter = 0;
     for (size_t i = start_index; i < end_index; i++) {
-      idx->insert(wp[i].get_key(), wp[i].get_val(), ti);
+      idx->insert(wp[i].key, wp[i].val, ti);
       gc_counter++;
       if (gc_counter % 4096 == 0) {
         ti->rcu_quiesce();
@@ -902,7 +902,7 @@ ConInsertByStep(auto num_thread,
         size_t const lo = (in.size() * tid) / num_thread;
         size_t const hi = (in.size() * (tid + 1)) / num_thread;
         for (size_t i = lo; i < hi; i++) {
-          idx->insert(in[i].get_key(), in[i].get_val(), ti);
+          idx->insert(in[i].key, in[i].val, ti);
           if (++counter % 4096 == 0) {
             ti->rcu_quiesce();
           }
@@ -955,7 +955,7 @@ ConDeleteByStep(auto num_thread,
         size_t const lo = (in.size() * tid) / num_thread;
         size_t const hi = (in.size() * (tid + 1)) / num_thread;
         for (size_t i = lo; i < hi; i++) {
-          idx->remove(in[i].get_key(), in[i].get_val(), ti);
+          idx->remove(in[i].key, in[i].val, ti);
           if (++counter % 4096 == 0) {
             ti->rcu_quiesce();
           }
@@ -999,7 +999,7 @@ ConQueryAfterStep(auto num_thread,
     ConMembership(
       num_thread,
       idx,
-      parlay::map(ele, [](auto const& e) { return e.get_key(); }));
+      parlay::map(ele, [](auto const& e) { return e.key; }));
   };
 
   // NOTE: one membership pass, the mix -- both halves put together, shuffled,
@@ -1227,14 +1227,8 @@ ApplyConcurrentIndexDynamicGraph(Options const& opts)
 {
   // opts.PrintOptionValue();
 
-  using wrapper = wrapper<uint64_t, uint32_t>;
-  using entry_type = typename wrapper::entry_type;
-  using type_trait =
-    pab_tree::btree_type_trait<wrapper::element_wrapper<entry_type>,
-                               16,
-                               wrapper::leaf_aug_empty,
-                               wrapper::interior_aug_empty,
-                               pab_tree::proto_node>;
+  using entry_type = element<uint64_t, uint32_t>;
+  using type_trait = pab_tree::btree_type_trait<entry_type, 16>;
 
 #if defined(DYNAMIC_GRAPH)
   constexpr int k_input_type = input_type::dynamic_graph_input;
@@ -1344,15 +1338,8 @@ ApplyConcurrentIndex(Options const& opts)
 {
   // opts.PrintOptionValue();
 
-  using wrapper = wrapper<uint32_t, uint32_t>;
-  using entry_type = typename wrapper::entry_type;
-  // using EleType = Element<uint32_t, uint32_t>;
-  using type_trait =
-    pab_tree::btree_type_trait<wrapper::element_wrapper<entry_type>,
-                               16,
-                               wrapper::leaf_aug_empty,
-                               wrapper::interior_aug_empty,
-                               pab_tree::proto_node>;
+  using entry_type = element<uint32_t, uint32_t>;
+  using type_trait = pab_tree::btree_type_trait<entry_type, 16>;
 
   using entry_seq = type_trait::entry_seq;
 
@@ -1481,7 +1468,7 @@ ApplyConcurrentIndex(Options const& opts)
     // PARA: lambda for membership
     auto membership_query = [&](auto const& input_query_ele) {
       auto query_ele =
-        parlay::map(input_query_ele, [&](auto const& e) { return e.get_key(); });
+        parlay::map(input_query_ele, [&](auto const& e) { return e.key; });
       ConMembership(num_thread, primal_idx, query_ele);
     };
 

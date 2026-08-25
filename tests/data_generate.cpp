@@ -142,8 +142,7 @@ int main(int argc, char *argv[])
 		std::cout << newpath << std::endl;
 		rand_seed = i;
 		if (val_n == 1) {
-			generate.operator()<wrapper<axis, std::tuple<axis>>::element<
-				axis, std::tuple<axis>>>(newpath);
+			generate.operator()<element<axis, std::tuple<axis>>>(newpath);
 		}
 		/*
 		 * else if (pts_dim == 3) {

@@ -933,8 +933,7 @@ int main(int argc, char *argv[])
 	std::string const stem = ".batch";
 	std::string const ext = binary ? ".bin" : ".in";
 
-	using entry_type =
-		wrapper<axis, std::tuple<axis>>::element<axis, std::tuple<axis>>;
+	using entry_type = element<axis, std::tuple<axis>>;
 
 	for (int i = 0; i < file_n; i++) {
 		std::string const out_path = path + toString(i + 1) + stem + ext;

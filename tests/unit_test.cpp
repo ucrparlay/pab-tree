@@ -23,11 +23,7 @@ template <typename Options, typename RunFunc>
 static void check_orthogonal(Options const &opts, RunFunc test_func)
 {
 	/* using key_type = std::pair<uint32_t, uint32_t>; */
-	using wrapper = wrapper<uint32_t, uint32_t>;
-	using key_type [[maybe_unused]] = wrapper::key_type;
-	using mapped_type [[maybe_unused]] = wrapper::mapped_type;
-	using entry_type = wrapper::entry_type;
-	/* using EleType = Element<uint32_t, uint32_t>; */
+	using entry_type = element<uint32_t, uint32_t>;
 #ifdef LEAF1
 	static constexpr uint const k_buf = 1;
 #elif defined(LEAF2)
@@ -54,9 +50,7 @@ static void check_orthogonal(Options const &opts, RunFunc test_func)
 	static constexpr uint const k_buf = 32; /* Default */
 #endif /* LEAF1 */
 
-	using TT = pab_tree::btree_type_trait<
-		wrapper::element_wrapper<entry_type>, k_buf, wrapper::leaf_aug_empty,
-		wrapper::interior_aug_empty, pab_tree::proto_node>;
+	using TT = pab_tree::btree_type_trait<entry_type, k_buf>;
 	if (opts.tree_type == 0) {
 		Run<btree_wrapper<TT>>(opts, test_func);
 	}

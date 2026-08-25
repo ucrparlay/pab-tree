@@ -16,20 +16,14 @@ template <typename Options, typename RunFunc>
 void apply_cpam(Options const &opts, RunFunc test_func)
 {
 #if defined(DYNAMIC_GRAPH)
-	using wrapper = wrapper<uint64_t, uint32_t>;
+	using entry_type = element<uint64_t, uint32_t>;
 #elif defined(OSM)
-	using wrapper = wrapper<uint64_t, uint32_t>;
+	using entry_type = element<uint64_t, uint32_t>;
 #else
-	using wrapper = wrapper<uint32_t, uint32_t>;
+	using entry_type = element<uint32_t, uint32_t>;
 #endif
 
-	using key_type [[maybe_unused]] = wrapper::key_type;
-	using mapped_type [[maybe_unused]] = wrapper::mapped_type;
-	using entry_type = wrapper::entry_type;
-	/* using EleType = Element<uint32_t, uint32_t>; */
-	using TT = pab_tree::btree_type_trait<
-		wrapper::element_wrapper<entry_type>, 16, wrapper::leaf_aug_empty,
-		wrapper::interior_aug_empty, pab_tree::proto_node>;
+	using TT = pab_tree::btree_type_trait<entry_type, 16>;
 	if (opts.tree_type == 0) {
 		/* B-tree */
 	} else if (opts.tree_type == 1) {
