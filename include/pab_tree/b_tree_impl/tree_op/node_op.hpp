@@ -472,7 +472,24 @@ void btree<TT>::balance_over_leaves(node_type *node,
 				}
 			}
 		}
-		assert(rpidx != TT::k_buf_ub);
+		/*
+		 * No valid child: one group pivoted on the last child. Only
+		 * consolidate_invalid_root sends such a node here, with a
+		 * reinsert_size that covers every child, so entry_buf holds the
+		 * group. node_n >= 2: an interior below the root keeps at least
+		 * k_buf_lb children, and the root arrives with k_buf_ub entries,
+		 * which one leaf cannot hold.
+		 */
+		if (rpidx == TT::k_buf_ub) {
+			assert(interior->get_node_n() >= 2);
+			rpidx = interior->get_node_n() - 1;
+			group_sum[rpidx] = 0;
+			for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
+				tree_group[i] = rpidx;
+				group_sum[rpidx] += interior->tree_nodes[i]->size;
+			}
+			return rpidx;
+		}
 		for (buf_size_type i = rpidx + 1; i < interior->get_node_n(); ++i) {
 			tree_group[i] = rpidx;
 			group_sum[rpidx] += interior->tree_nodes[i]->size;

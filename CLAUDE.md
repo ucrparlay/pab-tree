@@ -20,6 +20,9 @@
 - **The shell is zsh: it does not word-split unquoted variables.**
   `git stash push -- $FILES` sends one giant pathspec, not a list. Use an array
   or `${=FILES}`, and never chain a destructive command after it with `;`.
+  `set -- $pair` does not split either: `rm -rf $S/src/$2` then ran with `$2`
+  empty and removed all of `$S/src` (2026-09-10, scratch only). Write multi-step
+  shell as a `#!/bin/bash` script, and guard every `rm` path with `${v:?}`.
 
 ## What this project is
 
@@ -138,7 +141,10 @@ Plan: `docs/refactor_plan_2026-08.md`.
   Kernel and STL naming agree on functions, variables, structs and macros
   (checked against `/usr/include/linux/*.h` and libstdc++ 15.1.1); they differ
   on enum values and type-alias suffixes, where the STL form above wins.
-- **Format**: Linux kernel style, 8-wide tabs, 80 columns. **There is no
+- **Format**: Linux kernel style, 80 columns, tabs -- now **4 wide** (`0548915`;
+  `.clang-format` has `TabWidth: 4`), so measure line length at 4. It needs
+  clang-format >= 19 (`BreakTemplateDeclarations`); `/opt/opencilk-3/bin` has
+  19.1.7, the mason 18.1.6 on `PATH` rejects the file. **There is no
   `BasedOnStyle: Linux`** — verified with clang-format 22.1.3, the only values
   are LLVM/Google/Chromium/Mozilla/WebKit/Microsoft/GNU. The settings are
   spelled out in `.clang-format.kernel` at the repo root (staged, not active;
@@ -917,11 +923,134 @@ the benchmark is built:
 Once the tree is freed and `root_` nulled, every remaining batch returns in
 **0.0000 s**. So the old del 1% and del 10% numbers were timing a chain that
 deleted about half the tree and then measured nothing, and the "regression" is
-the cost of the batches that now actually run. The ratio-dependence matches the
-benchmark exactly: a big batch invalidates enough subtrees to make the root
-invalid while tens of millions of entries are still live, a small one only
-manages it when the tree is nearly empty -- which is why del 0.01%/0.1% moved
-5-6% and del 1%/10% moved 77-88%.
+the cost of the batches that now actually run.
+
+(This note used to say small batches lose the tree only "when nearly empty".
+True at 1e8, false at 1e9 -- see below. All four columns were truncated.)
+
+### Re-verified on the benchmark itself, 1e9 (2026-09-10)
+
+Harness instrumented per batch (time, `size()`, rebuild/reinsert counters),
+user's command, `-r 1`:
+
+| ratio | `376e067` freed tree at | live entries destroyed | `376e067` | HEAD |
+|---|---|---|---|---|
+| 0.01% | batch 8983 / 10000 | 101 600 000 | 35.15 | 37.50 |
+| 0.1% | batch 897 / 1000 | 102 000 000 | 14.08 | 15.43 |
+| 1% | batch 52 / 100 | 470 000 000 | 3.87 | 6.77 |
+| 10% | batch 5 / 10 | 400 000 000 | 1.38 | 2.54 |
+
+- Before the loss point the two match per batch (ratio 0.99--1.02).
+- `376e067` + `2a2d2ed` and HEAD make **identical** decisions: same size,
+  reinsert and rebuild counts after every batch, all four ratios.
+- HEAD's extra time is all after the old loss point: the batches that now run,
+  plus 2--5 full rebuilds (`rebuild_from_flatten`, 0.14 / 0.26 / 1.13 /
+  0.67 s). Rebuilds halve the tree each time (1%: 470M, 220M, 100M, 40M, 10M):
+  a rebuilt leaf holds `k_buf_md` and goes invalid below `k_buf_lb`.
+
+Timed, user's command, `-r 3`, 2 runs each in ABBA order (±0.25 s):
+
+| variant | 0.01% | 0.1% | 1% | 10% |
+|---|---|---|---|---|
+| `376e067` | 34.73 | 14.25 | 3.88 | 1.39 |
+| HEAD, fix reverted | 34.31 | 14.05 | 3.84 | 1.36 |
+| `376e067` + fix | 36.96 | 15.21 | 6.85 | 2.62 |
+| HEAD | 36.59 | 15.11 | 6.78 | 2.54 |
+
+The refactor is 1--3% *faster* at equal fix state; the fix is the whole delta.
+
+**The user's reference row `33.34 8.48 3.82 1.355` is the old 90-column sweep**
+(`logs/incremental_updates/0/uni/64.log`, 2026-07-30, `96526fd`): old `kv_pair`
+root, `-b 1`, one `del/1/1.batch.bin` sliced four ways, `tag=224`, `-r 4`.
+Library identical to `376e067`. On that file the 0.1% chain loses the tree at
+batch **533** (466M live) -- 9.28 s today -- versus 897 on `kv_pair_incre`.
+The loss point at 0.1% depends on the data; the other three columns lose at
+the same batch on both files. HEAD loses nothing on either.
+
+**`rebuild_from_flatten` sorts sorted data** (superseded, see below). Leaves
+are ordered, so `flatten_rec<decltype(out), true, true>` + `build_recursive`
+skips the sort: del 1% 6.83 -> 6.19, 10% 2.58 -> 2.19. Not applied; the
+consolidation below replaces the rebuild on this path altogether.
+
+### An invalid root is consolidated in place (2026-09-12)
+
+`consolidate_invalid_root` (`b_batch_delete.hpp`) replaces
+`rebuild_from_flatten` when the root is invalid with entries live:
+
+1. parallel recursion to every leaf-parent; `balance_over_leaves` merges its
+   underfull leaves in place. New phase-1 branch in `balance_over_leaves`
+   for a node with **no** valid leaf (was an `assert`): one group pivoted
+   on the last child, merged or re-bucketed. A leaf-parent whose leaves
+   are all empty just frees them (`node_n = 0`);
+2. `collect_leaves_rec`: leaves in key order plus the separator before
+   each, taken from the stored splits (child 0 inherits its parent's,
+   child j gets `split[j-1]`); frees every old interior on the way;
+3. `assemble_interior_levels` over that list, as `build` does.
+
+No entry leaves its leaf-parent, nothing is sorted, scratch is one pointer
+and one key per leaf (~256 MB at 1e9, was an 8 GB entry buffer).
+
+**Guard, read-only, before any mutation**: `root_->size >= k_buf_ub` and
+every leaf-parent holds 0 or `>= k_buf_lb` entries. Otherwise the old
+rebuild runs. Reason: an all-invalid leaf-parent with `1..k_buf_lb-1`
+entries would merge into one underfull leaf, and a tree below `k_buf_ub`
+could come out as a single leaf, which the assembly cannot take.
+
+**Decided from the leaves, not the deletion flags.** `consolidate_leaf_
+parents_rec` sums leaf sizes directly; flags are only read by the code it
+does not call. `prune_out_empty_tree` is not used (its assert reads the
+flag).
+
+**Which path ran is observable through the allocator**: consolidation
+allocates interiors and never a leaf; the rebuild allocates leaves. The
+tests assert that signature with `typed_counting_alloc`.
+
+Tests (`self_test`): `ConsolidateInvalidRoot` (leaf 2/8/64, sequential keys,
+delete all but every 8th -- deterministic collapse; with a `hole` that
+empties one root subtree), `ConsolidateInvalidRootHeight2` (root is the
+leaf-parent), `ConsolidateFallback` (a 1-entry leaf-parent trips the guard),
+`DeleteChainTenPercent` (10 x 10%, insert into the rebuilt levels),
+`AugmentationAfterConsolidation`, `ConsolidateLeakCheck` (allocs == frees
+per node type), `ConsolidateHeapAllocator` (plain new/delete, for ASAN),
+`ConsolidateReverseComparator`.
+
+**A random 10% chain does not always collapse the root.** At 1e9 the sixth
+batch does; at 4e5 with leaf 64 none does (the batch-5 repair leaves a
+spread of leaf sizes and the tree then consolidates gradually to the
+height floor, which the last batch reaches at size 0). `DeleteChainTenPercent`
+therefore forces the collapse with a keep-every-8th batch after five random
+ones instead of waiting for one.
+
+**Measured, 1e9, user's command, `-r 3`, ABBA x2** (repeats within 0.05 s):
+
+| | 0.01% | 0.1% | 1% | 10% |
+|---|---|---|---|---|
+| HEAD | 36.14 | 14.78 | 6.69 | 2.52 |
+| consolidation | 36.09 | 14.80 | **6.02** | **1.96** |
+
+Per event (probe): 470 M entries 0.020 s where the rebuild took 0.62 s; 400 M
+0.045 s vs 0.53 s; the two floor collapses of the small-ratio chains (102 M,
+leaves already healthy) 1-2 ms vs 0.14 s. Sizes after every batch identical
+to HEAD's. The small-ratio columns move within noise, as predicted.
+
+**A probe run is only as clean as the machine.** The first probe ran 17%
+slower than HEAD from batch 0, long before any consolidation; four nice'd
+single-core compiles were running beside a 224-thread fork-join program.
+Stop everything else before timing, even at nice 19.
+
+**Sanitizer build**: gcc-toolset-15 has no libasan here (`cannot find
+-lasan`). Use `/opt/opencilk-3/bin/clang++ -fsanitize=address,undefined`
+with `-fno-pie -no-pie`, because `build/lib/libgtest.a` is not PIC and
+clang links PIE by default. `ASAN_OPTIONS=detect_leaks=0` (parlay's pools
+never return memory). `ConsolidateHeapAllocator` exists for this build:
+under parlay's pool a freed node is recycled and a use-after-free is
+invisible.
+
+**Stale logs**: every BTree incremental-delete column produced before
+2026-08-17 is truncated. Under `logs/incremental_updates_new/0/` only
+`{uni,norm,seg}/64.log` were rerun after the fix (2026-08-24); every other leaf
+size and all of `exp` date from 2026-08-01/02. Insert columns and the other
+trees are unaffected.
 
 **Build the old code with asserts and it simply aborts**: `assert(root_->size
 == 0)` at `b_batch_delete.hpp:89`, the assert `2a2d2ed` removed for asserting

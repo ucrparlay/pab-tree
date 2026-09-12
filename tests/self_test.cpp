@@ -18,9 +18,12 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <new>
 #include <numeric>
 #include <random>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <parlay/primitives.h>
@@ -1129,6 +1132,188 @@ struct counting_alloc {
 	}
 };
 
+/*
+ * Per-type allocation counts. Which recovery a delete took shows up here:
+ * the in-place consolidation allocates interiors and never a leaf, the
+ * flatten-and-rebuild allocates leaves.
+ */
+struct typed_counting_alloc {
+	template <typename node>
+	static inline std::atomic<long> allocs{ 0 };
+
+	template <typename node>
+	static inline std::atomic<long> frees{ 0 };
+
+	template <typename node>
+	static node *alloc()
+	{
+		allocs<node>.fetch_add(1, std::memory_order_relaxed);
+		return parlay::type_allocator<node>::alloc();
+	}
+
+	template <typename node>
+	static void free(node *p)
+	{
+		frees<node>.fetch_add(1, std::memory_order_relaxed);
+		parlay::type_allocator<node>::retire(p);
+	}
+};
+
+/* Plain new/delete, so a sanitizer sees a node used after it was freed. */
+struct heap_alloc {
+	template <typename node>
+	static node *alloc()
+	{
+		return static_cast<node *>(
+			::operator new(sizeof(node), std::align_val_t{ alignof(node) }));
+	}
+
+	template <typename node>
+	static void free(node *p)
+	{
+		p->~node();
+		::operator delete(p, std::align_val_t{ alignof(node) });
+	}
+};
+
+/* (leaf, interior) allocation counts of one tree type, for deltas. */
+template <typename tree>
+std::pair<long, long> node_allocs()
+{
+	return {
+		typed_counting_alloc::allocs<typename tree::leaf_type>.load(),
+		typed_counting_alloc::allocs<typename tree::interior_type>.load()
+	};
+}
+
+/*
+ * Delete `gone` and check the tree against the oracle. With
+ * typed_counting_alloc, `consolidates` asserts which recovery ran: the
+ * in-place one allocates no leaf and at least one interior, the
+ * flatten-and-rebuild allocates leaves.
+ */
+template <typename tree>
+void delete_and_check(tree &t, oracle &ref, std::vector<uint32_t> const &gone,
+					  std::vector<uint32_t> const &probes, uint64_t seed,
+					  bool consolidates)
+{
+	using tt = typename tree::type_trait;
+	constexpr bool counted =
+		std::is_same_v<typename tt::node_alloc, typed_counting_alloc>;
+
+	[[maybe_unused]] auto const before = node_allocs<tree>();
+	t.batch_delete(gone);
+	for (auto k : gone) {
+		ref.erase(k);
+	}
+	if constexpr (counted) {
+		auto const after = node_allocs<tree>();
+		if (consolidates) {
+			ASSERT_EQ(after.first, before.first)
+				<< "consolidation allocated a leaf";
+			ASSERT_GT(after.second, before.second)
+				<< "no interior level was rebuilt";
+		} else {
+			ASSERT_GT(after.first, before.first) << "expected the rebuild";
+		}
+	}
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes));
+	ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed, 12));
+}
+
+/*
+ * Build the keys 0..n-1 and delete all but every eighth in one batch. Each
+ * build leaf keeps fewer than k_buf_lb entries, so every node and the root
+ * go invalid with entries still live; each leaf-parent keeps at least
+ * k_buf_lb, so the in-place consolidation applies. `hole` also empties one
+ * whole root subtree. Then all but every 32nd, then everything.
+ */
+template <typename tree>
+void consolidation_scenario(size_t n, bool hole, uint64_t seed,
+							auto &&after_each)
+{
+	using tt = typename tree::type_trait;
+	SCOPED_TRACE("consolidate k_buf=" +
+				 std::to_string(static_cast<unsigned>(tt::k_buf)) +
+				 " n=" + std::to_string(n) + (hole ? " hole" : "") +
+				 " seed=" + std::to_string(seed));
+
+	std::vector<uint32_t> keys(n);
+	std::iota(keys.begin(), keys.end(), 0u);
+	auto const all = to_entries(keys);
+
+	tree t;
+	oracle ref;
+	t.build(all);
+	add_to_oracle(ref, all);
+
+	std::vector<uint32_t> probes;
+	{
+		std::mt19937_64 rng(seed);
+		for (int i = 0; i < 200; ++i) {
+			probes.push_back(static_cast<uint32_t>(rng() % (n + 64)));
+		}
+	}
+
+	std::vector<uint32_t> gone;
+	for (auto k : keys) {
+		if (k % 8 != 0) {
+			gone.push_back(k);
+		}
+	}
+	if (hole) {
+		auto const *root =
+			static_cast<typename tree::interior_type const *>(t.get_root());
+		ASSERT_FALSE(root->is_leaf);
+		ASSERT_GE(root->get_node_n(), 3u) << "the hole needs 3 root children";
+		uint32_t const lo = root->split[0];
+		uint32_t const hi = root->split[1];
+		for (auto k : keys) {
+			if (k % 8 == 0 && k >= lo && k < hi) {
+				gone.push_back(k);
+			}
+		}
+	}
+	ASSERT_NO_FATAL_FAILURE(
+		delete_and_check(t, ref, gone, probes, seed ^ 1, true));
+	ASSERT_NO_FATAL_FAILURE(after_each(t, "first consolidation"));
+
+	gone.clear();
+	for (auto const &kv : ref) {
+		if (kv.first % 32 != 0) {
+			gone.push_back(kv.first);
+		}
+	}
+	ASSERT_NO_FATAL_FAILURE(
+		delete_and_check(t, ref, gone, probes, seed ^ 2, true));
+	ASSERT_NO_FATAL_FAILURE(after_each(t, "second consolidation"));
+
+	/* Everything left: the empty-root branch, not a consolidation. */
+	gone.clear();
+	for (auto const &kv : ref) {
+		gone.push_back(kv.first);
+	}
+	t.batch_delete(gone);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_TRUE(t.empty());
+}
+
+template <typename tree>
+void consolidation_scenario(size_t n, bool hole, uint64_t seed)
+{
+	consolidation_scenario<tree>(n, hole, seed, [](tree &, char const *) {});
+}
+
+struct counted_opts : pab_tree::default_options {
+	using node_alloc = typed_counting_alloc;
+};
+
+template <unsigned KBuf>
+using counted_tree =
+	pab_tree::btree<pab_tree::btree_trait<ele, KBuf, counted_opts>>;
+
 TEST(SelfTest, CustomAllocator)
 {
 	struct opts : pab_tree::default_options {
@@ -1283,6 +1468,341 @@ TEST(SelfTest, ReverseComparator)
 			ref.erase(k);
 	}
 	ASSERT_NO_FATAL_FAILURE(check("after batch_delete"));
+}
+
+/* ---- an invalid root is consolidated in place, not rebuilt ---- */
+
+TEST(SelfTest, ConsolidateInvalidRoot)
+{
+	auto const seed = g_seed ^ 0xc0501ULL;
+	for (bool hole : { false, true }) {
+		ASSERT_NO_FATAL_FAILURE(
+			consolidation_scenario<counted_tree<2>>(4096, hole, seed));
+		ASSERT_NO_FATAL_FAILURE(
+			consolidation_scenario<counted_tree<8>>(200000, hole, seed));
+		ASSERT_NO_FATAL_FAILURE(
+			consolidation_scenario<counted_tree<64>>(1000000, hole, seed));
+	}
+}
+
+/* The root is the leaf-parent: it takes the no-valid-leaf fallback itself. */
+TEST(SelfTest, ConsolidateInvalidRootHeight2)
+{
+	using tree = counted_tree<8>;
+	auto const seed = g_seed ^ 0x4e162ULL;
+
+	auto run = [&](size_t n, bool consolidates, bool leaf_root_after) {
+		SCOPED_TRACE("height-2 n=" + std::to_string(n));
+		std::vector<uint32_t> keys(n);
+		std::iota(keys.begin(), keys.end(), 0u);
+		auto const all = to_entries(keys);
+
+		tree t;
+		oracle ref;
+		t.build(all);
+		add_to_oracle(ref, all);
+		ASSERT_FALSE(t.get_root()->is_leaf);
+		ASSERT_TRUE(static_cast<tree::interior_type const *>(t.get_root())
+						->tree_nodes[0]
+						->is_leaf)
+			<< "the root must be the leaf-parent";
+
+		std::vector<uint32_t> gone;
+		for (auto k : keys) {
+			if (k % 4 != 0) {
+				gone.push_back(k);
+			}
+		}
+		ASSERT_NO_FATAL_FAILURE(
+			delete_and_check(t, ref, gone, keys, seed, consolidates));
+		ASSERT_EQ(t.get_root()->is_leaf, leaf_root_after);
+	};
+
+	/* 100 entries left of 400: consolidated, root keeps 6 leaves. */
+	ASSERT_NO_FATAL_FAILURE(run(400, true, false));
+	/* 25 left of 100: below k_buf_ub, the guard sends it to the rebuild. */
+	ASSERT_NO_FATAL_FAILURE(run(100, false, true));
+}
+
+/* A leaf-parent left with 1..k_buf_lb-1 entries fails the guard: rebuild. */
+TEST(SelfTest, ConsolidateFallback)
+{
+	using tree = counted_tree<8>;
+	auto const seed = g_seed ^ 0xfa11ULL;
+	SCOPED_TRACE("consolidate fallback seed=" + std::to_string(seed));
+
+	{
+		/*
+		 * Leaf-parents span 256 consecutive keys. Keep every fourth key
+		 * below 1000 (four leaf-parents at 58..64 entries, each leaf at
+		 * 4) plus the single key 10000: one leaf-parent holding 1 entry.
+		 */
+		size_t const n = 20000;
+		std::vector<uint32_t> keys(n);
+		std::iota(keys.begin(), keys.end(), 0u);
+		auto const all = to_entries(keys);
+
+		tree t;
+		oracle ref;
+		t.build(all);
+		add_to_oracle(ref, all);
+
+		std::vector<uint32_t> gone;
+		for (auto k : keys) {
+			bool const keep = (k < 1000 && k % 4 == 0) || k == 10000;
+			if (!keep) {
+				gone.push_back(k);
+			}
+		}
+		ASSERT_NO_FATAL_FAILURE(
+			delete_and_check(t, ref, gone, keys, seed, false));
+		ASSERT_EQ(t.size(), 251u);
+	}
+
+	{
+		/* Random keys, 99.9% gone in one batch; whichever path, correct. */
+		auto const keys = gen_keys(200000, dist::uniform, seed);
+		auto const all = to_entries(keys);
+
+		tree t;
+		oracle ref;
+		t.build(all);
+		add_to_oracle(ref, all);
+
+		std::vector<uint32_t> gone(keys.begin() + 200, keys.end());
+		t.batch_delete(gone);
+		for (auto k : gone) {
+			ref.erase(k);
+		}
+		std::vector<uint32_t> probes(keys.begin(), keys.begin() + 400);
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+		ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes));
+		ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 3, 12));
+	}
+}
+
+/*
+ * A chain of 10% batches with a collapse in the middle: five random
+ * batches, then one that keeps every eighth survivor (every leaf ends
+ * underfull, so the root goes invalid with live entries), then an insert
+ * and the remaining batches against the rebuilt levels.
+ *
+ * Whether a random 10% batch collapses the root depends on the shape --
+ * at 1e9 the sixth one does, at 4e5 with leaf 64 none does -- so the
+ * collapse is forced rather than waited for.
+ */
+template <typename tree>
+void ten_percent_chain(size_t n, uint64_t seed)
+{
+	using tt = typename tree::type_trait;
+	SCOPED_TRACE(
+		"chain k_buf=" + std::to_string(static_cast<unsigned>(tt::k_buf)) +
+		" n=" + std::to_string(n) + " seed=" + std::to_string(seed));
+
+	std::vector<uint32_t> keys(n);
+	std::iota(keys.begin(), keys.end(), 0u);
+	auto const all = to_entries(keys);
+
+	tree t;
+	oracle ref;
+	t.build(all);
+	add_to_oracle(ref, all);
+
+	std::vector<uint32_t> order = keys;
+	std::mt19937_64 rng(seed);
+	std::shuffle(order.begin(), order.end(), rng);
+	std::vector<uint32_t> probes(order.begin(), order.begin() + 200);
+	probes.push_back(static_cast<uint32_t>(n + 7));
+
+	size_t const step = n / 10;
+	auto random_batch = [&](int b) {
+		SCOPED_TRACE("batch " + std::to_string(b));
+		std::vector<uint32_t> gone(order.begin() + b * step,
+								   order.begin() + (b + 1) * step);
+		/* Later batches may name keys the collapse already removed. */
+		t.batch_delete(gone);
+		for (auto k : gone) {
+			ref.erase(k);
+		}
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+		ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes));
+	};
+
+	for (int b = 0; b < 5; ++b) {
+		ASSERT_NO_FATAL_FAILURE(random_batch(b));
+	}
+
+	/* Every leaf is valid here, so keeping an eighth empties all of them. */
+	{
+		std::vector<uint32_t> gone;
+		for (auto const &kv : ref) {
+			if (kv.first % 8 != 0) {
+				gone.push_back(kv.first);
+			}
+		}
+		ASSERT_NO_FATAL_FAILURE(
+			delete_and_check(t, ref, gone, probes, seed ^ 5, true));
+	}
+
+	/* Fresh keys into the rebuilt levels. */
+	std::vector<uint32_t> fresh(5000);
+	std::iota(fresh.begin(), fresh.end(), static_cast<uint32_t>(n));
+	auto const fresh_e = to_entries(fresh);
+	t.batch_insert(fresh_e);
+	add_to_oracle(ref, fresh_e);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	for (int b = 5; b < 10; ++b) {
+		ASSERT_NO_FATAL_FAILURE(random_batch(b));
+	}
+
+	std::vector<uint32_t> rest;
+	for (auto const &kv : ref) {
+		rest.push_back(kv.first);
+	}
+	t.batch_delete(rest);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_TRUE(t.empty());
+}
+
+TEST(SelfTest, DeleteChainTenPercent)
+{
+	auto const seed = g_seed ^ 0xc4a1aULL;
+	ASSERT_NO_FATAL_FAILURE(ten_percent_chain<counted_tree<8>>(100000, seed));
+	ASSERT_NO_FATAL_FAILURE(ten_percent_chain<counted_tree<64>>(400000, seed));
+}
+
+/* The merged leaves and the new interiors carry a current augmentation. */
+TEST(SelfTest, AugmentationAfterConsolidation)
+{
+	using tt =
+		pab_tree::btree_type_trait<ele, 8, sum_leaf_aug, subtree_size_aug>;
+	using tree = pab_tree::btree<tt>;
+	auto const seed = g_seed ^ 0xa06c0ULL;
+
+	ASSERT_NO_FATAL_FAILURE(consolidation_scenario<tree>(
+		30000, false, seed, [](tree &t, char const *stage) {
+			SCOPED_TRACE(stage);
+			size_t leaves = 0;
+			size_t interiors = 0;
+			ASSERT_NE(t.get_root(), nullptr);
+			ASSERT_NO_FATAL_FAILURE(
+				check_aug<tree>(t.get_root(), leaves, interiors));
+			ASSERT_GT(interiors, 0u) << "expected rebuilt interior levels";
+		}));
+}
+
+/* Every old interior is freed exactly once, every leaf exactly once. */
+TEST(SelfTest, ConsolidateLeakCheck)
+{
+	using tree = counted_tree<8>;
+	auto const seed = g_seed ^ 0x1eacULL;
+
+	ASSERT_NO_FATAL_FAILURE(consolidation_scenario<tree>(200000, true, seed));
+
+	/* Counts are per node type and outlive every tree of this trait. */
+	EXPECT_EQ(typed_counting_alloc::allocs<tree::leaf_type>.load(),
+			  typed_counting_alloc::frees<tree::leaf_type>.load())
+		<< "leaf leak or double free";
+	EXPECT_EQ(typed_counting_alloc::allocs<tree::interior_type>.load(),
+			  typed_counting_alloc::frees<tree::interior_type>.load())
+		<< "interior leak or double free";
+}
+
+/*
+ * Same scenario on plain new/delete. Under a sanitizer this is where a
+ * freed node still being read, or freed twice, shows up; parlay's pool
+ * recycles the block and would hide it.
+ */
+TEST(SelfTest, ConsolidateHeapAllocator)
+{
+	struct heap_opts : pab_tree::default_options {
+		using node_alloc = heap_alloc;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, heap_opts>>;
+	auto const seed = g_seed ^ 0x4ea9ULL;
+
+	ASSERT_NO_FATAL_FAILURE(consolidation_scenario<tree>(200000, true, seed));
+	ASSERT_NO_FATAL_FAILURE(ten_percent_chain<tree>(100000, seed));
+}
+
+/* The separators carried into the new levels follow the comparator. */
+TEST(SelfTest, ConsolidateReverseComparator)
+{
+	struct desc : pab_tree::default_options {
+		using key_compare = std::greater<uint32_t>;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, desc>>;
+
+	auto const seed = g_seed ^ 0x9e77c0ULL;
+	SCOPED_TRACE("consolidate under std::greater seed=" + std::to_string(seed));
+
+	size_t const n = 30000;
+	std::vector<uint32_t> keys(n);
+	std::iota(keys.begin(), keys.end(), 0u);
+	auto const all = to_entries(keys);
+
+	std::map<uint32_t, uint32_t, std::greater<uint32_t>> ref;
+	tree t;
+	t.build(all);
+	for (auto const &e : all) {
+		ref[e.key] = e.val;
+	}
+
+	auto check = [&](char const *stage) {
+		SCOPED_TRACE(stage);
+		bool const ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok) << "validate() failed under std::greater";
+		ASSERT_EQ(t.size(), ref.size());
+
+		auto rt = ref.begin();
+		size_t cnt = 0;
+		for (auto it = t.begin(); it != t.end(); ++it, ++rt, ++cnt) {
+			ASSERT_NE(rt, ref.end());
+			ASSERT_EQ(it->key, rt->first) << "order diverged at " << cnt;
+			ASSERT_EQ(it->val, rt->second);
+		}
+		ASSERT_EQ(cnt, ref.size());
+
+		auto const seq = t.to_seq();
+		ASSERT_EQ(seq.size(), ref.size());
+		for (size_t i = 1; i < seq.size(); ++i) {
+			ASSERT_GT(seq[i - 1].key, seq[i].key) << "not descending at " << i;
+		}
+
+		for (uint32_t k = 0; k < n + 64; k += 97) {
+			ASSERT_EQ(t.contain(k), ref.count(k) != 0)
+				<< "contain(" << k << ")";
+		}
+	};
+
+	auto erase_unless_multiple_of = [&](uint32_t m) {
+		std::vector<uint32_t> gone;
+		for (auto const &kv : ref) {
+			if (kv.first % m != 0) {
+				gone.push_back(kv.first);
+			}
+		}
+		t.batch_delete(gone);
+		for (auto k : gone) {
+			ref.erase(k);
+		}
+	};
+
+	erase_unless_multiple_of(8);
+	ASSERT_NO_FATAL_FAILURE(check("first consolidation"));
+	erase_unless_multiple_of(32);
+	ASSERT_NO_FATAL_FAILURE(check("second consolidation"));
+
+	std::vector<uint32_t> rest;
+	for (auto const &kv : ref) {
+		rest.push_back(kv.first);
+	}
+	t.batch_delete(rest);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check("emptied"));
+	ASSERT_TRUE(t.empty());
 }
 
 /* ---- edge cases: the sizes where the structure changes shape ---- */

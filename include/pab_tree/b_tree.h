@@ -707,6 +707,36 @@ private:
 
 	void rebuild_from_flatten();
 
+	/*
+	 * Invalid root with live entries: merge the underfull leaves under
+	 * every leaf-parent in place, then rebuild only the interior levels.
+	 * False, with nothing touched, when a leaf would come out underfull;
+	 * the caller then falls back to rebuild_from_flatten().
+	 */
+	template <typename LeafSortPred>
+	bool consolidate_invalid_root(
+		const type_trait::pattern_type leaf_entries_pattern,
+		LeafSortPred const &leaf_sort_pred);
+
+	/* Every leaf-parent below node holds no entry or at least k_buf_lb. */
+	static bool leaf_parents_consolidable_rec(node_type const *node);
+
+	/* Returns the number of leaves left below node. */
+	template <typename LeafSortPred>
+	size_type consolidate_leaf_parents_rec(
+		node_type *node, const type_trait::pattern_type leaf_entries_pattern,
+		LeafSortPred const &leaf_sort_pred);
+
+	static size_type count_leaves_rec(node_type const *node);
+
+	/*
+	 * Leaves below node in key order, the separator before each, and free
+	 * every interior on the way. out_keys[i] belongs to out_nodes[i].
+	 */
+	static void collect_leaves_rec(node_type *node, key_type const &key_before,
+								   type_trait::node_slice out_nodes,
+								   type_trait::split_slice out_keys);
+
 	template <typename LeafSortPred>
 	void
 	balance_over_leaves(node_type *node, const size_type reinsert_size,

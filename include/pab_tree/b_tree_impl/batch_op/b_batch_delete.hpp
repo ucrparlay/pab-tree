@@ -1,9 +1,12 @@
 #ifndef PABTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_DELETE_HPP_
 #define PABTREE_B_TREE_IMPL_BATCH_OP_B_BATCH_DELETE_HPP_
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <iterator>
 #include <memory>
+#include <numeric>
 
 #include "pab_tree/b_tree.h"
 #include "parlay/monoid.h"
@@ -103,7 +106,9 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 			this->root_ = nullptr;
 			return;
 		}
-		this->rebuild_from_flatten();
+		if (!consolidate_invalid_root(leaf_entries_pattern, leaf_sort_pred)) {
+			this->rebuild_from_flatten();
+		}
 		return;
 	}
 
@@ -138,6 +143,205 @@ void btree<TT>::rebuild_from_flatten()
 	this->delete_tree_rec<true>(this->root_);
 	this->root_ = nullptr; /* build_ releases root_, which is already freed */
 	build_(parlay::make_slice(tree_entries));
+}
+
+/*
+ * The cheap recovery for an invalid root: no entry leaves its leaf-parent,
+ * nothing is sorted, and only the interior levels are allocated afresh.
+ */
+template <typename TT>
+template <typename LeafSortPred>
+bool btree<TT>::consolidate_invalid_root(
+	const TT::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
+{
+	assert(this->root_ != nullptr && !this->root_->is_leaf);
+	assert(get_node_invalid_status(this->root_));
+
+	/*
+	 * Read-only guard. k_buf_ub entries leave at least two leaves, so
+	 * the assembly never gets a single node; a leaf-parent holding fewer
+	 * than k_buf_lb entries would collapse into one underfull leaf.
+	 */
+	if (this->root_->size < TT::k_buf_ub ||
+		!leaf_parents_consolidable_rec(this->root_)) {
+		return false;
+	}
+
+	const size_type leaf_n = consolidate_leaf_parents_rec(
+		this->root_, leaf_entries_pattern, leaf_sort_pred);
+	assert(leaf_n >= 2);
+
+	/* keys[i] is the separator before leaf i; keys[0] is never read. */
+	auto nodes = TT::node_seq::uninitialized(leaf_n);
+	auto keys = TT::key_seq::uninitialized(leaf_n);
+	collect_leaves_rec(this->root_, key_type{}, parlay::make_slice(nodes),
+					   parlay::make_slice(keys));
+	/* root_ is freed now; nothing may read it before the assignment. */
+	this->root_ = assemble_interior_levels(
+		parlay::make_slice(nodes), parlay::make_slice(keys).cut(1, leaf_n));
+
+#ifdef DEBUG
+	[[maybe_unused]] const bool tree_ok = this->validate<false>();
+	assert(tree_ok);
+#endif /* DEBUG */
+	return true;
+}
+
+template <typename TT>
+bool btree<TT>::leaf_parents_consolidable_rec(node_type const *node)
+{
+	assert(!node->is_leaf);
+	auto const *interior = static_cast<interior_type const *>(node);
+	const buf_size_type node_n = interior->get_node_n();
+
+	if (node_has_leaf_children(node)) {
+		size_type total = 0;
+		for (buf_size_type i = 0; i < node_n; ++i) {
+			total += interior->tree_nodes[i]->size;
+		}
+		return total == 0 || total >= TT::k_buf_lb;
+	}
+
+	boolean_buf_ub_arr ok;
+	parlay::parallel_for(
+		0, node_n,
+		[&](buf_size_type i) {
+			ok[i] = leaf_parents_consolidable_rec(interior->tree_nodes[i]);
+		},
+		force_parallel_recursion<true>(interior) ? 1 : TT::k_buf_ub);
+	return std::all_of(ok.begin(), ok.begin() + node_n,
+					   [](bool b) { return b; });
+}
+
+template <typename TT>
+template <typename LeafSortPred>
+TT::size_type btree<TT>::consolidate_leaf_parents_rec(
+	node_type *node, const TT::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
+{
+	assert(!node->is_leaf);
+	auto interior = static_cast<interior_type *>(node);
+	const buf_size_type node_n = interior->get_node_n();
+
+	if (node_has_leaf_children(node)) {
+		/* Decided from the leaves, not from the deletion flags. */
+		size_type total = 0;
+		size_type underfull_n = 0;
+		size_type underfull_sum = 0; /* what balance_over_leaves moves */
+		for (buf_size_type i = 0; i < node_n; ++i) {
+			auto const *leaf = interior->tree_nodes[i];
+			total += leaf->size;
+			if (leaf->size < TT::k_buf_lb) {
+				underfull_n++;
+				underfull_sum += leaf->size;
+			}
+		}
+		if (total == 0) { /* every leaf is empty: drop them all */
+			for (buf_size_type i = 0; i < node_n; ++i) {
+				free_node<leaf_type>(interior->tree_nodes[i]);
+			}
+			interior->node_n = 0;
+			return 0;
+		}
+		if (underfull_n > 0) {
+			balance_over_leaves(node, underfull_sum, leaf_entries_pattern,
+								leaf_sort_pred);
+		}
+		return interior->get_node_n();
+	}
+
+	size_buf_ub_arr leaf_n;
+	parlay::parallel_for(
+		0, node_n,
+		[&](buf_size_type i) {
+			leaf_n[i] = consolidate_leaf_parents_rec(
+				interior->tree_nodes[i], leaf_entries_pattern, leaf_sort_pred);
+		},
+		force_parallel_recursion<true>(interior) ? 1 : TT::k_buf_ub);
+	return std::accumulate(leaf_n.begin(), leaf_n.begin() + node_n,
+						   static_cast<size_type>(0));
+}
+
+template <typename TT>
+TT::size_type btree<TT>::count_leaves_rec(node_type const *node)
+{
+	assert(!node->is_leaf);
+	auto const *interior = static_cast<interior_type const *>(node);
+	const buf_size_type node_n = interior->get_node_n();
+
+	/* node_n first: an emptied leaf-parent's slot 0 is a freed leaf. */
+	if (node_n == 0 || node_has_leaf_children(node)) {
+		return node_n;
+	}
+
+	size_buf_ub_arr leaf_n;
+	parlay::parallel_for(
+		0, node_n,
+		[&](buf_size_type i) {
+			leaf_n[i] = count_leaves_rec(interior->tree_nodes[i]);
+		},
+		force_parallel_recursion<true>(interior) ? 1 : TT::k_buf_ub);
+	return std::accumulate(leaf_n.begin(), leaf_n.begin() + node_n,
+						   static_cast<size_type>(0));
+}
+
+template <typename TT>
+void btree<TT>::collect_leaves_rec(node_type *node, key_type const &key_before,
+								   TT::node_slice out_nodes,
+								   TT::split_slice out_keys)
+{
+	assert(!node->is_leaf);
+	auto interior = static_cast<interior_type *>(node);
+	const buf_size_type node_n = interior->get_node_n();
+	assert(out_nodes.size() == out_keys.size());
+
+	if (node_n == 0) { /* emptied: no leaf below */
+		assert(out_nodes.size() == 0);
+		free_node<interior_type>(node);
+		return;
+	}
+
+	if (node_has_leaf_children(node)) {
+		assert(out_nodes.size() == node_n);
+		for (buf_size_type i = 0; i < node_n; ++i) {
+			out_nodes[i] = interior->tree_nodes[i];
+			out_keys[i] = i == 0 ? key_before : interior->split[i - 1];
+		}
+		free_node<interior_type>(node);
+		return;
+	}
+
+	size_buf_ub_arr leaf_n;
+	parlay::parallel_for(
+		0, node_n,
+		[&](buf_size_type i) {
+			leaf_n[i] = count_leaves_rec(interior->tree_nodes[i]);
+		},
+		force_parallel_recursion<true>(interior) ? 1 : TT::k_buf_ub);
+
+	std::array<size_type, TT::k_buf_ub + 1> offsets;
+	offsets[0] = 0;
+	for (buf_size_type i = 0; i < node_n; ++i) {
+		offsets[i + 1] = offsets[i] + leaf_n[i];
+	}
+	assert(offsets[node_n] == out_nodes.size());
+
+	/*
+	 * Child i > 0 starts after split[i - 1]; child 0 starts where this
+	 * node does. A child with no leaf gets an empty cut and no key.
+	 */
+	parlay::parallel_for(
+		0, node_n,
+		[&](buf_size_type i) {
+			collect_leaves_rec(interior->tree_nodes[i],
+							   i == 0 ? key_before : interior->split[i - 1],
+							   out_nodes.cut(offsets[i], offsets[i + 1]),
+							   out_keys.cut(offsets[i], offsets[i + 1]));
+		},
+		force_parallel_recursion<true>(interior) ? 1 : TT::k_buf_ub);
+
+	free_node<interior_type>(node); /* after the join: children read split */
 }
 
 /*
