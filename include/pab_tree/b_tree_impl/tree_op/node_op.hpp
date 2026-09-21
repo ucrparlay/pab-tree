@@ -3,8 +3,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdlib>
-#include <iostream>
 #include <concepts>
 #include <cstddef>
 #include <numeric>
@@ -278,154 +276,299 @@ btree<TT>::batch_delete_update_interior_size(
 						   get_node_reinsert_size(node));
 }
 
+/*
+ * Bottom-up repair below a valid node. Children are repaired first, in
+ * parallel; then the thin ones among them are merged into siblings.
+ * Afterwards every node strictly below is valid. node itself may be
+ * left thin, which its own parent resolves.
+ */
 template <typename TT>
 template <typename LeafSortPred>
-void btree<TT>::fetch_invalid_subtree_nodes(
-	node_type *node, entry_slice reinsert_entries, const bool has_tomb,
-	const TT::pattern_type leaf_entries_pattern,
-	LeafSortPred const &leaf_sort_pred)
+void btree<TT>::repair_rec(node_type *node,
+						   const TT::pattern_type leaf_entries_pattern,
+						   LeafSortPred const &leaf_sort_pred)
 {
-	constexpr bool k_sort_reinsert_entries = true;
-	assert(reinsert_entries.size() == get_node_reinsert_size(node));
-
-	if (get_node_invalid_status(
-			node)) { /* every invalid tree should be flatten */
-		assert(reinsert_entries.size() == node->size);
-		assert(has_tomb == false);
-
-		[[maybe_unused]] auto size = node->size;
-		assert(node != nullptr);
-		flatten_rec<decltype(reinsert_entries), false, k_sort_reinsert_entries>(
-			node, reinsert_entries);
-		delete_tree_rec<false>(node);
-		return;
-	}
-
-	assert(node_is_valid(node));
-
-	if (node->is_leaf) { /* do nothing for a valid leaf */
-		assert(reinsert_entries.size() == 0);
-		return;
-	}
-
+	assert(!node->is_leaf);
 	auto interior = static_cast<interior_type *>(node);
 
-	if (!node_contain_invalid_subtree(node) && !get_node_reinsert_size(node)) {
-		/* no subtree is invalid, fully valid */
-		assert(interior->valid);
-		assert(reinsert_entries.size() == 0);
-		return;
-	}
-
-	if (self_balance_node(node,
-						  has_tomb)) { /* reach a node can be self balanced */
-		assert(node_is_valid(node));
-		if (get_node_reinsert_size(node) == 0) { /* just contain empty trees */
-			assert(node_contain_invalid_subtree(node));
-			prune_out_empty_tree(node);
-			interior->reset_deletion_flag();
-			return;
+	if (!node_has_leaf_children(node)) {
+		typename interior_type::node_arr todo;
+		buf_size_type todo_n = 0;
+		for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
+			if (node_contain_invalid_subtree(interior->tree_nodes[i])) {
+				todo[todo_n++] = interior->tree_nodes[i];
+			}
 		}
+		parlay::parallel_for(
+			0, todo_n,
+			[&](buf_size_type i) {
+				repair_rec(todo[i], leaf_entries_pattern, leaf_sort_pred);
+			},
+			1);
+	}
+	repair_node(node, leaf_entries_pattern, leaf_sort_pred);
+}
 
-		balance_over_leaves(node, interior->reinsert_size, leaf_entries_pattern,
-							leaf_sort_pred);
+/*
+ * One node: merge its underfull leaves, or its thin interior children.
+ * Decided from the children, not from the deletion flags, so it also
+ * serves a node that just absorbed a sibling's children.
+ */
+template <typename TT>
+template <typename LeafSortPred>
+void btree<TT>::repair_node(node_type *node,
+							const TT::pattern_type leaf_entries_pattern,
+							LeafSortPred const &leaf_sort_pred)
+{
+	assert(!node->is_leaf);
+	auto interior = static_cast<interior_type *>(node);
+	const buf_size_type node_n = interior->get_node_n();
+
+	if (node_n == 0) {
+		interior->size = 0;
 		interior->reset_deletion_flag();
 		return;
 	}
 
-	/* PARA: this node is valid, but contains invalid subtree */
-	typename interior_type::node_arr invalid_subtree;
-	assert(invalid_subtree.size() == TT::k_buf_ub);
-	buf_size_type invalid_idx = 0;
-	buf_size_type tree_node_idx = 0;
-	buf_size_type split_idx = 0;
+	if (!node_has_leaf_children(node)) {
+		balance_over_children(node, leaf_entries_pattern, leaf_sort_pred);
+		return;
+	}
 
-	bool reinsert_flag = false; /* whether we will reinsert in this node */
-	for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-		auto child = interior->tree_nodes[i];
-
-		/* this child contain invalid subtree */
-		if (node_contain_invalid_subtree(child)) {
-			invalid_subtree[invalid_idx] = child;
-			invalid_idx++;
-		}
-
-		if (!reinsert_flag && get_node_invalid_status(child)) {
-			reinsert_flag = true;
-		}
-
-		/*
-		 * check if this child child contain no invalid subtree, then
-		 * itself must be valid
-		 */
-		assert(node_contain_invalid_subtree(child) == 0 ? node_is_valid(child) :
-														  true);
-		assert(node_is_valid(child) ? 1 : node_contain_invalid_subtree(child));
-
-		if (node_is_valid(child)) {
-			const bool has_split = i < interior->get_split_n();
-			if (i != tree_node_idx) {
-				interior->tree_nodes[tree_node_idx] = child;
-				if (has_split) {
-					interior->split[split_idx] = interior->split[i];
-				}
-			}
-			tree_node_idx += 1;
-			split_idx += has_split;
+	size_type total = 0;
+	size_type underfull_n = 0;
+	size_type underfull_sum = 0; /* what balance_over_leaves moves */
+	for (buf_size_type i = 0; i < node_n; ++i) {
+		auto const *leaf = interior->tree_nodes[i];
+		total += leaf->size;
+		if (leaf->size < TT::k_buf_lb) {
+			underfull_n++;
+			underfull_sum += leaf->size;
 		}
 	}
-	assert(interior->node_n >= invalid_idx);
-	interior->node_n = tree_node_idx;
+	if (total == 0) { /* every leaf is empty: drop them all */
+		for (buf_size_type i = 0; i < node_n; ++i) {
+			free_node<leaf_type>(interior->tree_nodes[i]);
+		}
+		interior->node_n = 0;
+		interior->size = 0;
+		interior->reset_deletion_flag();
+		return;
+	}
+	/* A lone underfull leaf has no neighbour here; the parent finds one. */
+	if (underfull_n > 0 && node_n >= 2) {
+		balance_over_leaves(node, underfull_sum, leaf_entries_pattern,
+							leaf_sort_pred);
+		return;
+	}
+	interior->update_aug();
+	interior->reset_deletion_flag();
+}
 
-	size_buf_ub_arr reinsert_sum;
-	reinsert_sum[0] = 0;
-	for (buf_size_type i = 1; i < invalid_idx; i++) {
-		auto sub = invalid_subtree[i - 1];
-		reinsert_sum[i] = reinsert_sum[i - 1] + get_node_reinsert_size(sub);
+/*
+ * balance_over_leaves for interior children. A child with fewer than
+ * k_buf_lb children is thin; thin children are grouped with the nearest
+ * valid sibling to their right and their child arrays are concatenated
+ * into it, or the group is re-bucketed when it would overflow k_buf_ub.
+ * Only pointers move. A node that absorbed a thin sibling is repaired
+ * again, since the sibling may have carried a thin child of its own.
+ */
+template <typename TT>
+template <typename LeafSortPred>
+void btree<TT>::balance_over_children(
+	node_type *node, const TT::pattern_type leaf_entries_pattern,
+	LeafSortPred const &leaf_sort_pred)
+{
+	auto interior = static_cast<interior_type *>(node);
+	assert(!node->is_leaf && !node_has_leaf_children(node));
+
+	/* Drop empty children, keeping every kept child's right separator. */
+	{
+		const buf_size_type n = interior->get_node_n();
+		const buf_size_type split_n = interior->get_split_n();
+		buf_size_type w = 0;
+		buf_size_type ws = 0;
+		for (buf_size_type i = 0; i < n; ++i) {
+			auto *child = static_cast<interior_type *>(interior->tree_nodes[i]);
+			if (child->get_node_n() == 0) {
+				free_node<interior_type>(child);
+				continue;
+			}
+			const bool has_split = i < split_n;
+			if (i != w) {
+				interior->tree_nodes[w] = child;
+				if (has_split) {
+					interior->split[ws] = interior->split[i];
+				}
+			}
+			w++;
+			ws += has_split;
+		}
+		interior->node_n = w;
+	}
+	const buf_size_type node_n = interior->get_node_n();
+	if (node_n == 0) {
+		interior->size = 0;
+		interior->reset_deletion_flag();
+		return;
+	}
+
+	auto child_n = [&](buf_size_type i) -> size_type {
+		return static_cast<interior_type *>(interior->tree_nodes[i])
+			->get_node_n();
+	};
+
+	/* Group assignment, as in balance_over_leaves phase 1. */
+	buf_size_buf_ub_arr tree_group;
+	size_buf_ub_arr group_n;
+	bool any_thin = false;
+	buf_size_type rpidx = TT::k_buf_ub;
+	{
+		buf_size_type pivot = TT::k_buf_ub;
+		for (buf_size_type i = node_n; i-- > 0;) {
+			if (child_n(i) >= TT::k_buf_lb) {
+				if (rpidx == TT::k_buf_ub) {
+					rpidx = i;
+				}
+				pivot = i;
+				tree_group[i] = i;
+				group_n[i] = child_n(i);
+			} else {
+				any_thin = true;
+				tree_group[i] = pivot;
+				if (pivot != TT::k_buf_ub) {
+					group_n[pivot] += child_n(i);
+				}
+			}
+		}
+	}
+	if (!any_thin) {
+		interior->update_aug();
+		interior->reset_deletion_flag();
+		return;
+	}
+	if (rpidx == TT::k_buf_ub) { /* no valid child: one group, last child */
+		rpidx = node_n - 1;
+		group_n[rpidx] = 0;
+		for (buf_size_type i = 0; i < node_n; ++i) {
+			tree_group[i] = rpidx;
+			group_n[rpidx] += child_n(i);
+		}
+	}
+	for (buf_size_type i = rpidx + 1; i < node_n; ++i) {
+		tree_group[i] = rpidx;
+		group_n[rpidx] += child_n(i);
 	}
 
 	/*
-	 *     node,
-	 *     flatten_node_slice.cut(subtree_sum[i],
-	 *                                                 : subtree_sum[i +
-	 * 1]),     reinsert_entries.cut(reinsert_sum[i],
-	 * : reinsert_sum[i + 1]),
+	 * Compact in place: tree_idx <= i throughout, and every group's
+	 * outer separator split[j - 1] is read before that slot is written.
 	 */
+	buf_size_type tree_idx = 0;
+	buf_size_type split_idx = 0;
+	for (buf_size_type i = 0; i < node_n;) {
+		const buf_size_type g = tree_group[i];
+		const bool is_rightmost = g == rpidx;
+		const size_type sum_n = group_n[g];
+		buf_size_type j = i + 1;
+		while (j < node_n && tree_group[j] == g) {
+			++j;
+		}
 
-	bool const next_tomb = has_tomb ? !reinsert_flag : false;
-	parlay::parallel_for(
-		0, invalid_idx,
-		[&](buf_size_type i) {
-			fetch_invalid_subtree_nodes(
-				invalid_subtree[i],
-				reinsert_entries.cut(reinsert_sum[i],
-									 i == invalid_idx - 1 ?
-										 reinsert_entries.size() :
-										 reinsert_sum[i + 1]),
-				next_tomb, leaf_entries_pattern, leaf_sort_pred);
-		},
-		1);
-
-	interior->size = std::accumulate(
-		interior->tree_nodes.begin(),
-		interior->tree_nodes.begin() + interior->get_node_n(),
-		static_cast<size_type>(0),
-		[](size_type sum, node_type *child) { return sum + child->size; });
-	interior->update_aug();
-	if (reinsert_flag && has_tomb) {
-		assert(parlay::none_of(reinsert_entries, [](auto entry) {
-			return entry_traits::get_val(entry) == 0;
-		}));
-		assert(parlay::is_sorted(reinsert_entries, [](auto a, auto b) {
-			return TT::entry_less(a, b) &&
-				   !TT::key_equal(entry_traits::get_key(a),
-								  entry_traits::get_key(b));
-		}));
-		reinsert_tree_after_delete(node, reinsert_entries, leaf_entries_pattern,
-								   leaf_sort_pred);
+		if (j == i + 1) {
+			interior->tree_nodes[tree_idx++] = interior->tree_nodes[i];
+			if (!is_rightmost) {
+				interior->split[split_idx++] = interior->split[i];
+			}
+		} else if (sum_n <= TT::k_buf_ub) {
+			/* Merge into the last member: shift its arrays right, fill. */
+			auto *dest =
+				static_cast<interior_type *>(interior->tree_nodes[j - 1]);
+			const buf_size_type dest_n = dest->get_node_n();
+			std::copy_backward(dest->tree_nodes.begin(),
+							   dest->tree_nodes.begin() + dest_n,
+							   dest->tree_nodes.begin() + sum_n);
+			std::copy_backward(dest->split.begin(),
+							   dest->split.begin() + (dest_n - 1),
+							   dest->split.begin() + (sum_n - 1));
+			buf_size_type wn = 0;
+			buf_size_type wk = 0;
+			size_type moved = 0;
+			for (buf_size_type k = i; k < j - 1; ++k) {
+				auto *src =
+					static_cast<interior_type *>(interior->tree_nodes[k]);
+				const buf_size_type src_n = src->get_node_n();
+				std::copy_n(src->tree_nodes.begin(), src_n,
+							dest->tree_nodes.begin() + wn);
+				std::copy_n(src->split.begin(), src_n - 1,
+							dest->split.begin() + wk);
+				wn += src_n;
+				wk += src_n - 1;
+				dest->split[wk++] = interior->split[k];
+				moved += src->size;
+				free_node<interior_type>(src);
+			}
+			assert(wn == sum_n - dest_n && wk == wn);
+			dest->node_n = sum_n;
+			dest->size += moved;
+			dest->update_aug();
+			dest->reset_deletion_flag();
+			interior->tree_nodes[tree_idx++] = dest;
+			if (!is_rightmost) {
+				interior->split[split_idx++] = interior->split[j - 1];
+			}
+			repair_node(dest, leaf_entries_pattern, leaf_sort_pred);
+		} else {
+			/* Re-bucket the whole group's children into fresh nodes. */
+			auto node_buf = TT::node_seq::uninitialized(sum_n);
+			auto key_buf = TT::key_seq::uninitialized(sum_n - 1);
+			size_type wn = 0;
+			size_type wk = 0;
+			for (buf_size_type k = i; k < j; ++k) {
+				auto *src =
+					static_cast<interior_type *>(interior->tree_nodes[k]);
+				const buf_size_type src_n = src->get_node_n();
+				std::copy_n(src->tree_nodes.begin(), src_n,
+							node_buf.begin() + wn);
+				std::copy_n(src->split.begin(), src_n - 1,
+							key_buf.begin() + wk);
+				wn += src_n;
+				wk += src_n - 1;
+				if (k < j - 1) {
+					key_buf[wk++] = interior->split[k];
+				}
+				free_node<interior_type>(src);
+			}
+			assert(wn == sum_n && wk == sum_n - 1);
+			const buf_size_type base = tree_idx;
+			const size_type bkt_n = generate_interior_nodes(
+				parlay::make_slice(node_buf), parlay::make_slice(key_buf),
+				gen_nodes_output_handler{
+					.set_key =
+						[&](size_type k, auto key) {
+							interior->split[split_idx + k] = key;
+						},
+					.set_node =
+						[&](size_type k, auto child) {
+							interior->tree_nodes[base + k] = child;
+						} });
+			assert(bkt_n >= 2 && bkt_n <= static_cast<size_type>(j - i));
+			tree_idx += bkt_n;
+			split_idx += bkt_n - 1;
+			if (!is_rightmost) {
+				interior->split[split_idx++] = interior->split[j - 1];
+			}
+			for (buf_size_type k = 0; k < bkt_n; ++k) {
+				repair_node(interior->tree_nodes[base + k],
+							leaf_entries_pattern, leaf_sort_pred);
+			}
+		}
+		i = j;
 	}
 
-	assert((this->validate<true, false>(node)));
+	assert(tree_idx == split_idx + 1);
+	interior->node_n = tree_idx;
+	interior->update_aug();
 	interior->reset_deletion_flag();
 }
 
@@ -473,12 +616,10 @@ void btree<TT>::balance_over_leaves(node_type *node,
 			}
 		}
 		/*
-		 * No valid child: one group pivoted on the last child. Only
-		 * consolidate_invalid_root sends such a node here, with a
-		 * reinsert_size that covers every child, so entry_buf holds the
-		 * group. node_n >= 2: an interior below the root keeps at least
-		 * k_buf_lb children, and the root arrives with k_buf_ub entries,
-		 * which one leaf cannot hold.
+		 * No valid child: one group pivoted on the last child. The
+		 * callers (repair_node, consolidate_invalid_root) pass a
+		 * reinsert_size that covers every child, so entry_buf holds
+		 * the group, and they skip a node with a single child.
 		 */
 		if (rpidx == TT::k_buf_ub) {
 			assert(interior->get_node_n() >= 2);
@@ -682,64 +823,6 @@ void btree<TT>::balance_over_leaves(node_type *node,
 		}
 	}
 #endif /* DEBUG */
-}
-
-template <typename TT>
-void btree<TT>::prune_out_empty_tree(node_type *node)
-{
-	assert(get_node_reinsert_size(node) == 0);
-	assert(node_has_leaf_children(node));
-	auto interior = static_cast<interior_type *>(node);
-	buf_size_type tree_node_idx = 0;
-	buf_size_type split_idx = 0;
-	for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-		auto child = interior->tree_nodes[i];
-
-		assert(node_is_valid(child) || get_node_reinsert_size(child) == 0);
-		if (node_is_valid(child)) {
-			const bool has_split = i < interior->get_split_n();
-			if (i != tree_node_idx) {
-				interior->tree_nodes[tree_node_idx] = child;
-				if (has_split) {
-					interior->split[split_idx] = interior->split[i];
-				}
-			}
-			tree_node_idx += 1;
-			split_idx += has_split;
-		} else {
-			assert(child->size == 0);
-			free_node<leaf_type>(child);
-		}
-	}
-
-	interior->node_n = tree_node_idx;
-	interior->update_aug();
-}
-
-template <typename TT>
-template <typename LeafSortPred>
-void btree<TT>::reinsert_tree_after_delete(
-	node_type *node, entry_slice reinsert_entries,
-	TT::pattern_type leaf_entries_pattern, LeafSortPred const &leaf_sort_pred)
-{
-	node_split_pair_seq node_split_seq =
-		node_split_pair_seq::uninitialized(2 * reinsert_entries.size());
-	size_type new_node_n = batch_insert_recursive(
-		node, reinsert_entries, parlay::make_slice(node_split_seq),
-		leaf_entries_pattern, leaf_sort_pred);
-	/*
-	 * A non-zero result means batch_insert_recursive freed node and put the
-	 * replacement children in node_split_seq for the caller to splice.
-	 * There is no parent pointer here, so we cannot. Abort rather than
-	 * return to a caller that will use the freed node; the assert alone
-	 * vanishes under NDEBUG and leaves a use-after-free.
-	 */
-	if (new_node_n != 0) [[unlikely]] {
-		std::cerr << "pab_tree: reinsert split the subtree root and "
-					 "cannot splice it; see docs/open_issues.md #1\n";
-		std::abort();
-	}
-	assert(new_node_n == 0);
 }
 
 template <typename TT>

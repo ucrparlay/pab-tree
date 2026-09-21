@@ -1187,15 +1187,18 @@ std::pair<long, long> node_allocs()
 }
 
 /*
- * Delete `gone` and check the tree against the oracle. With
- * typed_counting_alloc, `consolidates` asserts which recovery ran: the
- * in-place one allocates no leaf and at least one interior, the
- * flatten-and-rebuild allocates leaves.
+ * Which recovery a delete is expected to take. Observable through
+ * typed_counting_alloc: the in-place consolidation allocates interiors and
+ * never a leaf, the flatten-and-rebuild allocates leaves, and the
+ * bottom-up repair allocates no leaf either (interiors only on a split).
  */
+enum class expect { consolidation, rebuild, repair, any };
+
+/* Delete `gone`, assert the expected recovery, check against the oracle. */
 template <typename tree>
 void delete_and_check(tree &t, oracle &ref, std::vector<uint32_t> const &gone,
 					  std::vector<uint32_t> const &probes, uint64_t seed,
-					  bool consolidates)
+					  expect path)
 {
 	using tt = typename tree::type_trait;
 	constexpr bool counted =
@@ -1208,13 +1211,21 @@ void delete_and_check(tree &t, oracle &ref, std::vector<uint32_t> const &gone,
 	}
 	if constexpr (counted) {
 		auto const after = node_allocs<tree>();
-		if (consolidates) {
+		switch (path) {
+		case expect::consolidation:
 			ASSERT_EQ(after.first, before.first)
 				<< "consolidation allocated a leaf";
 			ASSERT_GT(after.second, before.second)
 				<< "no interior level was rebuilt";
-		} else {
+			break;
+		case expect::rebuild:
 			ASSERT_GT(after.first, before.first) << "expected the rebuild";
+			break;
+		case expect::repair:
+			ASSERT_EQ(after.first, before.first) << "repair allocated a leaf";
+			break;
+		case expect::any:
+			break;
 		}
 	}
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
@@ -1275,8 +1286,8 @@ void consolidation_scenario(size_t n, bool hole, uint64_t seed,
 			}
 		}
 	}
-	ASSERT_NO_FATAL_FAILURE(
-		delete_and_check(t, ref, gone, probes, seed ^ 1, true));
+	ASSERT_NO_FATAL_FAILURE(delete_and_check(t, ref, gone, probes, seed ^ 1,
+											 expect::consolidation));
 	ASSERT_NO_FATAL_FAILURE(after_each(t, "first consolidation"));
 
 	gone.clear();
@@ -1285,8 +1296,8 @@ void consolidation_scenario(size_t n, bool hole, uint64_t seed,
 			gone.push_back(kv.first);
 		}
 	}
-	ASSERT_NO_FATAL_FAILURE(
-		delete_and_check(t, ref, gone, probes, seed ^ 2, true));
+	ASSERT_NO_FATAL_FAILURE(delete_and_check(t, ref, gone, probes, seed ^ 2,
+											 expect::consolidation));
 	ASSERT_NO_FATAL_FAILURE(after_each(t, "second consolidation"));
 
 	/* Everything left: the empty-root branch, not a consolidation. */
@@ -1491,7 +1502,7 @@ TEST(SelfTest, ConsolidateInvalidRootHeight2)
 	using tree = counted_tree<8>;
 	auto const seed = g_seed ^ 0x4e162ULL;
 
-	auto run = [&](size_t n, bool consolidates, bool leaf_root_after) {
+	auto run = [&](size_t n, expect path, bool leaf_root_after) {
 		SCOPED_TRACE("height-2 n=" + std::to_string(n));
 		std::vector<uint32_t> keys(n);
 		std::iota(keys.begin(), keys.end(), 0u);
@@ -1514,14 +1525,14 @@ TEST(SelfTest, ConsolidateInvalidRootHeight2)
 			}
 		}
 		ASSERT_NO_FATAL_FAILURE(
-			delete_and_check(t, ref, gone, keys, seed, consolidates));
+			delete_and_check(t, ref, gone, keys, seed, path));
 		ASSERT_EQ(t.get_root()->is_leaf, leaf_root_after);
 	};
 
 	/* 100 entries left of 400: consolidated, root keeps 6 leaves. */
-	ASSERT_NO_FATAL_FAILURE(run(400, true, false));
+	ASSERT_NO_FATAL_FAILURE(run(400, expect::consolidation, false));
 	/* 25 left of 100: below k_buf_ub, the guard sends it to the rebuild. */
-	ASSERT_NO_FATAL_FAILURE(run(100, false, true));
+	ASSERT_NO_FATAL_FAILURE(run(100, expect::rebuild, true));
 }
 
 /* A leaf-parent left with 1..k_buf_lb-1 entries fails the guard: rebuild. */
@@ -1555,7 +1566,7 @@ TEST(SelfTest, ConsolidateFallback)
 			}
 		}
 		ASSERT_NO_FATAL_FAILURE(
-			delete_and_check(t, ref, gone, keys, seed, false));
+			delete_and_check(t, ref, gone, keys, seed, expect::rebuild));
 		ASSERT_EQ(t.size(), 251u);
 	}
 
@@ -1640,8 +1651,8 @@ void ten_percent_chain(size_t n, uint64_t seed)
 				gone.push_back(kv.first);
 			}
 		}
-		ASSERT_NO_FATAL_FAILURE(
-			delete_and_check(t, ref, gone, probes, seed ^ 5, true));
+		ASSERT_NO_FATAL_FAILURE(delete_and_check(t, ref, gone, probes, seed ^ 5,
+												 expect::consolidation));
 	}
 
 	/* Fresh keys into the rebuilt levels. */
@@ -1803,6 +1814,369 @@ TEST(SelfTest, ConsolidateReverseComparator)
 	ref.clear();
 	ASSERT_NO_FATAL_FAILURE(check("emptied"));
 	ASSERT_TRUE(t.empty());
+}
+
+/* ---- a valid root repairs the levels below it bottom-up ---- */
+
+/*
+ * The tree's leaf-parents in key order, each as its leaves' sorted keys,
+ * plus the index of the root child each one sits under. Scenarios are
+ * built from this map, so they do not depend on the exact bucket sizes.
+ */
+struct leaf_map {
+	std::vector<std::vector<std::vector<uint32_t>>> parents;
+	std::vector<size_t> root_child;
+};
+
+template <typename tree>
+leaf_map leaf_parents_of(tree const &t)
+{
+	using interior = typename tree::interior_type;
+	using leaf = typename tree::leaf_type;
+	leaf_map m;
+	auto const *root = t.get_root();
+	if (root == nullptr || root->is_leaf) {
+		return m;
+	}
+	auto walk = [&](auto const &self, auto const *n, size_t top) -> void {
+		auto const *in = static_cast<interior const *>(n);
+		if (in->get_node_n() > 0 && in->tree_nodes[0]->is_leaf) {
+			std::vector<std::vector<uint32_t>> lp;
+			for (size_t i = 0; i < in->get_node_n(); ++i) {
+				auto const *lf = static_cast<leaf const *>(in->tree_nodes[i]);
+				std::vector<uint32_t> ks;
+				for (size_t k = 0; k < lf->size; ++k) {
+					ks.push_back(lf->elements[k].key);
+				}
+				std::sort(ks.begin(), ks.end());
+				lp.push_back(std::move(ks));
+			}
+			m.parents.push_back(std::move(lp));
+			m.root_child.push_back(top);
+			return;
+		}
+		for (size_t i = 0; i < in->get_node_n(); ++i) {
+			self(self, in->tree_nodes[i], top);
+		}
+	};
+	auto const *ri = static_cast<interior const *>(root);
+	for (size_t i = 0; i < ri->get_node_n(); ++i) {
+		walk(walk, ri->tree_nodes[i], i);
+	}
+	return m;
+}
+
+/* Every key under leaf-parent p, or of its leaf l. */
+inline void take_parent(leaf_map const &m, size_t p, std::vector<uint32_t> &out)
+{
+	for (auto const &lf : m.parents[p]) {
+		out.insert(out.end(), lf.begin(), lf.end());
+	}
+}
+
+inline void take_leaf(leaf_map const &m, size_t p, size_t l,
+					  std::vector<uint32_t> &out)
+{
+	out.insert(out.end(), m.parents[p][l].begin(), m.parents[p][l].end());
+}
+
+/*
+ * One repair shape. Each is a deletion drawn from the leaf map, so that a
+ * particular path in repair_rec / balance_over_children runs:
+ *   thin      one leaf-parent keeps k_buf_lb - 1 leaves: merged into its
+ *             neighbour by pointer moves
+ *   seam      one leaf-parent keeps a single key: its lone underfull leaf
+ *             is carried into the neighbour and merged there
+ *   overflow  enough thin leaf-parents in a row that the group exceeds
+ *             k_buf_ub children: re-bucketed with generate_interior_nodes
+ *   empties   whole leaf-parents emptied, dropped without a trace
+ *   chain     a whole root subtree emptied but for one key: a thin chain
+ *             absorbed level by level, the key merged at the bottom
+ */
+enum class shape { thin, seam, overflow, empties, chain };
+
+inline char const *shape_name(shape s)
+{
+	switch (s) {
+	case shape::thin:
+		return "thin";
+	case shape::seam:
+		return "seam";
+	case shape::overflow:
+		return "overflow";
+	case shape::empties:
+		return "empties";
+	case shape::chain:
+		return "chain";
+	}
+	return "?";
+}
+
+/* The keys to delete for `s` on a tree described by `m`. */
+template <unsigned KBuf>
+std::vector<uint32_t> repair_deletion(leaf_map const &m, shape s)
+{
+	constexpr size_t lb = KBuf;
+	std::vector<uint32_t> gone;
+	size_t const np = m.parents.size();
+	EXPECT_GE(np, 8u) << "the scenario needs more leaf-parents";
+	if (np < 8) {
+		return gone;
+	}
+
+	switch (s) {
+	case shape::thin: { /* parent 2 keeps lb - 1 leaves */
+		size_t const p = 2;
+		for (size_t l = lb - 1; l < m.parents[p].size(); ++l) {
+			take_leaf(m, p, l, gone);
+		}
+		break;
+	}
+	case shape::seam: { /* parent 3 keeps one key */
+		size_t const p = 3;
+		for (size_t l = 0; l < m.parents[p].size(); ++l) {
+			take_leaf(m, p, l, gone);
+		}
+		gone.erase(std::find(gone.begin(), gone.end(), m.parents[p][0][0]));
+		break;
+	}
+	case shape::overflow: {
+		/*
+		 * r thin parents of lb - 1 leaves before a full one: the group
+		 * holds r * (lb - 1) + >= 2 lb children, more than 4 lb once
+		 * r >= (2 lb + 1) / (lb - 1) rounded up.
+		 */
+		size_t const r = (2 * lb + 1 + lb - 2) / (lb - 1);
+		for (size_t p = 1; p <= r; ++p) {
+			for (size_t l = lb - 1; l < m.parents[p].size(); ++l) {
+				take_leaf(m, p, l, gone);
+			}
+		}
+		break;
+	}
+	case shape::empties: { /* parents 2..4 emptied, parent 5 thinned */
+		for (size_t p = 2; p <= 4; ++p) {
+			take_parent(m, p, gone);
+		}
+		for (size_t l = lb - 1; l < m.parents[5].size(); ++l) {
+			take_leaf(m, 5, l, gone);
+		}
+		break;
+	}
+	case shape::chain: {
+		/* every parent under root child 1, but one key of the first */
+		bool first = true;
+		for (size_t p = 0; p < np; ++p) {
+			if (m.root_child[p] != 1) {
+				continue;
+			}
+			take_parent(m, p, gone);
+			if (first) {
+				gone.erase(
+					std::find(gone.begin(), gone.end(), m.parents[p][0][0]));
+				first = false;
+			}
+		}
+		EXPECT_FALSE(first) << "root child 1 has no leaf-parent";
+		break;
+	}
+	}
+	return gone;
+}
+
+/*
+ * Build 0..n-1, apply one repair shape, check; then a random 30% (more
+ * repairs on the repaired structure), then everything.
+ */
+template <typename tree>
+void repair_scenario(size_t n, shape s, uint64_t seed, auto &&after_each)
+{
+	using tt = typename tree::type_trait;
+	SCOPED_TRACE("repair " + std::string(shape_name(s)) +
+				 " k_buf=" + std::to_string(static_cast<unsigned>(tt::k_buf)) +
+				 " n=" + std::to_string(n) + " seed=" + std::to_string(seed));
+
+	std::vector<uint32_t> keys(n);
+	std::iota(keys.begin(), keys.end(), 0u);
+	auto const all = to_entries(keys);
+
+	tree t;
+	oracle ref;
+	t.build(all);
+	add_to_oracle(ref, all);
+
+	std::vector<uint32_t> probes;
+	{
+		std::mt19937_64 rng(seed);
+		for (int i = 0; i < 200; ++i) {
+			probes.push_back(static_cast<uint32_t>(rng() % (n + 64)));
+		}
+	}
+
+	auto const m = leaf_parents_of(t);
+	auto gone = repair_deletion<tt::k_buf>(m, s);
+	ASSERT_FALSE(gone.empty());
+	ASSERT_NO_FATAL_FAILURE(
+		delete_and_check(t, ref, gone, probes, seed ^ 1, expect::repair));
+	ASSERT_NO_FATAL_FAILURE(after_each(t, "after the shape"));
+
+	gone.clear();
+	{
+		std::mt19937_64 rng(seed ^ 2);
+		for (auto const &kv : ref) {
+			if (rng() % 10 < 3) {
+				gone.push_back(kv.first);
+			}
+		}
+	}
+	ASSERT_NO_FATAL_FAILURE(
+		delete_and_check(t, ref, gone, probes, seed ^ 3, expect::any));
+	ASSERT_NO_FATAL_FAILURE(after_each(t, "after the random 30%"));
+
+	gone.clear();
+	for (auto const &kv : ref) {
+		gone.push_back(kv.first);
+	}
+	t.batch_delete(gone);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_TRUE(t.empty());
+}
+
+template <typename tree>
+void repair_scenario(size_t n, shape s, uint64_t seed)
+{
+	repair_scenario<tree>(n, s, seed, [](tree &, char const *) {});
+}
+
+constexpr shape k_shapes[] = { shape::thin, shape::seam, shape::overflow,
+							   shape::empties, shape::chain };
+
+TEST(SelfTest, RepairShapes)
+{
+	auto const seed = g_seed ^ 0x2e9a12ULL;
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(
+			repair_scenario<counted_tree<2>>(4096, s, seed));
+		ASSERT_NO_FATAL_FAILURE(
+			repair_scenario<counted_tree<8>>(200000, s, seed));
+		ASSERT_NO_FATAL_FAILURE(
+			repair_scenario<counted_tree<64>>(2000000, s, seed));
+	}
+}
+
+/* Merged and re-bucketed interiors carry a current augmentation. */
+TEST(SelfTest, RepairAugmentation)
+{
+	using tt =
+		pab_tree::btree_type_trait<ele, 8, sum_leaf_aug, subtree_size_aug>;
+	using tree = pab_tree::btree<tt>;
+	auto const seed = g_seed ^ 0xa062e9ULL;
+
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(repair_scenario<tree>(
+			200000, s, seed, [](tree &t, char const *stage) {
+				SCOPED_TRACE(stage);
+				size_t leaves = 0;
+				size_t interiors = 0;
+				ASSERT_NE(t.get_root(), nullptr);
+				ASSERT_NO_FATAL_FAILURE(
+					check_aug<tree>(t.get_root(), leaves, interiors));
+			}));
+	}
+}
+
+/* Every absorbed or re-bucketed interior is freed exactly once. */
+TEST(SelfTest, RepairLeakCheck)
+{
+	using tree = counted_tree<8>;
+	auto const seed = g_seed ^ 0x1eac2eULL;
+
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(repair_scenario<tree>(200000, s, seed));
+	}
+	EXPECT_EQ(typed_counting_alloc::allocs<tree::leaf_type>.load(),
+			  typed_counting_alloc::frees<tree::leaf_type>.load())
+		<< "leaf leak or double free";
+	EXPECT_EQ(typed_counting_alloc::allocs<tree::interior_type>.load(),
+			  typed_counting_alloc::frees<tree::interior_type>.load())
+		<< "interior leak or double free";
+}
+
+/* The same shapes on plain new/delete, for the sanitizer build. */
+TEST(SelfTest, RepairHeapAllocator)
+{
+	struct heap_opts : pab_tree::default_options {
+		using node_alloc = heap_alloc;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, heap_opts>>;
+	auto const seed = g_seed ^ 0x4ea92eULL;
+
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(repair_scenario<tree>(200000, s, seed));
+	}
+}
+
+/* Separators carried between siblings follow the comparator. */
+TEST(SelfTest, RepairReverseComparator)
+{
+	struct desc : pab_tree::default_options {
+		using key_compare = std::greater<uint32_t>;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, desc>>;
+	auto const seed = g_seed ^ 0x9e772eULL;
+
+	for (shape s : k_shapes) {
+		SCOPED_TRACE(std::string("repair under std::greater, ") +
+					 shape_name(s) + " seed=" + std::to_string(seed));
+		size_t const n = 200000;
+		std::vector<uint32_t> keys(n);
+		std::iota(keys.begin(), keys.end(), 0u);
+		auto const all = to_entries(keys);
+
+		std::map<uint32_t, uint32_t, std::greater<uint32_t>> ref;
+		tree t;
+		t.build(all);
+		for (auto const &e : all) {
+			ref[e.key] = e.val;
+		}
+
+		auto check = [&](char const *stage) {
+			SCOPED_TRACE(stage);
+			bool const ok = t.template validate<true, false>();
+			ASSERT_TRUE(ok) << "validate() failed under std::greater";
+			ASSERT_EQ(t.size(), ref.size());
+			auto rt = ref.begin();
+			size_t cnt = 0;
+			for (auto it = t.begin(); it != t.end(); ++it, ++rt, ++cnt) {
+				ASSERT_NE(rt, ref.end());
+				ASSERT_EQ(it->key, rt->first) << "order diverged at " << cnt;
+			}
+			ASSERT_EQ(cnt, ref.size());
+			for (uint32_t k = 0; k < n + 64; k += 97) {
+				ASSERT_EQ(t.contain(k), ref.count(k) != 0)
+					<< "contain(" << k << ")";
+			}
+		};
+
+		auto const m = leaf_parents_of(t);
+		auto gone = repair_deletion<8>(m, s);
+		ASSERT_FALSE(gone.empty());
+		t.batch_delete(gone);
+		for (auto k : gone) {
+			ref.erase(k);
+		}
+		ASSERT_NO_FATAL_FAILURE(check("after the shape"));
+
+		gone.clear();
+		for (auto const &kv : ref) {
+			gone.push_back(kv.first);
+		}
+		t.batch_delete(gone);
+		ref.clear();
+		ASSERT_NO_FATAL_FAILURE(check("emptied"));
+		ASSERT_TRUE(t.empty());
+	}
 }
 
 /* ---- edge cases: the sizes where the structure changes shape ---- */

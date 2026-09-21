@@ -614,11 +614,6 @@ private:
 								   ->is_leaf;
 	}
 
-	static bool self_balance_node(const node_type *node, const bool tomb)
-	{
-		return node_has_leaf_children(node) && tomb && node_is_valid(node);
-	}
-
 	static bool get_node_invalid_status(const node_type *node)
 	{
 		return node->is_leaf ?
@@ -675,9 +670,8 @@ private:
 				  const bool sorted_input, LeafSortPred const &leaf_sort_pred);
 
 	/*
-	 * Returns (invalid_flag, needs_fetch, reinsert_entry_num).
-	 * needs_fetch: any subtree needs fetch_invalid_subtree_nodes (not
-	 * stored in node).
+	 * Returns (invalid_flag, needs_repair, reinsert_entry_num).
+	 * needs_repair: some node below is invalid (not stored in node).
 	 */
 	template <typename LeafSortPred>
 	std::tuple<bool, bool, size_type>
@@ -686,24 +680,27 @@ private:
 						   LeafSortPred const &leaf_sort_pred);
 
 	/*
-	 * Remove the invalid subtree and put it in flatten_node_slice
-	 * Needs to compact the tree_nodes if find a invalid subtree and update
-	 * the interior node size and valid flag after the compaction Return the
-	 * total number entries in the tree that needs to rebuild
+	 * Bottom-up repair below a valid node: children first, in parallel,
+	 * then the thin ones are merged into siblings. Afterwards every node
+	 * strictly below is valid; node itself may be thin for its parent.
 	 */
 	template <typename LeafSortPred>
-	void fetch_invalid_subtree_nodes(
-		node_type *node, entry_slice reinsert_entries, bool has_tomb,
-		const type_trait::pattern_type leaf_entries_pattern,
-		LeafSortPred const &leaf_sort_pred);
+	void repair_rec(node_type *node,
+					const type_trait::pattern_type leaf_entries_pattern,
+					LeafSortPred const &leaf_sort_pred);
 
+	/* One node: merge its underfull leaves, or its thin interior children. */
 	template <typename LeafSortPred>
-	void reinsert_tree_after_delete(
-		node_type *node, entry_slice reinsert_entries,
-		const type_trait::pattern_type leaf_entries_pattern,
-		LeafSortPred const &leaf_sort_pred);
+	void repair_node(node_type *node,
+					 const type_trait::pattern_type leaf_entries_pattern,
+					 LeafSortPred const &leaf_sort_pred);
 
-	void prune_out_empty_tree(node_type *node);
+	/* balance_over_leaves for interior children: pointer moves only. */
+	template <typename LeafSortPred>
+	void
+	balance_over_children(node_type *node,
+						  const type_trait::pattern_type leaf_entries_pattern,
+						  LeafSortPred const &leaf_sort_pred);
 
 	void rebuild_from_flatten();
 

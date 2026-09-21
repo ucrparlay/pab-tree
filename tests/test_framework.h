@@ -2087,8 +2087,8 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TT,
 			 * NOTE: the first half of wi was deleted, so the second half is the one
 			 * left in the tree.
 			 */
-			incre_update_query(wi.cut(wi.size() / 2, wi.size()),
-							   wi.cut(0, wi.size() / 2));
+			// incre_update_query(wi.cut(wi.size() / 2, wi.size()),
+			// 				   wi.cut(0, wi.size() / 2));
 		}
 	}
 

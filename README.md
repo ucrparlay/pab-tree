@@ -149,13 +149,13 @@ overruns; debug builds assert.
 scratch — `2n` slots of `pair<Node*, key>`, one pair per input element per
 side of a possible split. About 40 bytes per entry in flight, both released
 when the call returns. At n = 1e9 that is roughly 40 GB, so size the batch to
-the machine. `build` and `batch_delete` need only the sorted copy; the delete
-path allocates scratch just when a rebalance has to reinsert, sized by the
-reinserted entries rather than by the batch. A batch that empties every root
-child (roughly half the tree at once) is repaired in place with pointer arrays
-of one slot per leaf; only the fallback — a leaf-parent left with fewer than
-`k_buf_lb` entries, or fewer than `k_buf_ub` entries in the whole tree —
-flattens every entry to rebuild.
+the machine. `build` and `batch_delete` need only the sorted copy. The delete
+path rebalances by moving nodes between siblings, so its scratch is at most
+one node's worth of entries or child pointers at a time. A batch that empties
+every root child (roughly half the tree at once) is repaired in place with
+pointer arrays of one slot per leaf; only the fallback — a leaf-parent left
+with fewer than `k_buf_lb` entries, or fewer than `k_buf_ub` entries in the
+whole tree — flattens every entry to rebuild.
 
 The `2n` is not slack that can be trimmed: slots `2i` and `2i+1` belong to
 input element `i`, and that fixed mapping is what lets the parallel recursion

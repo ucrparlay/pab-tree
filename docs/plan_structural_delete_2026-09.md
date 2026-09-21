@@ -1,8 +1,27 @@
 # Plan: structural rebalance for batch delete (bottom-up sibling merge)
 
-Status: proposal, not started. Depends on the invalid-root consolidation
-(`consolidate_invalid_root`, 2026-09-12), which is the degenerate case of
-this scheme.
+Status: implemented 2026-09-12 as `repair_rec` / `repair_node` /
+`balance_over_children` (`node_op.hpp`); `fetch_invalid_subtree_nodes`,
+`reinsert_tree_after_delete` and `prune_out_empty_tree` are gone. Written
+as a separate function rather than templating `balance_over_leaves`, so the
+leaf path is untouched. The invalid-root consolidation
+(`consolidate_invalid_root`, 2026-09-12) stays as the degenerate case, since
+it regenerates the levels with build's fan-out.
+
+Result (2026-09-20, 1e9, `-t 128 -r 3`, ABBA x2 vs `c937b45`): 0.01%
+35.15 → 32.61 s, 0.1% 14.54 → 13.09 s, 1% 5.98 → 5.55 s, 10% 1.96 →
+1.81 s. Step 0's answer: the repair phase was 4.0 / 2.8 / 0.9 / 1.25 s of
+wall time per chain and is now 1.1 / 0.57 / 0.21 / 0.07 s; the old path
+reinserted up to 1.27 B entries per chain.
+
+Skewed data gains more (2026-09-21, same protocol): `norm` 28.62 / 13.60 /
+5.48 / 2.64 → 24.43 / 10.77 / 3.79 / 1.77 s; `seg` 10.59 / 4.67 / 3.13 /
+2.67 → 7.63 / 2.54 / 1.59 / 1.38 s. Sizes correct after every batch.
+
+Next candidate: on `norm` the consolidation guard still fails twice and
+falls back to the full rebuild (200 M entries, 0.29 s of the 1.8 s 10%
+chain). `repair_rec` could take the invalid root as well and retire both
+the guard and `rebuild_from_flatten` on that path.
 
 ## Context
 

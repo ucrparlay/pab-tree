@@ -1,2937 +1,379 @@
-# ParallelMultiwayOrderedSet — Project Knowledge
+# pab_tree — project knowledge
+
+This file covers the tree. Harness, datasets, baselines and the
+concurrent-index sweep live in `docs/harness_notes.md` (moved 2026-09-12).
 
 ## Working conventions (for Claude)
 
-- When writing something intended for human consumption, (comment, commit message, reply to prompt) use as few words as possible. Pick every word meticulously to reduce the volume to a strict minimum. Be down to the point. Less is more.
-
-- **Keep this file updated.** After any session where new files are read, new functions are understood, or new design decisions are uncovered, append or update the relevant section here. This file is the persistent knowledge store for this project and travels across machines.
-
-- **Check `.claude/` for memory.** At the start of each session, also check `.claude/MEMORY.md` and the memory files under `.claude/projects/` for additional persistent context (user preferences, feedback, project decisions) that supplements this file.
-
-
-- Don't need to run the unit_test after the updates. just make sure the compilation is passed.
-
-- **Never run a bare `git stash pop` in this repo.** It carries two long-lived
-  `autostash` entries (`stash@{0}` holds `.claude/settings.local.json`), so a
-  pop meant for your own stash consumes one of those instead. To A/B a change
-  against HEAD, copy `tests/` and `include/` to a scratch dir and overwrite the
-  changed files with `git show HEAD:<path>` — no git state to unwind.
-
-- **The shell is zsh: it does not word-split unquoted variables.**
-  `git stash push -- $FILES` sends one giant pathspec, not a list. Use an array
-  or `${=FILES}`, and never chain a destructive command after it with `;`.
-  `set -- $pair` does not split either: `rm -rf $S/src/$2` then ran with `$2`
-  empty and removed all of `$S/src` (2026-09-10, scratch only). Write multi-step
-  shell as a `#!/bin/bash` script, and guard every `rm` path with `${v:?}`.
-
-## What this project is
-
-A parallel, cache-oblivious B-tree (`pmos::BTree<TypeTrait>`) that supports parallel batch insert, batch delete, and range queries. It lives entirely in `include/pb_tree/`.
-
-## Library review — `docs/code_review_2026-08.md` (2026-08-17)
-
-Full review of `include/pb_tree/`: 89 findings (13 critical, 31 high). **Read it
-before changing library code** — several of its findings are traps that current
-tooling cannot catch.
-
-> NOTE: `/docs` is gitignored (`.gitignore:7`), so that file is on disk but not
-> committed. `git add -f docs/code_review_2026-08.md` to track it, or move it
-> somewhere unignored. The summary below is the tracked copy.
-
-The short version:
-
-- **The safety net is inert.** Default build is `-DNDEBUG -w`, so all 152
-  `assert()`s compile to nothing and every warning is off. `Validate()` returns
-  `true` unconditionally (`validation.hpp:190`) — it discards
-  `VerifyTreeProperty`/`CheckHeight`, which only assert. `kCheckSize` checks no
-  sizes at all. Do not treat a green `unit_test` as evidence of anything.
-- **Seven stop-ship defects**, three of which fire in normal use: deleting from
-  a small tree frees live entries (`b_batch_delete.hpp:85`); duplicate keys are
-  silently unreachable to every query (`node_op.hpp:31`); querying an empty or
-  default-constructed tree segfaults (`membership.hpp:14`, `range_count.hpp:17`,
-  `range_report.hpp:26`, `utility.hpp:24`). Also: copy ctor/assign do not
-  compile (`node_op.hpp:685,691`), `BTree t(seq)` is ambiguous
-  (`b_tree.h:77-87`), `Build()` leaks the old tree (`b_build_tree.hpp:34`), and
-  `BatchDelete(..., sorted_input=true, ...)` deletes nothing
-  (`b_batch_delete.hpp:80` passes `sorted_seq` where it built `sorted_slice`).
-- **The delete/rebalance path never calls `UpdateAug`**, so any non-trivial
-  augmentation is correct after `Build`/`BatchInsert` and silently wrong after
-  a `BatchDelete` that rebalances. `InteriorAug` cannot be implemented at all —
-  `Update()` gets no arguments and no access to children.
-- **What was checked and is fine**: `BalanceOverLeaves`' in-place-write
-  invariants, the fixed-array bounds arithmetic, parallel slice disjointness in
-  the insert path, the branchless `BinarySearch`, and the unsigned-`BufSizeT`
-  underflow class.
-
-## Refactor status (2026-08-17) -- COMPLETE
-
-Plan: `docs/refactor_plan_2026-08.md`. Review: `docs/code_review_2026-08.md`.
-
-All phases done, 30 commits, each gated on `unit_test`.
-
-| | before | after |
-|---|---|---|
-| library | 4860 lines / 24 files | 4004 / 21 |
-| `sizeof(btree)` | 296 B | 8 B |
-| public surface | ~90 members | 12 + aliases |
-| warnings | off via `-w` | 0 with `-Wall -Wextra` |
-| asserts in tests | 0 of 152 | all live |
-| include roots | 2, three spellings | 1, headers self-contained |
-| lines over 80 cols | -- | 0 |
-| user boilerplate | ~45 lines | 13 |
-| installable | no | `find_package(pab_tree)` |
-
-**Defects fixed.** The review's seven stop-ship items, plus four it missed:
-
-- `RunTest` built argv from `std::to_string(x).c_str()`, seven dangling
-  pointers, so the suite ran with garbage flags and the membership check never
-  executed.
-- `verify_tree_property` read `split[0]` on single-child interiors, where no
-  split key exists. This was the "kBuf<=8 structural violation"; the tree was
-  fine.
-- `tree_node.h` used `parlay::is_sorted` without including
-  `parlay/primitives.h`, surviving only on a transitive include from the
-  deleted `basic_point.h`.
-- The build path never called `update_aug`, so a fresh tree had a zero
-  augmentation.
-
-**Where measurement overrode the plan.** `range_report` clamping cost +3.5%,
-so the contract is documented and asserted instead. Node predicates went
-`private` rather than into a `detail` namespace: all 72 call sites are
-internal. Removing the loggers is performance-neutral (325.5 vs 327.8 ns), not
-the win first claimed.
-
-**Two asserts touched, both recorded.** The wrong one in `b_batch_insert.hpp`
-was kept with the correct check added beside it. The one in
-`b_batch_delete.hpp` asserting `root_->size == 0` was removed: it asserted
-exactly what the data-loss fix disproves.
-
-## Conventions (set 2026-08-17)
-
-Plan: `docs/refactor_plan_2026-08.md`.
-
-- **Rename**: `pb_tree` → `pab_tree`; class `BTree` → `pab_tree::btree`;
-  directory `include/pab_tree/`; guards `PABTREE_*`; CMake `PMOS` targets →
-  `pab_tree`. `tests/` and `scripts/` follow.
-- **Naming**: everything is `lower_snake_case` except `CamelCase` template
-  parameters and `UPPER_CASE` macros. That covers classes, functions, members,
-  enum values, type aliases **and concepts**.
-  - `static constexpr` constants take a **`k_` prefix**: `kBufUB` → `k_buf_ub`,
-    `kSplitFactor` → `k_split_factor`.
-  - **Enum values take no prefix**: `kSorted` → `sorted`. They are values of a
-    type, not compile-time sizes.
-  - **Template parameters take no prefix either**, even when constant —
-    `kCheckSize` → `CheckSize`.
-  - Type aliases take the STL name where one exists (`value_type`, `key_type`,
-    `size_type`), else bare snake_case (`entry_seq`).
-  - Nothing is `UPPER_CASE` unless it is a macro. This also avoids macro
-    capture: `BLOCK_SIZE` is `#define`d in `<linux/fs.h>` and
-    `<sys/mount.h>`, so an `UPPER_CASE` class member of that name would be
-    rewritten by the preprocessor whatever its scope.
-  - Never use leading-underscore + capital or double underscore; reserved to
-    the implementation. Ctor params keep their leading `_`, members stay plain.
-- **Macros must be `PABTREE_`-prefixed.** The library's own macros are all
-  include guards and already are. But the library *reads* `DEBUG` at 9 sites
-  (`CMakeLists.txt:87` sets it) — rename to `PABTREE_DEBUG`. `DEBUG` is one of
-  the most commonly defined names anywhere, and a consumer whose build sets it
-  silently enables the `GetNodeBoxRec` verification loops: an O(subtree)
-  traversal with heap allocation per child per interior update. Tests-only
-  macros (`MEMCHECK`, `DYNAMIC_GRAPH`, `OSM`, `MAC`, `CCP`, `SIEVE`, `LEAF<N>`)
-  are lower priority; `MAC` and `SIEVE` are generic enough to be worth it.
-  Kernel and STL naming agree on functions, variables, structs and macros
-  (checked against `/usr/include/linux/*.h` and libstdc++ 15.1.1); they differ
-  on enum values and type-alias suffixes, where the STL form above wins.
-- **Format**: Linux kernel style, 80 columns, tabs -- now **4 wide** (`0548915`;
-  `.clang-format` has `TabWidth: 4`), so measure line length at 4. It needs
-  clang-format >= 19 (`BreakTemplateDeclarations`); `/opt/opencilk-3/bin` has
-  19.1.7, the mason 18.1.6 on `PATH` rejects the file. **There is no
-  `BasedOnStyle: Linux`** — verified with clang-format 22.1.3, the only values
-  are LLVM/Google/Chromium/Mozilla/WebKit/Microsoft/GNU. The settings are
-  spelled out in `.clang-format.kernel` at the repo root (staged, not active;
-  R3 renames it into place). One deviation from the kernel file:
-  `Standard: c++20`, not `Cpp03` — Cpp03 writes `vector<vector<int> >`.
-  Measured: all 24 headers format cleanly, most get *shorter*, and of 49 lines
-  over 80 columns only 2 are code (`validation.hpp:59` string literal,
-  `comparator.h:90` trailing comment) — the rest are long comment blocks.
-- **Order**: delete → rename → restyle → reformat, as separate commits.
-  Reformat commit goes in `.git-blame-ignore-revs`.
-- **Comments**: short and concise. One or two lines, never a paragraph. No
-  jargon. State the fact; add detail only if it is very important. Same for
-  commit messages.
-- **One empty line after every function declaration.** The declaration blocks
-  in `b_tree.h` were packed solid; inline definitions were already separated.
-  clang-format does not do this (it only caps consecutive blanks at 1), so it
-  is a manual rule.
-- **Comment syntax is kernel style — `/* */`, never `//`** (done 2026-08-18).
-  A lone comment is `/* text */`; a run of adjacent ones becomes one block with
-  a bare `/*`, ` * ` bodies and a bare `*/`. Trailing comments are
-  `code /* text */`. Applies to `include/pab_tree/` and `tests/`, not to
-  `tests/common/` (vendored PBBS).
-- **Do not change**: the algorithm implementations, existing asserts (adding
-  new ones is fine), or the submodules. `external/baselines/` was frozen until
-  2026-08-18, when it was migrated to the renamed API on request — it had not
-  compiled since the rename. The algorithms inside it are still frozen.
-- **Gate**: `unit_test` after each mechanical pass. It runs here — data is at
-  `/ssd1/zmen002/kv_pair/`. Elsewhere every test skips and ctest passes green,
-  so a green run only means something where the data exists.
-- **Settled**: the tree is a **set** (distinct keys, debug assert only);
-  loggers are deleted (`contain` → `bool`); deep copy is fixed, not deleted;
-  the wrong assert at `b_batch_insert.hpp:86` stays with a correct one added
-  beside it.
-
-## Kernel-style comments (converted 2026-08-18)
-
-All 44 files under `include/pab_tree/` and `tests/` (not `tests/common/`,
-vendored PBBS) now use `/* */`. 461 comments in the library, ~1200 in the
-tests. Done by script, not by hand; any redo must track string and
-block-comment state so a `//` inside a literal is never touched (there are
-none today, but there are `//` sequences inside the new blocks).
-
-**Strip exactly one space after `//`, not all of them.** `// ` and ` * ` are
-both 3 columns, so the conversion is then *exactly* width-neutral and
-commented-out code keeps its own indentation. Verified: lines over 80 columns
-went 117 → 117, all pre-existing and all in `tests/`; `include/pab_tree/` has
-none, before or after.
-
-**A comment body containing `*/` silently produces uncompilable code.** The one
-case was `tests/data_op.h`'s banner
-`///****...****///` — the `*/` inside `*///` closes the block early and strips
-the rest to loose tokens. Rewritten as a real block comment of the same width,
-`/****...****/`. The converter now hard-errors on any body holding `*/` or
-`/*` rather than emitting the broken form.
-
-Two other things worth knowing:
-
-- **Trailing comments gain 3 columns** (` */`), so a line at exactly 80 breaks.
-  Only one did — `range_report.hpp:94`; the comment moved above the statement,
-  which then fit on one line.
-- **27 `//` remain, all legitimately** — they are text *inside* the new blocks,
-  from commented-out code that carried its own comment.
-
-`clang-format -i` over the result changed **nothing** (`ReflowComments: false`),
-so the converter output is already canonical.
-
-## Naming pass completed (2026-08-18)
-
-The alias rename (2026-08-18) covered type aliases only. This pass covered
-everything else, in `include/pab_tree/`, `tests/`, `external/baselines/` and
-`external/index-microbench/workload.cpp`.
-
-| what | count | now |
-|---|---|---|
-| library template params in `snake_case` | 107 decls / 20 files | `TT`, `LeafType`, `InteriorType`, `Granularity`, `Sorted` |
-| library capitalised params/locals | ~200 decls / ~900 uses | `T`→`node`, `TI`→`interior`, `TL`→`leaf`, `In`→`in`, `Out`→`out`, `A`→`in_slice`, `I`→`seq`, `P`→`target` |
-| `Build_` `BatchInsert_` `BatchDelete_` | 16 sites | `build_`, `batch_insert_`, `batch_delete_` |
-| `In_offset` (decl disagreed with its definition) | 1 | `in_offset` |
-| `static constexpr T eps` | 1 | `k_eps` |
-| mixed-case include guard `..._B_Batch_DELETE_HPP_` | 1 macro | all upper |
-| test constants `kCamelCase` | 45 names / 267 uses | `k_snake_case` |
-| test enums | 3 types / 10 values | `input_type`/`dis_type`/`delete_type`, values lose the `k` |
-| test template params | 8 names | `TT`, `Entry`, `NodeType`, `SplitSeq`, `InputType`, `TestTime`, `Serial`, `Print`, `OutputRatio` |
-| test + baseline CamelCase functions/types | 123 names | `snake_case` |
-
-**Codegen is byte-identical throughout** — `b_test` is 140799 instructions
-before and after, with every mnemonic count unchanged. That is the proof the
-whole pass is semantics-free; run it after any similar rename.
-
-### `-Wshadow` is what makes the big rename safe
-
-`T` → `node` collides with 29 existing locals, `TL` → `leaf` with 31. A
-same-scope collision fails to compile, but a collision in a **nested** scope
-compiles and silently changes meaning. Establish a baseline first
-(`include/pab_tree` had 0), rename, then compare:
-
-```bash
-g++ -std=c++20 -O0 -fsyntax-only -pthread -Wshadow -Iinclude \
-  -Iexternal/parlaylib/include -Itests \
-  -Iexternal/googletest/googletest/include tests/self_test.cpp 2>&1 \
-  | grep Wshadow | grep include/pab_tree
-```
-
-It caught 8, and **one had already changed behaviour**:
-`verify_unoverlapped_tree` called `check_contain_node(T, node)`, and with `T`
-renamed both arguments became the loop-local `node`. The fix is to rename the
-inner local (`child`, `sub`, `new_node`), not the parameter.
-
-### Three traps in the rename tooling itself
-
-- **Word-boundary renames hit include paths.** `type_trait` → `TT`
-  rewrote `#include "pab_tree/dependence/type_trait.h"`. Check for
-  `<NewName>.h` after every pass.
-- **A scanner that skips comments must know about `//`.** The first version
-  handled `/* */` and quotes only, so in the baselines an apostrophe in a `//`
-  comment (`CPAM's`) opened a bogus char literal and silently swallowed every
-  rename to the next quote — 5 in `cpam.h`, 12 across `tests/`, all found only
-  because the build broke later. Treat a quote as a literal only when it closes
-  on the same line.
-- **Same-name-different-thing needs scoping, not a global rename.**
-  `type_trait` is a template parameter in 16 files and a class alias in
-  `b_tree.h`/`tree_node.h`; `k_test_time` and `k_input_type` are each *both* a
-  template parameter and a local `constexpr`. Rename per declaration scope
-  (`template <…>` through the end of that entity), never file-wide, and never
-  touch `::type_trait` member access.
-
-### Template parameters shortened (2026-08-18, same session)
-
-`TypeTrait` → **`TT`** and `Range` → **`R`**, on request: 634 and 250 sites.
-`TT` and `R` were both free, and both sit with the existing single-capital
-parameters (`T`, `F`, `A`, `Seq`). Codegen unchanged again — 140799
-instructions.
-
-`Range` is a template parameter at every site but one:
-`tests/data_op.h:144` prints `"Range: ["`. A rename tool that skips string
-literals keeps that safe; a plain `sed` would not.
-
-`external/baselines/BwTree.h` was **deleted** rather than migrated — nothing
-included it, and the BwTree the workload actually drives lives in
-`external/index-microbench/BwTree/`.
-
-### Names that could not take the obvious form
-
-- `Typename` → `coord_type`, not `typename` (keyword).
-- `DeleteType`'s values `kBatchDelete`/`kBatchDiff` → `del_batch`/`del_diff`,
-  because `batch_delete` is already a free function template. The enum is
-  **unused** — nothing but its own declaration mentions it.
-- Test parameters `WP`/`WI` → `wp_in`/`wi_in`, because the bodies already
-  derive locals named `wp`/`wi` from them.
-- gtest suite and test names stay CamelCase (`TEST(SelfTest, Augmentation)`) —
-  they are labels, not identifiers.
-- `tests/common/` is vendored PBBS and was excluded, as in every earlier pass.
-
-## The `-DDEBUG` build is warning-clean now (2026-08-18)
-
-`option(DEBUG)` is what compiles the `#ifdef DEBUG` blocks, and nothing had
-ever built them, so their warnings appeared the first time anyone configured
-`-DDEBUG=ON`. Nine were real:
-
-| where | warning | fix |
-|---|---|---|
-| `b_batch_delete.hpp` | `validate()` result dropped -- it is `[[nodiscard]]` | assign to `[[maybe_unused]] tree_ok`, then `assert` it. Keeping the call outside the assert means it still runs under `-DDEBUG -DNDEBUG` |
-| `b_batch_delete/insert.hpp`, `node_op.hpp` x2 | `int i` vs `buf_size_type` in four `#ifdef DEBUG` loops | `buf_size_type`. All four count **forward**, so the CLAUDE.md warning about backward loops does not apply |
-| `node_op.hpp:156` | `auto node = ...` never read | deleted |
-
-### The sign change was checked against the `i--` trap
-
-Turning `int i` into `buf_size_type i` is the one edit in that list that could
-introduce a bug, so it was verified rather than assumed:
-
-- **All four loops count forward** (`i++`), read in full, and nothing in a body
-  decrements `i`. The library has exactly **one** backward loop, in
-  `balance_over_leaves`; it was `int` at the time and untouched by that pass,
-  and was converted separately (below).
-- **Every `- 1` is guarded.** In the two `get_split_n()` loops `i` starts at 1,
-  so `i - 1 >= 0`. In the two `get_node_n()` loops `i - 1` appears only in the
-  `else` branch, which requires `i != 0`; `get_node_n() - 1` and
-  `get_split_n() - 1` are reachable only once `node_n >= 2`, because `node_n ==
-  1` hits `continue` and `node_n == 0` never enters the loop.
-- The only other decrement, `const_iterator::operator--`, guards with
-  `if (this->idx_ > 0)`.
-- **Runtime proof**: `self_test` is 22/22 under `-DDEBUG -UNDEBUG`, the build
-  that actually compiles these loops and their asserts. An unsigned backward
-  loop would hang; a bad index would trip the box-vs-split asserts beside it.
-
-**Running the suite caught something compiling could not.**
-`SelfTest.GetEntriesOutputSize` uses `EXPECT_DEATH(..., "Out.size\\(\\) >=")`,
-matching the assert's *text*. Renaming `Out` to `out` changed the message, the
-regex stopped matching, and the test failed even though the assert fired
-correctly. The identifier was inside a **string literal**, which the rename
-tool skips on purpose -- so no compiler could have flagged it. After any
-rename, grep the string literals too:
-
-```bash
-grep -rnoE '"[^"]*\b(Out|In|TypeTrait|Range)\b[^"]*"' tests/*.cpp tests/*.h
-```
-
-That sweep also found `"Range: ["` in `data_op.h`, which is output text about a
-numeric range and correctly stays.
-
-The rest were in `tests/`: unused `key_type`/`mapped_type` aliases in the four
-baseline drivers (now `[[maybe_unused]]`, matching `b_test.cpp`), a dead
-placeholder `test_func` lambda in three of them (deleted; `pma.cpp` keeps its
-copy `[[maybe_unused]]` because it holds commented-out PMA reference code), two
-sign comparisons, and `parse_param`'s `defaultValue` parameter, which every
-caller passed and the body never read -- dropped, matching
-`incre_data_generate.cpp`'s signature.
-
-**Release codegen is unaffected**: every library fix is inside `#ifdef DEBUG`,
-and `b_test` at `-O3` is 140798 instructions before and after.
-
-What is left is not ours and is deliberately untouched: 43 warnings from
-`external/Packed-Memory-Array`, 11 from `external/CPAM`, 14 from
-`tests/common` (vendored PBBS).
-
-## The one backward loop, and what large nodes exposed (2026-08-18)
-
-`balance_over_leaves` had
-
-```cpp
-/* WARN: signed; --i from 0 is safe */
-for (int i = interior->get_node_n() - 1; i >= 0; --i) {
-```
-
-**The comment named the wrong hazard.** `--i` from 0 is indeed fine; the
-*initializer* is the problem. `get_node_n() - 1` is evaluated in **unsigned**
-arithmetic before the conversion to `int`, so at `node_n == 0` it wraps first:
-
-| `buf_size_type` | `node_n - 1` | as `int` | first index |
-|---|---|---|---|
-| `uint_fast8_t` (BufferSize ≤ 63) | 255 | **255** | out of bounds — array is 128 |
-| `uint_fast16_t`/`uint_fast32_t` | 2^64−1 | −1 | loop skipped, safe by luck |
-
-The narrow case is a real out-of-bounds walk, not a hang. Replaced with the
-test-then-decrement idiom, which removes the signed/unsigned mixing at all five
-uses of `i` in the body:
-
-```cpp
-for (buf_size_type i = interior->get_node_n(); i-- > 0;) {
-```
-
-Measured, not assumed: `b_test` at `-O3` goes 140798 → **140768** instructions,
-with 4 fewer `cmp` and 2 fewer `js` — the signed compare is gone. This is the
-one fix in the warning pass that is **not** inside `#ifdef DEBUG`, so it is the
-only one that touches release codegen.
-
-### `uint_fast16_t` is 8 bytes here
-
-Worth knowing before reasoning about widths: on this platform `uint_fast8_t` is
-1 byte but `uint_fast16_t` and `uint_fast32_t` are both **8**. So BufferSize 64
-and up all get a 64-bit `buf_size_type`, and only BufferSize ≤ 63 gets the
-narrow one.
-
-### Leaf 1024 (`k_buf_ub` 4096) is not covered by `self_test`
-
-`self_test` runs leaf sizes 2–256. A standalone probe at BufferSize 1024 under
-`-DDEBUG -UNDEBUG` (build, delete 90%, reinsert, validate, membership) passes at
-1024, 256, 32 and 2.
-
-**That probe was wrong the first time and looked like a tree bug.** It
-reinserted *every* entry after deleting 90%, so the 10% survivors were inserted
-twice; the tree is a set and forbids that. The `#ifdef DEBUG` box-vs-split
-assert caught it and aborted — which is the assert doing its job, not a defect.
-Reinsert only the deleted keys. Before concluding a large-leaf bug exists,
-check the probe against the distinct-keys contract.
-
-## `external/` consumers were stale; all of them build again
-
-Every consumer of the library outside `tests/` predated the
-`pb_tree` → `pab_tree` rename and did not compile. Confirmed pre-existing by
-`git stash` before touching anything. All are fixed now.
-
-| file | was broken on | fixed by |
-|---|---|---|
-| `stdset.h`, `tlxbtree.h` | `pb_tree/b_tree.h: No such file` | include path, trait aliases, loggers, API → `snake_case` |
-| `cpam.h`, `pma.h` | `dependence/loggers.h: No such file` | same |
-| `pam.h`, `spma.h` | pulled in by `cpam.cpp`/`pma.cpp` | same |
-| `BwTree.h` | same | deleted -- dead, nothing included it |
-| `workload.cpp` | `Wrapper::E`, `pb_tree::`, `TT` | same, plus the trait's dropped `kSkHeight` parameter |
-
-**The API contract is what `test_framework.h` calls**, and it is worth deriving
-rather than guessing: `build batch_insert batch_delete contain delete_tree
-get_entries range_count range_report sorted_leaf_ratio validate`, plus
-`box_type entry_traits input_range_type input_delete_range_type interior_type
-leaf_type parse_input parse_delete_input` and `tree_type::type_trait`.
-
-```bash
-grep -ohE '\bpkd\.[A-Za-z_]\w*' tests/test_framework.h | sed 's/pkd\.//' | sort -u
-```
-
-Loggers were removed rather than reinstated: `contain` returns `bool`,
-`range_count`/`range_report` return `size_t`. **CPAM was the one that could not
-just drop it** — `zmap::range_report_filter2` takes a logger and the algorithm
-is frozen, so `cpam.h` now passes a local `visit_counter` holding the only two
-fields CPAM touches (`vis_leaf_num`, `vis_interior_num`).
-
-Two latent bugs surfaced and were fixed: `workload.cpp` referenced
-`InputType::kOSM`, which the enum never had (the `-DOSM` path could not have
-compiled), and `cpam.h`/`pam.h` both carried `using key_type = K;` beside the
-inherited `key_type`, a redeclaration once `K` *was* `key_type`.
-
-**All 14 targets build**: `self_test unit_test b_test data_generator
-incre_data_generator data_to_binary filter_csv_year temporal_graph_osm
-temporal_graph_signal stdset tlxbtree cpam pma index_microbench_workload`.
-
-
-## Build
-
-```bash
-cd build && make <target> -j$(nproc)
-# targets: unit_test, b_test, pma, cpam, ...
-```
-
-Build is CMake-based. The `build/` directory already exists; no need to re-run cmake.
-
-### `INDEX_MICROBENCH` — MassTree/BwTree are out of `all` (added 2026-08-03)
-
-`index_microbench_workload` (the concurrent-index driver: MassTree, BwTree,
-ARTOLC, skiplists) is still **configured** on every run, but carries
-`EXCLUDE_FROM_ALL` unless `-DINDEX_MICROBENCH=ON` is passed:
-
-| | default | `-DINDEX_MICROBENCH=ON` |
-|---|---|---|
-| part of `all` (plain `make`) | no | yes |
-| `make index_microbench_workload` | works | works |
-| configure-time warning | printed | silent |
-
-`EXCLUDE_FROM_ALL` rather than an `if()` around the whole block **on purpose**:
-the 8 benchmark scripts name the target explicitly (`make "${solver}"`), so
-gating its *existence* would break `scalability_concurrent.sh` and
-`range_query_with_log.sh`. This way the change stays entirely inside
-`CMakeLists.txt` and no script needs the flag. Verified in the generated
-`CMakeFiles/Makefile2`: with ON there is an `all:
-CMakeFiles/index_microbench_workload.dir/all` line, without it there is not,
-while the target's own `.dir/all` rule is present either way. (`make -n all` at
-the top level is *not* a usable check — it only prints the recursive
-`$(MAKE) -f CMakeFiles/Makefile2 all`, never the sub-make's commands.)
-
-Why it is out of `all`: the target hard-codes `-lpapi -ltcmalloc_minimal -ltbb
--latomic` as naked link names (no `find_library`, so a miss is a link-time
-error, not a configure one), and `-include masstree/config.h` pulls in a
-**checked-in Linux configure output** (`HAVE_MADV_HUGEPAGE`,
-`HAVE_SYS_EPOLL_H`). PAPI has no macOS port, so the target cannot build on a
-Mac at all — in `all`, a plain `make` there fails on work nobody asked for.
-None of it is needed to build or test the tree itself.
-
-Package list (also in the warning): PAPI (`libpapi-dev` / `papi-devel`),
-gperftools (`libgoogle-perftools-dev` / `gperftools-devel`), oneTBB
-(`libtbb-dev` / `tbb-devel`), libatomic, pthreads+libm. MassTree additionally
-wants `external/index-microbench/masstree/config.h` (tracked in-tree; `git
-ls-files` confirms it, so no autotools run is normally needed) or a prebuilt
-`mtIndexAPI.a` beside it — absent that `.a`, CMake compiles the 17 masstree
-`.cc`/`.c` sources directly and says so in a warning. That `mtIndexAPI.a`
-warning and the `libatomic was not found` one (macOS only) fire on every
-configure, exactly as they did before this change, since the target is still
-configured.
-
-**Formatting gotcha**: `message()` reflows any line starting at column 0, which
-mangled the package table on the first attempt. Every line of that warning is
-indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
-
-## Key source files
-
-| Path | Role |
-|------|------|
-| `include/pb_tree/b_tree.h` | `BTree<TT>` class declaration + all type aliases |
-| `include/pb_tree/dependence/type_trait.h` | `BTreeTypeTrait` template — defines all size constants |
-| `include/pb_tree/dependence/tree_node.h` | `LeafNode`, `MultiWayNode` (interior) structs; alloc/free helpers |
-| `include/pb_tree/b_tree_impl/tree_op/node_op.hpp` | `BalanceOverLeaves`, `GenerateLeafNodes`, `GenerateInteriorNodes`, `BatchInsertUpdateInterior`, etc. |
-| `include/pb_tree/b_tree_impl/tree_op/leaf_op.hpp` | `InsertPoints2Leaf`, `DeletePoints4Leaf`, `HandlingLeafSplitOverflow` |
-| `include/pb_tree/b_tree_impl/batch_op/b_batch_delete.hpp` | `BatchDelete`, `BatchDeleteRecursive`, `FetchInvalidSubtreeNodes` |
-| `include/pb_tree/b_tree_impl/batch_op/b_batch_insert.hpp` | `BatchInsert`, `BatchInsertRecursive` |
-| `include/pb_tree/b_tree_impl/batch_op/b_build_tree.hpp` | `Build`, `BuildRecursive` |
-| `tests/b_test.cpp` | Main benchmark/test driver |
-| `tests/unit_test.cpp` | Unit tests (uses GoogleTest) |
-| `tests/wrapper.h` | `element<Key, Val>` — the entry the tests store, plus the `input_type` enum |
-
-All `b_tree_impl/**/*.hpp` files are `#include`d at the bottom of `b_tree.h`; they are not compiled separately.
-
-## Key comparator (added 2026-08-17)
-
-`btree_type_trait`'s sixth parameter, `KeyCompare = std::less<K>`. The trait
-exposes three helpers and **every ordering decision in the library goes through
-them** — ~55 sites across 13 files:
-
-```cpp
-using key_compare = KeyCompare;
-static bool key_less(K const &a, K const &b);    // KeyCompare{}(a, b)
-static bool key_equal(K const &a, K const &b);   // see below
-static bool entry_less(E const &a, E const &b);  // key_less on the keys
-```
-
-Rewrites used: `a <= b` → `!key_less(b, a)`, `a >= b` → `!key_less(a, b)`,
-`a > b` → `key_less(b, a)`. All one comparison, so nothing got slower.
-
-`key_equal` would be two comparisons in general (`!less(a,b) && !less(b,a)`).
-It is one for `std::less` (special-cased to `a == b`) and one for any
-comparator supplying a static `equal(a, b)`, detected with a `requires`.
-
-### Performance was verified by codegen, not by timing
-
-The timing noise floor swamps the effect. `rcount` measured **+2.8%**, but
-splitting the *baseline* runs in half and comparing them to each other gives
-**3.5%** — the "regression" is smaller than the measurement's own spread.
-`rreport`'s noise floor is 8.7%.
-
-What settles it: compile the same benchmark against both libraries and diff the
-disassembly with addresses normalised. **Every comparison and branch
-instruction count is identical** — cmp 2727, test 1755, and all of
-`setb/setbe/seta/setae/sete/setne/cmovb/cmovbe/cmova/cmovae/jb/jbe/ja/jae/je/jne`
-unchanged. Total instructions 55461 → 55465; the four are register-allocation
-churn (`%rcx`↔`%rdi`, operand order in `lea`). Almost the whole binary diff is
-mangled names, since the trait now carries `St4lessIjE`.
-
-Do this rather than trusting a 2 ms benchmark:
-
-```bash
-objdump -d --no-show-raw-insn X | sed -E 's/^\s*[0-9a-f]+:\s*//; s/0x[0-9a-f]+/HEX/g;
-    s/<[^>]*\+0x[0-9a-f]+>/<SYM>/g; s/\b[0-9a-f]{4,}\b/ADDR/g'
-```
-
-### `SelfTest.ReverseComparator` found five sites that a green suite did not
-
-Instantiating with `std::greater` and checking against
-`std::map<K, V, std::greater<K>>` caught, one per rebuild:
-
-1. `b_build_tree.hpp` sortedness assert still `a < b`
-2. the **key** branches of `if constexpr` in both partitioners
-   (`points_op.hpp`) — the entry branches had been routed, the `K` ones not
-3. the empty-range early-out `query_box.first >= query_box.second` in
-   `range_count`/`range_report`
-4. `balance_over_leaves`' `quick_check` box-vs-split asserts
-5. four more box-vs-split asserts in `node_op.hpp`
-
-None of these fire under `std::less`, so the default suite stayed green
-throughout. **A comparator that is not `std::less` is the only thing that
-tests this.** Keep that test.
-
-### `get_box` had to move too
-
-It is used only by `validate()`, and took numeric `Num::min/max`, which
-disagrees with the tree under a reversed comparator. Now folds with
-`key_less`. `get_empty_box` needs the comparator-extreme keys, derived as
-`key_less(min_val, max_val) ? ... : ...` — correct for `std::less`,
-`std::greater` and any monotone order, wrong only for a comparator where
-neither numeric limit is extreme (a hash order). Documented in the README.
-
-### Existing asserts
-
-Six sortedness asserts and eight box-vs-split asserts were rewritten to use
-`key_less`. They assert the same propositions — sorted, and within the split
-range — just in the tree's order rather than the numeric one. No assert was
-removed or weakened.
-
-## Alias names now follow the convention (2026-08-18)
-
-Every CamelCase type alias is gone. `TT` alone was 712 sites; the pass touched
-~1500 across the library and the test drivers.
-
-| was | now | | was | now |
-|---|---|---|---|---|
-| `TT` | `type_trait` | | `E` | `entry_type` |
-| `Node` | `node_type` | | `K` | `key_type` |
-| `Leaf` | `leaf_type` | | `V` | `mapped_type` |
-| `Interior` | `interior_type` | | `Entry` | `entry_traits` |
-| `Box` | `box_type` | | `BaseNode` | `base_node` |
-| `Split` | `split_type` | | `AT` / `BT` | `aug_type` / `base_trait` |
-| `Num` | `num_comparator` | | `Num_Comparator` | `numeric_comparator` |
-
-Two of the requested names collided and were resolved:
-
-- **`E` -> `entry_type` collided with the concept `entry_type`.** The concept
-  is now `entry_adaptor`, which is what it actually constrains.
-- **`V` -> `value_type` collided with `value_type = E`**, and
-  `const_iterator::value_type` must stay the entry or `std::iterator_traits`
-  breaks. `V` is `mapped_type` instead — already present, and the STL name for
-  a map's value. `value_type` still means the stored entry.
-
-`class TypeTrait` became `type_trait_base`. The *template parameters* are
-`TT` (2026-08-18); `type_trait` in snake_case is the class **alias**, a
-different thing — `btree<TT>` declares `using type_trait = TT;` and
-`leaf_node`/`multi_way_node` do the same, which is how
-`LeafType::type_trait::node_alloc` reaches the allocator from a node type
-alone.
-
-**This changed the user-facing adaptor contract.** A user now writes
-`entry_type` / `key_type` / `mapped_type`, not `E` / `K` / `V`. README updated.
-
-### Three traps in a blanket word-boundary rename
-
-- **`tests/common/` is vendored PBBS** and uses bare `E` 66 times and `V` 16
-  times. Excluded, or the rename would have wrecked it.
-- **Prose gets renamed too.** `// x = K/lambda is e^-K of the total` became
-  `e^-key_type` in `incre_data_generate.cpp`, where K is a mathematical
-  variable. Three comment lines and two in commented-out code in `b_ccp.cpp`
-  had to be put back by hand. Grep the diff for the new names in comments.
-- **Template parameters must stay CamelCase.** The pass turned
-  `template <typename E>` into `template <typename entry_type>` in two helpers
-  in `incre_data_generate.cpp`, which is both against the convention and
-  shadowing. Reverted to `Entry`; only the *member access* (`E::K` ->
-  `Entry::key_type`) should follow the contract rename.
-
-Codegen identical: 55463 instructions, no mnemonic count changed.
-
-## The augmentation concepts are applied now (2026-08-17)
-
-I opened this one while constraining `NodeType`: `leaf_augmentation` and
-`interior_augmentation` had existed since the refactor and **nothing used
-them**. The blocker was that each was pinned to a single `Slice` type while
-the library calls the augmentation with more than one range.
-
-Fixed by splitting them by where the call happens:
-
-| concept | checked |
+- Human-facing text (comments, commit messages, replies): as few words as
+  possible. State the fact; no jargon, no paragraphs.
+- Keep this file updated; it is the persistent knowledge store. Also read
+  the `.claude/` memory files at session start.
+- No need to run `unit_test` after edits; compilation must pass.
+- **Never run a bare `git stash pop`** here (two long-lived `autostash`
+  entries). To A/B against HEAD: `git archive <sha> | tar -x` into a scratch
+  dir, symlink `external/{parlaylib,googletest,libmorton,fast-cpp-csv-parser,
+  tlx}`, overlay the changed files.
+- **zsh does not word-split unquoted variables** (`$FILES`, `set -- $pair`);
+  a `rm -rf $S/src/$2` once ran with `$2` empty. Multi-step shell goes in a
+  `#!/bin/bash` script; guard `rm` paths with `${v:?}`.
+- Stop everything else before timing, even at nice 19: four single-core
+  compiles slowed a 224-thread run 17% from batch 0.
+
+## What it is
+
+A parallel, cache-oblivious B+-tree, `pab_tree::btree<TT>`, header-only in
+`include/pab_tree/`: parallel batch insert, batch delete, membership, range
+count/report, plus a `std::set`-like interface. Keys are distinct (a set).
+
+| path (under `include/pab_tree/`) | role |
 |---|---|
-| `leaf_augmentation<A>` / `interior_augmentation<A>` | in the trait — default-constructible, `reset()`, and `force_parallel` |
-| `leaf_aug_constructible_from<A, Range>` | in `leaf_node`'s entry constructor |
-| `leaf_aug_updatable_with<A, Range>` | in `leaf_node::update_aug` |
-| `interior_aug_updatable_with<A, Nodes, Splits>` | in `btree_interior_node::update_aug` |
-
-Each site checks against the range **it** passes, so nothing is
-over-constrained. Verified against five malformed augmentations; every one now
-names what it is missing rather than failing inside a header.
-
-### One check is lazy, and that is not fixable here
-
-A leaf augmentation with no `update_aug` **compiles** if the program only ever
-calls `build` — that path instantiates the augmentation's constructor but not
-`update_aug`. Add a `batch_insert` and the assert fires. My first probe did
-exactly that and reported the check as broken; it was the probe.
-
-Making it eager would mean asserting in the trait, which cannot name the range
-type — the circularity that made these concepts dead in the first place.
-
-Compile-time only: 55463 instructions, no mnemonic count changed.
-
-## Trait configuration: defaults plus a by-name form (2026-08-17)
-
-`kSkHeightVal`, which the finding called unguessable, was already removed by
-the refactor. What was left is real: seven positional parameters, and setting
-the comparator meant naming three defaults first. I hit that three times
-writing `self_test`.
-
-Two changes:
-
-- **`BufferSize` now defaults to 64**, so `btree_type_trait<my_ele>` is the
-  whole declaration.
-- **`btree_trait<EleType, BufferSize, Options>`** takes the rest by name.
-  Inherit `default_options`, override only what you want. It is an **alias**
-  for `btree_type_trait`, so the two name the same type — `self_test` static
-  asserts that for four combinations, so a wrong mapping cannot compile.
-
-All three spelled-out instantiations in `self_test` are gone.
-
-### `key_compare` is a plain alias with a `void` sentinel, deliberately
-
-The first design had `template <typename K> using key_compare = std::less<K>;`
-on `default_options`. That is a **member template, which C++ forbids in a local
-class**, so an options struct could not be declared inside a function — the
-first `TEST` using it failed with "invalid declaration of member template in
-local class". It is now `using key_compare = void;`, with `void` meaning
-`std::less<K>`, resolved by `std::conditional_t` in the alias. Plain aliases
-work in a local class.
-
-Codegen unchanged: 55463 instructions, no mnemonic count changed.
-
-## `ele_wrapper` deleted — one adaptor layer, not two (2026-08-17)
-
-Superseded by "The entry needs no adaptor at all" below, which removed the
-remaining layer for the common case. This note is why the *library-side*
-wrapper went.
-
-`btree_type_trait` wrapped every user adaptor in `ele_wrapper`, which
-inherited it and re-declared the three accessors with **by-value** parameters:
-
-```cpp
-static auto get_key(E const e) { return EleType::get_key(e); }
-```
-
-It added nothing else — `E`/`K`/`V` were already inherited — so the trait now
-uses `EleType` directly and the library calls the adaptor as the user wrote
-it. `TT::Entry` is the user's type.
-
-### The finding's performance claim is wrong; its API claim is right
-
-It calls the copy "on the hottest path there is". In source, yes.
-**Measured, the compiler already elides it**, even for a fat entry:
-
-| entry | instructions before | after |
-|---|---|---|
-| 8 bytes | 55463 | 55463 |
-| **64 bytes** | 25601 | 25601 |
-
-No mnemonic count changed in either. Only `.key` is read from the copy, so
-`-O3` never materialises it. So this is an API simplification — one less layer
-for a user to reason about, and signatures that no longer lie — not a speedup.
-
-**A timing run said the opposite and was wrong.** With the 64-byte entry it
-reported +2.2% / +3.9% / +6.2% *slower* after removing a copy, which cannot be
-real. That benchmark's own noise floor is 3.7-11.8% (min-to-max over six
-identical runs). When a result contradicts the mechanism, check the noise
-floor before believing it.
-
-### Both accessor signatures work
-
-`SelfTest.ElementAdaptorSignatures` builds trees through an adaptor taking
-`E const &` and one taking `E` by value, plus a 64-byte entry type, and static
-asserts all three satisfy `entry_type`. Removing the wrapper does not break
-adaptors written for the old by-value signature.
-
-## The entry needs no adaptor at all (2026-08-20)
-
-Three types stood between a key/val pair and the tree, all in `tests/wrapper.h`:
-`wrapper<K,V>` (a class holding everything else), `wrapper::element<K,V>` (the
-entry), `wrapper::element_wrapper<E>` (the adaptor). All three are gone. An
-entry with public `key` and `val` members is now the whole declaration:
-
-```cpp
-struct entry { uint64_t key, val; };
-using tt = pab_tree::btree_type_trait<entry>;
-```
-
-**What went into the library.** `plain_entry_adaptor<E>` (`type_trait.h`)
-derives `key_type`/`mapped_type` from `decltype(E::key)`/`decltype(E::val)`
-and supplies `get_key`/`get_val`/`to_entry`. `entry_traits_of<E>` picks it, or
-`E` itself when `E` already satisfies `entry_adaptor` — so a hand-written
-adaptor still works exactly as before, and a *self*-adaptor entry (both member
-`key`/`val` and static `get_key`) resolves to itself, not to the plain one.
-Two concepts back it in `concepts.h`: `keyed_entry` (has `.key` and `.val`)
-and `entry_spec = entry_adaptor || keyed_entry`, which replaces `entry_adaptor`
-as the constraint on the trait's first parameter and on `btree_trait`.
-
-**The test-side declaration went from 5 explicit arguments to 1.**
-`wrapper::leaf_aug_empty` and `wrapper::interior_aug_empty` were duplicates of
-`pab_tree::empty_leaf_aug`/`empty_interior_aug`, and `proto_node` was being
-named only to reach past them, so all six drivers (`b_test`, `unit_test`,
-`stdset`, `tlxbtree`, `cpam`, `pma`, plus both in `workload.cpp`) now read
-`btree_type_trait<entry_type, k_buf>`.
-
-### Zero cost, and this is the strongest form of that proof yet
-
-Checked again on 2026-08-24 across **12 binaries** -- gcc 15.1.1 and clang 21.1.8,
-LEAF 2/32/64/1024, `-DDYNAMIC_GRAPH=ON`, `-DOSM=ON`, and the baselines
-(`stdset`, `tlxbtree`, `cpam`, `pma`) plus `index_microbench_workload`. Every
-one: same instruction count, same `.text` size, **0 differing lines** once
-addresses are normalised. `stdset`/`tlxbtree` matter because `key_probe` calls
-`to_entry` per query and `to_entry`'s body is the one function body this change
-rewrote (designated aggregate init -> value-init + two assignments); gcc emits
-the identical instruction sequence for both forms, at 8 and at 64 bytes.
-
-`b_test` at `-O3 -march=native`, before vs after:
-
-| | before | after |
-|---|---|---|
-| `.text` | 570725 B | **570725 B** |
-| instructions | 136531 | 136531 |
-| disassembly diff, symbol names normalised away | — | **0 lines** |
-| `.rodata` | 101376 B | 97600 B (−3776) |
-
-Not just the same mnemonic histogram — the *same instruction stream, in the
-same order*. The only section that moves is `.rodata`, and it shrinks because
-the mangled type names got shorter. No timing run was needed or would have
-meant anything.
-
-Build both sides from the same build dir (swap the sources, `make b_test`) and
-compare with the symbol operands erased, not just normalised:
-
-```bash
-objdump -d --no-show-raw-insn X | grep -E '^\s+[0-9a-f]+:' \
-  | sed -E 's/^\s*[0-9a-f]+:\s*//; s/<[^>]*>/<S>/g; s/0x[0-9a-f]+/HEX/g;
-            s/\b[0-9a-f]{4,}\b/ADDR/g'
-```
-
-`s/<[^>]*>/<S>/g` is what makes this stricter than the recipe under "Key
-comparator" — that one keeps the symbol and so still diffs on every renamed
-type, which is 21694 lines of noise here.
-
-### `.text` bytes differ; that is relocation, not code
-
-`sha256` of the extracted `.text` differs for all 12 binaries even though the
-size is identical. Every differing byte is an address: `$0x4bdb90` -> `$0x4bcb90`
-absolute immediates, `0x4bed80(%rax)` displacements, and `lea 0xeca6(%rip)`
-under clang. The deltas are a **constant per binary** -- gcc `b_test` −4096 and
-−3776 (the `.rodata` shrink), clang −70, and the shift on all 22 clang lines is
-exactly −70. So compare disassembly, never section hashes.
-
-**Calibration for how sensitive this is**: changing `get_tree_name`'s return
-from `"btree"` to `"BTree"` -- five characters to five characters, in a
-function called once for printing -- moves **11707 disassembly lines and 19
-instructions**. Basic-block layout is that twitchy. A *0*-line diff is
-therefore a very strong statement.
-
-### A constrained alias cannot be a `conditional_t` branch
-
-The first `entry_traits_of` had `template <keyed_entry E> struct
-plain_entry_adaptor`, and then
-
-```cpp
-std::conditional_t<entry_adaptor<T>, T, plain_entry_adaptor<T>>
-```
-
-**hard-errors** for an adaptor `T` — forming the template-id checks the
-constraint even in the branch that is not taken. Verified with a standalone
-probe, not assumed. The constraint is a `static_assert` in the class body
-instead, which is only instantiated on use, and the user-facing message comes
-from `entry_spec` on the trait parameter — it names the failing disjunction
-and points at the user's own `using tt = ...` line.
-
-### What the two test suites cover now
-
-`self_test`'s whole matrix (leaf 2–256, five key shapes, every size where the
-structure changes) runs the **no-adaptor** path, since that is the new code;
-`ele` stays and still drives the augmentation, comparator, allocator,
-trait-by-name and adaptor-signature tests, so both paths are exercised. Three
-`static_assert`s beside the two declarations check that
-`btree_type_trait<entry>` and `btree_type_trait<ele>` agree on `entry_type`,
-`key_type` and `mapped_type`. 22/22 at `-O3` and again under
-`-DDEBUG -UNDEBUG`.
-
-### Measured too, at 1e9, with the real benchmark command
-
-Static equality settles it, but the sweep was run anyway (2026-08-24), since a
-benchmark comparison had raised the question. Exactly what
-`scripts/incre_updates.sh` runs -- `numactl -i all b_test -p
-kv_pair_incre/uni/1000000000_1/ins/100/1.batch.bin -r 3 -s 0 -t 224 -q 0
--b 0.01 -T 0 -D uni` -- interleaved old/new, two runs each:
-
-| | build | ins .01% | ins .1% | ins 1% | ins 10% | del .01% | del .1% | del 1% | del 10% |
-|---|---|---|---|---|---|---|---|---|---|
-| new vs old | +0.8% | +0.6% | +0.3% | +0.2% | +0.2% | −0.2% | +0.2% | +0.4% | −0.1% |
-
-Repeatability within a side is 0.0--1.0%, so this bounds any effect at **under
-1% with no consistent sign** -- which is what identical machine code predicts.
-Note these columns are 3-round `time_loop` averages (`batch_delete_by_step`
-honours `-r`), not the single shots the concurrent driver produces; they are
-much steadier than the 1e8 `-r 20` runs, where the same binary's own runs
-spread 5--74% and a null split of one binary against itself manufactures
-"effects" up to 56%.
-
-**`element` lost its member `get_key()`/`get_val()`.** `workload.cpp` was the
-only caller (6 sites) and reads `.key`/`.val` now. Keeping them would also have
-put a 0-arg non-static `get_key` next to the concept's `T::get_key(e)` probe,
-which is a needlessly subtle thing to leave lying around.
-
-## The incremental delete columns: `2a2d2ed`, and the old numbers were fake
-
-Bisected 2026-08-24, from the 2026-08-02 committed log to HEAD (70 commits).
-The entry-wrapper change is **not** involved; one commit is.
-
-Probe: `numactl -i all b_test -p kv_pair_incre/uni/1000000000_1/ins/100/1.batch.bin
--r 1 -s 0 -t 128 -q 0 -b 0.01 -T 0 -D uni` -- the delete block alone, 227 s a run.
-
-| commit | del 0.01% | del 0.1% | del 1% | del 10% |
-|---|---|---|---|---|
-| `3faa9c6` the committed log | 33.54 | 13.89 | 3.849 | 1.370 |
-| `bd02b63` its parent | 33.31 | 13.98 | 3.832 | 1.371 |
-| **`2a2d2ed`** | **35.49** | **14.70** | **6.771** | **2.574** |
-| HEAD + the wrapper change | 35.51 | 14.63 | 6.653 | 2.514 |
-
-`2a2d2ed` is "BatchDelete freed the whole tree when every root child was
-underfull". The 57 commits after it, the wrapper change included, are flat.
-
-### The old code was destroying the tree mid-chain
-
-Not inferred from the diff -- reproduced. A ~25-line probe (build n random
-keys, delete them in equal batches, print `size()` and the time after each)
-compiled against both header sets at `-O3 -march=native -DNDEBUG`, which is how
-the benchmark is built:
-
-| n = 1e8, leaf 64 | old: entries lost at | live entries destroyed | old | new | ratio |
-|---|---|---|---|---|---|
-| 10 batches (= del 10%) | batch 6 of 10 | 40 000 000 | 0.209 s | 0.348 s | **1.67x** |
-| 100 batches (= del 1%) | batch 53 of 100 | 48 000 000 | 0.534 s | 0.955 s | **1.79x** |
-| 1000 batches (= del 0.1%) | batch 990 of 1000 | 1 100 000 | 2.003 s | 1.980 s | 0.99x |
-
-Once the tree is freed and `root_` nulled, every remaining batch returns in
-**0.0000 s**. So the old del 1% and del 10% numbers were timing a chain that
-deleted about half the tree and then measured nothing, and the "regression" is
-the cost of the batches that now actually run.
-
-(This note used to say small batches lose the tree only "when nearly empty".
-True at 1e8, false at 1e9 -- see below. All four columns were truncated.)
-
-### Re-verified on the benchmark itself, 1e9 (2026-09-10)
-
-Harness instrumented per batch (time, `size()`, rebuild/reinsert counters),
-user's command, `-r 1`:
-
-| ratio | `376e067` freed tree at | live entries destroyed | `376e067` | HEAD |
-|---|---|---|---|---|
-| 0.01% | batch 8983 / 10000 | 101 600 000 | 35.15 | 37.50 |
-| 0.1% | batch 897 / 1000 | 102 000 000 | 14.08 | 15.43 |
-| 1% | batch 52 / 100 | 470 000 000 | 3.87 | 6.77 |
-| 10% | batch 5 / 10 | 400 000 000 | 1.38 | 2.54 |
-
-- Before the loss point the two match per batch (ratio 0.99--1.02).
-- `376e067` + `2a2d2ed` and HEAD make **identical** decisions: same size,
-  reinsert and rebuild counts after every batch, all four ratios.
-- HEAD's extra time is all after the old loss point: the batches that now run,
-  plus 2--5 full rebuilds (`rebuild_from_flatten`, 0.14 / 0.26 / 1.13 /
-  0.67 s). Rebuilds halve the tree each time (1%: 470M, 220M, 100M, 40M, 10M):
-  a rebuilt leaf holds `k_buf_md` and goes invalid below `k_buf_lb`.
-
-Timed, user's command, `-r 3`, 2 runs each in ABBA order (±0.25 s):
-
-| variant | 0.01% | 0.1% | 1% | 10% |
-|---|---|---|---|---|
-| `376e067` | 34.73 | 14.25 | 3.88 | 1.39 |
-| HEAD, fix reverted | 34.31 | 14.05 | 3.84 | 1.36 |
-| `376e067` + fix | 36.96 | 15.21 | 6.85 | 2.62 |
-| HEAD | 36.59 | 15.11 | 6.78 | 2.54 |
-
-The refactor is 1--3% *faster* at equal fix state; the fix is the whole delta.
-
-**The user's reference row `33.34 8.48 3.82 1.355` is the old 90-column sweep**
-(`logs/incremental_updates/0/uni/64.log`, 2026-07-30, `96526fd`): old `kv_pair`
-root, `-b 1`, one `del/1/1.batch.bin` sliced four ways, `tag=224`, `-r 4`.
-Library identical to `376e067`. On that file the 0.1% chain loses the tree at
-batch **533** (466M live) -- 9.28 s today -- versus 897 on `kv_pair_incre`.
-The loss point at 0.1% depends on the data; the other three columns lose at
-the same batch on both files. HEAD loses nothing on either.
-
-**`rebuild_from_flatten` sorts sorted data** (superseded, see below). Leaves
-are ordered, so `flatten_rec<decltype(out), true, true>` + `build_recursive`
-skips the sort: del 1% 6.83 -> 6.19, 10% 2.58 -> 2.19. Not applied; the
-consolidation below replaces the rebuild on this path altogether.
-
-### An invalid root is consolidated in place (2026-09-12)
-
-`consolidate_invalid_root` (`b_batch_delete.hpp`) replaces
-`rebuild_from_flatten` when the root is invalid with entries live:
-
-1. parallel recursion to every leaf-parent; `balance_over_leaves` merges its
-   underfull leaves in place. New phase-1 branch in `balance_over_leaves`
-   for a node with **no** valid leaf (was an `assert`): one group pivoted
-   on the last child, merged or re-bucketed. A leaf-parent whose leaves
-   are all empty just frees them (`node_n = 0`);
-2. `collect_leaves_rec`: leaves in key order plus the separator before
-   each, taken from the stored splits (child 0 inherits its parent's,
-   child j gets `split[j-1]`); frees every old interior on the way;
-3. `assemble_interior_levels` over that list, as `build` does.
-
-No entry leaves its leaf-parent, nothing is sorted, scratch is one pointer
-and one key per leaf (~256 MB at 1e9, was an 8 GB entry buffer).
-
-**Guard, read-only, before any mutation**: `root_->size >= k_buf_ub` and
-every leaf-parent holds 0 or `>= k_buf_lb` entries. Otherwise the old
-rebuild runs. Reason: an all-invalid leaf-parent with `1..k_buf_lb-1`
-entries would merge into one underfull leaf, and a tree below `k_buf_ub`
-could come out as a single leaf, which the assembly cannot take.
-
-**Decided from the leaves, not the deletion flags.** `consolidate_leaf_
-parents_rec` sums leaf sizes directly; flags are only read by the code it
-does not call. `prune_out_empty_tree` is not used (its assert reads the
-flag).
-
-**Which path ran is observable through the allocator**: consolidation
-allocates interiors and never a leaf; the rebuild allocates leaves. The
-tests assert that signature with `typed_counting_alloc`.
-
-Tests (`self_test`): `ConsolidateInvalidRoot` (leaf 2/8/64, sequential keys,
-delete all but every 8th -- deterministic collapse; with a `hole` that
-empties one root subtree), `ConsolidateInvalidRootHeight2` (root is the
-leaf-parent), `ConsolidateFallback` (a 1-entry leaf-parent trips the guard),
-`DeleteChainTenPercent` (10 x 10%, insert into the rebuilt levels),
-`AugmentationAfterConsolidation`, `ConsolidateLeakCheck` (allocs == frees
-per node type), `ConsolidateHeapAllocator` (plain new/delete, for ASAN),
-`ConsolidateReverseComparator`.
-
-**A random 10% chain does not always collapse the root.** At 1e9 the sixth
-batch does; at 4e5 with leaf 64 none does (the batch-5 repair leaves a
-spread of leaf sizes and the tree then consolidates gradually to the
-height floor, which the last batch reaches at size 0). `DeleteChainTenPercent`
-therefore forces the collapse with a keep-every-8th batch after five random
-ones instead of waiting for one.
-
-**Measured, 1e9, user's command, `-r 3`, ABBA x2** (repeats within 0.05 s):
-
-| | 0.01% | 0.1% | 1% | 10% |
-|---|---|---|---|---|
-| HEAD | 36.14 | 14.78 | 6.69 | 2.52 |
-| consolidation | 36.09 | 14.80 | **6.02** | **1.96** |
-
-Per event (probe): 470 M entries 0.020 s where the rebuild took 0.62 s; 400 M
-0.045 s vs 0.53 s; the two floor collapses of the small-ratio chains (102 M,
-leaves already healthy) 1-2 ms vs 0.14 s. Sizes after every batch identical
-to HEAD's. The small-ratio columns move within noise, as predicted.
-
-**A probe run is only as clean as the machine.** The first probe ran 17%
-slower than HEAD from batch 0, long before any consolidation; four nice'd
-single-core compiles were running beside a 224-thread fork-join program.
-Stop everything else before timing, even at nice 19.
-
-**Sanitizer build**: gcc-toolset-15 has no libasan here (`cannot find
--lasan`). Use `/opt/opencilk-3/bin/clang++ -fsanitize=address,undefined`
-with `-fno-pie -no-pie`, because `build/lib/libgtest.a` is not PIC and
-clang links PIE by default. `ASAN_OPTIONS=detect_leaks=0` (parlay's pools
-never return memory). `ConsolidateHeapAllocator` exists for this build:
-under parlay's pool a freed node is recycled and a use-after-free is
-invisible.
-
-**Stale logs**: every BTree incremental-delete column produced before
-2026-08-17 is truncated. Under `logs/incremental_updates_new/0/` only
-`{uni,norm,seg}/64.log` were rerun after the fix (2026-08-24); every other leaf
-size and all of `exp` date from 2026-08-01/02. Insert columns and the other
-trees are unaffected.
-
-**Build the old code with asserts and it simply aborts**: `assert(root_->size
-== 0)` at `b_batch_delete.hpp:89`, the assert `2a2d2ed` removed for asserting
-the condition the fix disproves. `-DNDEBUG` is what turned an abort into
-silent data loss.
-
-### Method notes
-
-- **Old commits build without touching the working tree**: `git archive <sha> |
-  tar -x` into a scratch dir, then symlink `external/{parlaylib,googletest,
-  libmorton,fast-cpp-csv-parser,tlx}` from the real worktree -- every submodule
-  pointer is identical across this whole window, so the links are sound.
-  Roughly 3 minutes a commit to build `b_test`.
-- **Pre-rename commits need two include roots**: `-Iinclude` *and*
-  `-Iinclude/pb_tree`, because `box_op.h` spells its include
-  `"dependence/type_trait.h"`. That is the "2 roots, three spellings" the
-  refactor removed.
-- **A small probe proves nothing here.** At n = 2e6 the old code loses nothing
-  at all; the root only goes invalid with entries still live once the tree is
-  big enough that one batch can invalidate every root child. Reproduce at 1e8
-  or above.
-
-All 14 targets build with no warning from our own code under `-Wall -Wextra`,
-plus `-DDYNAMIC_GRAPH=ON` and `-DOSM=ON` (both arms of the `#if` in every
-driver). The `-Wshadow` set over `self_test`/`b_test` is byte-identical to
-HEAD's — 3 warnings, all pre-existing and all in files this change never
-touched.
-
-## `get_entries`' output-size precondition is now checked (2026-08-17)
-
-`assert(Out.size() >= root_->size)` at the top of `get_entries`. It has to be
-**there and not deeper**: the existing `flatten.hpp:32`
-`assert(T->size == Out.size())` sees a slice built as
-`Out.begin() + root_->size`, and forming that iterator is already out of
-bounds when `Out` is short — the assert can never fire first.
-
-`range_report` was already covered; CLAUDE.md's claim that its contract is
-"documented and asserted" checks out — `range_report.hpp` has bounds asserts
-at lines 62, 73, 146 and 175.
-
-`SelfTest.GetEntriesOutputSize` covers exact size, oversized (asserting the
-tail past `size()` is untouched), an empty tree, and a one-short buffer via
-`EXPECT_DEATH`. The death test needs
-`GTEST_FLAG_SET(death_test_style, "threadsafe")` because parlay's thread pool
-is already running, and is guarded by `#ifndef NDEBUG`. Verified by removing
-the assert: the test fails.
-
-This closes both halves of the two `GetEntries` findings; the ordering and
-allocating halves were already handled by `to_seq()`.
-
-## Deleting an absent key is a no-op (settled 2026-08-17)
-
-Your call, and it is what `std::set::erase` does. Release builds already
-behaved this way — `delete_points_4_leaf`'s loop has an `if (it != end)` guard
-and derives `TL->size` from the write cursor, so absent keys were already
-skipped and the size already came out right. Only asserts aborted.
-
-Four asserts encoded the old "every key must be present" precondition and were
-**replaced, not deleted** — the new ones are strictly stronger:
-
-| was | now |
-|---|---|
-| `assert(T->size >= In.size())` | dropped — a batch may be longer than the leaf |
-| `assert(parlay::all_of(In, ...found...))` | dropped — that is the precondition being removed |
-| `assert(distance(begin,end) == TL->size - In.size())` | `... == TL->size - delete_cnt` **plus** `delete_cnt <= In.size()` |
-| `assert(new_node->size + In.size() == old_size)` | `new_node->size <= old_size` and `old_size - new_node->size <= In.size()` |
-
-The third one makes `delete_cnt` load-bearing; it was previously incremented
-and never read.
-
-Fault-injected to confirm the replacements still bite: suppressing
-`delete_cnt++` and double-counting it are both caught under `-DDEBUG`.
-
-**A probe that only deletes absent keys cannot test this.** My first fault run
-used the reviewer's repro (all keys absent), so `delete_cnt` stayed 0, the
-invariant held trivially, and both faults came back "not caught". Run the
-fault against `SelfTest.DeleteAbsentKeys`, which mixes present and absent.
-
-Both of the review's exact repros now pass under `-DDEBUG`: build 0..999 then
-delete 5000..5099, and even keys then delete {1,3,5,7}.
-
-## The four inlined binary searches stay inlined (measured 2026-08-17)
-
-The finding asked to replace the four hand-inlined right-boundary searches
-in `range_count`/`range_report` with `detail::binary_search`. **Tried twice,
-rejected on measurement.** The four sites now carry a comment saying so, so
-nobody redoes it.
-
-| version | instructions | measured |
-|---|---|---|
-| inlined (HEAD) | 55463 | baseline |
-| via `binary_search` over a slice | 55553 (+90, +21 `cmp`) | `range_count` **+35% small boxes, +54% large** |
-| via a new pointer+count `binary_search_n`, base 8 | 55523 (+60, +21 `cmp`) | inconclusive |
-
-The slice version is clearly bad — `parlay::slice` indexing does not optimize
-like the raw-pointer loop the sites already use. Adding a pointer+count
-primitive recovered most but not all of it: still +60 instructions and 21
-extra compares, with no timing win to pay for them. That primitive was removed
-again rather than left as dead code.
-
-**The base is a separate question from the dedup, and the finding conflates
-them.** Switching from the literal 8 to the node's `k_binary_search_base`
-accounts for +21 `cmp` on its own, because the interior base is
-`64 / sizeof(K)` = **16** for a 4-byte key — double the linear tail. For the
-*leaf* the tuned base is `64 / sizeof(E)` = 8, so the literal already is the
-tuned value there. The claim only bites for interior splits with small keys,
-and whether 16 beats 8 is unresolved: this machine could not resolve a few
-percent (see below).
-
-### The timing floor moved mid-session — check before trusting a number
-
-Repeated identical runs drifted 96 → 129 → 149 → 163 ms, and min-of-10 paired
-runs gave contradictory signs (−6.8% / +2.8% / +0.7%). The box is shared. When
-that happens the disassembly diff is the only reliable evidence; a few percent
-is simply not measurable. Re-measure the base question on a quiet machine
-before acting on it.
-
-## The `2n` scratch buffer stays — re-verified 2026-08-17
-
-Re-checked rather than taken on faith, because it was already on the frozen
-list. It stays frozen, and the finding's numbers are partly wrong.
-
-**Load-bearing, confirmed.** `batch_insert_recursive` hands each child
-`node_split_slice.cut(2 * l, 2 * r)` where `l`/`r` are *input* indices, so
-slots `2i`/`2i+1` belong to input element `i`. The function opens with
-`assert(2 * In.size() == node_split_slice.size())`. That fixed mapping is what
-makes the per-child sub-ranges provably disjoint with no coordination.
-**The suggested fix — sizing it `2 * min(n, ...)` — would index out of
-bounds.**
-
-**The size claim is right**: `sizeof(node_split_pair)` is 16 for both a 32-bit
-and a 64-bit key (pointer + key + padding), so 32 bytes per input element.
-Measured at batch 1e7: predicted 320 MB of scratch, peak RSS rose 381 MB with
-the 80 MB sorted copy included.
-
-**"Essentially all of it is untouched in the common case" is not supported.**
-The buffer is `uninitialized`, so in principle untouched pages never fault in,
-but ~94% of it is resident at batch = tree size and ~56% at batch = 10% of the
-tree. Below that the measurement is swamped by parlay's own allocations and
-says nothing — do not quote those rows.
-
-**"Allocates the same 2n scratch a second time during reinsert" is
-overstated.** `reinsert_tree_after_delete` is sized by `reinsert_entries`, not
-by the batch, and it rarely runs: over deletes of 90%, 50% and 10% of a 2e6
-tree it was called 0, 1 and 0 times, and the one call carried 51% of the batch.
-
-Action taken: documented the memory requirement in the README, which is what
-the finding asked for as its fallback. No code change.
-
-## Traversal skeleton: only the pure part was extracted (2026-08-17)
-
-The finding asked for a shared `for_each_touched_child` skeleton across
-`batch_insert_recursive` and `batch_delete_recursive`. Read side by side, less
-is shared than it claims:
-
-| piece | shared? |
-|---|---|
-| partitioner selection | **byte-identical**, 5 lines |
-| `#ifdef DEBUG` range assert | no — entries vs keys |
-| touched-children loop | shape only. Insert writes 1 array; delete writes 3, stores `touched_l`/`touched_r`, and calls `reset_deletion_flag()` on untouched interior children |
-| `parallel_for` body | no — different payload, and insert recomputes `l`/`r` inside the lambda while delete uses the precomputed ones |
-| aggregation | no |
-
-So only the partitioner selection came out, as `partition_batch` in
-`points_op.hpp`. It is pure and has no parallel structure, which is what makes
-it safe under the "don't change the parallel algorithm" rule.
-
-**It needed `[[gnu::always_inline]]`.** Plain extraction did not fully inline
-and cost **+33 instructions and +9 `callq`** in the hottest recursion. With
-the attribute: 55463 vs 55465 instructions and `callq` 3091 → **3087**, i.e.
-marginally better than before, and every timing delta below the noise floor.
-Measure this kind of extraction; do not assume the compiler inlines it.
-
-The parallel dispatch was deliberately left duplicated. Threading a lambda
-through the `parallel_for` in both recursions is exactly the "trick" code the
-standing rule protects, and it would unify perhaps 10 lines that are not
-actually identical.
-
-## A `-DDEBUG` build had never been run, and hid a comparator bug
-
-`b_batch_delete.hpp`'s range assertion still read
-
-```cpp
-return k >= TI->split[i - 1] && k < TI->split[i];
-```
-
-The comparator sweep could not have caught it: the block is behind `#ifdef
-DEBUG`, which nothing in the build system sets, so it never compiles. Under
-`std::greater` it aborts. Fixed, and confirmed by building `self_test` with
-`-DDEBUG -UNDEBUG` — it aborted before, 18/18 after.
-
-Build it that way by hand, since no CMake target does:
-
-```bash
-g++ -std=c++20 -O1 -pthread -DDEBUG -UNDEBUG -Iinclude \
-  -Iexternal/parlaylib/include -Iexternal/googletest/googletest/include \
-  tests/self_test.cpp build/lib/libgtest_main.a build/lib/libgtest.a -o st_debug
-```
-
-`-DDEBUG` also turns on the `get_node_box_rec` verification loops, so it is
-slow — but it is the only way any of those asserts get compiled at all.
-
-## `default_hybrid_pred` — both review findings were wrong (2026-08-17)
-
-Two findings claimed defects here. Measured, both are false, and in opposite
-directions. **The code is unchanged**; only the comment was wrong.
-
-| claim | measured |
-|---|---|
-| "ASLR-nondeterministic" | **false** — identical pattern over 6 runs under full ASLR (`randomize_va_space=2`), identical again under `setarch -R`, identical at 1/2/8/32 threads |
-| "bit 3 of `begin` is zero, so the address terms achieve nothing" | **false** — `bit3(begin)`=1 in 1596 of 3124 calls; the address terms flip the result in 1534 of 3124 |
-| "the outcome is in fact stable" | true |
-
-The mechanism neither finding identified: allocation bases are at least
-16-byte aligned, so bit 3 of an address **is** bit 3 of the offset within its
-buffer. Deterministic, but not zero — it contributes about half the time.
-
-The comment did claim something false ("XOR in low address bits from
-begin/end to break correlation across call sites") and is corrected.
-
-### Testing this needs separate processes
-
-`SelfTest.DefaultHybridPredIsReproducible` re-execs itself (`readlink
-/proc/self/exe`, `PABTREE_HYBRID_CHILD=1`, `popen`) and compares the
-leaf-sortedness pattern from two fresh processes.
-
-**An in-process two-run version is worthless here** and was written first: the
-slices the predicate sees are internal parlay buffers, and the pool hands the
-second run the same addresses, so nothing varies. Proven by fault injection —
-changing the shift from 3 to 12 (a bit that does differ between allocations)
-**passed** the in-process test and **fails** the cross-process one. Shift 20
-also fails it.
-
-A second trap in the same test: the first in-process attempt compared the
-addresses of the two input `std::vector`s as a sanity guard, and they came
-back *equal* — the allocator reuses the freed block. The guard fired and
-stopped the test claiming a result it had not earned. Keep guards like that.
-
-Note `/proc/self/exe` must be resolved with `readlink` in the parent: inside
-`popen` it names the shell, not the test binary.
-
-## Node base is a real extension point now (2026-08-17)
-
-`NodeType` was the one trait parameter with no constraint, so a wrong type
-failed somewhere inside a header instead of at the user's declaration. It is
-now `node_base NodeType = proto_node`:
-
-```cpp
-template <typename T>
-concept node_base =
-	std::constructible_from<T, bool, size_t> && requires(T t, size_t n) {
-		{ t.is_leaf } -> std::convertible_to<bool>;
-		{ t.size } -> std::convertible_to<size_t>;
-		t.size = n;
-	};
-```
-
-`t.size = n` is in there because rebalancing writes `size` (`leaf_op.hpp:164`,
-`node_op.hpp:99,141,255,390,518,565`); a `const size_t size` compiles as a
-member but breaks the tree.
-
-**A plain aggregate satisfies it.** C++20 parenthesized aggregate
-initialization (P0960) makes `struct { bool is_leaf; size_t size; };`
-constructible from `(bool, size_t)` with no constructor written — verified, it
-builds and validates. A test case written expecting it to be *rejected* was
-wrong, not the concept.
-
-### `EleAssignTag` was dead and is gone
-
-`leaf_node`'s second template parameter, aliased to `ele_assign_tag_type` and
-**never read**. `b_tree.h` passed `parlay::move_assign_tag` for it. Removed;
-`Leaf` is now `leaf_node<TT>`.
-
-### The augmentation concepts were declared and never applied
-
-`leaf_augmentation` and `interior_augmentation` have existed in `concepts.h`
-since the refactor and **nothing used them** — a concept that is never applied
-enforces nothing. They cannot simply be attached to the trait, because they
-are parameterised on a `Slice` type and the library calls `update_aug`/the
-augmentation constructor with more than one range type; pinning them to one
-would reject valid augmentations.
-
-What went in instead: the trait now `static_assert`s the parts that do not
-depend on a range type — both augmentations default-constructible, and
-`interior_aug::force_parallel(size_t, size_t) -> bool`. The range-dependent
-half is still unenforced and is recorded as a finding.
-
-Compile-time only: instruction count 55465 before and after, no mnemonic count
-changed.
-
-## Node allocator (added 2026-08-17)
-
-`btree_type_trait`'s seventh parameter, `NodeAllocType = parlay_node_alloc`
-(`node_base.h`), which wraps `parlay::type_allocator`. All **8** allocation
-sites in `tree_node.h` route through `TT::node_alloc`; nothing in the library
-names `parlay::type_allocator` except that one adaptor.
-
-```cpp
-Leaf *o = Leaf::TT::node_alloc::template alloc<Leaf>();
-NodeType::TT::node_alloc::template free<NodeType>(static_cast<NodeType *>(T));
-```
-
-**No signature changed.** The alloc helpers are templated on `Leaf`/`Interior`
-rather than on `TT`, but both node types expose `::TT` (`leaf_node` and
-`multi_way_node` each declare `using TT = TypeTrait;`), so the allocator is
-reachable from the node type alone. `free_node<NodeType>` likewise — every
-call site already names `Leaf` or `Interior`.
-
-Also dropped the unused `Range` template parameter from
-`alloc_empty_leaf_node`, which the finding called out. One call site.
-
-### Zero cost, and this one is provable
-
-Stronger than the comparator result: **no mnemonic count changed at all**, and
-total instructions are 55465 before and after. The `.text` bytes differ only
-because the mangled names got longer (`NS_17parlay_node_allocE`); every
-non-symbol diff line is the same instruction on both sides, shifted. No timing
-run was needed.
-
-### `SelfTest.CustomAllocator` is also a leak check
-
-It instantiates with a `counting_alloc` that tracks live and total nodes, then
-asserts `live == 0` once the tree is destroyed. That catches both a bypassed
-allocation site and a node the tree forgets to release.
-
-Fault-injected to confirm it works: reverting one leaf site to
-`parlay::type_allocator` directly makes `live` go **negative** (−129), since
-frees still count but those allocs do not, and the test fails.
-
-The allocator must be thread-safe — batch operations build nodes inside
-`parlay::parallel_for`. `counting_alloc` uses `std::atomic` for that reason.
-
-## Two test suites (self_test added 2026-08-17)
-
-| target | data | runtime | what it is |
-|---|---|---|---|
-| `self_test` | none | ~7 s | generates keys from a seed, checks against `std::map` |
-| `unit_test` | `/ssd1/zmen002/kv_pair` | minutes | real distributions at scale, **skips** without the data |
-
-Both are `-UNDEBUG` and both are ctest tests. `self_test` is the gate that
-works anywhere; `unit_test` is unchanged.
-
-`./self_test --seed=N` reproduces a run **exactly** — verified by hashing two
-runs with the timing text stripped. Default seed is fixed (20260817), printed
-on startup. A failure prints leaf size, input size, key shape and seed via
-`SCOPED_TRACE`, plus the rerun flag.
-
-Covers build / batch_insert / batch_delete / contain / range_count /
-range_report / get_entries / to_seq / iteration / find / lower_bound /
-upper_bound / equal_range / augmentation / copy-move-swap-clear, over leaf
-sizes 2–256, five key shapes (uniform, clustered, sequential, sparse,
-boundary), and every size where the structure changes shape (0,1,2,3,…,1025).
-
-### It was validated by breaking the library, not by passing
-
-| injected fault | caught? |
-|---|---|
-| drop an `update_aug` on the delete path | yes — `Augmentation` |
-| off-by-one in the leaf delete compaction | yes — SIGABRT |
-| `range_count` skips a covered middle child | yes — 20 of 14 tests |
-| iterator skips `ensure_leaf_sorted` | yes, **after fixing the test** |
-| `range_count` right edge `<` → `<=` | no — the mutant is *equivalent* |
-
-Two things worth keeping:
-
-- **The iterator fault initially passed.** `check_against` called `to_seq()`
-  before iterating, and `to_seq` runs `flatten_rec<sorted=true>` which sorts
-  every leaf — so iteration never saw an unsorted leaf. **Iteration must be
-  checked before `to_seq`/`get_entries`.** Anything added to that function
-  that sorts leaves has to go after the iteration block.
-- **The `<`→`<=` mutant is not a coverage gap.** With `<=` the extra child
-  pulled into the middle sum lies entirely below `second`, and the child then
-  recursed into starts at `second` and contributes 0. Same answer, more work.
-
-A no-op fault injection looks exactly like a coverage gap. The first
-`range_count` attempt replaced `get_node_id_containing_key_exclusive`, a string
-that does not occur in that file, so nothing changed and the suite "passed".
-Confirm the mutant actually differs before concluding anything.
-
-### `multi_way_node` needed `get_aug()`
-
-`leaf_node` had `get_aug()`; the interior did not, so an interior augmentation
-could be written but not read back. Added both overloads. `aug` was already
-public (`multi_way_node` is a `struct`), so this is an accessor, not a change
-in access.
-
-## STL container interface (added 2026-08-17)
-
-`btree` now carries the API common to TLX's four B+-tree containers and to
-`std::set`, on top of the batch interface. `include/pab_tree/b_tree_impl/query_op/iterator.hpp`
-holds the iteration half.
-
-| Group | Members |
-|---|---|
-| types | `key_type` `mapped_type` `value_type` `difference_type` `size_type` `key_compare` `value_compare` `iterator` `const_iterator` `reverse_iterator` `const_reverse_iterator` |
-| capacity | `size` `empty` `max_size` `clear` |
-| lookup | `contains` `count` `find` `lower_bound` `upper_bound` `equal_range` |
-| iteration | `begin` `end` `cbegin` `cend` `rbegin` `rend` `to_seq` `sort_leaves` |
-| modifiers | `bulk_load` `insert(range)` `insert(entry)` `erase(range)` `erase(key)` `erase(iter)` `erase(first,last)` |
-| compare | `operator==` `operator<=>` |
-| observers | `key_comp` `value_comp` |
-
-Not adopted: `get_allocator` (no allocator parameter yet), `insert(hint, x)`,
-`erase_one` (a duplicate of `erase(key)` here, since keys are distinct),
-`print`/`print_leaves`. `validate` is the existing spelling of TLX's `verify`.
-
-### Iteration rests on one structural fact
-
-Leaves are ordered **against each other** — the B+-tree invariant — but a
-leaf's own entries are not necessarily sorted (`is_sorted`, the deliberate
-performance trick that `sorted_leaf_ratio` measures). So ordered iteration
-only needs the leaf currently under the cursor to be sorted, and
-`ensure_leaf_sorted` does that on arrival. This is the same lazy-sort that
-`extract_points_in_leaf<sorted=true>` already performed for `to_seq`.
-
-**That write means iteration and lookup are not thread-safe by default.** Call
-`sort_leaves()` first (one parallel pass, idempotent) and afterwards both only
-read.
-
-An earlier draft called `sort_leaves()` from inside `begin`/`find`/
-`lower_bound`/`upper_bound`. That is O(n) *per lookup* — probing n keys became
-O(n²) and the test hung. Per-leaf sorting is what makes lookups O(log n).
-
-### `const_iterator` carries no path stack
-
-Crossing a leaf boundary re-descends from the root via `next_leaf`/`prev_leaf`,
-which track the deepest node that still had a child on the far side. That is
-O(height) per leaf, so O(height / k_buf) amortised per entry, and it keeps the
-iterator 3 words wide rather than holding an O(height) stack. Entries are
-immutable (`iterator` is `const_iterator`, as in `std::set`) because moving one
-would break the leaf holding it.
-
-### Overload traps found while writing this
-
-- `erase(K)` vs `erase(Range&&)`: `erase(500u)` bound to the **template**,
-  because binding `unsigned&&` to an rvalue outranks `const unsigned&`, and
-  that tiebreak is applied before the non-template preference. Both range
-  overloads are now constrained with `requires std::ranges::range<...>`.
-- `CHECK(t.validate<true, false>())` does not compile — the comma inside the
-  template argument list splits the macro's arguments.
+| `b_tree.h` | class, aliases, node predicates; `#include`s every `b_tree_impl/**/*.hpp` at the bottom |
+| `dependence/type_trait.h` | `btree_type_trait`, `btree_trait`, size constants, `default_options`, `plain_entry_adaptor` |
+| `dependence/tree_node.h` | `leaf_node`, `multi_way_node`, alloc/free helpers |
+| `dependence/{concepts,node_base,binary_search}.h` | concepts; `proto_node`, `parlay_node_alloc`; branchless `binary_search<Base>` |
+| `b_tree_impl/batch_op/b_build_tree.hpp` | `build_`, `build_recursive`, `assemble_interior_levels` |
+| `b_tree_impl/batch_op/b_batch_insert.hpp` | `batch_insert_`, `batch_insert_recursive` |
+| `b_tree_impl/batch_op/b_batch_delete.hpp` | `batch_delete_`, `batch_delete_recursive`, `rebuild_from_flatten`, `consolidate_invalid_root` |
+| `b_tree_impl/tree_op/node_op.hpp` | `generate_*_nodes`, `batch_insert_update_interior`, `batch_delete_update_interior_size`, `repair_rec`, `repair_node`, `balance_over_children`, `balance_over_leaves` |
+| `b_tree_impl/tree_op/leaf_op.hpp` | `post_process_leaf_change`, `insert_points_2_leaf`, `delete_points_4_leaf`, `handling_leaf_split_overflow` |
+| `b_tree_impl/tree_op/{flatten,points_op}.hpp` | `flatten_rec`; `partition_batch` and the two partitioners |
+| `b_tree_impl/query_op/*.hpp` | membership, range count, range report, iterator |
+| `b_tree_impl/validation.hpp` | `validate`, `verify_tree_property`, `check_height` |
+| `tests/self_test.cpp` | dataset-free gate against `std::map` |
+| `tests/{unit_test,b_test}.cpp`, `tests/test_framework.h` | data-driven tests, benchmark driver |
+
+Build: CMake, `build/` exists; `cd build && make <target> -j`. `self_test`
+and `unit_test` compile `-UNDEBUG` (asserts live); everything else is
+`-O3 -march=native -DNDEBUG`. The CMake option `DEBUG` also compiles the
+`#ifdef DEBUG` box-vs-split loops (O(subtree) per touched node); no test
+target sets it, see the recipes under Tests.
+
+## Conventions
+
+- Names: `lower_snake_case` everywhere; `CamelCase` template parameters
+  (`TT`, `R`, `LeafSortPred`); `k_` prefix on `static constexpr`
+  constants; enum values and template parameters take no prefix; STL alias
+  names where one exists (`key_type`, `size_type`; `value_type` is the
+  entry, `mapped_type` the value). Nothing `UPPER_CASE` but macros, all
+  `PABTREE_`-prefixed except the read of `DEBUG`.
+- Format: Linux kernel style, tabs 4 wide, 80 columns measured at tab 4,
+  `/* */` comments only, one blank line after every declaration in
+  `b_tree.h`. Format with `/opt/opencilk-3/bin/clang-format` (19); the
+  mason 18 on `PATH` rejects `.clang-format`.
+- Do not change the algorithms, existing asserts (adding is fine) or the
+  submodules unless asked. `external/baselines/` algorithms are frozen.
+- Prove "no behaviour change" by codegen, not timing: build both sides in
+  the same build dir and diff the normalised disassembly:
+
+  ```bash
+  objdump -d --no-show-raw-insn X | grep -E '^\s+[0-9a-f]+:' \
+    | sed -E 's/^\s*[0-9a-f]+:\s*//; s/<[^>]*>/<S>/g; s/0x[0-9a-f]+/HEX/g; s/\b[0-9a-f]{4,}\b/ADDR/g'
+  ```
+
+  Section hashes differ on relocations alone; a 5-character string change
+  moves 11 707 lines, so a 0-line diff is a strong statement. Timing on
+  this shared box has a noise floor of several percent and drifts within a
+  session; a 3-round `-r 3` at 1e9 repeats within 0.05 s, a 2 ms benchmark
+  does not.
+- After a rename: `-Wshadow` over `self_test` (baseline 3 warnings, all
+  pre-existing; a nested-scope collision compiles and changes meaning) and
+  a grep of string literals for the old names (an `EXPECT_DEATH` regex once
+  matched an assert's text).
 
 ## Type system
 
-The tree is parameterised by `TypeTrait = BTreeTypeTrait<EleType, kBufferSize, LeafAug, InteriorAug, kSkHeight, NodeType>`.
-
-### Key size constants (all in `BTreeTypeTrait`)
+`btree_type_trait<EleType, BufferSize = 64, LeafAug, InteriorAug, NodeType,
+KeyCompare, NodeAllocType>`. `btree_trait<EleType, BufferSize, Options>`
+names the rest: inherit `default_options` (`leaf_aug`, `interior_aug`,
+`node`, `node_alloc`, `key_compare`; `void` means `std::less`, a plain alias
+so the struct can be local to a function).
 
 ```
-kBuf   = kBufferSize          (minimum/target leaf size)
-kBufLB = kBufferSize          (leaf validity lower bound: size < kBufLB → invalid)
-kBufMD = 2 * kBufferSize      (average/split target)
-kBufUB = 4 * kBufferSize      (max nodes per interior / max entries per leaf)
+k_buf_lb = B    leaf valid iff size >= B; interior valid iff >= B valid children (root: >= 1)
+k_buf_md = 2B   build/split target for leaves and interiors
+k_buf_ub = 4B   leaf capacity, max children, every std::array size
 ```
 
-Typical values in tests: `kBuf` ∈ {16, 32, **64** (default), 128, 256, 512, 1024}.
-
-### Type aliases used everywhere
-
-```cpp
-using SizeT    = uint_fast32_t;   // entry/size counts
-using BufSizeT = <unsigned>;      // node/slot counts -- see WARNING below
-using SizeBufUBArr    = std::array<SizeT,    kBufUB>;
-using BufSizeBufUBArr = std::array<BufSizeT, kBufUB>;
-using BooleanBufUBArr = std::array<bool,     kBufUB>;
-using EntryArr = std::array<E, kBufUB>;   // fixed-size leaf element buffer
-```
-
-**WARNING — `BufSizeT` is UNSIGNED, not `int`.** This doc said `int` until
-2026-08-17; that was stale. `type_trait.h:118-123` picks it by width:
-
-```cpp
-using BufSizeT = std::conditional_t<(kBufferSize * kBufUBFac > 65535U),
-                   uint_fast32_t,
-                   std::conditional_t<(kBufferSize * kBufUBFac > 255U),
-                     uint_fast16_t, uint_fast8_t>>;
-```
-
-So `kBuf=64` → `kBufUB=256` → `uint_fast16_t`; `kBuf=32` → `kBufUB=128` →
-`uint_fast8_t`. Consequences for anyone editing node code:
-
-- A backward loop `for (BufSizeT i = n-1; i >= 0; --i)` **never terminates**.
-  Use the test-then-decrement idiom instead of falling back to `int`:
-
-  ```cpp
-  for (buf_size_type i = n; i-- > 0;) { /* i is n-1 .. 0 */ }
-  ```
-
-  It needs no signed/unsigned mixing, never computes `n - 1`, and runs zero
-  times at `n == 0`. The library's one backward loop (`node_op.hpp`, in
-  `balance_over_leaves`) was converted to it on 2026-08-18; there are now no
-  signed reverse loops left.
-- Every `- 1` on a count must be guarded. Existing sites are
-  (`GetSplitN()` returns `node_n == 0 ? 0 : node_n - 1`); match that pattern.
-- `BinarySearch` returns `size_t`; assigning to `BufSizeT` narrows silently
-  (the build passes `-w`, see below).
-
-A 2026-08-17 review checked every `-1` site and backward loop in the library and
-found no live underflow — but the guarding is by convention, not by type.
-
-## Node types
-
-### `LeafNode<TT>` (= `BTree::Leaf`)
-
-- `bool is_leaf = true`
-- `size_t size` — number of live elements
-- `EntryArr elements` — fixed-size array of `E` (capacity = `kBufUB`)
-- `bool is_sorted` — true when elements are in key order
-- A leaf is **valid** iff `size >= kBufLB`
-
-### `BTree::BTreeInteriorNode` (= `BTree::Interior`)
-
-Inherits `MultiWayNode<TT>`:
-- `BufSizeT node_n` — number of children (≤ kBufUB)
-- `NodeArr tree_nodes` — array of child `Node*` (size kBufUB)
-- `SplitArr split` — separator keys (size kBufUB; `node_n - 1` are live)
-- `bool valid` — interior is valid iff `(node_n - invalid_children) >= kBufLB` (or > 0 for root)
-- `SizeT invalid_subtree_num` — count of invalid subtrees below
-- `SizeT reinsert_size` — entries that need re-insertion after deletion
-- `ResetDeletionFlag()` — clears valid/invalid_subtree_num/reinsert_size
-
-### Node validity helpers
-
-```cpp
-GetNodeInvalidStatus(T)     // leaf: size < kBufLB; interior: !valid
-NodeIsValid(T)              // !GetNodeInvalidStatus(T)
-NodeContainInvalidSubtree(T) // leaf: 0 or 1; interior: contain_invalid_subtree
-GetNodeReinsertSize(T)      // leaf: size if invalid, else 0; interior: reinsert_size
-NodeHasLeafChildren(T)      // true if first child is a leaf
-SelfBalanceNode(T, tomb)    // NodeHasLeafChildren && tomb && NodeIsValid
-```
-
-## Bucket arithmetic
-
-```cpp
-GetBktNum(item_n)            = item_n / kBufMD        // target # of output buckets
-GetBktStIdx(i, bkt_n, n)     = (n * i) / bkt_n        // start index of bucket i
-GetBktEndIdx(i, bkt_n, n)    = (n * (i+1)) / bkt_n    // end index of bucket i
-```
-
-## Deletion path (high-level)
-
-1. `BatchDelete` → sorts keys → `BatchDeleteRecursive` (marks invalid nodes, sets `reinsert_size`)
-2. `FetchInvalidSubtreeNodes` — traverses tree, compacts invalid subtrees:
-   - If `SelfBalanceNode` (leaf-level interior, tomb flag): calls `BalanceOverLeaves`
-   - Otherwise recursively handles invalid subtrees, then calls `ReInsertTreeAfterDelete`
-
-## `BalanceOverLeaves` — optimized implementation (node_op.hpp:425)
-
-Called when an interior node's direct children are all leaves and some are invalid (underfull). Groups each invalid leaf with an adjacent valid pivot leaf and redistributes entries.
-
-### Algorithm
-
-**Backward pass** (right→left): assigns each node to its group pivot (the nearest valid node to its right). Simultaneously accumulates `group_sum[pivot]` = total entries in that group. Trailing invalid nodes (right of all valid nodes) are fixed up in a forward pass to belong to `rightmost_pivot_idx`.
-
-**Main forward loop**: for each group `[i, j)`:
-- **Case 1** (j == i+1, single valid node): copy pointer/split directly in-place → O(1)
-- **Case 2** (sum < kBufUB, merge): copy all invalid leaves' entries into the valid leaf via a running pointer, free source leaves → O(sum)
-- **Case 3** (distribute): gather all entries into `entry_buf`, `std::sort`, scatter back into buckets
-
-### Key design decisions in the current optimized version
-
-1. **`group_sum` precomputed in backward pass** — avoids `->size` pointer dereferences in the inner group-end-finding loop.
-2. **Write directly to `TI->tree_nodes`/`TI->split`** — no intermediate `new_tree_nodes`/`new_splits` arrays, no final O(kBufUB) copy. Safe because invariant `tree_idx ≤ i` holds throughout (verified for all three cases including that outer-split reads from `TI->split[j-1]` never alias write targets).
-3. **Lazy `entry_buf` allocation** — `typename TT::EntrySeq entry_buf` starts empty; allocated only on the first case-3 group. Common paths (cases 1 & 2) pay zero heap allocation cost.
-4. **Running pointers in copy loops**:
-   - Case 2 merge: `dst` pointer advances instead of re-calling `GetEleEndIter()` per iteration; final size computed as `dst - begin`.
-   - Case 3 gather: `ep` pointer advances with each `std::copy_n` result.
-   - Case 3 scatter: `sp` pointer advances; split key read as `Entry::GetKey(*sp)` right after advance, avoiding `GetBktStIdx` call.
-5. **`ele_l` tracked across scatter iterations** — computes `bkt_size = ele_r - ele_l` without calling `GetBktStIdx` per bucket.
-6. **`[[likely]]`/`[[unlikely]]` hints** — single-node case (most common) marked `[[likely]]`; entry_buf allocation marked `[[unlikely]]`.
-
-### Correctness invariants for direct-write
-
-At the start of group `[i, j)`: `tree_idx == split_idx` (non-rightmost groups keep them equal; rightmost group produces Δtree = Δsplit + 1 at the very end). And `tree_idx ≤ i`. This ensures all write positions are ≤ all read positions, making in-place compaction safe.
-
-## Parallelism
-
-Uses `parlay::parallel_for` for tree-level operations. `BalanceOverLeaves` itself is sequential (operates on a single interior node's children which is bounded by kBufUB).
-
-## Range report implementation notes
-
-- `RangeReport` lives in `include/pb_tree/b_tree_impl/query_op/range_report.hpp`.
-- Boundary nodes (`l`, `r`) are still handled with recursive filtering against `[query_l, query_r)`.
-- Fully covered middle subtrees now use `RangeReportFlattenRec` (const traversal) rather than generic `FlattenRec`:
-  - leaf case performs a single `std::copy_n` into output,
-  - interior case descends children left-to-right and appends contiguously.
-- Sorted-leaf filtering path in `RangeReportLeaf` uses `BinarySearchKey` bounds plus one bulk `std::copy_n` instead of per-element assignment.
-- Empty ranges (`query_box.first >= query_box.second`) return immediately.
-- `FlattenRec` (`tree_op/flatten.hpp`) now precomputes per-child offsets in O(node_n) before `parallel_for`, removing prior O(node_n^2) prefix-sum work inside each task.
-
-## Point-membership query path (`ContainRec`)
-
-`Contain(k)` → `ContainRec(root, k)` in `query_op/membership.hpp`.
-
-### Key functions on the hot path
-
-| Function | Location | Role |
-|---|---|---|
-| `ContainRec` | `membership.hpp` | Iterative descent; follows child pointers until leaf |
-| `GetNodeIdContainingKey(k)` | `tree_node.h:333` | Binary search on `split[]` → child index |
-| `Leaf::Contain(k)` | `tree_node.h:115` | Binary search on `elements[]`; branches on `is_sorted` |
-| `BinarySearch<8>` | `dependence/binary_search.h` | Core search primitive used by all the above |
-
-### `kBinarySearchBase` — cache-line-sized linear scan base
-
-Both `LeafNode` and `MultiWayNode` expose a `static constexpr BufSizeT kBinarySearchBase` that sets the linear-scan threshold for `BinarySearch<N>`. It is computed from the hardware cache line size at compile time using `std::hardware_constructive_interference_size` (from `<new>`, C++17):
-
-```cpp
-// LeafNode — searches E (entry = key + val)
-static constexpr TT::BufSizeT kBinarySearchBase =
-    std::hardware_constructive_interference_size / sizeof(E);
-
-// MultiWayNode — searches K (split keys only)
-static constexpr BufSizeT kBinarySearchBase =
-    std::hardware_constructive_interference_size / sizeof(TT::K);
-```
-
-They differ because leaf search scans entries (`sizeof(E)`) while interior search scans bare split keys (`sizeof(K)`). Example with key=uint64+val=uint32 (E=16B, K=8B) on a 64B-line machine: leaf base=4, interior base=8.
-
-`hardware_constructive_interference_size` (not `destructive`) is correct here: it gives the max size that fits within one cache line, which is exactly the linear-scan budget we want.
-
-### Optimizations already applied
-
-- **`ContainRec` is iterative** (not recursive): eliminates O(height) function-call overhead; the former tail-recursive form is now a `while (!T->is_leaf)` loop.
-- **`BinarySearch` is branchless**: both the binary phase and the final linear scan are branchless.
-  - Binary phase: `bool go = less(I[mid]); lo = go ? mid+1 : lo; hi = go ? hi : mid;` — compiles to `cmov`, no mispredictions.
-  - Linear phase: `count += less(I[i]) ? 1 : 0` loop instead of early-exit — trades ≤ `_base/2` extra comparisons for zero branch mispredictions in the tail.
-- These improvements benefit **all** `BinarySearch<8>` callers: `GetNodeIdContainingKey`, `GetNodeIdContainingKeyExclusive`, `Leaf::BinarySearchKey`, `Leaf::BinarySearchKeyExclusive`, and range-query paths.
-
-### What `GetNodeIdContainingKey` does
-
-Returns first `i` where `split[i] > k` (= the child subtree containing `k`). Implemented as `BinarySearch<8>(GetSplitSlice(), [&](K key){ return key <= k; })`. `GetSplitSlice()` returns a `parlay::slice` over `split[0..node_n-2]`.
-
-### Leaf search note
-
-`Leaf::Contain` branches on `is_sorted`. Leaves become unsorted after the merge case in `BalanceOverLeaves` (`is_sorted = false`); the unsorted fallback is an O(kBufUB) linear scan via `std::ranges::find_if`.
-
-## Range query path (`RangeReport` / `RangeCount`)
-
-Both live in `query_op/range_report.hpp` and `query_op/range_count.hpp`.
-
-### Algorithm
-
-At each interior node: find `l` = first child overlapping `[first, second)`, `r` = last such child. Visit boundary children `l` and `r` recursively; middle children `(l, r)` are fully covered.
-
-### Optimizations applied
-
-1. **Iterative descent** (same idea as `ContainRec`): the `while (!T->is_leaf)` loop avoids O(height) recursive call overhead when the query falls in a single child at each level (narrow queries).
-
-2. **Narrowed search for `r`**: since `r ≥ l`, the binary search for `r` starts from index `l` in the split array instead of 0. This halves the search range in the common case.
-
-3. **Same narrowing in leaf `r` search**: `RangeReportLeaf` and `RangeCountLeaf` search for the upper bound `r` starting from `l` rather than 0.
-
-4. **Parallel flatten of middle children** (`RangeReportRec`): pre-computes each middle child's output offset using `nodes[i]->size`, then launches `parlay::parallel_for` over the middle children, each calling `FlattenRec<Range, true, false>` on its own non-overlapping output slice.
-
-5. **Bug fix**: original code called `FlattenRec(nodes[i], offset, out, logger)` with 4 args but `FlattenRec` takes 2 — never caught because the template was never instantiated in unit_test. Fixed to call `FlattenRec<Range, true, false>(nodes[i], out.cut(start, end))`.
-
-6. **Branchless count in unsorted leaf** (`RangeCountLeaf`): original code had a dead `cnt` variable and wrote directly to `offset++`. Replaced with `cnt += condition ? 1 : 0` (no early-exit branch), then `offset += cnt`.
-
-### Key type note
-
-`GetNodeIdContainingKeyExclusive(k)`: returns first i where `split[i] >= k` — used for the right boundary. If `split[i] == k`, tree_nodes[i] is still visited (elements in tree_nodes[i] have keys in `[split[i-1], split[i])`, all `< k = split[i]`, so they belong in the query range `[first, second)`).
-
-### Template instantiation note
-
-`RangeReportRec` and `RangeCountRec` are templated on `Range` and are never instantiated in `unit_test`. Always compile `b_test` to catch template body errors in these functions.
-
-## Batch insert path (`BatchInsert_` / `BatchInsertRecursive`)
-
-### `BatchInsert_` (`b_batch_insert.hpp`)
-
-Entry point. Sorts input once via `parlay::sort`, then calls `BatchInsertRecursive` on the root. If the root splits (returns `new_node_n > 0`), assembles the new root via `AssembleInteriorLevels`.
-
-### `BatchInsertRecursive` (`b_batch_insert.hpp`)
-
-Recursive parallel descent. Input `In` is always a sorted slice (sorted once in `BatchInsert_` before descent — all recursive calls pass `In.cut(l, r)` which are subarrays of the sorted input).
-
-- **Leaf case**: if fits (`size + n <= kBufUB`) → `InsertPoints2Leaf` in-place; else → `HandlingLeafSplitOverflow`.
-- **Interior case**: partitions input across children using `SplitBatchBinarySearch` (when `n > kSplitFactor * split_n`) or `SplitBatchMerge`; recurses in parallel via `parlay::parallel_for` with granularity 1.
-- `new_node_n` is accumulated in O(cnt) — iterating only touched children — starting from `GetNodeN()` and adding `split_n - 1` for children that split. `return_node_n_arr[i]` is always 0 or ≥2 (never 1), so this is correct.
-
-### `BatchInsertUpdateInterior` (`node_op.hpp`)
-
-Updates the interior node after recursive insert.
-
-**Fast path** (common case): if `new_node_n == TI->GetNodeN()` (no child split), only recomputes `TI->size` by summing child sizes and calls `UpdateAug`. Avoids two O(kBufUB) `std::array` copies (~4KB) that would otherwise rebuild `tree_nodes`/`split` to identical values.
-
-**Why the invariant holds**: `return_node_n_arr[i]` is always 0 or ≥2, because `GenerateLeafNodes` and `GenerateInteriorNodes` always produce ≥2 buckets (since input to overflow path has ≥ kBufUB elements, and `GetBktNum = item_n / kBufMD`, so ≥2). Therefore `new_node_n == GetNodeN()` iff all `return_node_n_arr[i] == 0`.
-
-**Slow path** (some child split): rebuilds `new_nodes`/`new_splits` arrays in a temporary, then moves into `TI`. Cannot write directly in-place because the expansion ratio means write index overtakes read index.
-
-### `HandlingLeafSplitOverflow` (`leaf_op.hpp`)
-
-Handles leaf overflow. Allocates a merged entry buffer, then splits via `GenerateLeafNodes`.
-
-**Sorted fast path**: when `TL->is_sorted` is true (after `Build` or after distribute in `BalanceOverLeaves`), uses `std::ranges::merge` O(n) instead of concatenate + `parlay::sort` O(n log n). Safe because `In` is always sorted.
-
-### `AssembleInteriorLevels` (`b_build_tree.hpp`)
-
-Shared helper used by both `BuildRecursive` and `BatchInsert_` (when root splits). Takes a flat (node, key) slice and iteratively calls `GenerateInteriorNodes` until the result fits in a single root. Allocates its own aux ping-pong buffers internally. Replaced the duplicated while-loop that existed in both call sites.
-
-### Points-op helpers (`points_op.hpp`)
-
-- `SplitBatchBinarySearch`: sequential binary searches narrowing the range, O(split_n · log(n/split_n)).
-- `SplitBatchMerge`: single O(n + split_n) merge pass; used when `n <= kSplitFactor * split_n`.
-- `SeievePoints`: parallel histogram-based scatter (used in `BatchInsertSieve` / `-DSIEVE` path only).
-
-## Batch delete path (`BatchDelete_` / `BatchDeleteRecursive`)
-
-### `BatchDelete_` (`b_batch_delete.hpp`)
-
-Entry point. Sorts input keys once via `parlay::sort`, then calls `BatchDeleteRecursive` on the root. If the result is `invalid_flag` (tree emptied), calls `DeleteTree`. If any invalid subtrees remain, calls `FetchInvalidSubtreeNodes` with `has_tomb = true` to compact and reinsert.
-
-### `BatchDeleteRecursive` (`b_batch_delete.hpp`)
-
-Recursive parallel descent. `In` (sorted key slice) is partitioned across children using `SplitBatchBinarySearch` or `SplitBatchMerge` (same threshold as insert). Results `(invalid_flag, invalid_subtree_num, reinsert_size)` per child are collected, then `BatchDeleteUpdateInteriorSize` aggregates them into the current node's validity state.
-
-**Precomputed l/r**: `touched_l[cnt]` / `touched_r[cnt]` are stored alongside `nodes_map[cnt]` to avoid recomputing child ranges inside the `parallel_for` lambda.
-
-**Hoisted `NodeHasLeafChildren`**: whether children are interior nodes is computed once before the loop (same result for every child of a given interior node), avoiding a repeated function call per untouched child.
-
-**Untouched children**: `invalid_subtree_flag[i] = false`, counts = 0 are set directly; if children are interior nodes, `ResetDeletionFlag()` is called so the reinsertion phase sees clean state.
-
-### `DeletePoints4Leaf` (`leaf_op.hpp`)
-
-`In` is always sorted (sorted once in `BatchDelete_` before descent). Replaces the original O(n × m) scan (linear search per key × leaf size) with:
-
-1. If `!TL->is_sorted`: sort the leaf in-place O(m log m), set `is_sorted = true`.
-2. Two-pointer O(m + n) compaction: walk sorted leaf and sorted `In` together, copying surviving elements to a write cursor.
-
-Result: O(m + n) for already-sorted leaves, O(m log m + n) otherwise — vs O(n × m) previously. The result is always sorted, so `is_sorted` stays `true`.
-
-### `BatchDeleteUpdateInteriorSize` (`node_op.hpp`)
-
-Aggregates per-child validity info into the current interior node. Updates `TI->size`, `TI->valid`, `TI->invalid_subtree_num`, `TI->reinsert_size`. Called unconditionally from `BatchDeleteRecursive` (unlike insert, there is no fast path here because validity state always needs updating even when no children became invalid).
-
-### `FetchInvalidSubtreeNodes` / `BalanceOverLeaves`
-
-See `BalanceOverLeaves` section above — these are shared between delete and the general rebalancing path.
-
-## Leaf sort policy (`PostProcessLeafChange` / `PseudoRandomGenPattern`)
-
-### What it does
-
-After any leaf mutation (insert, delete, balance-merge), `PostProcessLeafChange` is the single authority for setting `is_sorted`. It branches on `PatternType` (`b_tree_impl/tree_op/leaf_op.hpp`):
-
-| Pattern | Action |
-|---|---|
-| `kSorted` | Always `std::sort` the leaf; `is_sorted = true` |
-| `kUnsorted` | Skip sort; `is_sorted = false` |
-| `kHybrid` | Call `pred(T, In.size())` — sort if returns `true`, mark unsorted if `false` |
-
-### Call sites (all three delegate here)
-
-- `InsertPoints2Leaf` — after appending batch entries to the leaf end
-- `DeletePoints4Leaf` — after swap-to-end removal (leaf order scrambled)
-- `BalanceOverLeaves` case B merge — after compacting invalid leaves into the pivot
-
-### User-supplied hybrid predicate
-
-The `kHybrid` decision function is a **template parameter `LeafSortPred`** threaded through the entire call stack — zero runtime overhead, fully inlinable. The predicate signature is:
-
-```cpp
-bool leaf_sort_pred(Node const* T, size_t batch_size);
-```
-
-Users pass a lambda (or any callable) at `BatchInsert` / `BatchDelete` call sites:
-
-```cpp
-tree.BatchInsert(data, kHybrid, /*sorted=*/false,
-    [](auto const* T, size_t n) { return T->size + n > threshold; });
-```
-
-### Default: `DefaultHybridPred`
-
-Defined as a nested struct in `BTree<TT>` (declared before `BatchInsert` in `b_tree.h` so it can serve as a default template argument). Computes a Knuth multiplicative hash of `(T->size + batch_sz)` and returns the low bit — effectively a ~50/50 coin flip with no global state:
-
-```cpp
-struct DefaultHybridPred {
-    template<typename N>
-    bool operator()(N const* T, size_t batch_sz) const noexcept {
-        return (static_cast<size_t>(T->size) + batch_sz) * 2654435761ULL & 1;
-    }
-};
-```
-
-The no-pattern `BatchInsert(Range&&)` / `BatchDelete(Range&&)` overloads hardcode `kHybrid` and pass `DefaultHybridPred{}`.
-
-### Threading chain
-
-```
-BatchInsert(In, pattern, sorted, pred)
-  └─ BatchInsert_(In, pattern, sorted, pred)
-       └─ BatchInsertRecursive(T, In, node_split_slice, pattern, pred)
-            └─ InsertPoints2Leaf(T, In, pattern, pred)
-                 └─ PostProcessLeafChange(T, In, pattern, pred)
-
-BatchDelete(In, pattern, sorted, pred)
-  └─ BatchDelete_(In, pattern, sorted, pred)
-       ├─ BatchDeleteRecursive(T, In, pattern, pred)
-       │    └─ DeletePoints4Leaf(T, In, pattern, pred)
-       │         └─ PostProcessLeafChange(T, In, pattern, pred)
-       └─ FetchInvalidSubtreeNodes(root, entries, tomb, pattern, pred)
-            ├─ BalanceOverLeaves(TI, reinsert_size, pattern, pred)   [case B merge]
-            │    └─ PostProcessLeafChange(dest, slice, pattern, pred)
-            └─ ReInsertTreeAfterDelete(T, entries, pattern, pred)
-                 └─ BatchInsertRecursive(…, pattern, pred)
-```
-
-### `PseudoRandomGenPattern` (kept but no longer on the hot path)
-
-The original coin-flip helper (`b_tree.h:396`) that additionally XORs in address bits from `In.begin()`/`In.end()` to break per-call-site correlation. Still exists but is not called internally; the default is now `DefaultHybridPred`.
-
-### Important: `DefaultHybridPred` must be declared before `BatchInsert` in the class body
-
-C++ requires default template arguments to reference names already declared at that point. `DefaultHybridPred` is placed immediately before the `BatchInsert` declarations in `b_tree.h`.
-
-## Concrete element type in tests
-
-Default: `element<uint32_t, uint32_t>` (`tests/wrapper.h`) → key=uint32_t (4B),
-val=uint32_t (4B) → E is 8 bytes. It goes to `btree_type_trait` directly; there
-is no adaptor. OSM variant: key=uint64_t. Dynamic graph: key=uint64_t packed as
-`(u << 32) | v`.
-
-## Benchmark dataset files (`/data/zmen002/kv_pair/...`)
-
-Generated by `data_generator` (`tests/data_generate.cpp` + `tests/data_op.h`).
-
-### Directory layout
-
-`<root>/<dis>/<base_n>_<val_n>/<ins|del>/<base_n/batch_n>/<i>.{base,batch}.in`
-e.g. `uni/100000000_1/del/10/1.base.in` = uniform, 100M base entries, 1 value
-column, delete workload, batch = 10% of base, file #1 (rand_seed = 0).
-
-### Text `.in` format
-
-Header line `<N> <dim>` (dim = 1 key + #value columns), then N lines of
-`<key> <val>`. Keys are **rank-discretized** distribution draws: real samples
-from base+batch are sorted together and each key is its rank — distinct
-integers preserving the distribution shape. Entries are then random-shuffled
-and `val` = post-shuffle position (0,1,2,...). For delete workloads the base
-is a dense permutation of `0..base_n-1` and the batch keys ⊆ base; for insert
-workloads base and batch keys are disjoint, jointly covering
-`0..base_n+batch_n-1`.
-
-### Binary `.bin` format (`tests/binary_io.h` — single source of truth)
-
-Little-endian: `uint64_t header[3] = {N, dim, width}` followed by `N*dim`
-values of `width` bytes each, row-major (`key, val, ...`). `width` is 4 when
-every value fits in uint32 (writers narrow automatically via
-`WriteBinaryEntries`), else 8. `ReadBinaryEntries` widens back to uint64
-transparently. All writers/readers go through these two helpers — **older
-2-word-header `.bin` files are incompatible; regenerate them**. Producers:
-
-- `data_to_binary -p <file.in> [-o <file.bin>]` — converts an existing text
-  file (default output replaces `.in` with `.bin`).
-- `scripts/convert_to_binary.sh <dir> [-f] [-d]` — recursively converts every
-  `.in` under `<dir>`; skips up-to-date `.bin` twins unless `-f`; `-d` deletes
-  each `.in` after its successful conversion (skipped files are kept).
-- `data_generator ... -binary 1` — generates directly to `.base.bin`/
-  `.batch.bin` via `PrintToBinaryFile` (`data_op.h`) instead of text.
-- `temporal_graph_osm -p <graph> -o <out_dir> [-binary {0,1}]` — `-binary 1`
-  writes `<i>_insert.bin`/`<i>_delete.bin` (`[N, 2, src, dest, ...]`) instead of
-  `.in`. Uses the `commandLine` parser (`common/parse_command_line.h`): `-p`/`-o`
-  are required (empty → usage), `-h`/`-help` print usage.
-- `temporal_graph_signal -p <graph> -o <out_dir> [-binary {0,1}]
-  [-group_by_year {0,1}]` — converts a *signal* graph (edge appearances, no
-  insert/delete) into a single `0.in`/`0.bin` (`[N, 3, src, dest, timestamp,
-  ...]`). Timestamps are Unix epoch seconds; `-group_by_year 1` (default) labels
-  edges by calendar year `1..#batches`, `-group_by_year 0` renumbers distinct
-  timestamps `1..#timestamps`. Same `commandLine` interface as above.
-- `filter_csv_year <in.csv> <out>` — if `<out>` ends with `.bin`, writes
-  binary (`[N, 2, code, time, ...]`) instead of text.
-
-### Generator gotcha
-
-`data_generator` **segfaults** if `-base_param`/`-batch_param` are omitted
-(`std::string(nullptr)` from `getOptionValue`) — pass dummies (e.g. `1`) even
-for uniform, which ignores them. `incre_data_generator` uses the
-`getOptionValue(opt, default)` **string** overload instead and does not have
-this bug.
-
-### `incre_data_generator` (`tests/incre_data_generate.cpp`)
-
-Datasets for the incremental-update tags (`1<<6` / `1<<7`), added 2026-07-30.
-
-**The problem it solves.** `data_generator`'s `Generator::ToEntry`
-random-shuffles the whole key set before writing, so slicing that file into
-consecutive chunks — exactly what `BatchInsertByStep`/`BatchDeleteByStep` do —
-gives every batch a *uniform* sample of the key space no matter what `-dis`
-said. The distribution survives only globally, never per batch, so `exp` and
-`uni` produce statistically identical incremental workloads.
-
-**Construction.** Base keys are the dense uniform space `[0, base_n)` (key ==
-rank; a rank-discretised base comes out dense anyway, see `Discreatize`). Then
-repeatedly, over a shrinking pool of surviving keys:
-
-```
-draw batch_n positions from the requested distribution, mapped onto [0, |pool|)
-  -- these are RANKS INTO THE POOL, not keys
-batch <- pool entries at those ranks;  pool <- pool minus batch
-```
-
-Output = the batches concatenated **in generation order**, shuffled *within*
-each batch but not across. So the harness's existing slicing picks the batches
-up unchanged. Verified at 1e6/1e4 (`exp`, λ=10): batch mean walks 0.10 → 0.15 →
-… → 0.99 of the key space with a tight p10–p90 band, i.e. a clustered hotspot
-that migrates as the front is thinned. `norm` starts tight around 0.5 and
-spreads outward as the middle is consumed; `uni` stays flat (correctly).
-
-**Flags.** Same shape as `data_generator`: `-path -base_n -batch_n -val_n 1
--file_num -dis {0,1,2,3} -batch_op {0,1} -binary {0,1} -batch_param <csv>`,
-plus `-validate {0,1}` (full distinctness check; the cheap count/sum/max
-permutation check always runs). `-batch_param` is now a **fraction of the
-surviving pool**: exp → λ (default 10); norm → mean,dev (0.5,0.2); dual_norm →
-mean1,dev1,mean2,dev2 (0.25,0.05,0.75,0.05).
-
-**`dual_norm` changed meaning.** In `data_generator` "dual" meant base *and*
-batch normal. Here the base distribution is meaningless (the base is the whole
-dense key space), so `-dis 3` is a **two-mode batch** instead — otherwise it
-would be identical to `-dis 2`.
-
-### `seg` (`-dis 4`) — a sliding segment
-
-Each batch of `m` is drawn **uniformly from the leading `mult * m` surviving
-keys** (`-batch_param mult`, default 2), then removed. So the hot region is a
-fixed-width window of *ranks* that advances by exactly `m` per batch.
-
-Implemented as `TargetDensity == 1.0` (flat, like `uni`) plus
-`WindowSize == mult * want`. All of the shape lives in the window; nothing else
-in the sampler changes.
-
-**It has the one property `exp` cannot.** `exp`'s concentration is capped by
-`lambda <= pool/batch` and its demand rises as the pool drains, so the shape
-degrades over a run and needs per-ratio `lambda` tuning. `seg`'s window is
-defined relative to `batch_n`, not to the pool, so **one parameter is equally
-concentrated at every ratio and every point in the run** — no tuning, no
-degradation, no capping.
-
-Measured at 1e6 / 100 batches, `mult = 2`:
-
-- max rank used is `19999` of a `20000` window in every batch — the draw never
-  escapes the leading `2m`.
-- rank spread `p10/p50/p90 = 2000/9950/18000` of 20000 — exactly uniform inside.
-- key-space `p10..p90` width settles at **3.2%** of the key space and slides
-  0.002 → 0.036 → 0.235 → 0.487 → 0.736 → 0.966.
-
-The key span (~3.2m) is wider than the rank span (2m) because a key that
-survives a draw stays in the window and can be re-exposed — survival decays
-geometrically at `1/mult` per batch, so a thin tail trails behind.
-
-`mult` is a clean knob: `1` is **exactly sequential** (batch b is literally keys
-`[b*m, (b+1)*m)`), `2` gives a 3.2%-wide window, `16` a 31%-wide one.
-
-Also the cheapest shape to generate: pool-work saving is `pool_n / (mult*m)`,
-which at ratio 100 is already 25x and grows with the ratio.
-
-**Writes one file, not a pair, and the stem is `.batch` for BOTH ops** (renamed
-2026-07-31): `ins/<base_n/batch_n>/<i>.batch.<ext>` and
-`del/<base_n/batch_n>/<i>.batch.<ext>`. There is no base/batch pair in these
-datasets — the whole file *is* the batch stream, sliced into equal windows by
-the harness — so the old `.base` stem on the insert side (inherited from what
-tag `1<<6` happened to read) made two identical things look different. Both
-tags now read `ParseXBatchPath(ratio).batch_path`.
-
-This required `Options::ExtractPrefixes` to also strip `.batch` — it stripped
-only `.bin`/`.in`/`.base`, so a `-p` pointing at a batch file left the prefix as
-`<i>.batch` and every derived path became `<i>.batch.base.<ext>`. Verified: `-p`
-on `ins/<x>/<i>.batch.bin` now resolves all four ratios on both sides, and
-`tag=224` emits 36 tokens from `b_test`, masstree and bwtree alike. The change is
-additive — the standard `/data/zmen002/kv_pair` datasets still have real
-base/batch pairs and tags `1<<0`/`1<<1`/`1<<3` still read `base_path`.
-
-The layout is otherwise identical to the standard datasets so
-`ParseInsertBatchPath`/`ParseDeleteBatchPath` resolve it unchanged — which also
-means **point `-path` at a fresh root** or it overwrites them.
-
-**λ must track the batch ratio — there is a hard arithmetic ceiling.** The
-exponential asks for `batch_n · λ / pool` of the ranks at the very front of the
-pool ("demand"), and nothing can supply more than 100% of them, so
-
-```
-λ ≤ pool / batch_n   ==  the number of batches still to come
-```
-
-Demand rises through a run because the pool drains: `demand_b = demand_0 /
-(1 − b/batch_num)`. So the **fraction of the run that is exactly on-shape is
-`1 − demand_0`**. Past the ceiling the excess probability is capped at 1 and the
-batch becomes the sharpest achievable rather than the requested shape (reported
-as a NOTE with the count of capped rank-slots).
-
-### Sampler — three generations, and why the last one won
-
-`SelectBatchFlags` computes an inclusion probability per surviving rank and then
-flips an independent weighted coin for each. Measured shape error and scatter at
-batch 50/100, ratio 100 (scatter 1.0 = what a genuine random draw gives):
-
-| sampler | λ=10 | λ=20 | λ=50 | scatter |
-|---|---|---|---|---|
-| guess-and-retry (v1) | −2.0% | −4.6% | −11.7% | 1.1 / 1.8 / 13.6 |
-| running-total sweep (v2) | −0.0% | −0.0% | −0.0% | **0.007** |
-| independent coins (v3, current) | −0.3% | −0.5% | −0.1% | **1.07 / 1.00 / 0.89** |
-
-- **v1 was wrong, not just noisy.** Rejection sampling wastes every draw that
-  lands on an already-taken rank, and in a crowded region nearly all of them do,
-  so keys leaked out of the peak into the tail. Its inflated "scatter" at λ=50 is
-  the systematic bias showing up in the chi-square, not real scatter.
-- **v2 got the shape exactly right but killed the randomness** — picks spaced
-  evenly along the cumulative curve by construction, ~150× less scatter than a
-  real draw. Every stretch of the key range got almost precisely its predicted
-  count, so there were no lucky hot spots, which is most of what makes a skewed
-  workload hard on a tree.
-- **v3 keeps v2's accuracy and restores v1's randomness.** Residual shape errors
-  of ±0.5% are within one standard deviation of the per-batch count — they *are*
-  the scatter, not bias. Also ~25% faster than v2 (no prefix scan).
-
-Inclusion probabilities: `π_i = min(1, w_i/t)` where `w_i` is the unnormalised
-target density at rank i and `t` solves `#{w_i ≥ t} + (Σ_{w_i<t} w_i)/t = want`.
-Since `π ∝ w` for every uncapped rank, "capped" is exactly `w_i ≥ t` for a single
-scalar `t`, so the solve is a scalar fixed-point iteration (`g(t)` is strictly
-decreasing; the step always moves the right way), not a per-element search.
-
-Independent coins give a count near `want`, not on it (±√want ≈ 0.03%), and the
-file is sliced into equal windows downstream, so the count is repaired: drop
-uniformly at random when over (uniform dropping scales every π by the same
-factor, leaving the shape untouched), add uniformly at random from the unselected
-when under. Both repairs are ≪ the natural scatter. The repair draws positions by
-oversample-and-dedupe rather than materialising and shuffling a `pool_n`-sized
-index array.
-
-**Bug that v2 introduced and the permutation check caught** (worth remembering,
-since the same shape of error can recur): under heavy capping the scalar solve
-does not fully converge, the running total lands just under `want`, the rescale
-goes slightly *above* 1, and a capped slot (π = 1) can then straddle two whole
-numbers while the sweep can only ever pick that rank once. One lost pick leaves
-an **uninitialised** output slot, and the file stops being a permutation. The
-cheap sum/max check in `ValidatePermutation` is what surfaced it — keep it.
-
-Other implementation notes: distribution objects are constructed inside the
-lambda because `std::normal_distribution` caches a spare deviate (sharing one
-across workers, as `data_op.h`'s generators do, is a data race). `parlay::filter`
-must not be used with a side-effecting predicate — its predicate runs over a
-delayed sequence and may be evaluated more than once per element.
-
-### Per-ratio datasets — the harness now reloads per ratio
-
-Tags `1<<6`/`1<<7` used to read *one* file and slice it four ways. As of
-2026-07-30 the loops in `test_framework.h` hoist `incre_ratio_seq =
-{1e-4, 1e-3, 1e-2, 1e-1}` above both blocks and call
-`ParseInsertBatchPath(ratio)` / `ParseDeleteBatchPath(ratio)` **inside** the
-loop, reloading `ins/<1/ratio>/` and `del/<1/ratio>/` each time. That matches
-`incre_data_generator`'s ratio dir (`base_n / batch_n` == `1/ratio`), so each
-ratio gets batches laid out for the step it slices at.
-
-Consequences:
-
-- **`-b` / `opts.batch_ratio` is now unused by tags `1<<6`/`1<<7`.** It only
-  picks the file handed to `-p`, which tag `1<<5` builds its control from.
-- 4 file reads per block instead of 1 (~64 GB of extra I/O per run at 1e9).
-- Under the new root both sides are 1e9 entries; under the old root
-  `del/<x>/*.batch.bin` is `base_n/x` entries, so the insert and delete blocks
-  were not comparable at `-b != 1`. That asymmetry is gone.
-
-**Silent-wrong-data hazard.** The old root `/data/zmen002/kv_pair` *also* has
-`ins/{10,100,1000,10000}/`, so pointing the sweep there still runs to
-completion — it just measures the globally-shuffled data. `incre_updates.sh`
-now sets `data_prefix=/data/zmen002/kv_pair_incre` and `batch_ratio=0.01`
-(so `-p` resolves to `ins/100/1.base.bin`); the old prefix is kept commented
-one line below.
-
-**The two halves are no longer interchangeable.** With globally-shuffled data
-both halves of `wp` were uniform samples of the whole key space. With the new
-data the first half is the low-key region (for `exp`) and the second the high-key
-region, so in `incre_update_query`: membership `IND` probes only low keys and
-`OOD` only high keys, and `GenRectangles` builds every range box out of
-`entry_in_tree`, i.e. entirely inside the low half. Arguably what a skewed
-workload should do, but the columns do not mean what they did.
-
-### `scripts/gen_incre_data.sh`
-
-Generates the whole sweep: 4 ratios x 4 distributions x 2 ops = 32 files x 8 GB
-= **~256 GB** (the volume had 698 GB free on 2026-07-30). Ratios are generated
-**cheapest first** (`10 100 1000 10000`) and existing non-empty outputs are
-skipped unless `-f` is passed, so it is resumable.
-
-**λ = `batch_ratio / 2`** → `{5, 50, 500, 5000}`. That puts demand at 0.5 at the
-start of a run, so it reaches the ceiling of 1.0 exactly at the half-way point:
-**every batch in the first half is exactly on-shape**, and the first half is what
-builds the tree state the queries run against. Front-vs-back odds inside a batch
-are `e^λ`, so even the widest batches (10% of the pool, λ=5) lean ~148x. The
-earlier `batch_ratio / 10` was 5x flatter for no accuracy gain once the sampler
-became exact. `norm`/`dual_norm` need no scaling — their mass sits in a band
-~`2*dev` wide, so even the widest batch here stays under the ceiling.
-
-### Front-window optimization (2026-07-31)
-
-`WindowSize()` restricts each batch to the leading `win_n` ranks; only that
-prefix is scanned, and **compaction shifts the window's survivors right against
-a moving `lo` offset** so the untouched suffix never moves. Per-batch cost drops
-from `O(pool_n)` to `O(win_n)`.
-
-- `exp`: window is `40/lambda` of the pool (mass beyond is `e^-40`, and the
-  expected picks lost are bounded by `lambda*want*e^-40` ≈ 1e-9), floored at
-  `8*want` so a capped batch can still reach. **123.8x less pool-work** at
-  lambda 5000; measured 1e8/10000 batches **~22 min → 18 s (77x)**.
-- `seg`: window is `mult*want` by definition — 25x at ratio 100, more at finer
-  ratios.
-- `norm`/`dual_norm`: window is the whole pool (a centred window would work for
-  them but is a different change), so they behave as before.
-- `uni`: **closed form, no carve at all** (2026-07-31). For a flat density the
-  batch-by-batch process is provably one global shuffle — cut a uniform random
-  permutation of `[0, base_n)` into consecutive `batch_n` blocks and block 0 is
-  a uniform random subset of the key space, block 1 a uniform random subset of
-  what is left, and so on, which is exactly what the loop computes. `O(base_n)`
-  instead of `O(base_n * batch_num / 2)`. Measured at 1e8: **9.3 s at every
-  ratio** (was ~4.6 min at ratio 10000); at 1e9 it should drop 46 min → ~90 s.
-  Verified empirically before the change: `uni` batch 0 at ratio 100 had
-  p10/p50/p90 = 0.0999/0.5002/0.9000 of the key space, i.e. already a plain
-  uniform subset, so the carve was producing nothing the shuffle does not.
-
-  Corollary worth remembering: for `uni` this generator's output is
-  distributionally identical to `data_generator`'s. The new generator only earns
-  its keep on shapes that *have* per-batch structure.
-
-**`parlay::random_shuffle` defaults to a FIXED seed.** Both the uniform closed
-form and the per-batch within-batch shuffle now pass `parlay::random(seed)`
-explicitly. Without it every `-file_num` instance of a `uni` dataset would have
-come out byte-identical (verified: files 1 and 2 now differ).
-
-**Bug this surfaced.** The count repair used to top up **uniformly** over the
-free ranks. Harmless when the shape is gentle, badly wrong when it is steep: at
-lambda 5000 it sprayed ~0.5% of the batch flat across the window and pushed the
-largest key to **4x** where the exponential could plausibly reach (0.0078 vs an
-expected max of 0.0018). Fixed by rejection-sampling the additions from the
-shape itself (accept with probability `w/max(w)`). KS 0.0144 → **0.0073**, head
-error −0.72% → **+0.09%**, max key 0.0078 → **0.0017**. Dedupe the *accepted*
-set, not the raw candidate draw, or the repair costs more than the optimization
-saves (41 s vs 18 s at 1e8).
-
-### Rank-skew is not key-skew — what `exp` actually produces
-
-The sampler shapes **ranks in the surviving pool**, and the pool is sorted
-throughout (`pack` preserves order, the window is a prefix, survivors shift
-right, the untouched suffix holds strictly larger keys). Confirmed empirically:
-ranks computed as index-in-`sorted(pool)` match `exp(lambda)` to KS ≈ 0.005.
-
-But once the front is thinned the survivors are no longer evenly spaced, so the
-rank→key map goes nonlinear. Measured at lambda 50 (shape indicator
-`(p50-p10)/(p90-p10)`; 0.268 = exponential, 0.500 = symmetric):
-
-| batch | 0 | 5 | 25 | 50 | 90 |
+`buf_size_type` is **unsigned**: `uint_fast8_t` for B <= 63, else 64-bit
+(`uint_fast16_t` is 8 bytes here). `n - 1` wraps at 0: backward loops are
+`for (i = n; i-- > 0;)` and every `- 1` is guarded (`get_split_n()` is 0
+for `node_n == 0`). `size_type` is `uint_fast32_t`.
+
+Entry: a struct with public `key`/`val` (`plain_entry_adaptor` derives the
+types), or an adaptor with `entry_type/key_type/mapped_type` and static
+`get_key/get_val/to_entry`; `entry_traits_of<E>` picks. A `conditional_t`
+over a constrained alias hard-errors even on the untaken branch, so the
+constraint is a `static_assert` in the class body.
+
+Comparator: every ordering decision goes through `TT::key_less`,
+`key_equal`, `entry_less` (`a <= b` is `!key_less(b, a)`); `key_equal` is
+one comparison for `std::less` or a comparator with static `equal`.
+`SelfTest.ReverseComparator` (`std::greater`) is the only test of this;
+five sites passed under `std::less` and failed under it, and a sixth hid
+behind `#ifdef DEBUG`.
+
+Allocator: every node comes from `TT::node_alloc::alloc<Node>()` and goes
+back through `free<Node>(p)` (runs the destructor); must be thread-safe.
+`free_node<NodeType>` with the wrong type is silently wrong.
+
+Augmentation: `leaf_aug(range)`, `leaf_aug::update_aug(range)`,
+`interior_aug::update(children, splits)`, `force_parallel(size, cutoff)`,
+`reset()`. Concepts are checked at the call sites that pass the range, so
+a leaf aug with no `update_aug` compiles until something inserts. Both
+node types have `get_aug()`.
+
+Node base: the `node_base` concept wants `is_leaf`, an assignable `size`,
+and construction from `(bool, size_t)`; a plain aggregate satisfies it.
+
+## Nodes
+
+`leaf_node`: `is_leaf`, `size`, `elements` (`std::array<entry, k_buf_ub>`,
+tail deliberately uninitialised), `aug`, `is_sorted`.
+`btree_interior_node : multi_way_node`: `node_n`, `tree_nodes[k_buf_ub]`,
+`split[k_buf_ub]` (`node_n - 1` live), `aug`, `size` (sum of children, set
+by the constructor), and the deletion flags `valid`,
+`contain_invalid_subtree`, `reinsert_size` (constructor and
+`reset_deletion_flag()` give true/0/0).
+
+Separators: `split[i]` is a closed lower bound of child i+1 and a strict
+upper bound of child i; strictly increasing. Build emits the first key of
+the right bucket; a deletion may remove that key and the bound stays valid.
+`get_node_id_containing_key(k)` = first i with `split[i] > k`;
+`_exclusive` = first i with `split[i] >= k` (right edge of a half-open box).
+
+Predicates (`b_tree.h`): `get_node_invalid_status` (leaf `size < B`,
+interior `!valid`), `node_is_valid`, `node_contain_invalid_subtree`,
+`get_node_reinsert_size` (an invalid interior reports its whole `size`),
+`node_has_leaf_children` (reads child 0; never call it on a node with
+`node_n == 0`, its slot 0 is a freed leaf).
+
+Buckets: `get_bkt_num(n) = n / k_buf_md`, `get_bkt_st_idx(i) = n*i/bkt_n`,
+`get_bkt_end_idx(i) = n*(i+1)/bkt_n`; sizes land in `[k_buf_md, 3B]`, so
+`generate_*_nodes` makes at least 2 from `>= k_buf_ub` items.
+
+`k_binary_search_base` = cache line / `sizeof(entry)` (leaf) or
+`sizeof(key)` (interior); `binary_search<Base>` is branchless in both
+phases. The four hand-inlined right-boundary searches in
+`range_count`/`range_report` stay inlined: a `slice` version cost +35–54%.
+
+## Build, insert, delete
+
+`build_`: `delete_tree()`, `parlay::sort`, assert distinct keys;
+`build_recursive`: `< k_buf_ub` entries → one leaf, else
+`generate_leaf_nodes` + `assemble_interior_levels` (repeats
+`generate_interior_nodes` while `>= k_buf_ub` nodes remain, then one root
+with `[2, k_buf_ub)` children; writes into the caller's node/key buffers
+from the second level on).
+
+`batch_insert_`: sort once; `batch_insert_recursive` partitions with
+`partition_batch` (binary search when `n > k_split_factor(8) * split_n`,
+else merge; `[[gnu::always_inline]]`, or it costs 9 calls), recurses with
+grain 1; leaf fits → `insert_points_2_leaf`, else
+`handling_leaf_split_overflow` (sorted leaf: `std::ranges::merge`);
+`batch_insert_update_interior` has a fast path when no child split; a root
+split goes through `assemble_interior_levels`. Scratch: `2n`
+`node_split_pair`s, 32 B per input entry. Slots `2i`, `2i+1` belong to
+input element i; that mapping is what makes the parallel sub-ranges
+disjoint, so it cannot be shrunk.
+
+`batch_delete_`: sort once; `batch_delete_recursive` marks bottom-up
+(`batch_delete_update_interior_size` sets `size`, `valid`,
+`contain_invalid_subtree`, `reinsert_size`; untouched interior children
+get `reset_deletion_flag()`); `delete_points_4_leaf` compacts the leaf
+and `post_process_leaf_change` decides `is_sorted`. Deleting an absent
+key is a no-op. Then:
+
+- root invalid and a leaf: return; `size == 0`: free the tree;
+- root invalid with entries live: `consolidate_invalid_root`, else
+  `rebuild_from_flatten` (flatten, free, sort, build) when its guard fails;
+- root valid, interior, `size < k_buf_ub`: `rebuild_from_flatten`;
+- else `repair_rec(root)`, then a root left with one child is collapsed.
+
+**`repair_rec`** (2026-09-12, replaced flatten-and-reinsert): bottom-up.
+Children flagged `contain_invalid_subtree` are repaired first, in parallel
+(grain 1), then `repair_node`: a leaf-parent merges its underfull leaves
+(`balance_over_leaves`; all-empty leaves are freed, a lone underfull leaf
+is left for the parent); an interior runs `balance_over_children` — drop
+empty children, group the thin ones (`node_n < k_buf_lb`) with the nearest
+valid sibling to the right exactly as phase 1 of `balance_over_leaves`,
+then per group: concatenate the child arrays into the last member
+(separator between two members = the parent's split between them), or,
+above `k_buf_ub` children, re-bucket the group's children with
+`generate_interior_nodes`. Only pointers move; entries move only inside
+`balance_over_leaves`. A node that absorbed siblings is repaired again
+(`repair_node(dest)`) because a thin sibling may have carried a thin child
+of its own; the cascade runs along that seam only. Everything strictly
+below a repaired node is valid; the node itself may be thin for its parent,
+and the root's thinness is resolved by collapsing single-child roots.
+Height never changes below the root. No reinsert, no `2n` scratch, no
+`has_tomb`; `reinsert_size`/`contain_invalid_subtree` are still computed
+and used only to prune the traversal.
+
+Measured at 1e9, user's command (`-t 128 -r 3`, `-p
+kv_pair_incre/<dis>/1000000000_1/ins/100/1.batch.bin -D <dis>`), ABBA x2
+against the consolidation commit `c937b45`, repeats within 0.08 s:
+
+| dis | build | 0.01% | 0.1% | 1% | 10% |
 |---|---|---|---|---|---|
-| in rank space | 0.265 | 0.279 | 0.264 | 0.269 | 0.476 |
-| **in key space** | **0.265** | **0.447** | **0.452** | **0.419** | **0.508** |
+| uni | `c937b45` | 35.15 | 14.54 | 5.98 | 1.96 |
+| uni | repair | **32.61** | **13.09** | **5.55** | **1.81** |
+| norm | `c937b45` | 28.62 | 13.60 | 5.48 | 2.64 |
+| norm | repair | **24.43** | **10.77** | **3.79** | **1.77** |
+| seg | `c937b45` | 10.59 | 4.67 | 3.13 | 2.67 |
+| seg | repair | **7.63** | **2.54** | **1.59** | **1.38** |
 
-So each `exp` batch is a **tight migrating cluster in key space** (p10–p90 width
-3–7% of the key space, centre walking 0.014 → 0.25 → 0.50 → 0.90), but the shape
-*inside* the cluster is exponential only for batch 0 — afterwards it is roughly
-symmetric. At batch 25 the leading 10% of the pool's key span holds just **0.04x**
-the average survivor density, which is what bends the mapping.
+uni −7..10%, norm −15..33%, seg −28..49%: the more a batch concentrates,
+the more whole subtrees go thin or empty, which the old path flattened and
+reinserted. Wall time of the repair phase per chain (probe, `-r 1`): uni
+4.0/2.8/0.9/1.25 → 1.1/0.57/0.21/0.07 s; norm 5.9/4.7/3.1/1.1 →
+1.2/0.54/0.20/0.10 s; seg 7.4/4.0/3.0/2.4 → 2.8/0.40/0.16/0.11 s. The old
+path reinserted 0.35–1.4 B entries per chain, more than the tree holds:
+the same entries went round wave after wave. `size()` equals the expected
+count after every batch, all three distributions, both builds.
 
-If per-batch key-space exponentiality is required, feed `TargetDensity` the key
-position `(pool[lo+i] - klo)/(khi - klo)` instead of `(i+0.5)/pool_n`; the window
-would then need a binary search on keys and would come out smaller. Not done.
-`seg` sidesteps the whole issue — its window is a rank count by definition.
+Still open: on `norm` the consolidation guard fails twice (a leaf-parent
+left with 1..`B`-1 entries) and the full rebuild runs — 0.1%: batch 997,
+2 M entries, 4 ms; 10%: batch 7, 200 M entries, **0.29 s of a 1.8 s
+chain**. Letting `repair_rec` take the invalid root too (the no-valid-child
+merge at every level, then the single-child collapse) would remove the
+guard and that rebuild.
 
-**Generation cost is the real constraint, and it is worse than first estimated.**
-Cost is linear in total pool-work `base_n * batch_num / 2`, measured at ~2.9 ns
-per unit (n=1e7, 100/1000/10000 batches → 1.6 / 13.3 / ~145 s). Projected at
-base_n=1e9, per file and per 8-file tier:
+Tests: `Repair*` in `self_test` — five shapes read off the live tree with
+`leaf_parents_of` (thin, seam, overflow, empties, chain) at leaf 2/8/64,
+plus augmentation, leak (allocs == frees per node type), heap allocator and
+`std::greater`; `expect::repair` asserts no leaf was allocated. Faults
+caught: no seam repair (underfull-leaf assert), wrong concatenation
+separator (box-vs-split assert), source not freed (leak check). 35/35 under
+`-UNDEBUG` and `-DDEBUG -UNDEBUG`; ASAN/UBSan clean.
 
-| ratio dir | per file | tier |
+**Why the root collapses.** Build leaves hold `2B`; uniform deletion puts
+all of them at `B` once half the tree is gone. A batch of >= 1% pushes every
+leaf under `B` in one pass, invalidity reaches the root in that same
+recursion, and no repair runs. Small batches cross a few leaves per batch,
+get repaired, and the tree narrows instead; the root then fails only at
+the height floor (a 5-level tree cannot keep one root child valid below
+~`B^4` entries at minimum occupancy, ~100 M at 1e9 in practice).
+
+**`consolidate_invalid_root`** (2026-09-12). Guard, read-only, before any
+mutation: `root->size >= k_buf_ub` and every leaf-parent holds 0 or `>= B`
+entries (summed from the leaves, not the flags). Then (1) parallel
+recursion: a leaf-parent with an underfull leaf runs `balance_over_leaves`
+— with **no** valid leaf it takes the new phase-1 branch, one group pivoted
+on the last child (was an `assert`); all-empty leaves are freed (`node_n =
+0`); (2) `collect_leaves_rec`: leaves in order plus the separator before
+each, from the stored splits (child 0 inherits, child j gets
+`split[j-1]`), freeing each old interior after its join; (3)
+`assemble_interior_levels`. No entry leaves its leaf-parent, nothing is
+sorted, scratch is a pointer and a key per leaf. Which path ran shows in
+the allocator: consolidation allocates interiors and never a leaf. At 1e9
+(`-t 128 -r 3`, ABBA): del 1% 6.69 → 6.02 s, 10% 2.52 → 1.96 s, small
+ratios unchanged; 470 M entries in 0.020 s where the rebuild took 0.62 s.
+The same bottom-up merge for the reinsert path is planned in
+`docs/plan_structural_delete_2026-09.md`.
+
+**`balance_over_leaves`**, sequential per node: a backward pass gives each
+child the nearest valid child to its right as pivot and sums the group;
+trailing invalid children join the rightmost pivot. Per group: one node →
+slide; `sum < k_buf_ub` → copy into the group's last node, free the rest,
+`post_process_leaf_change`; else gather into `entry_buf` (`reinsert_size
++ k_buf_ub`), `std::sort`, scatter into the first `sum / k_buf_md` leaves
+of the group (no allocation), splits = first key of each next bucket, free
+the surplus. Writes go straight into the node's arrays; `tree_idx <= i`
+throughout is what makes that safe. Epilogue: `node_n`, `update_aug`,
+`reset_deletion_flag`; `size` is not recomputed.
+
+## Leaf sort policy
+
+`post_process_leaf_change` is the one place `is_sorted` is decided:
+`sorted` sorts, `unsorted` marks false, `hybrid` asks `leaf_sort_pred(node,
+in)`. `default_hybrid_pred` hashes `size + in.size()` with address bits
+of the slice — deterministic under ASLR (allocations are 16-byte aligned,
+so bit 3 is an in-buffer offset), and the address terms flip half the
+calls. A lookup on an unsorted leaf is a linear scan; `sort_leaves()` is
+the idempotent parallel fix. Iteration sorts the leaf under the cursor on
+arrival, so iteration and lookups are not thread-safe until `sort_leaves()`
+has run.
+
+## Queries and iteration
+
+`contain`: iterative descent, `get_node_id_containing_key`, then leaf
+binary search or scan. `range_count`/`range_report`: at each node find `l`
+and `r` (the `r` search starts at `l`), recurse on the two boundary
+children; middle children are fully covered, and `range_report` flattens
+them in parallel into precomputed offsets. `range_report`'s output must
+hold `range_count(box)` entries (asserted, not clamped: clamping cost
++3.5%). `get_entries` asserts `out.size() >= size()` at the top. An empty
+or default tree answers every query empty. `flatten_rec<R, Granularity,
+Sorted>`: `Sorted = true` sorts each leaf in place.
+
+STL interface (`iterator.hpp`): `size empty max_size clear`, `contains
+count find lower_bound upper_bound equal_range`, `begin/end/rbegin/rend`,
+`to_seq`, `bulk_load insert erase`, `==`/`<=>`, `key_comp`. `const_iterator`
+is three words and re-descends at leaf boundaries. Range overloads are
+constrained with `requires std::ranges::range`; without it `erase(500u)`
+binds to the template.
+
+## Tests
+
+| target | data | what |
 |---|---|---|
-| 10 | 0.2 min | 0.03 h |
-| 100 | 2.4 min | 0.3 h |
-| 1000 | 24 min | 3.2 h |
-| **10000** | **4.0 h** | **32 h** |
+| `self_test` | none, ~45 s | keys from a seed against `std::map`; leaf 2–256, five key shapes, every size where the shape changes; `--seed=N` reproduces a run exactly |
+| `unit_test` | `/ssd1/zmen002/kv_pair` | real distributions at scale; skips without the data |
 
-~36 h total, **90% of it in the finest tier**. Not yet implemented, but the clear
-fix: at λ=5000 the density is negligible beyond ~0.6% of the pool, so 99.4% of
-every pass is spent on ranks with essentially zero chance of selection.
-Restricting the work to that front window, and compacting by shifting survivors
-rightward against a moving start offset instead of rebuilding the whole pool,
-would cut the finest tier by roughly 160x (≈15 min). Do this before generating at
-1e9.
+`check_against` validates, then iterates **before** `to_seq`/`get_entries`
+(those sort every leaf and once hid an iterator bug). Special tests:
+`ReverseComparator`; `CustomAllocator` (leak check, `live == 0`);
+`Augmentation`; `DefaultHybridPredIsReproducible` (re-execs itself; an
+in-process pair sees the same addresses and proves nothing);
+`GetEntriesOutputSize` (`EXPECT_DEATH`, `death_test_style = threadsafe`);
+`DeleteAbsentKeys`; `Consolidate*` and `DeleteChainTenPercent`
+(deterministic collapse: sequential keys, keep every 8th — a random 10%
+chain does not always collapse the root at small n).
 
-### `temporal_graph_signal` driver (`tests/temporal_graph_signal.cpp`)
+Validate a new test by injecting a fault and watching it fail. An
+equivalent mutant (`<` → `<=` on a covered edge) and a replacement that
+matched nothing both look like coverage gaps.
 
-Converts a **signal graph** — a stream of edge *appearances* `(src, dest,
-timestamp)` with no INSERT/DELETE semantics — into one timestamp-labeled output
-file (`0.in`/`0.bin`; rows `src dest timestamp`, binary `[N, 3, src, dest,
-timestamp, ...]`). Pipeline:
+Builds no CMake target makes:
 
-1. **Read & sort** edges by raw timestamp (Unix epoch seconds, read as
-   `double`).
-2. **Deduplicate** `(src, dest)` keeping the earliest (smallest raw-timestamp)
-   copy via `remove_duplicates_ordered` (input is timestamp-sorted, so the
-   stable sort by `(src, dest)` keeps the earliest copy of each group).
-3. **Re-label timestamps** on the deduplicated edges (the label becomes the
-   output timestamp). Dedup leaves the result sorted by `(src, dest)`, so it is
-   **re-sorted by raw timestamp first** to make group adjacency valid, then:
-   - `-group_by_year 1` (default): convert each epoch second to its UTC calendar
-     year via `gmtime_r` (`tm_year + 1900`), then label the distinct years
-     `1..#batches` by ascending year — one batch per year. Years with no edges
-     are skipped, so labels stay contiguous.
-   - `-group_by_year 0`: renumber the distinct raw timestamps `1..#timestamps`
-     by ascending value (each distinct timestamp = its own label). Ranks are
-     computed over the **deduplicated** set.
-   - Both share the same group-flag + `scan_inclusive` machinery; only the flag
-     predicate differs (year change vs raw-timestamp change). The result
-     `labels` sequence overwrites `deduped_edges[i].timestamp`.
-4. **Shuffle within equal labels**: global `random_shuffle` then `stable_sort`
-   on the label → uniform order within each label group, globally ordered across
-   groups.
-5. **Stats + write**: prints max vertex ids, max degree, average degree, and a
-   post-dedup per-batch summary (`Batch N: M edges`, listed only in year mode
-   since rank mode can have a huge number of labels; the aggregate distinct-label
-   count prints in both modes).
-
-Note the **dedup-before-relabel** order: relabeling operates on the final edge
-set, so rank-mode labels (and the printed distinct counts) reflect deduped data,
-not the raw stream.
-
-CLI (`commandLine`, `common/parse_command_line.h`): `-p` input (required), `-o`
-output dir (required), `-binary {0,1}`, `-group_by_year {0,1}`. Missing required
-arg or `-h`/`-help` → usage.
-
-## `ReadEntries` (`test_framework.h`) — the dataset loader
-
-```cpp
-template<typename E, int kInputType = 0>
-auto ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
-  -> std::pair<size_t, int>;  // returns (N, dim)
+```bash
+# the #ifdef DEBUG box checks, asserts live
+g++ -std=c++20 -O1 -pthread -DDEBUG -UNDEBUG -Iinclude -Iexternal/parlaylib/include \
+  -Iexternal/googletest/googletest/include tests/self_test.cpp \
+  build/lib/libgtest_main.a build/lib/libgtest.a -o st_debug
+# ASAN/UBSan: gcc-toolset-15 has no libasan, and libgtest.a is not PIC
+/opt/opencilk-3/bin/clang++ -std=c++20 -O1 -g -fsanitize=address,undefined \
+  -fno-omit-frame-pointer -fno-pie -no-pie -pthread -UNDEBUG <same -I and libs> -o st_asan
+ASAN_OPTIONS=detect_leaks=0 ./st_asan --gtest_filter='SelfTest.Consolidate*'
 ```
 
-`ReadEntries` is a **dispatch layer**: path ends in `.bin` →
-`ReadEntriesBinary`; anything else → `ReadEntriesText`. No filesystem probing —
-the given path is the file that gets read. `ParseInsertBatchPath`/
-`ParseDeleteBatchPath` (`options.h`) derive base/batch paths that **inherit the
-input file's extension** (`InputExtension()`), so a `.bin` input (`-p`) makes
-all derived batch files load as binary too. `ExtractPrefixes` strips `.bin`,
-`.in`, then `.base`.
-
-**Debugging note**: `unit_test` redirects stdout during `RunTest`, so an
-`abort()` from a missing data file used to die silently (no gtest summary).
-`binary_io.h` errors go to **stderr** for this reason.
-
-### `ReadEntriesText` (the original text parser)
-
-- Reads whole file via `benchIO::readStringFromFile`, tokenizes in parallel via
-  `stringToWords`, parses `N`/`dim` from the first two tokens, then a
-  `parallel_for` fills `wp[i]` via `E::ReadKey`/`E::ReadVal` (`std::stoul`).
-- **Overwrites** `wp` (`clear()` + `resize(N)`), never appends.
-- Only ever reads 2 columns (`pts[i*dim]`, `pts[i*dim+1]`) regardless of dim.
-- `kInputType` (enum `InputType` in `wrapper.h`): `kNormalInput`/`kOsmInput`
-  read key+val from the two columns; `kDynamicGraphInput` packs two uint32
-  columns into a uint64 key `(u<<32)|v` and sets `val = i + offset`.
-- `offset` is only used by `kDynamicGraphInput`: callers thread a running
-  `total_entries` across multiple files so vals stay globally unique.
-- Call sites: `DefaultTestFunc` (base file from `-p`, then per-ratio
-  base/batch pairs via `opts.ParseInsertBatchPath`/`ParseDeleteBatchPath`),
-  `TestTemporalGraph` (OSM single file; dynamic graph 10×`{i}_insert.in`/
-  `{i}_delete.in` pairs), `unit_test.cpp`.
-- `ReadPointsSerial` (serial fallback) is used only under `-DMEMCHECK`.
-
-### `ReadEntriesBinary`
-
-Same interface/semantics, reads the `.bin` format via `ReadBinaryEntries`
-(`binary_io.h`; handles 32/64-bit payload widths transparently). Assigns
-`wp[i].key`/`wp[i].val` directly (no string parse); `kDynamicGraphInput`
-packs `(u<<32)|v` and uses `offset` like the text reader. Aborts on
-missing/truncated file or bad header.
-
-### Baseline targets build again (fixed 2026-08-18)
-
-They were broken from 2026-06 until the naming pass; see "`external/` consumers
-were stale" above. All 14 targets compile.
-
-## Baselines (`external/baselines/*.h` + `tests/<name>.cpp`)
-
-Single-threaded / external reference implementations that conform to the same
-test-framework interface as `BTree<TT>` (methods: `Build`, `BatchInsert`,
-`BatchDelete`, `Contain`, `RangeCount`, `RangeReport`, `GetEntries`,
-`DeleteTree`, `GetSize`, plus `ParseInput`/`ParseDeleteInput`/`KeyProbe` adapters
-and the `Leaf`/`Interior` aliases). Each has a thin `tests/<name>.cpp` driver
-(mirror of `tests/stdset.cpp`) and its own executable target in CMake.
-
-| Baseline | Wrapper header | Backing store | Notes |
-|---|---|---|---|
-| StdSet | `stdset.h` | `std::set<E, KeyLess>` | serial loops; ordered by key only |
-| TlxBTree | `tlxbtree.h` | `tlx::btree_set<E, KeyLess>` | serial loops; in-memory B+ tree |
-
-- **TLX** is a git **submodule** at `external/tlx` (header-only btree). Added with
-  `git submodule add -f` because `.gitignore` ignores all extensionless paths
-  (`*` on line 2). Include dir `${PROJECT_SOURCE_DIR}/external/tlx` is added only
-  to the `tlxbtree` target; header is `<tlx/container/btree_set.hpp>`.
-- `tlxbtree.h` differs from `stdset.h` only in: include, `SetType`, and
-  `Contain` uses `set_.exists(k)` (tlx) vs `set_.find(k) != end()` (std::set).
-- **Build caveat**: baselines have **no `Validate()` method**, so they only
-  compile on the `DefaultTestFunc` path. Under `-DOSM`/`-DDYNAMIC_GRAPH` the
-  driver selects `TestTemporalGraph`, which calls `pkd.Validate()` →
-  compile error. Build baselines with `OSM=OFF DYNAMIC_GRAPH=OFF` (the default).
-- **Membership-query segfault fix** (`DefaultTestFunc`, `test_framework.h`): the
-  `query_type & (1<<0)` (membership) branch sliced the membership probe set from
-  `wi` (the insert/delete batch) in its `wi.size()==0` case. With `-t 0` (no
-  insert/delete batch) `wi` is empty, so `wi.subseq(0, batch_size)` with
-  `batch_size = wp.size()*kMemberQueryRatio (0.01) > 0` did an out-of-bounds copy
-  → SIGSEGV inside parlay's parallel `sequence` construction (crash is in the
-  framework, *before* any `Contain` call — affected every baseline equally, not
-  TLX-specific). Fixed to slice `wp` (the keys actually built into the tree).
-
-## Concurrent-index incremental sweep (`external/index-microbench/workload.cpp`)
-
-Three tags, **numbered identically in `workload.cpp` and `tests/test_framework.h`**
-(renumbered 2026-07-28 — anything older that says "tag 5 = insert" predates this):
-
-| tag | block | b_test | concurrent |
-|---|---|---|---|
-| `1<<5` | static build, then query — the control | `BuildTree<…,kOutputRatio=2>` | `ConBuild` |
-| `1<<6` | incremental insert | `BatchInsertByStep` | `ConInsertByStep` |
-| `1<<7` | incremental delete | `BatchDeleteByStep` | `ConDeleteByStep` |
-
-Driven by `scripts/incre_updates.sh` (`tag=2#11100000` = 224, all three).
-
-All three end in the same query suite on a **half-filled** tree, factored into one
-helper per side — `incre_update_query` (`test_framework.h`, a lambda beside
-`membership_query`/`range_query`/`range_count`) and `ConQueryAfterStep`
-(`workload.cpp`). Both take `(entry_in_tree, entry_not_in_tree)` and run: one
-membership pass over `random_shuffle(append(both halves))` truncated to
-`batch_size`, then `kRangeQueryType` range queries and `kRangeQueryType` range
-counts, all on `entry_in_tree`. `batch_size` is `kMemberQueryRatio` of the
-**whole** input, not of one half.
-
-Tag `1<<5` being set also skips the shared primal build block (`if ((opts.tag &
-(1<<5)) == 0)`) in both files, since that block builds from the same input.
-
-### `ConInsertByStep` / `ConDeleteByStep`
-
-Both slice the input into `1/ratio` batches over
-`ratio_seq = {0.0001, 0.001, 0.01, 0.1}`, time the whole chain **once** (no
-`rounds` loop — `-r` is ignored), then **rebuild** to reach a half state rather
-than unwinding, because masstree's `remove` never reclaims (measured: 1e9 delete
-grows RSS 98GB → 1491GB and dies).
-
-The half state is `slice_num / 2` batches, and callers split the input at
-`size() / 2` to decide which keys are in the index — these agree exactly only
-when `step` divides `n` (true for every real dataset). Both sides use `size()/2`
-so the two drivers classify keys identically.
-
-### Timing vs. query state (tag `1<<5`)
-
-The timed build covers the **whole** input; only the final untimed build is the
-half one. `BuildTree`'s `kOutputRatio` template parameter does this (times
-`Build(wp)`, ends with `Build(wp[0, n/kOutputRatio))`), and the tag `1<<5` block
-in `workload.cpp` mirrors it with `ConBuild<1>(wp)` → drop → `ConBuild<0>(half)`.
-This is what makes the control comparable to tags `1<<6`/`1<<7`, which likewise
-time the full chain and then rebuild to half.
-
-### `ConRunBatched` — why threads are spawned once
-
-`threadinfo::make` mallocs 8KB, links into a never-pruned global `allthreads`,
-and grabs a 2MB superpage pool. One `StartThreads` per batch would leak
-`slice_num * num_thread` threadinfos (1e9 @ ratio 1e-4 → 2.24M ≈ 4.4TB, killing
-the run via `pthread_create` EAGAIN). `ConRunBatched` spawns one thread per
-worker, one threadinfo each, and walks all batches inside with a `std::barrier`
-between them. Work split inside a batch is **proportional**
-(`in.size()*tid/num_thread`), unlike `ConInsert`/`ConDelete`, which use
-`key_per_thread*tid` and drop the remainder.
-
-### Output format
-
-**The suite was trimmed at some point after the 2026-07-28 notes below, and both
-drivers were trimmed identically** — verify against the code before trusting any
-column count here. As of 2026-07-31 `incre_update_query` (`test_framework.h`) and
-`ConQueryAfterStep` (`workload.cpp`) each run:
-
-- **one** membership pass — `MIX` only (both halves appended, shuffled, truncated
-  to `batch_size`). The `IND` and `OOD` passes are commented out in both files.
-- **one** range query, `rec_type = 1` only (the `for rec_type` loop is commented
-  out in both).
-- **one** range count, `rec_type = 1` only.
-
-So per ratio it is **4 columns** = 1 timing + 1 membership + 1 range query + 1
-range count, not 10. Whole-run totals: tag `1<<5` → 4 tokens; tags `1<<6`/`1<<7`
-→ 4 ratios × 4 = 16 each, **plus** 1 primal build token when tag `1<<5` is not
-also set. `tag=2#11100000` (all three, what `incre_updates.sh` runs) is
-`4 + 16 + 16 = 36` tokens; a lone `1<<6` or `1<<7` is 17.
-
-Every column is a real number for every index type as of 2026-07-31 — masstree's
-range-count `-` placeholders are gone (see the `q_[0]` race fix below), and it
-reported all range queries from 2026-07-28 (the `scan` stack-array fix).
-
-**`merge_incre_updates.py` still expects the old 90-value layout** and has not
-been updated for the trim; it will treat a current 36-value run as a short row
-and pad it. Fix the parser before merging new logs.
-
-The primal build is **always** run and always a real number, in both drivers —
-`workload.cpp` used to skip it and print `-` when only the incremental bits were
-set. Restoring it costs masstree a full 98GB / ~66s index at 1e9 that tags
-`1<<6`/`1<<7` immediately release; it is paid only to keep that column
-comparable against `b_test`.
-
-### Merging the trimmed logs (`scripts/merge_incre_updates_new.py`)
-
-Merges **both** log trees into one 36-value CSV at
-`data/incremental_updates_new/<name>.csv`, and writes a concatenation of every
-source log (with `>>> <path>` markers) beside it for reading by hand.
-
-Row layout is `build | 3 queries | 8 x (update_time, 3 queries)` = **36 values**,
-9 blocks of 4. The 3 queries are `MIX`, `RRM`, `RCM` — the driver dropped the
-`IND`/`OOD` membership passes and the `RRS`/`RRL`/`RCS`/`RCL` box sizes, taking
-the row from 90 to 36. Block order is unchanged: build, then ins then del at
-0.01% / 0.1% / 1% / 10%. Field mapping was confirmed by magnitude against the
-old 90-column CSV (`exp,BTree,64` gives RRM 0.0837 vs 0.0804, RCM 0.00215 vs
-0.00205; MassTree's del timings track the old row within a few percent).
-
-**The 36 columns are a strict subset of the 90**, so the old logs are *projected*
-down rather than skipped — keep the timing plus MIX/RRM/RCM per block, drop the
-other six. Projection is **by column name**, not index, so it cannot drift if
-either layout changes. Only the 73-value pre-MIX layout is unprojectable (no MIX
-column at all) and still skipped.
-
-`kSources` decides which sweep supplies which distribution. **Order matters**:
-sources are tried in turn and the first to supply a given
-`(benchmark, tree, leaf_wrap)` wins, so a later entry only fills gaps.
-
-| order | source | values | supplies |
-|---|---|---|---|
-| 1 | `logs/incremental_updates_new/` | 36 | `uni`, `norm`, `seg` |
-| 2 | `logs/incremental_updates/` | 90 | `uni` — **backfill only** |
-
-As of 2026-08-02 the tag=224 sweep is primary for all three distributions, and
-the old 90-value sweep backfills `uni`: a `(tree, leaf_wrap)` it has that the new
-sweep lacks is taken from there and projected onto the 36 columns by name. This
-was requested explicitly; it is **not** the safe default — see the caution
-below.
-
-**The CSV reports `norm` as `skew` and `seg` as `adversary`** (`kBenchDisplay`).
-This is a display mapping applied at row construction, *not* a rename of the
-logs: the driver writes `Dis: norm` / `Dis: seg` from the generator's own `-dis`
-values, so renaming directories and headers would be undone by the next
-benchmark run. `kWantBench`, `kSources` and the dedupe key all stay in
-generator names; only the emitted `benchmark` column changes.
-
-For `norm`/`seg` there is no second source, so a tree with no run under
-`logs/incremental_updates_new/<tree>/<dis>/` is **absent** from that
-distribution. A distribution in `kWantBench` that supplies **no** rows at all is
-warned about on stderr (`warn: no rows for …`), since it is otherwise invisible:
-the CSV simply has no such row.
-
-**The `uni` backfill mixes two sweeps inside one distribution, and the merger
-says so.** `report_coverage()` prints every backfilled row, then a `WARN:` for
-any `(benchmark, tree)` drawing from more than one sweep — the dangerous case,
-because such a curve steps where the *source* changes rather than where the
-parameter does. Concretely, if the new sweep's `uni` has only `64.log`, then
-`uni/BTree` leaf 64 comes from the new sweep and 2..1024 from the old, so the
-leaf-size curve has an artificial discontinuity at 64. Read those lines before
-plotting; the real fix is rerunning the missing leaf sizes into the new sweep,
-after which the backfill goes quiet on its own (no backfill lines, no `WARN`).
-
-Whether a row was backfilled is **not** a CSV column — the schema is unchanged
-so downstream consumers keep working — it exists only in the stderr report.
-
-**`exp`, `seg_10` and `dual_norm` are dropped from the output**, their logs
-still on disk. Adding a name back to `kWantBench` *and* `kSources` restores it.
-
-`seg` and `seg_10` are the same sliding-segment shape at two window widths (the
-generator's `-batch_param mult`), so they are separate distributions rather than
-two runs of one — do not dedupe them. They differ per tree in *direction*, which
-is how you can tell: ins_0.01%, `seg` → `seg_10`, CPAM 7.43 → 12.60 and PAM
-8.40 → 12.66 (slower), but PMA 191.98 → 178.85 (faster).
-
-**How far apart the two sweeps are** — the evidence behind the caution above.
-They are not interchangeable, and the difference is **per tree, not a uniform
-scale factor** — same tree, `exp` ins_0.01%, old → new:
-
-| BTree | CPAM | PAM | PMA | MassTree | BwTree |
-|---|---|---|---|---|---|
-| 29.25 → 6.40 | 55.60 → 6.41 | 29.75 → 8.24 | 29.90 → **181.17** | 87.29 → 84.70 | 55.68 → 55.15 |
-
-PMA got ~6x *slower* while MassTree and BwTree barely moved, so a backfilled row
-sits at its own unrelated operating point next to rows measured on the new
-sweep — which is why the `uni` backfill is reported per row rather than applied
-silently. Rerunning the missing runs into `incremental_updates_new/` is the only
-thing that actually removes the mismatch. (`exp` itself is no longer emitted —
-the table is kept because it is the evidence for this.)
-
-(An earlier revision of this note claimed a "~9x" factor between the sweeps.
-That was derived by comparing `exp/BwTree`-old against `exp/BTree`-new — two
-different trees — and is wrong. The table above is the same-tree comparison.)
-
-**Every leaf size that was run is emitted** (`kBTreeLeafWraps = None`, changed
-2026-08-02 — it was previously `kBTreeLeafWrap = 64`, a hard pin). BTree is the
-only tree swept over leaf sizes, so a distribution holds one BTree row per leaf
-size it was run at against 1 row for each other tree. Set
-`kBTreeLeafWraps` to a collection — `{64}` reproduces the old 18-row output
-exactly — to pin it back for a plot that wants one line per tree.
-
-Because coverage is a property of the logs and not of the merger, the script
-prints a `note:` per `(benchmark, tree)` for any tree that is swept *somewhere*,
-including the distributions where it is not — so `adversary/BTree spans 1 leaf
-size(s): 64` appears next to `uni/BTree spans 10`, rather than the gap being
-silent.
-
-**`leaf_wrap` must come from the header's `Buf:` field, not the filename.** The
-new sweep names every file `64.log` after the BTree leaf size, so PAM, PMA and
-MassTree runs sit in a `64.log` while reporting `Buf: 1`. A merger written
-against the path would mislabel three of the six trees.
-
-Expected state: the 3 × 6 grid, `uni`/`skew`/`adversary` × BTree, PAM, CPAM,
-PMA, MassTree, BwTree, with BTree expanded over its leaf sizes — 18 rows when
-pinned, more once the leaf sweep is included. How many depends on which
-`logs/incremental_updates_new/<tree>/<dis>/<leaf_wrap>.log` files exist; read the
-`note:`/`warn:` lines the merger prints rather than assuming the grid is full.
-Every row should parse at exactly 36 values.
-
-The row counts and values recorded below predate the 2026-08-02 switch to a
-single source, when `uni` came from the old 90-value sweep — re-derive them from
-a current run before quoting. (The old `uni/MassTree` `-` in every `RCM` column
-was an artefact of those logs predating the `q_[0]` race fix; a `uni` run from
-the current sweep should have real numbers there.)
-
-`skew` lands between `uni` and `adversary`, as its centred band should — BTree
-ins_0.01%: uni 29.35, skew 25.03, adversary 7.61.
-
-**`adversary/MassTree` and `adversary/BwTree` are byte-identical to those trees'
-`exp` logs** (ins_0.01% 84.7021 and 55.145, matching to every digit) — they were
-copied from `exp` and relabelled, so they are placeholders, not `seg` runs. The
-other four `adversary` rows and all six `skew` rows are genuine. Re-run those
-two against the `seg` dataset before publishing, or the table reads as "MassTree
-and BwTree are insensitive to distribution", which the other four trees
-contradict.
-
-**The `seg` in the CSV is `45f7a2c6`'s data**, restored on 2026-08-01 (BTree
-ins_0.01% 7.61, CPAM 7.43, PAM 8.40, PMA 191.98). The set that had been there is
-now `seg_10`, moved into `<tree>/seg_10/64.log`.
-
-**Moving a log between distributions means editing its header, not just the
-path.** The merger reads `benchmark` from the `Dis:` field; the directory is
-never consulted. The `seg` → `seg_10` move needed
-`sed 's/Dis: seg;/Dis: seg_10;/'` on each file — without it the moved logs would
-still have come out labelled `seg` and collided with the restored ones, and
-first-seen-wins would have silently produced a mix of the two.
-
-BTree's `exp` logs in the new sweep now carry the full leaf-size sweep
-(2..1024), not just 64 — though `exp` is not emitted (see `kWantBench`). The
-`exp/BTree` values shifted slightly (build 1.3142 → 1.31545) when `64.log` was
-rerun — expected, not a merge bug.
-
-**A short row means a lost token, and it shifts every later column.** The
-BwTree `exp` log arrived once at 35 values, missing `del_0.01%_MIX`; the parser
-pads at the *end*, so `del_0.01%_MIX` read as 0.455 (a membership probe with a
-range-report magnitude) and `del_0.01%_RCM` as 38.6 seconds. The count is the
-cheap check — `sed -n '2,$p' <log> | tr -s ' \n' '\n' | grep -c .` should be 36
-for every file before trusting a merge.
-
-### `scripts/filter_incremental_updates.py`
-
-Cuts a merged CSV down to 20 columns: `benchmark, tree, leaf_wrap`, the 8 update
-timings, and the `build` and `1%` blocks' `MIX`/`RRM`/`RCM`. Defaults to the
-36-value CSV above, writing `<name>_filtered.csv` next to it.
-
-The kept columns are a subset of **both** layouts, so passing the old
-`data/incremental_updates/incremental_updates.csv` explicitly still works
-(verified). This script is the only place the 20-column list lives —
-`merge_incre_updates_new.py` deliberately has no `--slim` flag, so the two
-cannot drift apart.
-
-### Merging the logs (`scripts/merge_incre_updates.py`)
-
-Concatenates `logs/incremental_updates/<tree>/<dis>/<leaf_wrap>.log` (tree dirs
-are the numeric `-T` values: 0=BTree, 1=CPAM, 2=PAM, 3=PMA, 5=MassTree,
-6=BwTree) into one log, then writes `data/incremental_updates/<name>.csv` — one
-row per run, 93 columns = `benchmark, tree, leaf_wrap` + the 90 values.
-
-Column names are prefixed by their block (`build`, `ins_0.01%` … `del_10%`)
-because the 9 query names repeat once per block; a bare repeated `IND` × 9 is
-ambiguous to any consumer. Nothing reads this CSV yet — `merge_incre_updates.py`
-is its only reference.
-
-Three log realities the parser has to absorb:
-
-- **`-` is a legal value**, not a parse error (masstree's 27 range-count cells in
-  logs recorded before 2026-07-31). The pre-2026-07-29 version tested
-  `float(tok)` on every token and therefore dropped every masstree row silently.
-  Runs after the `q_[0]` race fix emit no `-` at all, but keep the handling for
-  the older logs.
-- **A row can be split across lines.** Masstree's allocator writes `madvise
-  superpage: Cannot allocate memory` to stderr while the row is going to stdout,
-  and `2>&1 | tee` splices it mid-row. The parser strips known noise phrases
-  (`kNoisePhrases`) and accumulates values until the *next header*, rather than
-  expecting one row per line. Verified against a saved noisy log.
-- **A run can end short.** A killed process leaves a partial row (BwTree at 1e9
-  uniform died mid-`del 1%`, 76 of 90 values). Those are padded to keep columns
-  aligned and reported on stderr — the valid prefix is real data.
-
-**Stale logs are dropped, deliberately.** A `2.log`/`32.log` from the older
-73-value layout (`build + 8 × 9`, no MIX and no static query block) carries a
-header *identical* to a current run's — `Buf` is the tree's internal block size,
-not the filename — so padding it would emit a duplicate
-`(benchmark, tree, leaf_wrap)` key holding shifted values. `kLegacyFieldNum`
-catches exactly 73 values and skips with a note.
-
-The 16 pre-MIX logs that existed (CPAM `32.log`, PAM/PMA/BwTree `2.log`, × 4
-distributions) were `git mv`d to `logs/incremental_updates_old/<tree>/<dis>/` on
-2026-07-29, keeping the `<tree>/<dis>/` structure because the bare filenames
-(`2.log` under three different trees) collide if flattened. That folder is a
-**sibling** of `logs/incremental_updates/`, deliberately outside
-`concat_logs()`'s `logs/incremental_updates/*/*/*.log` glob. `kLegacyFieldNum`
-stays as a net for future stragglers.
-
-### Gotchas found 2026-07-27
-
-- **Running the incremental blocks together used to yield only the insert half
-  for masstree** — the insert block ran first in the same process, masstree
-  returned nothing to the OS, and the `ConDeleteSweepFits` guard then saw a
-  depleted `MemAvailable` and skipped the delete block. **Fixed**:
-  `ReclaimMassTreeMemory` frees the memory between phases and the guard is gone,
-  so one process now produces both halves (verified at 1e8 for masstree and
-  bwtree). Splitting into one tag per process is no longer needed.
-- **Ratio 0.0001 is noisy.** Observed 7.16–14.51s for the same insert chain
-  across runs, while the other three ratios hold within a few percent — 10000
-  batches means 10000 barrier syncs. These are single-shot (`-r` is ignored on
-  this path), so average before trusting that column.
-- **Insert/delete blocks read different files**: tag `1<<6` reads `base_path`
-  into `wp`, tag `1<<7` reads `batch_path` into `wi`. Equal only when `-b 1`. At
-  `-b 0.1` the delete sweep is 10x smaller, and since `batch_size` derives from
-  `wp.size()` vs `wi.size()`, the membership columns differ 10x too — the two
-  blocks are not comparable as logged.
-- **Build config trap**: `main` dispatches to `ApplyConcurrentIndexDynamicGraph`
-  when `DYNAMIC_GRAPH` or `OSM` is defined, and that function only handles tags
-  3 and 4 — tags `1<<5`/`1<<6`/`1<<7` produce *no output at all*, silently.
-  Rebuild with `-DDYNAMIC_GRAPH=OFF -DOSM=OFF` before running them by hand.
-  `incre_updates.sh` is safe because its `run_cmake` passes those flags.
-- **`BatchInsertByStep` divides by zero when `ratio * n < 1`** (SIGFPE, rc 136):
-  `step` has no `max(…, 1)` guard, unlike `BatchDeleteByStep`. Only bites tiny
-  smoke datasets — at n ≥ 1e8 the smallest ratio still gives `step = 10000`.
-
-### Dataset note
-
-Ratio-1 dirs (`ins/1`, `del/1`, i.e. batch == base) exist only for some
-`<dis>/<n>` combinations — at 1e8 only `dual_norm` has them; `uni/100000000_1`
-has just `10/100/1000/10000`. `-b 1` against a distribution lacking `1/` aborts
-in `ReadEntries` before any work.
-
-### `ConRangeQuery` dead-allocation fix (2026-07-27)
-
-`ConRangeQuery` used to prefix-sum the per-query result sizes and allocate
-`parlay::sequence<std::pair<keytype,uint64_t>> v(tot_size)` up front. Nothing
-ever wrote to `v` — its only reader was the commented-out `range_report`
-branch — but at 1e8 with rectangle type 2 that is 2.5e10 pairs = **372GiB**,
-and bwtree died there with `std::bad_alloc`. Removed `v`, `offset`, and the
-`parlay::scan`; `rec_num` is now unused (`(void)rec_num`).
-
-Masstree never reached it only because `ConQueryAfterStep` skipped rectangle
-type 2 for it — masstree had the *same* bug in its own `scan` (`index.h:829`),
-`Str results[range]`, a stack array sized to the result count, ~8MB at 5e5
-elements on an 8MB stack. Same shape, different memory. **Both are fixed now**
-(see below); the range query skips are gone.
-
-Both index types implement `scan(key, range)` as "walk `range` elements from
-`key`" (masstree `get_next_n`, bwtree iterator walk), so the timings are
-comparable. If the `range_report` branch is ever restored, note
-`v.begin() + offset[start_index]` is wrong — it offsets by the thread's first
-query index, not per-query, so queries within a thread would overlap.
-
-### `GenRectangles` non-FixSize path never sets the lower bound
-
-In `tests/test_framework.h:126-139` (the `FixSize == false` branch, which is
-what `GenRectangles<TT, false, false>` — every concurrent-index call site —
-uses), `range.first` is never assigned for types 1 and 2; `range.second` is
-assigned twice instead. `std::pair`'s default ctor value-initializes, so
-`range.first == 0`:
-
-| type | intended | actual |
-|---|---|---|
-| 0 | `[1, n^0.25)` | `[1, n^0.25)` — correct |
-| 1 | `[n^0.25, sqrt(n))` | `[0, sqrt(n))` |
-| 2 | `[sqrt(n), 1e6)` | `[0, 1e6)` |
-
-So the three "brackets" are nested rather than disjoint (compare the `FixSize`
-branch, which correctly sets both bounds to `[1,100) [100,10000) [10000,1e6)`).
-Large-bracket measurements therefore include arbitrarily small boxes and
-understate large-range cost. Cross-tree comparisons stay valid — `srand(10)`
-makes the box sequence identical for every tree at a given `(rec_num, type, n)`
-— but the brackets do not measure what their names say.
-
-### BwTree incremental results (1e8 uni, `-t 96 -b 0.1`)
-
-Works end to end after the fix (bwtree was never subject to the old memory
-guard, which only applied to masstree and has since been removed). Notable: rectangle-type-2 scans cost **17.0s in the delete block vs 10.5s in
-the insert block** despite the delete-block tree holding 10x fewer live entries
-(5e6 vs 5e7). Because type 2 caps at `[0,1e6)` for both and `srand(10)` fixes
-the length sequence, both blocks walk an *identical* number of elements — so
-that 1.6x is a real per-element slowdown, consistent with BwTree delta/tombstone
-chains left behind by the bulk deletion.
-
-### Masstree memory reclamation (2026-07-27)
-
-**Where masstree's memory actually lives.** Not in the tree. `threadinfo::make`
-(`masstree/kvthread.cc:98`) mallocs a *fresh* 8KB threadinfo with zeroed
-`pool_[]` on every call, and `StartThreads`/`ConRunBatched` call it once per
-thread per invocation. Pools are per-threadinfo, refilled from `posix_memalign`
-superpages recorded in `pool_ptrs_`. So nothing an index frees is ever returned
-to the OS or reused by a later index.
-
-Consequence: **restoring `~mt_index` would reclaim nothing.** Its body is
-commented out (`masstree/mtIndexAPI.hh:76`) and references a `ti_` that is not a
-member, but even a correct `table_->destroy(ti)` would only push nodes onto a
-freelist no subsequent build consults, because that build gets new threadinfos.
-Don't spend time on it.
-
-**What does work** — `threadinfo::release_all_pools()` (added to `kvthread.hh`
-next to `deallocate_ti`): walks the global `allthreads` list, calls
-`deallocate_ti()` on each (frees its superpages plus the `pool_ptrs_` buffer),
-frees the threadinfo struct, and nulls `allthreads`. `deallocate_ti()` already
-existed and had **no callers** — it is the only thing in the tree that releases
-pool pages.
-
-`ReclaimMassTreeMemory()` in `workload.cpp` wraps it and is called at six points
-where the workers have joined and no index is live: inside
-`ConInsertByStep`/`ConDeleteByStep` between the full and half builds, and after
-each `delete idx` in tags 3, 5 and 6. All six are **outside** the timed regions
-(each follows a `t.stop()`).
-
-**Stop at the allocator — do not release to the OS.** An earlier version also
-called `MallocExtension::instance()->ReleaseFreeMemory()` (this binary links
-`tcmalloc_minimal`, CMakeLists.txt:246, which parks freed pages in its page
-heap). That was only ever needed to raise `MemAvailable` for the guard, and the
-guard is gone. Worse, it made the *next* build fault every page back in, and
-that cost lands inside its timed region — ratio 0.0001 swung 7.16–14.51s with
-it, and settled to 6.30–7.26s once removed. Leaving the pages with tcmalloc
-still prevents growth, because tcmalloc reuses them for the next build.
-
-**SAFETY**: `release_all_pools()` frees the pages masstree nodes live in and the
-threadinfo objects themselves. Only call it with no masstree index live, no
-`threadinfo*` held, and the Con* worker threads joined. Deliberately *not*
-called in tags 0/1, where `primal_idx` stays live across ratios.
-
-**The `ConDeleteSweepFits` guard is gone** (removed 2026-07-27). It multiplied
-the input size by a hand-picked 1000 bytes/entry, compared that against
-`MemAvailable`, and skipped the whole delete block when it did not fit — the
-`fits` flag, the 36 `-` placeholders, and all. It was ~2.3x over (93.1GiB
-demanded at 1e8 for a sweep peaking near 40GB) and its constant had been
-calibrated against the leaking behaviour that `ReclaimMassTreeMemory` now
-prevents. The delete sweep runs unconditionally.
-
-### Tag 3 (batch update by size) fixes
-
-- Removed the post-measurement `ConDelete` "reset" sweeps from both masstree
-  branches. `idx` is freshly built each iteration and dropped on the next line,
-  so emptying it bought nothing while costing ~1.4KB of unreclaimed RSS per
-  entry — `ConDelete(append(wi, wp))` was ~1.4TB at 1e9, plus a full
-  concatenated copy of the input. Both branches then became identical to the
-  bwtree branch, so they are now one path.
-- Tag 3 honours `opts.summary`: `1` keeps the in-process 13-ratio sweep, `0`
-  runs the single `-b` ratio so the sweep can be driven one process per ratio.
-- **Blocked on data**: tag 3's `ratio_seq` needs ratio dirs
-  `{10000,5000,2000,1000,500,200,100,50,20,10,5,2,1}`; only
-  `{1,10,100,1000,10000}` exist for any distribution, so it aborts on ratio 2.
-  Regenerate with `gen_graph.sh`'s full `batch_ratio_seq` uncommented before
-  trying to validate. `merge_batch_updates.py` expects one `Tree:` header
-  followed by a single line of 26 values, which a per-process sweep would break.
-
-### Masstree range query — `scan` stack array (fixed 2026-07-28)
-
-`MassTreeIndex::scan` sized a stack array from the caller's argument:
-
-```cpp
-Str results[range];   // Str is 16B; range reaches ~5e5 on rec_type 2 => ~8MB
-```
-
-That overruns the 8MB thread stack, which is the crash `ConQueryAfterStep` and
-the `range_query` lambdas were dodging with `if (index_type == TYPE_MASSTREE &&
-rec_type == kRangeQueryType - 1)`. Replaced with a `thread_local
-std::vector<Str>` grown on demand and reused (bounded ~16MB/thread by the 1e6
-box cap), and **all three range query skips removed**.
-
-Measured at 1e8 after the fix — rec2 is correct but expensive:
-
-| | rec0 | rec1 | rec2 |
-|---|---|---|---|
-| insert block | 0.015 | 0.55 | **~76s** |
-| delete block | 0.020 | 0.71 | **~105s** |
-
-rec2 boxes hold ~141x the elements of rec1 and cost ~138x the time, i.e. time
-tracks element count — evidence the scan is doing complete work, not bailing
-early. Cost: ~12 min/run vs ~1 min before, since rec2 adds 75-105s per ratio
-across 8 ratios. Masstree is ~7.5x slower per element than bwtree here (3.3e8
-vs 2.5e9 elements/s) because its scanner writes a 16-byte `Str` per element.
-
-### Masstree range count — shared `q_[0]` data race (fixed 2026-07-31)
-
-**The old note here was wrong.** It claimed the count path "cannot crash" and was
-merely slow, so the skip was cosmetic. It is not: with the skip removed, masstree
-**SIGSEGVs inside tcmalloc** (`CentralFreeList::ReleaseListToSpans`) at n=1e6 on
-16 threads, within a second. Reproduce with
-`./build/index_microbench_workload -p <file.bin> -D uni -t 0 -q 4 -T 5 -r 1`.
-
-**Root cause — one shared `query` object, not slowness.** `mt_index` holds a
-single `query<row_type> q_[1]` member (`mtIndexAPI.hh`), and the old
-`range_count` walked the range by calling `dynamic_get_next` once per key, which
-runs its scan through that shared `q_[0]`. `query_json_scanner::visit_value`
-(`kvrow.hh:405`) rewrites `q_.scankey_` — a **refcounted `lcdf::String` it
-reallocates whenever the key no longer fits** — and `run_scan` clears/refills
-`q_.f_`, a `std::vector`, on entry. Two threads scanning at once therefore free
-the same buffer twice. `get_next_n` never had the problem because its scanner is
-a plain stack local and it calls `table_->table().scan()` directly, bypassing
-`q_` entirely — which is why range *query* worked and range *count* did not.
-
-**The fix**: `mt_index::count_range` (`mtIndexAPI.hh`, next to `get_next_n`) —
-a stack-local `count_scanner` whose `visit_value` compares the key bytes against
-the upper bound and returns false to stop. `MassTreeIndex::range_count`
-(`index.h`) byte-swaps both ends of the box and makes one `count_range` call.
-This is thread safe *and* one tree descent per query instead of one per key,
-with no Json allocation at all.
-
-Correctness checked against `GenRectangles`' own oracle — the boxes are built as
-`(wp[l].key, wp[r].key)` over the sorted deduplicated input, so `.second == r-l`
-is the exact expected count. 50 000 boxes, 0 mismatches, at 8 and 32 threads.
-
-**Both masstree range-count skips are gone** (`ConQueryAfterStep` and the
-`range_count` lambda in `ApplyConcurrentIndex`), so masstree no longer emits `-`
-in any column. Measured at n=1e6 / 64 threads, rec_type 1: masstree 0.064s vs
-bwtree 0.096s — it is now the *faster* of the two on this column.
-
-**`range_report` still has the identical race** and is marked `WARN` in
-`index.h`. It is dead code (`ConRangeQuery` calls `scan()`, the branch that would
-use it is commented out), but it drives the same `dynamic_get_next`. Rebuild it
-on a stack-local scanner before ever calling it from more than one thread.
-
-## Scalability sweep (`scripts/scalability.sh`)
-
-Sweeps `PARLAY_NUM_THREADS` over `1 4 16 32 64 112 224` at n=1e9, pinning each
-step with `taskset` (stride 4 at 1/4/16 threads, stride 2 at 32, then dense) plus
-`numactl -i all` above 1 thread. `scalability_concurrent.sh` is the same sweep
-without the taskset/numactl prefixes, for the concurrent indexes.
-
-`round` is set **per thread count** — 1 round at 1 and 4 threads, 2 above — so a
-1-thread run does not cost 4× a 224-thread one. Timings are per-round averages,
-so they stay comparable across the sweep.
-
-Config: `tag=2#0011` (batch insert 1<<0 + batch delete 1<<1), `query_type=0`,
-`batch_ratio=0.01`, `dis_seq=("uni" "exp")` — norm/dual_norm are commented out.
-`scalability.sh` currently has only MassTree and BwTree uncommented; the tree
-side (0–3) is commented out but its logs are present from an earlier run.
-
-### Log layout — the core count is only in the filename
-
-`logs/scalability/<tree>/<dis>/<cores>.log`, one run each: a `Tree:` header then
-**3 values — build, insert, delete** (the primal build always reports, then the
-two tag bits; `query_type=0` means no query columns, unlike the incremental
-sweep's 90).
-
-The thread count appears **nowhere in the log body** — `Buf:` is the leaf size
-(64 for BTree, 1 for the rest), not the core count. So `merge_scalability.py`
-walks `<tree>/<dis>/<cores>.log` per file and takes cores from the stem;
-concatenating first and parsing the flat file, the way
-`merge_incre_updates.py` does, would silently lose the sweep's x axis. The
-concatenated log is still written (with a `>>> <path>` marker per file) for
-reading by hand.
-
-### `merge_scalability.py`
-
-Writes `data/scalability/<name>.csv`, **long/tidy**: one row per
-`(benchmark, tree, cores)` = 9 columns, `build/insert/delete` plus
-`build_su/insert_su/delete_su`, where `*_su` is self-relative speedup
-`t(1 core) / t(n cores)`. Long rather than cores-as-columns because cores is the
-x axis of every plot this feeds. Speedup cells are left **blank** when the 1-core
-baseline for that `(benchmark, tree)` is missing or blank — never fabricated from
-a partial baseline. Sorting is `bench_order`, `tree_order`, then cores
-**numerically** (a lexical sort gives 1, 112, 16, 224…).
-
-Shares the incremental merge's three robustness rules: `-` is a legal value,
-values accumulate until the next header so a `madvise`-spliced row still parses,
-and a short row is padded with a warning. A header with no timings at all (a run
-that died before printing) is reported and skipped rather than emitted as an
-empty row.
-
-Current state: 84 rows = 6 trees × 2 distributions × 7 core counts, all clean.
-One stray `logs/scalability/3/uni/.log` (empty filename stem, header only, no
-timings) is skipped with a note — note that both bash's `*` and Python's `glob`
-skip leading-dot names, so it is invisible to the concatenation but *is* seen by
-the per-file walk, which uses `os.listdir`.
+`ConsolidateHeapAllocator` runs on plain new/delete because parlay's pool
+recycles freed nodes and hides a use-after-free.
+
+## Settled decisions
+
+- The tree is a set; duplicates are a debug assert.
+- Loggers are gone: `contain` → `bool`, `range_*` → `size_t`.
+- These stay, each measured: the `2n` insert scratch; the four inlined
+  searches; the duplicated parallel dispatch in the two recursions (only
+  `partition_batch` is shared); `default_hybrid_pred`.
+- The `interior_aug`/`leaf_aug` concepts check at call sites, not in the
+  trait, which cannot name the range type.
+- Leaf sizes above 256 are not in `self_test`; a leaf-1024 probe under
+  `-DDEBUG -UNDEBUG` passed once the probe stopped reinserting survivors
+  (the set contract).
+
+## History
+
+`docs/` is gitignored; its files are tracked with `-f`:
+`code_review_2026-08.md`, `refactor_plan_2026-08.md`, `findings_register.md`,
+`open_issues.md`, `plan_structural_delete_2026-09.md`, `harness_notes.md`.
+
+The 2026-08 refactor renamed `pb_tree` → `pab_tree`, cut 4860 → 4004 lines
+and ~90 → 12 public members, made `-Wall -Wextra` clean and the asserts
+live in tests, and fixed seven stop-ship defects. One of them,
+`batch_delete` freeing a tree whose root was merely underfull (`2a2d2ed`),
+means every incremental-delete benchmark column recorded before 2026-08-17
+timed a chain that had silently lost 10–50% of its batches; only
+`logs/incremental_updates_new/0/{uni,norm,seg}/64.log` were rerun.

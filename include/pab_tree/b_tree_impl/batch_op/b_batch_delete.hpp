@@ -87,6 +87,7 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 	auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
 		batch_delete_recursive(this->root_, sorted_slice, leaf_entries_pattern,
 							   leaf_sort_pred);
+	(void)reinsert_entry_num; /* the repair moves nodes, not entries */
 
 	if (invalid_flag) { /* root is invalid */
 		if (this->root_->is_leaf) {
@@ -118,8 +119,6 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 			this->rebuild_from_flatten();
 			return;
 		}
-		auto reinsert_entries =
-			TT::entry_seq::uninitialized(reinsert_entry_num);
 
 #ifdef DEBUG
 		[[maybe_unused]] const bool tree_ok = this->validate<false>();
@@ -127,10 +126,15 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 		puts(">>> pass tree aug after delete");
 #endif /* DEBUG */
 
-		const bool has_tomb = true;
-		fetch_invalid_subtree_nodes(
-			this->root_, parlay::make_slice(reinsert_entries), has_tomb,
-			leaf_entries_pattern, leaf_sort_pred);
+		repair_rec(this->root_, leaf_entries_pattern, leaf_sort_pred);
+
+		/* A root left with one child is a level that only costs a hop. */
+		while (!this->root_->is_leaf &&
+			   static_cast<interior_type *>(this->root_)->get_node_n() == 1) {
+			auto *old = static_cast<interior_type *>(this->root_);
+			this->root_ = old->tree_nodes[0];
+			free_node<interior_type>(old);
+		}
 	}
 }
 
