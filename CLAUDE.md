@@ -106,15 +106,19 @@ types), or an adaptor with `entry_type/key_type/mapped_type` and static
 over a constrained alias hard-errors even on the untaken branch, so the
 constraint is a `static_assert` in the class body.
 
-Comparator: every ordering decision goes through `TT::key_less`,
+Comparator: structural ordering decisions go through `TT::key_less`,
 `key_equal`, `entry_less` (`a <= b` is `!key_less(b, a)`); `key_equal` is
 one comparison for `std::less` or a comparator with static `equal`.
 `SelfTest.ReverseComparator` (`std::greater`) is the only test of this;
 five sites passed under `std::less` and failed under it, and a sixth hid
-behind `#ifdef DEBUG`.
+behind `#ifdef DEBUG`. Remaining exceptions: unsorted range scans and
+`operator<=>` use native key operators; see the read-through findings below.
 
 Allocator: every node comes from `TT::node_alloc::alloc<Node>()` and goes
-back through `free<Node>(p)` (runs the destructor); must be thread-safe.
+back through `free<Node>(p)`; must be thread-safe. The allocator's `free`
+must run the destructor: `free_node` only delegates, and the default
+Parlay `retire` destroys the node. README and `node_base.h` incorrectly
+say the destructor has already run before the allocator receives it.
 `free_node<NodeType>` with the wrong type is silently wrong.
 
 Augmentation: `leaf_aug(range)`, `leaf_aug::update_aug(range)`,
@@ -187,7 +191,8 @@ key is a no-op. Then:
 - root invalid and a leaf: return; `size == 0`: free the tree;
 - root invalid with entries live: `consolidate_invalid_root`, else
   `rebuild_from_flatten` (flatten, free, sort, build) when its guard fails;
-- root valid, interior, `size < k_buf_ub`: `rebuild_from_flatten`;
+- root valid, interior, needs repair, `size < k_buf_ub`:
+  `rebuild_from_flatten`;
 - else `repair_rec(root)`, then a root left with one child is collapsed.
 
 **`repair_rec`** (2026-09-12, replaced flatten-and-reinsert): bottom-up.
@@ -209,6 +214,20 @@ and the root's thinness is resolved by collapsing single-child roots.
 Height never changes below the root. No reinsert, no `2n` scratch, no
 `has_tomb`; `reinsert_size`/`contain_invalid_subtree` are still computed
 and used only to prune the traversal.
+
+Serial repair work (2026-09-21): with `V` nodes before repair and capacity
+parameter `B`, the release/default-augmentation bound is
+`O(V * B * log(B + 1))`, including local leaf sorting; structural work is
+`O(V * B)`. Charge group changes to `Phi = node_count + underfull_count`,
+using actual occupancy, not deletion flags. A changed group of `r >= 2`
+nodes contains at least `r - 1` underfull nodes; merging or redistributing
+decreases Phi by at least `r - 1`, even allowing its parent to become
+underfull. Thus total group sizes and recursive repair callbacks are
+`O(V)`, without an extra height factor. A group's movement/sorting costs
+`O(r * B * log(B + 1))`. For an initially valid tree with `B >= 2` and
+`N` entries before deletion, `V = O(1 + N/B)`: worst-case repair is
+`O((N + B) * log(B + 1))`, linear in N for fixed B. This excludes deletion
+batch sorting and the separate invalid-root rebuild path.
 
 Measured at 1e9, user's command (`-t 128 -r 3`, `-p
 kv_pair_incre/<dis>/1000000000_1/ins/100/1.batch.bin -D <dis>`), ABBA x2
@@ -264,8 +283,9 @@ on the last child (was an `assert`); all-empty leaves are freed (`node_n =
 0`); (2) `collect_leaves_rec`: leaves in order plus the separator before
 each, from the stored splits (child 0 inherits, child j gets
 `split[j-1]`), freeing each old interior after its join; (3)
-`assemble_interior_levels`. No entry leaves its leaf-parent, nothing is
-sorted, scratch is a pointer and a key per leaf. Which path ran shows in
+`assemble_interior_levels`. No entry leaves its leaf-parent; local leaf
+balancing may sort, but there is no global sort. Scratch is a pointer and
+a key per leaf. Which path ran shows in
 the allocator: consolidation allocates interiors and never a leaf. At 1e9
 (`-t 128 -r 3`, ABBA): del 1% 6.69 → 6.02 s, 10% 2.52 → 1.96 s, small
 ratios unchanged; 470 M entries in 0.020 s where the rebuild took 0.62 s.
@@ -303,7 +323,8 @@ and `r` (the `r` search starts at `l`), recurse on the two boundary
 children; middle children are fully covered, and `range_report` flattens
 them in parallel into precomputed offsets. `range_report`'s output must
 hold `range_count(box)` entries (asserted, not clamped: clamping cost
-+3.5%). `get_entries` asserts `out.size() >= size()` at the top. An empty
++3.5%). `get_entries` asserts `out.size() >= size()` at the top and does
+not sort leaves (`flatten_rec` uses `Sorted = false`). An empty
 or default tree answers every query empty. `flatten_rec<R, Granularity,
 Sorted>`: `Sorted = true` sorts each leaf in place.
 
@@ -322,7 +343,8 @@ binds to the template.
 | `unit_test` | `/ssd1/zmen002/kv_pair` | real distributions at scale; skips without the data |
 
 `check_against` validates, then iterates **before** `to_seq`/`get_entries`
-(those sort every leaf and once hid an iterator bug). Special tests:
+(`to_seq` sorts every leaf and once hid an iterator bug; `get_entries`
+does not sort). Special tests:
 `ReverseComparator`; `CustomAllocator` (leak check, `live == 0`);
 `Augmentation`; `DefaultHybridPredIsReproducible` (re-execs itself; an
 in-process pair sees the same addresses and proves nothing);
@@ -363,6 +385,23 @@ recycles freed nodes and hides a use-after-free.
 - Leaf sizes above 256 are not in `self_test`; a leaf-1024 probe under
   `-DDEBUG -UNDEBUG` passed once the probe stopped reinserting survivors
   (the set contract).
+
+## Read-through findings (2026-09-21)
+
+Two failures reproduced with a temporary `-DNDEBUG` probe, leaf size 2;
+no implementation changes:
+
+- Reverse-comparator range queries on unsorted leaves use native `>=`/`<`
+  (`range_count.hpp`, `range_report.hpp`). Build keys 9,7, insert 5 with
+  the explicit unsorted policy: range [9,4) counts/reports 0 instead of 3.
+  `sort_leaves()` restores both results to 3. `ReverseComparator` currently
+  iterates before checking ranges, so it misses this state.
+- `copy_tree_recursive` passes each leaf's current order to the normal
+  leaf constructor, which assumes sorted input and sets `is_sorted=true`.
+  Build 10,20, insert 1 with the unsorted policy, then copy: the original
+  contains 1, but the release-build copy does not. Debug builds can assert
+  in the constructor. Both copy construction and copy assignment use this
+  helper.
 
 ## History
 

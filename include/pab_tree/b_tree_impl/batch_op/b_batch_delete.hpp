@@ -192,6 +192,7 @@ bool btree<TT>::consolidate_invalid_root(
 	return true;
 }
 
+/* check whether local rebalance leaf is possible */
 template <typename TT>
 bool btree<TT>::leaf_parents_consolidable_rec(node_type const *node)
 {

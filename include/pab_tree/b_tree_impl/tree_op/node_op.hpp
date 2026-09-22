@@ -291,6 +291,7 @@ void btree<TT>::repair_rec(node_type *node,
 	assert(!node->is_leaf);
 	auto interior = static_cast<interior_type *>(node);
 
+	/* For every interior node, including possible root */
 	if (!node_has_leaf_children(node)) {
 		typename interior_type::node_arr todo;
 		buf_size_type todo_n = 0;
@@ -582,11 +583,17 @@ void btree<TT>::balance_over_leaves(node_type *node,
 	auto interior = static_cast<interior_type *>(node);
 
 	/*
-	 * ── Phase 1: Group assignment
-	 * ────────────────────────────────────────────── Each child is assigned
-	 * to the nearest valid node on its right (its pivot). group_sum[pivot]
-	 * accumulates the total entry count for that group. Invalid nodes right
-	 * of all valid nodes are handled in the fix-up loop.
+	 * Phase 1: Group assignment
+	 *
+	 * Each child is assigned to the nearest valid node on its right (its
+	 * pivot). group_sum[pivot] accumulates the total entry count for that
+	 * group. Invalid nodes right of all valid nodes are handled in the fix-up
+	 * loop.
+	 *
+	 * For example, with B = 4:
+	 * Index:       0  1  2  3  4
+	 * Leaf size:   2  5  1  6  2
+	 * Group pivot: 1  1  3  3  3
 	 */
 	buf_size_buf_ub_arr tree_group;
 	size_buf_ub_arr group_sum;
@@ -650,8 +657,9 @@ void btree<TT>::balance_over_leaves(node_type *node,
 #endif /* DEBUG */
 
 	/*
-	 * ── Phase 2: Compact and redistribute
-	 * ───────────────────────────────────── Results written directly into
+	 * Phase 2: Compact and redistribute
+	 *
+	 * Results written directly into
 	 * interior's arrays. Safety: tree_idx ≤ i holds throughout, so writes never
 	 * clobber unread data.
 	 */
@@ -661,8 +669,9 @@ void btree<TT>::balance_over_leaves(node_type *node,
 	buf_size_type split_idx = 0;
 
 	/*
-	 * Validates that the last-emitted node falls inside its expected key
-	 * range. Called only from assert(), so has no cost in release builds.
+	 * Correctness validatation that the last-emitted node falls inside its
+	 * expected key range. Called only from assert(), so has no cost in release
+	 * builds.
 	 */
 	[[maybe_unused]] auto quick_check = [&](buf_size_type g) -> bool {
 		const auto box = get_node_box_rec(interior->tree_nodes[tree_idx - 1]);
@@ -777,8 +786,7 @@ void btree<TT>::balance_over_leaves(node_type *node,
 	};
 
 	/*
-	 * ── Dispatch loop
-	 * ──────────────────────────────────────────────────────────
+	 * Dispatch loop
 	 */
 	for (buf_size_type i = 0; i < interior->get_node_n();) {
 		const buf_size_type g = tree_group[i];
