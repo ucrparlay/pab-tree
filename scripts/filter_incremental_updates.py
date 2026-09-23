@@ -19,6 +19,8 @@ from pathlib import Path
 #
 # build keeps only its timing; the build block's MIX/RRM/RCM are dropped, so the
 # only query columns are the 1% blocks'.
+#
+# BTree keeps only its leaf_wrap 64 rows; every other tree keeps all its rows.
 
 DEFAULT_INPUT = Path("scripts/data/incremental_updates_new/incremental_updates_new.csv")
 DEFAULT_OUTPUT = Path(
@@ -46,6 +48,8 @@ KEEP_COLUMNS = [
     "del_1%_RCM",
 ]
 
+BTREE_LEAF_WRAP = "64"
+
 
 def main() -> int:
     input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_INPUT
@@ -62,6 +66,8 @@ def main() -> int:
             writer = csv.DictWriter(fout, fieldnames=KEEP_COLUMNS)
             writer.writeheader()
             for row in reader:
+                if row["tree"] == "BTree" and row["leaf_wrap"] != BTREE_LEAF_WRAP:
+                    continue
                 writer.writerow({k: row[k] for k in KEEP_COLUMNS})
 
     print(f"Written: {output_path}")

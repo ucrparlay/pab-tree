@@ -90,10 +90,10 @@ function run_cmake() {
 # run_test 0 "${solver}" "${tree}"
 
 # CPAM
-# tree=1
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+tree=1
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # ours
 solver="b_test"
