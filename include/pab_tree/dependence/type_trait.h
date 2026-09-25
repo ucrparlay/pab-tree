@@ -142,6 +142,15 @@ public:
 };
 
 /*
+ * How batch_delete fixes the levels below a valid root. repair_delete
+ * merges thin siblings in place; graft_delete moves the valid subtrees of
+ * each invalid one back whole (docs/plan_graft_delete_2026-09.md).
+ */
+struct repair_delete {};
+
+struct graft_delete {};
+
+/*
  * Defaults for everything btree_type_trait does not require. Inherit and
  * override only what you need, then hand it to btree_trait below -- that way
  * setting the last parameter does not mean naming the four before it.
@@ -156,6 +165,7 @@ struct default_options {
 	 * an options struct can be declared inside a function.
 	 */
 	using key_compare = void;
+	using delete_policy = repair_delete;
 };
 
 /*
@@ -170,11 +180,12 @@ struct default_options {
  *   NodeType        common base of both node types; see the node_base concept
  *   KeyCompare      key ordering; everything in the tree goes through it
  *   NodeAllocType   where nodes come from; must be thread safe
+ *   DeletePolicy    repair_delete or graft_delete
  *
  * They are positional, so overriding a later one means naming the earlier
  * defaults. The defaults are all spelled `pab_tree::empty_leaf_aug`,
- * `empty_interior_aug`, `proto_node`, `std::less<key_type>` and
- * `parlay_node_alloc`.
+ * `empty_interior_aug`, `proto_node`, `std::less<key_type>`,
+ * `parlay_node_alloc` and `repair_delete`.
  */
 template <entry_spec EleType, uint BufferSize = 64,
 		  typename LeafAugType = empty_leaf_aug,
@@ -182,7 +193,8 @@ template <entry_spec EleType, uint BufferSize = 64,
 		  node_base NodeType = proto_node,
 		  typename KeyCompare =
 			  std::less<typename entry_traits_of<EleType>::key_type>,
-		  typename NodeAllocType = parlay_node_alloc>
+		  typename NodeAllocType = parlay_node_alloc,
+		  typename DeletePolicy = repair_delete>
 class btree_type_trait
 	: public type_trait_base<EleType, BufferSize, LeafAugType, InteriorAugType,
 							 NodeType, KeyCompare, NodeAllocType> {
@@ -190,6 +202,12 @@ public:
 	using base_trait =
 		type_trait_base<EleType, BufferSize, LeafAugType, InteriorAugType,
 						NodeType, KeyCompare, NodeAllocType>;
+
+	static_assert(std::same_as<DeletePolicy, repair_delete> ||
+					  std::same_as<DeletePolicy, graft_delete>,
+				  "the delete policy is repair_delete or graft_delete");
+	using delete_policy = DeletePolicy;
+
 	using split_type = base_trait::key_type;
 	using split_seq = parlay::sequence<split_type>;
 	using split_slice = parlay::slice<split_type *, split_type *>;
@@ -247,7 +265,7 @@ using btree_trait = btree_type_trait<
 	std::conditional_t<std::is_void_v<typename Options::key_compare>,
 					   std::less<typename entry_traits_of<EleType>::key_type>,
 					   typename Options::key_compare>,
-	typename Options::node_alloc>;
+	typename Options::node_alloc, typename Options::delete_policy>;
 
 } /* namespace pab_tree */
 

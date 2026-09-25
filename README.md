@@ -167,7 +167,7 @@ Lifetime ends at `delete_tree()` or the destructor.
 
 ## Configuring the tree
 
-`btree_type_trait` takes seven parameters; only the first is required.
+`btree_type_trait` takes eight parameters; only the first is required.
 
 | # | parameter | default |
 |---|---|---|
@@ -178,6 +178,7 @@ Lifetime ends at `delete_tree()` or the destructor.
 | 5 | `NodeType` — common base of both node types | `proto_node` |
 | 6 | `KeyCompare` | `std::less<K>` |
 | 7 | `NodeAllocType` | `parlay_node_alloc` |
+| 8 | `DeletePolicy` — how `batch_delete` rebalances: `repair_delete` or `graft_delete` | `repair_delete` |
 
 ```cpp
 using tt = pab_tree::btree_type_trait<entry>;   // all defaults
@@ -194,8 +195,8 @@ struct desc : pab_tree::default_options {
 using tt = pab_tree::btree_trait<entry, 64, desc>;
 ```
 
-`default_options` has `leaf_aug`, `interior_aug`, `node`, `node_alloc` and
-`key_compare`; leaving `key_compare` as its default `void` means
+`default_options` has `leaf_aug`, `interior_aug`, `node`, `node_alloc`,
+`key_compare` and `delete_policy`; leaving `key_compare` as its default `void` means
 `std::less<K>`. `btree_trait` is an alias for `btree_type_trait`, so the two
 name the same type and cannot drift apart. The members are plain aliases, so
 an options struct can be declared inside a function.

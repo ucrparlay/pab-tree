@@ -35,9 +35,10 @@ count/report, plus a `std::set`-like interface. Keys are distinct (a set).
 | `b_tree_impl/batch_op/b_build_tree.hpp` | `build_`, `build_recursive`, `assemble_interior_levels` |
 | `b_tree_impl/batch_op/b_batch_insert.hpp` | `batch_insert_`, `batch_insert_recursive` |
 | `b_tree_impl/batch_op/b_batch_delete.hpp` | `batch_delete_`, `batch_delete_recursive`, `rebuild_from_flatten`, `consolidate_invalid_root` |
-| `b_tree_impl/tree_op/node_op.hpp` | `generate_*_nodes`, `batch_insert_update_interior`, `batch_delete_update_interior_size`, `repair_rec`, `repair_node`, `balance_over_children`, `balance_over_leaves` |
+| `b_tree_impl/batch_op/b_batch_delete_graft.hpp` | `graft_delete` path: `graft_repair`, `graft_settle_rec`, `graft_tomb_rec`, `graft_reinsert`, `graft_detach_rec`, `graft_decompose_rec`, `graft_rec`, `graft_into_node` |
+| `b_tree_impl/tree_op/node_op.hpp` | `generate_*_nodes`, `batch_insert_update_interior`, `handling_interior_split_overflow`, `batch_delete_update_interior_size`, `repair_rec`, `repair_node`, `balance_over_children`, `balance_over_leaves` |
 | `b_tree_impl/tree_op/leaf_op.hpp` | `post_process_leaf_change`, `insert_points_2_leaf`, `delete_points_4_leaf`, `handling_leaf_split_overflow` |
-| `b_tree_impl/tree_op/{flatten,points_op}.hpp` | `flatten_rec`; `partition_batch` and the two partitioners |
+| `b_tree_impl/tree_op/flatten.hpp`, `b_tree_impl/points_op.hpp` | `flatten_rec`; `partition_batch` and the two partitioners |
 | `b_tree_impl/query_op/*.hpp` | membership, range count, range report, iterator |
 | `b_tree_impl/validation.hpp` | `validate`, `verify_tree_property`, `check_height` |
 | `tests/self_test.cpp` | dataset-free gate against `std::map` |
@@ -45,9 +46,12 @@ count/report, plus a `std::set`-like interface. Keys are distinct (a set).
 
 Build: CMake, `build/` exists; `cd build && make <target> -j`. `self_test`
 and `unit_test` compile `-UNDEBUG` (asserts live); everything else is
-`-O3 -march=native -DNDEBUG`. The CMake option `DEBUG` also compiles the
-`#ifdef DEBUG` box-vs-split loops (O(subtree) per touched node); no test
-target sets it, see the recipes under Tests.
+`-O3 -march=native -DNDEBUG`. The CMake option `DEBUG=ON` makes every
+target, benchmarks included, a `-g -DDEBUG` Debug build: no `-O`, asserts
+live, plus the `#ifdef DEBUG` box-vs-split loops (O(subtree) per touched
+node). `build/` was configured that way on 2026-09-21; check
+`grep DEBUG build/CMakeCache.txt` before timing. The recipes under Tests
+give `-DDEBUG` at `-O1` for one binary.
 
 ## Conventions
 
@@ -84,10 +88,13 @@ target sets it, see the recipes under Tests.
 ## Type system
 
 `btree_type_trait<EleType, BufferSize = 64, LeafAug, InteriorAug, NodeType,
-KeyCompare, NodeAllocType>`. `btree_trait<EleType, BufferSize, Options>`
-names the rest: inherit `default_options` (`leaf_aug`, `interior_aug`,
-`node`, `node_alloc`, `key_compare`; `void` means `std::less`, a plain alias
-so the struct can be local to a function).
+KeyCompare, NodeAllocType, DeletePolicy>`. `btree_trait<EleType, BufferSize,
+Options>` names the rest: inherit `default_options` (`leaf_aug`,
+`interior_aug`, `node`, `node_alloc`, `key_compare`, `delete_policy`; `void`
+means `std::less`, a plain alias so the struct can be local to a function).
+`delete_policy` is `repair_delete` (default, `repair_rec`) or `graft_delete`
+(see Build, insert, delete); options are type aliases only, since a local
+struct cannot hold a static member.
 
 ```
 k_buf_lb = B    leaf valid iff size >= B; interior valid iff >= B valid children (root: >= 1)
@@ -185,7 +192,8 @@ disjoint, so it cannot be shrunk.
 (`batch_delete_update_interior_size` sets `size`, `valid`,
 `contain_invalid_subtree`, `reinsert_size`; untouched interior children
 get `reset_deletion_flag()`); `delete_points_4_leaf` compacts the leaf
-and `post_process_leaf_change` decides `is_sorted`. Deleting an absent
+(linear find per key, swap to the end: O(keys × leaf size), sorted leaf or
+not) and `post_process_leaf_change` decides `is_sorted`. Deleting an absent
 key is a no-op. Then:
 
 - root invalid and a leaf: return; `size == 0`: free the tree;
@@ -212,8 +220,10 @@ of its own; the cascade runs along that seam only. Everything strictly
 below a repaired node is valid; the node itself may be thin for its parent,
 and the root's thinness is resolved by collapsing single-child roots.
 Height never changes below the root. No reinsert, no `2n` scratch, no
-`has_tomb`; `reinsert_size`/`contain_invalid_subtree` are still computed
-and used only to prune the traversal.
+`has_tomb`. `contain_invalid_subtree` prunes the traversal;
+`reinsert_size` is still computed but read only by one assert and the
+uncalled `check_tree_aug_after_delete`. `balance_over_leaves`'s
+`reinsert_size` argument is the caller's underfull-leaf sum, not the field.
 
 Serial repair work (2026-09-21): with `V` nodes before repair and capacity
 parameter `B`, the release/default-augmentation bound is
@@ -303,6 +313,57 @@ the surplus. Writes go straight into the node's arrays; `tree_idx <= i`
 throughout is what makes that safe. Epilogue: `node_n`, `update_aug`,
 `reset_deletion_flag`; `size` is not recomputed.
 
+**`graft_delete`** (2026-09-24, branch `graft-delete`; idea
+`docs/new_delete_alg.md`, plan `docs/plan_graft_delete_2026-09.md`). A
+second fix-up for a valid root with invalid nodes below, kept beside
+`repair_rec` to compare; the invalid root, the small-root rebuild and the
+single-child collapse are shared. `batch_delete_` picks it with
+`if constexpr`. `c937b45`'s tomb reinsert, but whole valid subtrees go back
+instead of flattened entries:
+
+- `graft_settle_rec`, flagged nodes: every leaf-parent balances its
+  underfull leaves (`balance_over_leaves`), then `valid`,
+  `contain_invalid_subtree` and `reinsert_size` (= items emitted below:
+  children's counts, plus the valid children of an invalid node; an
+  invalid leaf-parent emits every leaf) are recomputed. Validity only
+  rises. All-empty leaf-parents are left whole.
+- `graft_tomb_rec` descends to the tombs (highest valid node with an
+  invalid child) and splices what they return (`graft_splice`).
+- `graft_reinsert` at the tomb: `graft_detach_rec` / `graft_decompose_rec`
+  write items (node, lower bound, height) in key order, underfull leaves
+  as entry sources (height `k_entry_source`); a valid item's invalid
+  descendants are detached first. Then per height, tallest first,
+  `graft_rec` (partition by bound, splice with
+  `batch_insert_update_interior` / `handling_interior_split_overflow`)
+  down to `graft_into_node` at one level above the item; then the
+  entries, sorted, through `batch_insert_recursive`. The tomb's children
+  live in a growable list; > `k_buf_ub` at the end: regroup and return.
+
+Three rules the plain idea misses, each with a hand-built test:
+tallest first (`order`); a dropped child's range goes to its **left**
+neighbour, and a node whose first child went reports its new bound so
+the parent raises that separator (`graft_compact`; `raised`); items
+left of all of the tomb's content are prepended, with the edge bound
+moved after each round (`edge`, `inner`). The tomb can overflow
+(`GraftTombOverflow`, B = 4: root 16 children -> 17, height 4 -> 5), so
+`c937b45`'s no-split argument does not carry over. Of five injected
+faults the random suites catch only "keep the right separator";
+shortest-first, no raise and no edge update fail only the hand-built
+shapes.
+
+Repair-path codegen of `b_test` is unchanged (0-line normalised diff).
+`b_test_graft` (CMake) is `b_test` with `PABTREE_GRAFT_DELETE`. 46/46 at
+`-O1 -UNDEBUG`; `Graft*` also under `-DDEBUG -UNDEBUG`; `Graft*`,
+`Repair*`, `Consolidate*` ASAN/UBSan clean.
+
+Sanity timings only (2026-09-24, single runs, no ABBA): 1e9 uni, `-r 1
+-t 128`, release builds made the same way: repair 70.2 / 28.9 / 13.3 /
+4.72 s, graft 78.9 / 30.4 / 13.9 / 4.78 s (0.01% / 0.1% / 1% / 10%).
+In one process at 1e8 (A B B A), random and key-sorted batches: within
+3% either way. The same repair command gave 32.6 s at 0.01% in the table
+above: compare only within one session. 1e9 norm, graft only (crash
+check): 51.8 / 23.5 / 9.05 / 4.20 s.
+
 ## Leaf sort policy
 
 `post_process_leaf_change` is the one place `is_sorted` is decided:
@@ -339,8 +400,8 @@ binds to the template.
 
 | target | data | what |
 |---|---|---|
-| `self_test` | none, ~45 s | keys from a seed against `std::map`; leaf 2–256, five key shapes, every size where the shape changes; `--seed=N` reproduces a run exactly |
-| `unit_test` | `/ssd1/zmen002/kv_pair` | real distributions at scale; skips without the data |
+| `self_test` | none, ~100 s at `-O1` | keys from a seed against `std::map`; leaf 2–256, five key shapes, every size where the shape changes; delete suites under both delete policies; `--seed=N` reproduces a run exactly |
+| `unit_test` | `/ssd1/zmen002/kv_pair` | uni/exp/norm/dual_norm at 1M–50M, every `*.base.bin`: build, insert the 1% batch, delete that batch, membership and range queries against the input; one config (leaf from `-DLEAF=`, default 32); checks are mostly plain `assert` (abort, no gtest report); `--file_filter=`, `--no_redirect`; skips without the data |
 
 `check_against` validates, then iterates **before** `to_seq`/`get_entries`
 (`to_seq` sorts every leaf and once hid an iterator bug; `get_entries`
@@ -351,7 +412,12 @@ in-process pair sees the same addresses and proves nothing);
 `GetEntriesOutputSize` (`EXPECT_DEATH`, `death_test_style = threadsafe`);
 `DeleteAbsentKeys`; `Consolidate*` and `DeleteChainTenPercent`
 (deterministic collapse: sequential keys, keep every 8th — a random 10%
-chain does not always collapse the root at small n).
+chain does not always collapse the root at small n). `Graft*` rerun the
+delete suites under `graft_delete` (`with_policy<Base, Policy>` options;
+`run_scenario`, `small_sizes`, `shapes`, `churn`, `repair_reverse_scenario`
+take the policy) plus `GraftHandShapes` / `GraftTombOverflow`: shapes
+built node by node (`shape_spec`, `shape_builder`, `install` copies a
+built root into the tree's root node), run under both policies.
 
 Validate a new test by injecting a fault and watching it fail. An
 equivalent mutant (`<` → `<=` on a covered edge) and a replacement that
@@ -403,11 +469,22 @@ no implementation changes:
   in the constructor. Both copy construction and copy assignment use this
   helper.
 
+2026-09-24, insert/delete read-through, no code change:
+
+- No caller: `partition_binary_search_rec` (`points_op.hpp`),
+  `check_tree_aug_after_delete` (`validation.hpp`).
+- Stale comments from the reinsert era: `b_batch_delete.hpp` above
+  `batch_delete_recursive` ("needs_fetch", `fetch_invalid_subtree_nodes`)
+  and at the untouched-child reset ("the reinsertion phase"); `b_tree.h`
+  says `needs_repair` is "not stored in node" (it is
+  `contain_invalid_subtree`).
+
 ## History
 
 `docs/` is gitignored; its files are tracked with `-f`:
 `code_review_2026-08.md`, `refactor_plan_2026-08.md`, `findings_register.md`,
-`open_issues.md`, `plan_structural_delete_2026-09.md`, `harness_notes.md`.
+`open_issues.md`, `plan_structural_delete_2026-09.md`, `harness_notes.md`,
+`new_delete_alg.md`.
 
 The 2026-08 refactor renamed `pb_tree` → `pab_tree`, cut 4860 → 4004 lines
 and ~90 → 12 public members, made `-Wall -Wextra` clean and the asserts

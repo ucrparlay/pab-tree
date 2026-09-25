@@ -500,16 +500,33 @@ void check_ranges(Tree const &t, oracle const &ref, uint64_t seed, int boxes)
 uint64_t g_seed = 20260817;
 int g_rounds = 1;
 
+/* Base options with the delete policy swapped in. */
+template <typename Base, typename Policy>
+struct with_policy : Base {
+	using delete_policy = Policy;
+};
+
+using graft_policy = pab_tree::graft_delete;
+
+template <typename Policy>
+char const *policy_name()
+{
+	return std::is_same_v<Policy, graft_policy> ? "graft" : "repair";
+}
+
 /* One full scenario: build, query, insert, delete, re-query. */
-template <unsigned KBuf>
+template <unsigned KBuf, typename Policy = pab_tree::repair_delete>
 void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 {
 	/* No adaptor: the whole matrix runs on the entry itself. */
-	using tt = pab_tree::btree_type_trait<entry, KBuf>;
+	using tt =
+		pab_tree::btree_trait<entry, KBuf,
+							  with_policy<pab_tree::default_options, Policy>>;
 	using tree = pab_tree::btree<tt>;
 
 	SCOPED_TRACE("k_buf=" + std::to_string(KBuf) + " n=" + std::to_string(n) +
-				 " dist=" + dist_name(d) + " seed=" + std::to_string(seed) +
+				 " dist=" + dist_name(d) + " delete=" + policy_name<Policy>() +
+				 " seed=" + std::to_string(seed) +
 				 "  (rerun: ./self_test --seed=" + std::to_string(seed) + ")");
 
 	auto const all = gen_keys(n, d, seed);
@@ -1994,7 +2011,9 @@ void repair_scenario(size_t n, shape s, uint64_t seed, auto &&after_each)
 	using tt = typename tree::type_trait;
 	SCOPED_TRACE("repair " + std::string(shape_name(s)) +
 				 " k_buf=" + std::to_string(static_cast<unsigned>(tt::k_buf)) +
-				 " n=" + std::to_string(n) + " seed=" + std::to_string(seed));
+				 " n=" + std::to_string(n) +
+				 " delete=" + policy_name<typename tt::delete_policy>() +
+				 " seed=" + std::to_string(seed));
 
 	std::vector<uint32_t> keys(n);
 	std::iota(keys.begin(), keys.end(), 0u);
@@ -2016,8 +2035,13 @@ void repair_scenario(size_t n, shape s, uint64_t seed, auto &&after_each)
 	auto const m = leaf_parents_of(t);
 	auto gone = repair_deletion<tt::k_buf>(m, s);
 	ASSERT_FALSE(gone.empty());
+	/* graft may split a leaf when it reinserts entries */
+	constexpr expect path =
+		std::is_same_v<typename tt::delete_policy, graft_policy> ?
+			expect::any :
+			expect::repair;
 	ASSERT_NO_FATAL_FAILURE(
-		delete_and_check(t, ref, gone, probes, seed ^ 1, expect::repair));
+		delete_and_check(t, ref, gone, probes, seed ^ 1, path));
 	ASSERT_NO_FATAL_FAILURE(after_each(t, "after the shape"));
 
 	gone.clear();
@@ -2117,18 +2141,24 @@ TEST(SelfTest, RepairHeapAllocator)
 	}
 }
 
+template <typename Policy>
+struct desc_opts : pab_tree::default_options {
+	using key_compare = std::greater<uint32_t>;
+	using delete_policy = Policy;
+};
+
 /* Separators carried between siblings follow the comparator. */
-TEST(SelfTest, RepairReverseComparator)
+template <typename Policy>
+void repair_reverse_scenario()
 {
-	struct desc : pab_tree::default_options {
-		using key_compare = std::greater<uint32_t>;
-	};
-	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, desc>>;
+	using tree =
+		pab_tree::btree<pab_tree::btree_trait<ele, 8, desc_opts<Policy>>>;
 	auto const seed = g_seed ^ 0x9e772eULL;
 
 	for (shape s : k_shapes) {
 		SCOPED_TRACE(std::string("repair under std::greater, ") +
-					 shape_name(s) + " seed=" + std::to_string(seed));
+					 shape_name(s) + " delete=" + policy_name<Policy>() +
+					 " seed=" + std::to_string(seed));
 		size_t const n = 200000;
 		std::vector<uint32_t> keys(n);
 		std::iota(keys.begin(), keys.end(), 0u);
@@ -2179,17 +2209,22 @@ TEST(SelfTest, RepairReverseComparator)
 	}
 }
 
+TEST(SelfTest, RepairReverseComparator)
+{
+	ASSERT_NO_FATAL_FAILURE(repair_reverse_scenario<pab_tree::repair_delete>());
+}
+
 /* ---- edge cases: the sizes where the structure changes shape ---- */
 
-template <unsigned KBuf>
+template <unsigned KBuf, typename Policy = pab_tree::repair_delete>
 void small_sizes()
 {
 	for (size_t n :
 		 { 0u,	 1u,   2u,	 3u,   4u,	 5u,   7u,	 8u,	9u,
 		   15u,	 16u,  17u,	 31u,  32u,	 33u,  63u,	 64u,	65u,
 		   127u, 128u, 129u, 255u, 256u, 257u, 511u, 1023u, 1025u }) {
-		run_scenario<KBuf>(n, dist::sequential, g_seed + n);
-		run_scenario<KBuf>(n, dist::uniform, g_seed + n + 1);
+		run_scenario<KBuf, Policy>(n, dist::sequential, g_seed + n);
+		run_scenario<KBuf, Policy>(n, dist::uniform, g_seed + n + 1);
 	}
 }
 
@@ -2220,16 +2255,16 @@ TEST(SelfTest, SmallSizesLeaf64)
 
 /* ---- the shapes, at a size that builds a real multi-level tree ---- */
 
-template <unsigned KBuf>
+template <unsigned KBuf, typename Policy = pab_tree::repair_delete>
 void shapes(size_t n)
 {
 	for (int r = 0; r < g_rounds; ++r) {
 		auto const s = g_seed + static_cast<uint64_t>(r) * 7919;
-		run_scenario<KBuf>(n, dist::uniform, s);
-		run_scenario<KBuf>(n, dist::clustered, s + 1);
-		run_scenario<KBuf>(n, dist::sequential, s + 2);
-		run_scenario<KBuf>(n, dist::sparse, s + 3);
-		run_scenario<KBuf>(n, dist::boundary, s + 4);
+		run_scenario<KBuf, Policy>(n, dist::uniform, s);
+		run_scenario<KBuf, Policy>(n, dist::clustered, s + 1);
+		run_scenario<KBuf, Policy>(n, dist::sequential, s + 2);
+		run_scenario<KBuf, Policy>(n, dist::sparse, s + 3);
+		run_scenario<KBuf, Policy>(n, dist::boundary, s + 4);
 	}
 }
 
@@ -2255,15 +2290,19 @@ TEST(SelfTest, ShapesLeaf256)
 
 /* ---- many small batches against one tree ---- */
 
-TEST(SelfTest, Churn)
+template <typename Policy>
+void churn()
 {
-	using tt = pab_tree::btree_type_trait<ele, 16>;
+	using tt =
+		pab_tree::btree_trait<ele, 16,
+							  with_policy<pab_tree::default_options, Policy>>;
 	using tree = pab_tree::btree<tt>;
 
 	auto const seed = g_seed ^ 0xc0ffeeULL;
-	SCOPED_TRACE("churn seed=" + std::to_string(seed) +
+	SCOPED_TRACE("churn delete=" + std::string(policy_name<Policy>()) +
+				 " seed=" + std::to_string(seed) +
 				 "  (rerun: ./self_test --seed=" + std::to_string(g_seed) +
-				 " --gtest_filter=SelfTest.Churn)");
+				 " --gtest_filter=SelfTest.*Churn)");
 
 	std::mt19937_64 rng(seed);
 	tree t;
@@ -2319,6 +2358,11 @@ TEST(SelfTest, Churn)
 	}
 
 	ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 5, 20));
+}
+
+TEST(SelfTest, Churn)
+{
+	ASSERT_NO_FATAL_FAILURE(churn<pab_tree::repair_delete>());
 }
 
 /* ---- augmentation stays current through every path ---- */
@@ -2527,6 +2571,416 @@ TEST(SelfTest, EmptyTree)
 	t.batch_insert(e);
 	add_to_oracle(ref, e);
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+}
+
+/* ---- graft_delete: the delete suites again, and shapes built by hand ---- */
+
+template <unsigned KBuf>
+using counted_graft_tree = pab_tree::btree<
+	pab_tree::btree_trait<ele, KBuf, with_policy<counted_opts, graft_policy>>>;
+
+TEST(SelfTest, GraftSmallSizes)
+{
+	small_sizes<2, graft_policy>();
+	small_sizes<4, graft_policy>();
+	small_sizes<8, graft_policy>();
+	small_sizes<32, graft_policy>();
+	small_sizes<64, graft_policy>();
+}
+
+TEST(SelfTest, GraftShapes)
+{
+	shapes<2, graft_policy>(20000);
+	shapes<8, graft_policy>(50000);
+	shapes<64, graft_policy>(200000);
+	shapes<256, graft_policy>(200000);
+}
+
+TEST(SelfTest, GraftRepairShapes)
+{
+	auto const seed = g_seed ^ 0x2e9a12ULL;
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(
+			repair_scenario<counted_graft_tree<2>>(4096, s, seed));
+		ASSERT_NO_FATAL_FAILURE(
+			repair_scenario<counted_graft_tree<8>>(200000, s, seed));
+		ASSERT_NO_FATAL_FAILURE(
+			repair_scenario<counted_graft_tree<64>>(2000000, s, seed));
+	}
+}
+
+TEST(SelfTest, GraftAugmentation)
+{
+	struct opts : pab_tree::default_options {
+		using leaf_aug = sum_leaf_aug;
+		using interior_aug = subtree_size_aug;
+		using delete_policy = graft_policy;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, opts>>;
+	auto const seed = g_seed ^ 0xa062e9ULL;
+
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(repair_scenario<tree>(
+			200000, s, seed, [](tree &t, char const *stage) {
+				SCOPED_TRACE(stage);
+				size_t leaves = 0;
+				size_t interiors = 0;
+				ASSERT_NE(t.get_root(), nullptr);
+				ASSERT_NO_FATAL_FAILURE(
+					check_aug<tree>(t.get_root(), leaves, interiors));
+			}));
+	}
+}
+
+TEST(SelfTest, GraftReverseComparator)
+{
+	ASSERT_NO_FATAL_FAILURE(repair_reverse_scenario<graft_policy>());
+}
+
+TEST(SelfTest, GraftChainTenPercent)
+{
+	auto const seed = g_seed ^ 0xc4a1aULL;
+	ASSERT_NO_FATAL_FAILURE(
+		ten_percent_chain<counted_graft_tree<8>>(100000, seed));
+	ASSERT_NO_FATAL_FAILURE(
+		ten_percent_chain<counted_graft_tree<64>>(400000, seed));
+}
+
+TEST(SelfTest, GraftChurn)
+{
+	ASSERT_NO_FATAL_FAILURE(churn<graft_policy>());
+}
+
+namespace
+{
+/*
+ * A subtree to build node by node: a leaf of `entries` keys when kids is
+ * empty. The test deletes every key under a doomed subtree.
+ */
+struct shape_spec {
+	size_t entries = 0;
+	std::vector<shape_spec> kids;
+	bool doomed = false;
+};
+
+shape_spec leaf_of(size_t n)
+{
+	return shape_spec{ n, {}, false };
+}
+
+shape_spec node_of(std::vector<shape_spec> kids)
+{
+	return shape_spec{ 0, std::move(kids), false };
+}
+
+shape_spec doomed(shape_spec s)
+{
+	s.doomed = true;
+	return s;
+}
+
+/* h levels of k children over leaves of k entries; valid for k = k_buf_lb. */
+shape_spec thinnest(size_t h, size_t k)
+{
+	if (h == 0) {
+		return leaf_of(k);
+	}
+	return node_of(std::vector<shape_spec>(k, thinnest(h - 1, k)));
+}
+
+std::vector<shape_spec> times(size_t n, shape_spec const &s)
+{
+	return std::vector<shape_spec>(n, s);
+}
+
+std::vector<shape_spec> cat(std::vector<shape_spec> a,
+							std::vector<shape_spec> const &b)
+{
+	a.insert(a.end(), b.begin(), b.end());
+	return a;
+}
+
+/* Keys 1, 2, ... in key order; a separator is the first key after it. */
+template <typename tree>
+struct shape_builder {
+	using tt = typename tree::type_trait;
+
+	uint32_t next = 1;
+	oracle ref;
+	std::vector<uint32_t> doomed_keys;
+
+	typename tt::node_type *make(shape_spec const &s, bool dead = false)
+	{
+		dead = dead || s.doomed;
+		if (s.kids.empty()) {
+			std::vector<entry> es;
+			for (size_t i = 0; i < s.entries; ++i, ++next) {
+				es.push_back(entry{ next, next ^ 0x5bf03635u });
+				ref[next] = next ^ 0x5bf03635u;
+				if (dead) {
+					doomed_keys.push_back(next);
+				}
+			}
+			auto in = parlay::make_slice(es.data(), es.data() + es.size());
+			return pab_tree::alloc_normal_leaf_node<decltype(in),
+													typename tree::leaf_type>(
+				in);
+		}
+		typename tt::node_seq kids;
+		typename tt::split_seq seps;
+		for (size_t i = 0; i < s.kids.size(); ++i) {
+			if (i > 0) {
+				seps.push_back(next);
+			}
+			kids.push_back(make(s.kids[i], dead));
+		}
+		auto *n =
+			pab_tree::alloc_interior_node<typename tree::interior_type, tt>(
+				kids, seps);
+		n->update_aug();
+		return n;
+	}
+};
+
+template <typename tree>
+void free_subtree(typename tree::node_type *n)
+{
+	if (n->is_leaf) {
+		pab_tree::free_node<typename tree::leaf_type>(n);
+		return;
+	}
+	auto *in = static_cast<typename tree::interior_type *>(n);
+	for (size_t i = 0; i < in->get_node_n(); ++i) {
+		free_subtree<tree>(in->tree_nodes[i]);
+	}
+	pab_tree::free_node<typename tree::interior_type>(n);
+}
+
+/* t takes the shape; its root node keeps its address. */
+template <typename tree>
+void install(tree &t, shape_builder<tree> &b, shape_spec const &s)
+{
+	using interior = typename tree::interior_type;
+	std::vector<uint32_t> keys(4096);
+	std::iota(keys.begin(), keys.end(), 0u);
+	t.build(to_entries(keys));
+	ASSERT_FALSE(t.get_root()->is_leaf);
+	auto *root = static_cast<interior *>(t.get_root());
+	for (size_t i = 0; i < root->get_node_n(); ++i) {
+		free_subtree<tree>(root->tree_nodes[i]);
+	}
+	auto *fresh = static_cast<interior *>(b.make(s));
+	*root = *fresh;
+	pab_tree::free_node<interior>(fresh);
+}
+
+template <typename tree>
+size_t tree_height(tree const &t)
+{
+	size_t h = 0;
+	for (auto const *n = t.get_root(); !n->is_leaf; ++h) {
+		n = static_cast<typename tree::interior_type const *>(n)->tree_nodes[0];
+	}
+	return h;
+}
+
+/*
+ * Install s, delete its doomed keys, check against the oracle. A nonzero
+ * height_after is the height the tree must have afterwards.
+ */
+template <typename tree>
+void hand_shape(shape_spec const &s, char const *name, size_t height_after = 0)
+{
+	using tt = typename tree::type_trait;
+	SCOPED_TRACE(std::string("shape ") + name +
+				 " k_buf=" + std::to_string(static_cast<unsigned>(tt::k_buf)) +
+				 " delete=" + policy_name<typename tt::delete_policy>());
+
+	tree t;
+	shape_builder<tree> b;
+	ASSERT_NO_FATAL_FAILURE(install(t, b, s));
+	oracle ref = b.ref;
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_FALSE(b.doomed_keys.empty());
+
+	std::vector<uint32_t> probes(b.next + 1);
+	std::iota(probes.begin(), probes.end(), 0u);
+	ASSERT_NO_FATAL_FAILURE(
+		delete_and_check(t, ref, b.doomed_keys, probes, g_seed, expect::any));
+	if (height_after != 0) {
+		ASSERT_EQ(tree_height(t), height_after);
+	}
+}
+
+/*
+ * Each shape makes a valid node X invalid under the tomb T, for leaf size
+ * B (k_buf_lb = B):
+ *   order   X holds, in key order, leaf q, leaf-parent P, leaf v; P must
+ *           be grafted before q and v, or v ends up inside q's node
+ *   edge    X is the leftmost node: all items lie left of T's content
+ *   inner   the same one level down, below the root
+ *   raised  X keeps only a valid V whose first child went; V's bound rises
+ */
+template <unsigned B>
+struct hand_shapes {
+	/* a leaf-parent that keeps one leaf of B entries */
+	static shape_spec one_leaf()
+	{
+		return node_of(cat({ leaf_of(B) }, times(B - 1, doomed(leaf_of(B)))));
+	}
+
+	/* height 2: q, P, v, then doomed leaf-parents up to B children */
+	static shape_spec x2()
+	{
+		return node_of(cat({ one_leaf(), thinnest(1, B), one_leaf() },
+						   times(B > 3 ? B - 3 : 0, doomed(thinnest(1, B)))));
+	}
+
+	static shape_spec order()
+	{
+		return node_of(
+			{ thinnest(2, B), thinnest(2, B), x2(), thinnest(2, B) });
+	}
+
+	static shape_spec edge()
+	{
+		return node_of({ x2(), thinnest(2, B), thinnest(2, B) });
+	}
+
+	static shape_spec inner()
+	{
+		auto const tomb = node_of(cat({ x2() }, times(B, thinnest(2, B))));
+		return node_of({ thinnest(3, B), tomb, thinnest(3, B) });
+	}
+
+	static shape_spec raised()
+	{
+		auto const v = node_of(cat({ one_leaf() }, times(B, thinnest(1, B))));
+		auto const x =
+			node_of(cat({ v }, times(B - 1, doomed(thinnest(2, B)))));
+		return node_of({ thinnest(3, B), thinnest(3, B), x, thinnest(3, B) });
+	}
+};
+
+/*
+ * B = 4. The tomb is the root, with 16 children; X has 3 full valid
+ * children and 13 invalid ones holding 3 valid children each. Grafting
+ * splits X's left neighbour c, then the half of c that takes the lower
+ * items, so the root ends with 17 children and splits.
+ */
+shape_spec tomb_overflow()
+{
+	constexpr size_t b = 4;
+	auto const lp = thinnest(1, b);
+	auto const full2 = node_of(times(4 * b, lp));
+	auto const y = node_of(cat(times(3, lp), times(13, doomed(lp))));
+	auto const x =
+		node_of({ y, y, y, y, full2, y, y, y, y, full2, y, y, y, y, full2, y });
+	auto const c = node_of(cat(times(15, thinnest(2, b)), { full2 }));
+	return node_of(
+		cat(cat(times(7, thinnest(3, b)), { c, x }), times(7, thinnest(3, b))));
+}
+
+template <unsigned B, typename Policy>
+using hand_tree = pab_tree::btree<
+	pab_tree::btree_trait<ele, B, with_policy<counted_opts, Policy>>>;
+
+template <unsigned B, typename Policy>
+void hand_shapes_at()
+{
+	using tree = hand_tree<B, Policy>;
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<B>::order(), "order"));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<B>::edge(), "edge"));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<B>::inner(), "inner"));
+	ASSERT_NO_FATAL_FAILURE(
+		hand_shape<tree>(hand_shapes<B>::raised(), "raised"));
+	EXPECT_EQ(typed_counting_alloc::allocs<typename tree::leaf_type>.load(),
+			  typed_counting_alloc::frees<typename tree::leaf_type>.load())
+		<< "leaf leak or double free";
+	EXPECT_EQ(typed_counting_alloc::allocs<typename tree::interior_type>.load(),
+			  typed_counting_alloc::frees<typename tree::interior_type>.load())
+		<< "interior leak or double free";
+}
+} /* namespace */
+
+TEST(SelfTest, GraftHandShapes)
+{
+	ASSERT_NO_FATAL_FAILURE((hand_shapes_at<2, graft_policy>()));
+	ASSERT_NO_FATAL_FAILURE((hand_shapes_at<4, graft_policy>()));
+	ASSERT_NO_FATAL_FAILURE((hand_shapes_at<8, graft_policy>()));
+	/* the same shapes through repair_rec */
+	ASSERT_NO_FATAL_FAILURE((hand_shapes_at<2, pab_tree::repair_delete>()));
+	ASSERT_NO_FATAL_FAILURE((hand_shapes_at<4, pab_tree::repair_delete>()));
+	ASSERT_NO_FATAL_FAILURE((hand_shapes_at<8, pab_tree::repair_delete>()));
+}
+
+/*
+ * The tomb overflows: as the root, the root splits and the height grows on
+ * a delete; below it, its parent takes the halves; under a full root, that
+ * parent splits in turn.
+ */
+TEST(SelfTest, GraftTombOverflow)
+{
+	using tree = hand_tree<4, graft_policy>;
+	auto const below =
+		node_of({ thinnest(4, 4), tomb_overflow(), thinnest(4, 4) });
+	auto const cascade =
+		node_of(cat(times(15, thinnest(4, 4)), { tomb_overflow() }));
+
+	ASSERT_NO_FATAL_FAILURE(
+		(hand_shape<tree>(tomb_overflow(), "tomb overflow", 5)));
+	ASSERT_NO_FATAL_FAILURE(
+		(hand_shape<tree>(below, "tomb overflow below", 5)));
+	ASSERT_NO_FATAL_FAILURE(
+		(hand_shape<tree>(cascade, "tomb overflow cascade", 6)));
+
+	using repair_tree = hand_tree<4, pab_tree::repair_delete>;
+	ASSERT_NO_FATAL_FAILURE(
+		(hand_shape<repair_tree>(tomb_overflow(), "tomb overflow")));
+	ASSERT_NO_FATAL_FAILURE(
+		(hand_shape<repair_tree>(cascade, "tomb overflow cascade")));
+}
+
+/* Every node the graft path cuts out, frees or regroups, exactly once. */
+TEST(SelfTest, GraftLeakCheck)
+{
+	using tree = counted_graft_tree<8>;
+	auto const seed = g_seed ^ 0x1eac2eULL;
+
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(repair_scenario<tree>(200000, s, seed));
+	}
+	ASSERT_NO_FATAL_FAILURE(ten_percent_chain<tree>(100000, seed));
+	EXPECT_EQ(typed_counting_alloc::allocs<tree::leaf_type>.load(),
+			  typed_counting_alloc::frees<tree::leaf_type>.load())
+		<< "leaf leak or double free";
+	EXPECT_EQ(typed_counting_alloc::allocs<tree::interior_type>.load(),
+			  typed_counting_alloc::frees<tree::interior_type>.load())
+		<< "interior leak or double free";
+}
+
+/* The graft tests on plain new/delete, for the sanitizer build. */
+TEST(SelfTest, GraftHeapAllocator)
+{
+	struct heap_opts : pab_tree::default_options {
+		using node_alloc = heap_alloc;
+		using delete_policy = graft_policy;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 8, heap_opts>>;
+	using tree4 = pab_tree::btree<pab_tree::btree_trait<ele, 4, heap_opts>>;
+	auto const seed = g_seed ^ 0x4ea92eULL;
+
+	for (shape s : k_shapes) {
+		ASSERT_NO_FATAL_FAILURE(repair_scenario<tree>(200000, s, seed));
+	}
+	ASSERT_NO_FATAL_FAILURE(ten_percent_chain<tree>(100000, seed));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<8>::order(), "order"));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<8>::edge(), "edge"));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<8>::inner(), "inner"));
+	ASSERT_NO_FATAL_FAILURE(
+		hand_shape<tree>(hand_shapes<8>::raised(), "raised"));
+	ASSERT_NO_FATAL_FAILURE(
+		hand_shape<tree4>(tomb_overflow(), "tomb overflow", 5));
 }
 
 /*

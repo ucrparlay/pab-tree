@@ -126,7 +126,11 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 		puts(">>> pass tree aug after delete");
 #endif /* DEBUG */
 
-		repair_rec(this->root_, leaf_entries_pattern, leaf_sort_pred);
+		if constexpr (std::same_as<typename TT::delete_policy, graft_delete>) {
+			graft_repair(leaf_entries_pattern, leaf_sort_pred);
+		} else {
+			repair_rec(this->root_, leaf_entries_pattern, leaf_sort_pred);
+		}
 
 		/* A root left with one child is a level that only costs a hop. */
 		while (!this->root_->is_leaf &&

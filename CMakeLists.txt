@@ -177,6 +177,12 @@ add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
 target_link_libraries(b_test PUBLIC TEST_FRAME)
 target_include_directories(b_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
 
+# b_test with batch delete through graft_delete, to compare against b_test.
+add_executable(b_test_graft ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
+target_link_libraries(b_test_graft PUBLIC TEST_FRAME)
+target_include_directories(b_test_graft PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+target_compile_definitions(b_test_graft PRIVATE PABTREE_GRAFT_DELETE)
+
 # NOTE: CPAM
 add_executable(cpam ${PROJECT_SOURCE_DIR}/tests/cpam.cpp)
 target_link_libraries(cpam PUBLIC TEST_FRAME)

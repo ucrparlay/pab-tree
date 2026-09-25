@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <ostream>
 #include <ranges>
 #include <tuple>
@@ -740,6 +741,112 @@ private:
 						const type_trait::pattern_type leaf_entries_pattern,
 						LeafSortPred const &leaf_sort_pred);
 
+	/* ---- graft_delete, docs/plan_graft_delete_2026-09.md ---- */
+
+	using height_type = typename type_trait::height_type;
+
+	/* A lower bound on keys; nullopt is below every key. */
+	using opt_key = std::optional<key_type>;
+
+	using opt_key_buf_ub_arr = std::array<opt_key, type_trait::k_buf_ub>;
+
+	/* Height recorded for an underfull leaf, reinserted entry by entry. */
+	static constexpr height_type k_entry_source =
+		std::numeric_limits<height_type>::max();
+
+	/*
+	 * Items cut out of invalid subtrees, in key order: a node, the lower
+	 * bound of its key range, its height.
+	 */
+	struct graft_pool {
+		type_trait::node_slice nodes;
+		type_trait::key_slice bounds;
+		parlay::slice<height_type *, height_type *> heights;
+
+		graft_pool cut(size_t l, size_t r) const
+		{
+			return { nodes.cut(l, r), bounds.cut(l, r), heights.cut(l, r) };
+		}
+
+		size_t size() const
+		{
+			return nodes.size();
+		}
+	};
+
+	/* Below a valid root after the mark pass: settle, then the tombs. */
+	template <typename LeafSortPred>
+	void graft_repair(const type_trait::pattern_type leaf_entries_pattern,
+					  LeafSortPred const &leaf_sort_pred);
+
+	/*
+	 * Balance each leaf-parent's underfull leaves, then recompute the flags
+	 * bottom-up. reinsert_size becomes the number of items below node.
+	 */
+	template <typename LeafSortPred>
+	void graft_settle_rec(node_type *node,
+						  const type_trait::pattern_type leaf_entries_pattern,
+						  LeafSortPred const &leaf_sort_pred);
+
+	/*
+	 * Down to the tombs, the highest valid nodes with an invalid child.
+	 * Returns the nodes that replace node, empty when it stays.
+	 */
+	template <typename LeafSortPred>
+	node_split_pair_seq
+	graft_tomb_rec(node_type *node, opt_key const &lo, height_type height,
+				   const type_trait::pattern_type leaf_entries_pattern,
+				   LeafSortPred const &leaf_sort_pred);
+
+	/* Cut the invalid subtrees below tomb into items; graft them back. */
+	template <typename LeafSortPred>
+	node_split_pair_seq
+	graft_reinsert(node_type *tomb, opt_key const &lo, height_type height,
+				   const type_trait::pattern_type leaf_entries_pattern,
+				   LeafSortPred const &leaf_sort_pred);
+
+	/* up[i] replaces child i when not empty. Returns node's replacement. */
+	static node_split_pair_seq
+	graft_splice(node_type *node,
+				 parlay::sequence<node_split_pair_seq> const &up);
+
+	/* Valid node: detach what is invalid below it. Returns its new bound. */
+	static opt_key graft_detach_rec(node_type *node, opt_key const &lo,
+									height_type height, graft_pool out);
+
+	/* Invalid node: its items into out, the rest freed. */
+	static void graft_decompose_rec(node_type *node, opt_key const &lo,
+									height_type height, graft_pool out);
+
+	/*
+	 * Drop the freed children; each one's range joins its left neighbour.
+	 * Returns node's new lower bound when its first child went.
+	 */
+	static opt_key graft_compact(node_type *node,
+								 boolean_buf_ub_arr const &drop,
+								 opt_key_buf_ub_arr const &raised);
+
+	/*
+	 * Items of height target, sorted by bound, into node's subtree one level
+	 * above them. Returns 0 or node's replacement count, as batch insert.
+	 */
+	static size_type graft_rec(node_type *node, height_type height,
+							   height_type target, type_trait::node_slice items,
+							   type_trait::const_key_slice bounds,
+							   node_split_pair_slice out, opt_key const &edge);
+
+	/* Items of the children's height into node's child list. */
+	static size_type graft_into_node(node_type *node,
+									 type_trait::node_slice items,
+									 type_trait::const_key_slice bounds,
+									 node_split_pair_slice out,
+									 opt_key const &edge);
+
+	/* lo, or node's smallest key when there is no bound. */
+	static key_type graft_bound(opt_key const &lo, node_type const *node);
+
+	static height_type graft_height(node_type const *node);
+
 	static node_type *batch_insert_update_interior(
 		node_type *node, node_split_pair_slice node_split_slice,
 		size_buf_ub_arr const &split_pos_arr, size_type new_node_n,
@@ -970,6 +1077,7 @@ private:
 
 #include "pab_tree/b_tree_impl/b_box_op.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_batch_delete.hpp"
+#include "pab_tree/b_tree_impl/batch_op/b_batch_delete_graft.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_build_tree.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_delete_tree.hpp"

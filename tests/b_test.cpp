@@ -7,6 +7,11 @@ struct btree_wrapper {
 	using tree_type = typename pab_tree::btree<TT>;
 };
 
+/* b_test_graft: batch delete through graft_delete. */
+struct graft_options : pab_tree::default_options {
+	using delete_policy = pab_tree::graft_delete;
+};
+
 template <typename Options, typename RunFunc>
 static void apply_orthogonal(Options const &opts, RunFunc test_func)
 {
@@ -45,7 +50,11 @@ static void apply_orthogonal(Options const &opts, RunFunc test_func)
 	using entry_type = element<uint32_t, uint32_t>;
 #endif
 
+#ifdef PABTREE_GRAFT_DELETE
+	using TT = pab_tree::btree_trait<entry_type, k_buf, graft_options>;
+#else
 	using TT = pab_tree::btree_type_trait<entry_type, k_buf>;
+#endif
 	if (opts.tree_type == 0) {
 		Run<btree_wrapper<TT>>(opts, test_func);
 	}
