@@ -302,53 +302,6 @@ double btree<TT>::sorted_leaf_ratio(node_type const *node) const
 			   static_cast<double>(sorted_n) / static_cast<double>(total_n);
 }
 
-template <typename TT>
-std::tuple<bool, bool, typename TT::size_type>
-btree<TT>::check_tree_aug_after_delete(node_type *node)
-{
-	if (node->is_leaf) {
-		return { get_node_invalid_status(node),
-				 node_contain_invalid_subtree(node),
-				 get_node_reinsert_size(node) };
-	}
-
-	auto interior = static_cast<interior_type *>(node);
-	auto node_n = interior->get_node_n();
-	parlay::sequence<int> invalid_seq(node_n);
-	parlay::sequence<typename TT::size_type> invalid_subtree_num_seq(node_n);
-	parlay::sequence<typename TT::size_type> reinsert_size_seq(node_n);
-	parlay::parallel_for(0, node_n, [&](size_t i) {
-		auto [invalid, invalid_subtree_num, reinsert_size] =
-			check_tree_aug_after_delete(interior->tree_nodes[i]);
-		invalid_seq[i] = invalid ? 1 : 0;
-		invalid_subtree_num_seq[i] = invalid_subtree_num;
-		reinsert_size_seq[i] = reinsert_size;
-	});
-
-	auto sum_invalid = parlay::reduce(invalid_seq);
-	auto sum_invalid_subtree_num = parlay::reduce(invalid_subtree_num_seq);
-	auto sum_reinsert_size = parlay::reduce(reinsert_size_seq);
-
-	if (node == this->root_) {
-		assert(interior->valid == ((interior->get_node_n() - sum_invalid) > 0));
-	} else {
-		assert(interior->valid ==
-			   ((interior->get_node_n() - sum_invalid) >= TT::k_buf_lb));
-	}
-
-	if (node_is_valid(node)) {
-		assert(sum_invalid_subtree_num == node_contain_invalid_subtree(node));
-		assert(sum_reinsert_size == get_node_reinsert_size(node));
-	} else {
-		assert(node_contain_invalid_subtree(node) == 1);
-		assert(get_node_reinsert_size(node) == interior->size);
-	}
-
-	return { get_node_invalid_status(node),
-			 node_is_valid(node) ? sum_invalid_subtree_num : 1,
-			 node_is_valid(node) ? sum_reinsert_size : interior->size };
-}
-
 } /* namespace pab_tree */
 
 #endif /* PABTREE_B_TREE_IMPL_VALIDATION_HPP_ */

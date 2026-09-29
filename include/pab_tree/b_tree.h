@@ -635,10 +635,14 @@ private:
 					   ->contain_invalid_subtree;
 	}
 
+	/*
+	 * Items a subtree hands to its tomb: the largest valid subtrees of
+	 * what is invalid below it, and its underfull leaves.
+	 */
 	static size_type get_node_reinsert_size(const node_type *node)
 	{
 		return node->is_leaf ?
-				   (node->size < type_trait::k_buf_lb ? node->size : 0) :
+				   (node->size < type_trait::k_buf_lb ? 1 : 0) :
 				   static_cast<const interior_type *>(node)->reinsert_size;
 	}
 
@@ -671,37 +675,15 @@ private:
 				  const bool sorted_input, LeafSortPred const &leaf_sort_pred);
 
 	/*
-	 * Returns (invalid_flag, needs_repair, reinsert_entry_num).
-	 * needs_repair: some node below is invalid (not stored in node).
+	 * Deletes in, balances each leaf-parent's underfull leaves, and sets the
+	 * flags on the way up. Returns (invalid, contain_invalid_subtree,
+	 * reinsert_size) of node.
 	 */
 	template <typename LeafSortPred>
 	std::tuple<bool, bool, size_type>
 	batch_delete_recursive(node_type *node, type_trait::const_key_slice in,
 						   const type_trait::pattern_type leaf_entries_pattern,
 						   LeafSortPred const &leaf_sort_pred);
-
-	/*
-	 * Bottom-up repair below a valid node: children first, in parallel,
-	 * then the thin ones are merged into siblings. Afterwards every node
-	 * strictly below is valid; node itself may be thin for its parent.
-	 */
-	template <typename LeafSortPred>
-	void repair_rec(node_type *node,
-					const type_trait::pattern_type leaf_entries_pattern,
-					LeafSortPred const &leaf_sort_pred);
-
-	/* One node: merge its underfull leaves, or its thin interior children. */
-	template <typename LeafSortPred>
-	void repair_node(node_type *node,
-					 const type_trait::pattern_type leaf_entries_pattern,
-					 LeafSortPred const &leaf_sort_pred);
-
-	/* balance_over_leaves for interior children: pointer moves only. */
-	template <typename LeafSortPred>
-	void
-	balance_over_children(node_type *node,
-						  const type_trait::pattern_type leaf_entries_pattern,
-						  LeafSortPred const &leaf_sort_pred);
 
 	void rebuild_from_flatten();
 
@@ -741,7 +723,7 @@ private:
 						const type_trait::pattern_type leaf_entries_pattern,
 						LeafSortPred const &leaf_sort_pred);
 
-	/* ---- graft_delete, docs/plan_graft_delete_2026-09.md ---- */
+	/* ---- graft fix-up, docs/plan_graft_delete_2026-09.md ---- */
 
 	using height_type = typename type_trait::height_type;
 
@@ -755,8 +737,9 @@ private:
 		std::numeric_limits<height_type>::max();
 
 	/*
-	 * Items cut out of invalid subtrees, in key order: a node, the lower
-	 * bound of its key range, its height.
+	 * Items cut out of invalid subtrees, in structural order (sorted by
+	 * bound within each height): a node, the lower bound of its key range,
+	 * its height.
 	 */
 	struct graft_pool {
 		type_trait::node_slice nodes;
@@ -774,41 +757,35 @@ private:
 		}
 	};
 
-	/* Below a valid root after the mark pass: settle, then the tombs. */
+	/*
+	 * Everything the descent puts back, sorted by key: items (a node and
+	 * its height) and the entries of underfull leaves (height
+	 * k_entry_source). hpos[h] lists the positions of the items of height h.
+	 */
+	struct graft_batch {
+		key_type const *keys;
+		node_type *const *nodes;
+		entry_type const *entries;
+		parlay::sequence<size_type> const *hpos;
+		size_type level_n;
+	};
+
+	/* A valid root with an invalid node below: cut out, then put back. */
 	template <typename LeafSortPred>
 	void graft_repair(const type_trait::pattern_type leaf_entries_pattern,
 					  LeafSortPred const &leaf_sort_pred);
 
 	/*
-	 * Balance each leaf-parent's underfull leaves, then recompute the flags
-	 * bottom-up. reinsert_size becomes the number of items below node.
+	 * One descent for in[l, r): items one level below node join its child
+	 * list, the rest route through it. Returns 0 or node's replacement
+	 * count, written to out as in batch insert.
 	 */
 	template <typename LeafSortPred>
-	void graft_settle_rec(node_type *node,
-						  const type_trait::pattern_type leaf_entries_pattern,
-						  LeafSortPred const &leaf_sort_pred);
-
-	/*
-	 * Down to the tombs, the highest valid nodes with an invalid child.
-	 * Returns the nodes that replace node, empty when it stays.
-	 */
-	template <typename LeafSortPred>
-	node_split_pair_seq
-	graft_tomb_rec(node_type *node, opt_key const &lo, height_type height,
-				   const type_trait::pattern_type leaf_entries_pattern,
-				   LeafSortPred const &leaf_sort_pred);
-
-	/* Cut the invalid subtrees below tomb into items; graft them back. */
-	template <typename LeafSortPred>
-	node_split_pair_seq
-	graft_reinsert(node_type *tomb, opt_key const &lo, height_type height,
-				   const type_trait::pattern_type leaf_entries_pattern,
-				   LeafSortPred const &leaf_sort_pred);
-
-	/* up[i] replaces child i when not empty. Returns node's replacement. */
-	static node_split_pair_seq
-	graft_splice(node_type *node,
-				 parlay::sequence<node_split_pair_seq> const &up);
+	size_type graft_all_rec(node_type *node, height_type height, size_type l,
+							size_type r, graft_batch const &in,
+							node_split_pair_slice out,
+							const type_trait::pattern_type leaf_entries_pattern,
+							LeafSortPred const &leaf_sort_pred);
 
 	/* Valid node: detach what is invalid below it. Returns its new bound. */
 	static opt_key graft_detach_rec(node_type *node, opt_key const &lo,
@@ -852,10 +829,17 @@ private:
 		size_buf_ub_arr const &split_pos_arr, size_type new_node_n,
 		size_buf_ub_arr const &return_node_n_arr);
 
+	/* An interior with interior children, from what they returned. */
 	std::tuple<bool, bool, size_type> batch_delete_update_interior_size(
 		node_type *node, boolean_buf_ub_arr const &invalid_subtree_num_arr,
 		boolean_buf_ub_arr const &invalid_subtree_flag_arr,
-		size_buf_ub_arr const &reinsert_entries_num_arr);
+		size_buf_ub_arr const &reinsert_num_arr);
+
+	/* A leaf-parent: balance its underfull leaves, then set its flags. */
+	template <typename LeafSortPred>
+	std::tuple<bool, bool, size_type> batch_delete_update_leaf_parent(
+		node_type *node, const type_trait::pattern_type leaf_entries_pattern,
+		LeafSortPred const &leaf_sort_pred);
 
 	/* PARA: return bucket_num */
 	static size_type generate_leaf_nodes(type_trait::entry_slice key_in,
@@ -993,9 +977,6 @@ private:
 	 */
 	static std::pair<size_type, size_type>
 	count_sorted_leaves(node_type const *node);
-
-	std::tuple<bool, bool, typename type_trait::size_type>
-	check_tree_aug_after_delete(node_type *node);
 
 	bool contain_iter(node_type const *node, key_type const &k) const;
 

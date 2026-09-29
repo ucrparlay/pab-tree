@@ -84,10 +84,11 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 			parlay::make_slice(sorted_seq.cbegin(), sorted_seq.cend());
 	}
 
-	auto [invalid_flag, invalid_subtree_num, reinsert_entry_num] =
+	/* Leaves are balanced inside their leaf-parents already. */
+	auto [invalid_flag, invalid_subtree_num, reinsert_num] =
 		batch_delete_recursive(this->root_, sorted_slice, leaf_entries_pattern,
 							   leaf_sort_pred);
-	(void)reinsert_entry_num; /* the repair moves nodes, not entries */
+	(void)reinsert_num; /* each tomb reads its own count */
 
 	if (invalid_flag) { /* root is invalid */
 		if (this->root_->is_leaf) {
@@ -120,25 +121,22 @@ void btree<TT>::batch_delete_(R in, const TT::pattern_type leaf_entries_pattern,
 			return;
 		}
 
-#ifdef DEBUG
-		[[maybe_unused]] const bool tree_ok = this->validate<false>();
-		assert(tree_ok);
-		puts(">>> pass tree aug after delete");
-#endif /* DEBUG */
+		/*
+		 * No validate() here: leaf-parents balanced in the mark pass may be
+		 * thin until grafted. graft_repair validates the result.
+		 */
+		graft_repair(leaf_entries_pattern, leaf_sort_pred);
+	}
 
-		if constexpr (std::same_as<typename TT::delete_policy, graft_delete>) {
-			graft_repair(leaf_entries_pattern, leaf_sort_pred);
-		} else {
-			repair_rec(this->root_, leaf_entries_pattern, leaf_sort_pred);
-		}
-
-		/* A root left with one child is a level that only costs a hop. */
-		while (!this->root_->is_leaf &&
-			   static_cast<interior_type *>(this->root_)->get_node_n() == 1) {
-			auto *old = static_cast<interior_type *>(this->root_);
-			this->root_ = old->tree_nodes[0];
-			free_node<interior_type>(old);
-		}
+	/*
+	 * A root left with one child is a level that only costs a hop. Leaf
+	 * balancing alone can leave one: a root leaf-parent whose leaves merged.
+	 */
+	while (!this->root_->is_leaf &&
+		   static_cast<interior_type *>(this->root_)->get_node_n() == 1) {
+		auto *old = static_cast<interior_type *>(this->root_);
+		this->root_ = old->tree_nodes[0];
+		free_node<interior_type>(old);
 	}
 }
 
@@ -354,9 +352,8 @@ void btree<TT>::collect_leaves_rec(node_type *node, key_type const &key_before,
 }
 
 /*
- * Returns (invalid_flag, needs_fetch, reinsert_entry_num).
- * needs_fetch: any descendant needs fetch_invalid_subtree_nodes (not stored in
- * node).
+ * Returns (invalid, contain_invalid_subtree, reinsert_size) of node, all
+ * decided after each leaf-parent below balanced its leaves.
  */
 template <typename TT>
 template <typename LeafSortPred>
@@ -414,7 +411,7 @@ btree<TT>::batch_delete_recursive(node_type *node, TT::const_key_slice in,
 
 	boolean_buf_ub_arr contain_invalid_subtree;
 	boolean_buf_ub_arr invalid_subtree_flag;
-	size_buf_ub_arr reinsert_entries_num;
+	size_buf_ub_arr reinsert_num;
 
 	/*
 	 * Hoist: same answer for every child since node's children are all at one
@@ -436,12 +433,10 @@ btree<TT>::batch_delete_recursive(node_type *node, TT::const_key_slice in,
 		} else { /* no element in this subtree, so it's valid */
 			invalid_subtree_flag[i] = false;
 			contain_invalid_subtree[i] = 0;
-			reinsert_entries_num[i] = 0;
+			reinsert_num[i] = 0;
 			/*
-			 * if a tree node receive no deletion, we need to
-			 * explicitly reset its deletion information, because
-			 * the reinsertion phase needs to access the reinsert
-			 * information from the tree node directly
+			 * A child that receives no deletion keeps stale flags from an
+			 * earlier batch; the graft reads them from the node.
 			 */
 			if (children_are_interior) {
 				static_cast<interior_type *>(interior->tree_nodes[i])
@@ -455,16 +450,19 @@ btree<TT>::batch_delete_recursive(node_type *node, TT::const_key_slice in,
 		[&](buf_size_type i) {
 			std::tie(invalid_subtree_flag[nodes_map[i]],
 					 contain_invalid_subtree[nodes_map[i]],
-					 reinsert_entries_num[nodes_map[i]]) =
+					 reinsert_num[nodes_map[i]]) =
 				batch_delete_recursive(interior->tree_nodes[nodes_map[i]],
 									   in.cut(touched_l[i], touched_r[i]),
 									   leaf_entries_pattern, leaf_sort_pred);
 		},
 		1);
 
-	return batch_delete_update_interior_size(node, contain_invalid_subtree,
-											 invalid_subtree_flag,
-											 reinsert_entries_num);
+	if (!children_are_interior) {
+		return batch_delete_update_leaf_parent(node, leaf_entries_pattern,
+											   leaf_sort_pred);
+	}
+	return batch_delete_update_interior_size(
+		node, contain_invalid_subtree, invalid_subtree_flag, reinsert_num);
 }
 
 } /* namespace pab_tree */

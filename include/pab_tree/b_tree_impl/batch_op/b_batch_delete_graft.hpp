@@ -12,10 +12,11 @@
 #include "parlay/slice.h"
 
 /*
- * graft_delete. Below a valid root, each tomb (the highest valid node with
- * an invalid child) cuts the largest valid subtrees out of its invalid
- * subtrees and grafts them back whole, tallest first. Underfull leaves go
- * back entry by entry. docs/plan_graft_delete_2026-09.md.
+ * Batch delete below a valid root. batch_delete_recursive has balanced the
+ * leaves and counted the items; one pass cuts the largest valid subtrees
+ * out of every invalid subtree into one pool, and one descent puts them
+ * back whole, with the underfull leaves' entries, into the tree that is
+ * left. docs/plan_graft_delete_2026-09.md.
  */
 
 namespace pab_tree
@@ -25,23 +26,161 @@ template <typename LeafSortPred>
 void btree<TT>::graft_repair(const TT::pattern_type leaf_entries_pattern,
 							 LeafSortPred const &leaf_sort_pred)
 {
-	assert(!this->root_->is_leaf && node_is_valid(this->root_));
-	const height_type height = graft_height(this->root_);
+	assert(!this->root_->is_leaf && node_is_valid(this->root_) &&
+		   node_contain_invalid_subtree(this->root_));
+	const size_type item_n =
+		static_cast<interior_type *>(this->root_)->reinsert_size;
+	const height_type levels = graft_height(this->root_);
 
-	graft_settle_rec(this->root_, leaf_entries_pattern, leaf_sort_pred);
-	if (!node_contain_invalid_subtree(this->root_)) {
+	/* 1. Cut every invalid subtree into one pool, sized by the mark pass. */
+	auto pool_nodes = TT::node_seq::uninitialized(item_n);
+	auto pool_bounds = TT::key_seq::uninitialized(item_n);
+	auto pool_heights = parlay::sequence<height_type>::uninitialized(item_n);
+	opt_key const edge =
+		graft_detach_rec(this->root_, std::nullopt, levels,
+						 graft_pool{ parlay::make_slice(pool_nodes),
+									 parlay::make_slice(pool_bounds),
+									 parlay::make_slice(pool_heights) });
+	if (item_n == 0) {
 		return;
 	}
 
-	auto const up = graft_tomb_rec(this->root_, std::nullopt, height,
-								   leaf_entries_pattern, leaf_sort_pred);
-	if (!up.empty()) { /* the root split: new levels on top */
-		auto nodes =
-			parlay::tabulate(up.size(), [&](size_t i) { return up[i].first; });
-		auto keys = parlay::tabulate(up.size() - 1,
-									 [&](size_t i) { return up[i].second; });
-		this->root_ = assemble_interior_levels(parlay::make_slice(nodes),
-											   parlay::make_slice(keys));
+	/* 2. Items and the underfull leaves' entries, sorted by key. */
+	struct input {
+		key_type key;
+		height_type height;
+		node_type *node;
+		entry_type entry;
+	};
+	auto const src =
+		parlay::filter(parlay::iota<size_type>(item_n), [&](size_type i) {
+			return pool_heights[i] == k_entry_source;
+		});
+	auto const sub =
+		parlay::filter(parlay::iota<size_type>(item_n), [&](size_type i) {
+			return pool_heights[i] != k_entry_source;
+		});
+	auto const sizes = parlay::tabulate(src.size(), [&](size_t i) {
+		return static_cast<size_type>(pool_nodes[src[i]]->size);
+	});
+	auto const [offsets, entry_n] = parlay::scan(sizes);
+	const size_type n = sub.size() + entry_n;
+	auto inputs = parlay::sequence<input>::uninitialized(n);
+	parlay::parallel_for(0, sub.size(), [&](size_t i) {
+		auto const p = sub[i];
+		inputs[i] = input{ pool_bounds[p], pool_heights[p], pool_nodes[p],
+						   entry_type{} };
+	});
+	parlay::parallel_for(0, src.size(), [&](size_t i) {
+		auto *leaf = static_cast<leaf_type *>(pool_nodes[src[i]]);
+		auto *dst = inputs.begin() + sub.size() + offsets[i];
+		for (size_type k = 0; k < leaf->size; ++k) {
+			auto const &e = leaf->elements[k];
+			dst[k] =
+				input{ entry_traits::get_key(e), k_entry_source, nullptr, e };
+		}
+		free_node<leaf_type>(leaf);
+	});
+	/* Keys are distinct; on a tie the taller input would go first. */
+	parlay::sort_inplace(inputs, [](input const &a, input const &b) {
+		if (TT::key_less(a.key, b.key) || TT::key_less(b.key, a.key)) {
+			return TT::key_less(a.key, b.key);
+		}
+		auto rank = [](height_type h) {
+			return h == k_entry_source ? -1 : static_cast<int>(h);
+		};
+		return rank(a.height) > rank(b.height);
+	});
+	auto const keys =
+		parlay::tabulate(n, [&](size_t i) { return inputs[i].key; });
+	auto const nodes =
+		parlay::tabulate(n, [&](size_t i) { return inputs[i].node; });
+	auto const entries =
+		parlay::tabulate(n, [&](size_t i) { return inputs[i].entry; });
+	parlay::sequence<parlay::sequence<size_type>> hpos(levels);
+	for (height_type h = 0; h < levels; ++h) {
+		hpos[h] = parlay::filter(parlay::iota<size_type>(n), [&](size_type i) {
+			return inputs[i].height == h;
+		});
+	}
+
+	auto scratch = node_split_pair_seq::uninitialized(2 * n);
+	/* A root that split hands up its parts: new levels on top. */
+	auto grow_root = [&](size_type k, node_split_pair_slice o) {
+		if (k == 0) {
+			return;
+		}
+		auto up_nodes =
+			parlay::tabulate(k, [&](size_t i) { return o[i].first; });
+		auto up_keys =
+			parlay::tabulate(k - 1, [&](size_t i) { return o[i].second; });
+		this->root_ = assemble_interior_levels(parlay::make_slice(up_nodes),
+											   parlay::make_slice(up_keys));
+	};
+
+	/*
+	 * 3. Inputs left of all of the tree's content (its first nodes went)
+	 * have no left neighbour to join: prepend them along the leftmost
+	 * path, tallest first, moving the edge after each height. Rare.
+	 */
+	size_type first = 0;
+	if (edge) {
+		first = static_cast<size_type>(
+			std::lower_bound(keys.begin(), keys.end(), *edge,
+							 [](key_type const &a, key_type const &b) {
+								 return TT::key_less(a, b);
+							 }) -
+			keys.begin());
+	}
+	if (first > 0) {
+		opt_key e = edge;
+		for (height_type h = levels; h-- > 0;) {
+			auto const &hp = hpos[h];
+			const size_type c = static_cast<size_type>(
+				std::lower_bound(hp.begin(), hp.end(), first) - hp.begin());
+			if (c == 0) {
+				continue;
+			}
+			auto items =
+				parlay::tabulate(c, [&](size_t i) { return nodes[hp[i]]; });
+			auto const bounds =
+				parlay::tabulate(c, [&](size_t i) { return keys[hp[i]]; });
+			auto const o = parlay::make_slice(scratch).cut(0, 2 * c);
+			grow_root(
+				graft_rec(this->root_, graft_height(this->root_), h,
+						  parlay::make_slice(items),
+						  parlay::make_slice(bounds.cbegin(), bounds.cend()), o,
+						  e),
+				o);
+			if (TT::key_less(bounds[0], *e)) {
+				e = bounds[0];
+			}
+		}
+		auto const lead =
+			parlay::filter(parlay::iota<size_type>(first), [&](size_type i) {
+				return inputs[i].height == k_entry_source;
+			});
+		if (!lead.empty()) {
+			auto const lead_entries = parlay::tabulate(
+				lead.size(), [&](size_t i) { return entries[lead[i]]; });
+			auto const o = parlay::make_slice(scratch).cut(0, 2 * lead.size());
+			grow_root(
+				batch_insert_recursive(this->root_,
+									   parlay::make_slice(lead_entries.cbegin(),
+														  lead_entries.cend()),
+									   o, leaf_entries_pattern, leaf_sort_pred),
+				o);
+		}
+	}
+
+	/* 4. Everything else in one descent. */
+	if (first < n) {
+		graft_batch const in{ keys.begin(), nodes.begin(), entries.begin(),
+							  hpos.begin(), static_cast<size_type>(levels) };
+		auto const o = parlay::make_slice(scratch).cut(2 * first, 2 * n);
+		grow_root(graft_all_rec(this->root_, graft_height(this->root_), first,
+								n, in, o, leaf_entries_pattern, leaf_sort_pred),
+				  o);
 	}
 
 #ifdef DEBUG
@@ -50,388 +189,189 @@ void btree<TT>::graft_repair(const TT::pattern_type leaf_entries_pattern,
 #endif /* DEBUG */
 }
 
+/*
+ * One descent for in[l, r), all inside node's range and sorted by key.
+ * Items one level below node join its child list first, each right after
+ * the child its bound routes to; everything shorter then routes by the
+ * merged list, so it can land inside a just-joined item. node is rebuilt
+ * once, after its children returned. Buffers are on the stack; the heap is
+ * used only when node takes more than k_buf_ub children and splits.
+ */
 template <typename TT>
 template <typename LeafSortPred>
-void btree<TT>::graft_settle_rec(node_type *node,
-								 const TT::pattern_type leaf_entries_pattern,
-								 LeafSortPred const &leaf_sort_pred)
+TT::size_type
+btree<TT>::graft_all_rec(node_type *node, height_type height, size_type l,
+						 size_type r, graft_batch const &in,
+						 node_split_pair_slice out,
+						 const TT::pattern_type leaf_entries_pattern,
+						 LeafSortPred const &leaf_sort_pred)
 {
-	assert(!node->is_leaf);
+	assert(!node->is_leaf && height >= 1 && l < r);
+	assert(out.size() == 2 * (r - l));
 	auto interior = static_cast<interior_type *>(node);
-	const bool is_root = node == this->root_;
+	const buf_size_type m = interior->get_node_n();
 
-	if (node_has_leaf_children(node)) {
-		size_type total = 0;
-		size_type underfull_n = 0;
-		size_type underfull_sum = 0;
-		for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-			const size_type sz = interior->tree_nodes[i]->size;
-			total += sz;
-			if (sz < TT::k_buf_lb) {
-				underfull_n++;
-				underfull_sum += sz;
+	/* The first position in [lo, r) whose key is not below k. */
+	auto first_at = [&](size_type lo, key_type const &k) {
+		size_type hi = r;
+		while (lo < hi) {
+			const size_type mid = lo + (hi - lo) / 2;
+			if (TT::key_less(in.keys[mid], k)) {
+				lo = mid + 1;
+			} else {
+				hi = mid;
 			}
 		}
-		/* All empty: left whole, graft_decompose_rec frees it. */
-		if (total > 0 && underfull_n > 0 && interior->get_node_n() >= 2) {
-			balance_over_leaves(node, underfull_sum, leaf_entries_pattern,
-								leaf_sort_pred);
-		}
+		return lo;
+	};
 
-		buf_size_type valid_n = 0;
-		for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-			valid_n += node_is_valid(interior->tree_nodes[i]) ? 1 : 0;
-		}
-		interior->valid = is_root ? valid_n > 0 : valid_n >= TT::k_buf_lb;
-		/* Balanced: a valid leaf-parent has no underfull leaf left. */
-		assert(!interior->valid || valid_n == interior->get_node_n());
-		interior->contain_invalid_subtree = !interior->valid;
-		/* An invalid leaf-parent hands over every leaf. */
-		interior->reinsert_size =
-			interior->valid || total == 0 ? 0 : interior->get_node_n();
-		return;
+	/* The items that become node's children: one level below it. */
+	size_type const *own = nullptr;
+	size_type own_n = 0;
+	if (static_cast<size_type>(height - 1) < in.level_n) {
+		auto const &hp = in.hpos[height - 1];
+		own = std::lower_bound(hp.begin(), hp.end(), l);
+		own_n =
+			static_cast<size_type>(std::lower_bound(own, hp.end(), r) - own);
 	}
+	const size_type merged_n = m + own_n;
 
-	typename interior_type::node_arr todo;
-	buf_size_type todo_n = 0;
-	for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-		if (node_contain_invalid_subtree(interior->tree_nodes[i])) {
-			todo[todo_n++] = interior->tree_nodes[i];
-		}
+	const bool big = merged_n > TT::k_buf_ub;
+	typename interior_type::node_arr mnode_s;
+	typename interior_type::split_arr msep_s;
+	size_buf_ub_arr mbeg_s, mend_s, mret_s, touched_s;
+	typename TT::node_seq mnode_h;
+	typename TT::key_seq msep_h;
+	parlay::sequence<size_type> mbeg_h, mend_h, mret_h, touched_h;
+	if (big) [[unlikely]] {
+		mnode_h = TT::node_seq::uninitialized(merged_n);
+		msep_h = TT::key_seq::uninitialized(merged_n);
+		mbeg_h = parlay::sequence<size_type>::uninitialized(merged_n);
+		mend_h = parlay::sequence<size_type>::uninitialized(merged_n);
+		mret_h = parlay::sequence<size_type>::uninitialized(merged_n);
+		touched_h = parlay::sequence<size_type>::uninitialized(merged_n);
 	}
-	parlay::parallel_for(
-		0, todo_n,
-		[&](buf_size_type i) {
-			graft_settle_rec(todo[i], leaf_entries_pattern, leaf_sort_pred);
-		},
-		1);
+	node_type **mnode = big ? mnode_h.begin() : mnode_s.data();
+	key_type *msep = big ? msep_h.begin() : msep_s.data();
+	size_type *mbeg = big ? mbeg_h.begin() : mbeg_s.data();
+	size_type *mend = big ? mend_h.begin() : mend_s.data();
+	size_type *mret = big ? mret_h.begin() : mret_s.data();
+	size_type *touched = big ? touched_h.begin() : touched_s.data();
 
-	buf_size_type valid_n = 0;
-	bool contain = false;
-	size_type item_n = 0;
-	for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-		auto const *child =
-			static_cast<interior_type const *>(interior->tree_nodes[i]);
-		valid_n += child->valid ? 1 : 0;
-		contain = contain || child->contain_invalid_subtree;
-		item_n += child->reinsert_size;
-	}
-	interior->valid = is_root ? valid_n > 0 : valid_n >= TT::k_buf_lb;
-	interior->contain_invalid_subtree = !interior->valid || contain;
-	/* An invalid node also hands over its valid children, whole. */
-	interior->reinsert_size = item_n + (interior->valid ? 0 : valid_n);
-	interior->update_aug();
-}
-
-template <typename TT>
-template <typename LeafSortPred>
-typename btree<TT>::node_split_pair_seq
-btree<TT>::graft_tomb_rec(node_type *node, opt_key const &lo,
-						  height_type height,
-						  const TT::pattern_type leaf_entries_pattern,
-						  LeafSortPred const &leaf_sort_pred)
-{
-	auto interior = static_cast<interior_type *>(node);
-	const buf_size_type node_n = interior->get_node_n();
-	assert(node_is_valid(node) && node_contain_invalid_subtree(node));
-	assert(!node_has_leaf_children(node));
-
-	for (buf_size_type i = 0; i < node_n; ++i) {
-		if (get_node_invalid_status(interior->tree_nodes[i])) {
-			return graft_reinsert(node, lo, height, leaf_entries_pattern,
-								  leaf_sort_pred);
-		}
-	}
-
-	parlay::sequence<node_split_pair_seq> up(node_n);
-	buf_size_buf_ub_arr todo;
-	buf_size_type todo_n = 0;
-	for (buf_size_type i = 0; i < node_n; ++i) {
-		if (node_contain_invalid_subtree(interior->tree_nodes[i])) {
-			todo[todo_n++] = i;
-		}
-	}
-	parlay::parallel_for(
-		0, todo_n,
-		[&](buf_size_type k) {
-			const buf_size_type i = todo[k];
-			up[i] = graft_tomb_rec(
-				interior->tree_nodes[i],
-				i == 0 ? lo : opt_key(interior->split[i - 1]), height - 1,
-				leaf_entries_pattern, leaf_sort_pred);
-		},
-		1);
-	return graft_splice(node, up);
-}
-
-template <typename TT>
-typename btree<TT>::node_split_pair_seq
-btree<TT>::graft_splice(node_type *node,
-						parlay::sequence<node_split_pair_seq> const &up)
-{
-	auto interior = static_cast<interior_type *>(node);
-	const buf_size_type node_n = interior->get_node_n();
-
-	size_type n = 0;
-	for (buf_size_type i = 0; i < node_n; ++i) {
-		n += up[i].empty() ? 1 : up[i].size();
-	}
-
-	if (n == node_n) { /* no child split */
-		size_type size = 0;
-		for (buf_size_type i = 0; i < node_n; ++i) {
-			size += interior->tree_nodes[i]->size;
-		}
-		interior->size = size;
-		interior->update_aug();
-		interior->reset_deletion_flag();
-		return {};
-	}
-
-	auto nodes = TT::node_seq::uninitialized(n);
-	auto keys = TT::key_seq::uninitialized(n - 1);
+	/*
+	 * The merged child list; child w takes in[mbeg[w], mend[w]). A removed
+	 * node's range went to its left neighbour, so an item goes right after
+	 * the child its bound routes to, and takes the rest of that range.
+	 */
 	size_type w = 0;
-	for (buf_size_type i = 0; i < node_n; ++i) {
-		if (up[i].empty()) {
-			nodes[w++] = interior->tree_nodes[i];
-		} else {
-			for (size_type j = 0; j < up[i].size(); ++j) {
-				if (j > 0) {
-					keys[w - 1] = up[i][j - 1].second;
+	size_type q = 0;
+	size_type start = l;
+	for (buf_size_type j = 0; j < m; ++j) {
+		const size_type end =
+			j + 1 == m ? r : first_at(start, interior->split[j]);
+		if (j > 0) {
+			mend[w - 1] = start;
+			msep[w] = interior->split[j - 1];
+		}
+		mnode[w] = interior->tree_nodes[j];
+		mbeg[w] = start;
+		++w;
+		for (; q < own_n && own[q] < end; ++q) {
+			const size_type p = own[q];
+			mend[w - 1] = p;
+			msep[w] = in.keys[p];
+			mnode[w] = in.nodes[p];
+			mbeg[w] = p + 1;
+			++w;
+		}
+		start = end;
+	}
+	mend[w - 1] = r;
+	assert(w == merged_n && q == own_n);
+
+	size_type touched_n = 0;
+	for (size_type i = 0; i < merged_n; ++i) {
+		mret[i] = 0;
+		if (mbeg[i] < mend[i]) {
+			touched[touched_n++] = i;
+		}
+	}
+	parlay::parallel_for(
+		0, touched_n,
+		[&](size_type t) {
+			const size_type i = touched[t];
+			auto const o = out.cut(2 * (mbeg[i] - l), 2 * (mend[i] - l));
+			if (height == 1) { /* only entries reach a leaf */
+				mret[i] = batch_insert_recursive(
+					mnode[i],
+					parlay::make_slice(in.entries + mbeg[i],
+									   in.entries + mend[i]),
+					o, leaf_entries_pattern, leaf_sort_pred);
+			} else {
+				mret[i] =
+					graft_all_rec(mnode[i], height - 1, mbeg[i], mend[i], in, o,
+								  leaf_entries_pattern, leaf_sort_pred);
+			}
+		},
+		1);
+
+	size_type final_n = merged_n;
+	for (size_type i = 0; i < merged_n; ++i) {
+		if (mret[i] > 0) {
+			final_n += mret[i] - 1;
+		}
+	}
+
+	/* The children in order; one that split is replaced by its parts. */
+	auto emit = [&](node_type **fnode, key_type *fsep) {
+		size_type v = 0;
+		size_type size = 0;
+		for (size_type i = 0; i < merged_n; ++i) {
+			if (i > 0) {
+				fsep[v - 1] = msep[i];
+			}
+			if (mret[i] == 0) {
+				size += mnode[i]->size;
+				fnode[v++] = mnode[i];
+				continue;
+			}
+			auto const *o = out.begin() + 2 * (mbeg[i] - l);
+			for (size_type t = 0; t < mret[i]; ++t) {
+				if (t > 0) {
+					fsep[v - 1] = o[t - 1].second;
 				}
-				nodes[w++] = up[i][j].first;
+				size += o[t].first->size;
+				fnode[v++] = o[t].first;
 			}
 		}
-		if (i + 1 < node_n) {
-			keys[w - 1] = interior->split[i];
-		}
-	}
-	assert(w == n);
+		assert(v == final_n);
+		return size;
+	};
 
-	if (n <= TT::k_buf_ub) {
-		size_type size = 0;
-		for (size_type i = 0; i < n; ++i) {
-			interior->tree_nodes[i] = nodes[i];
-			size += nodes[i]->size;
-		}
-		std::copy_n(keys.begin(), n - 1, interior->split.begin());
-		interior->node_n = static_cast<buf_size_type>(n);
+	if (final_n <= TT::k_buf_ub) {
+		typename interior_type::node_arr fnode;
+		typename interior_type::split_arr fsep;
+		const size_type size = emit(fnode.data(), fsep.data());
+		std::copy_n(fnode.begin(), final_n, interior->tree_nodes.begin());
+		std::copy_n(fsep.begin(), final_n - 1, interior->split.begin());
+		interior->node_n = static_cast<buf_size_type>(final_n);
 		interior->size = size;
 		interior->update_aug();
-		interior->reset_deletion_flag();
-		return {};
+		return 0;
 	}
 
+	auto fnode = TT::node_seq::uninitialized(final_n);
+	auto fsep = TT::key_seq::uninitialized(final_n - 1);
+	emit(fnode.begin(), fsep.begin());
 	free_node<interior_type>(node);
-	auto out = node_split_pair_seq::uninitialized(get_bkt_num(n));
-	[[maybe_unused]] const size_type bkt_n = generate_interior_nodes(
-		parlay::make_slice(nodes), parlay::make_slice(keys),
+	const size_type bkt_n = generate_interior_nodes(
+		parlay::make_slice(fnode), parlay::make_slice(fsep),
 		gen_nodes_output_handler{
 			.set_key = [&](size_type i, auto key) { out[i].second = key; },
 			.set_node = [&](size_type i,
 							auto child) { out[i].first = child; } });
-	assert(bkt_n == out.size());
-	return out;
-}
-
-template <typename TT>
-template <typename LeafSortPred>
-typename btree<TT>::node_split_pair_seq
-btree<TT>::graft_reinsert(node_type *tomb, opt_key const &lo,
-						  height_type height,
-						  const TT::pattern_type leaf_entries_pattern,
-						  LeafSortPred const &leaf_sort_pred)
-{
-	auto interior = static_cast<interior_type *>(tomb);
-	const size_type item_n = interior->reinsert_size;
-
-	auto pool_nodes = TT::node_seq::uninitialized(item_n);
-	auto pool_bounds = TT::key_seq::uninitialized(item_n);
-	auto pool_heights = parlay::sequence<height_type>::uninitialized(item_n);
-	graft_pool const pool{ parlay::make_slice(pool_nodes),
-						   parlay::make_slice(pool_bounds),
-						   parlay::make_slice(pool_heights) };
-
-	/* Items left of all of tomb's content, when its first child went. */
-	opt_key edge = graft_detach_rec(tomb, lo, height, pool);
-
-	/* tomb's children, as a list that may outgrow k_buf_ub. */
-	auto kids = typename TT::node_seq(interior->tree_nodes.begin(),
-									  interior->tree_nodes.begin() +
-										  interior->get_node_n());
-	auto seps =
-		typename TT::key_seq(interior->split.begin(),
-							 interior->split.begin() + interior->get_split_n());
-
-	/* start[j]: the first of n sorted keys at or above kid j's bound. */
-	auto route = [&](size_type n, auto const &key_at) {
-		parlay::sequence<size_type> start(kids.size() + 1);
-		start[0] = 0;
-		start[kids.size()] = n;
-		parlay::parallel_for(1, kids.size(), [&](size_t j) {
-			size_type l = 0;
-			size_type r = n;
-			while (l < r) {
-				const size_type m = l + (r - l) / 2;
-				if (TT::key_less(key_at(m), seps[j - 1])) {
-					l = m + 1;
-				} else {
-					r = m;
-				}
-			}
-			start[j] = l;
-		});
-		return start;
-	};
-
-	/* Kid j is replaced by the ret[j] nodes at out[2 * start[j]] on. */
-	auto splice_kids = [&](parlay::sequence<size_type> const &ret,
-						   parlay::sequence<size_type> const &start,
-						   node_split_pair_seq const &out) {
-		size_type n = 0;
-		for (size_t j = 0; j < kids.size(); ++j) {
-			n += ret[j] == 0 ? 1 : ret[j];
-		}
-		if (n == kids.size()) {
-			return;
-		}
-		auto new_kids = TT::node_seq::uninitialized(n);
-		auto new_seps = TT::key_seq::uninitialized(n - 1);
-		size_type w = 0;
-		for (size_t j = 0; j < kids.size(); ++j) {
-			if (ret[j] == 0) {
-				new_kids[w++] = kids[j];
-			} else {
-				auto const *o = out.begin() + 2 * start[j];
-				for (size_type t = 0; t < ret[j]; ++t) {
-					if (t > 0) {
-						new_seps[w - 1] = o[t - 1].second;
-					}
-					new_kids[w++] = o[t].first;
-				}
-			}
-			if (j + 1 < kids.size()) {
-				new_seps[w - 1] = seps[j];
-			}
-		}
-		assert(w == n);
-		kids = std::move(new_kids);
-		seps = std::move(new_seps);
-	};
-
-	/* Tallest first: every node at the target's child height is original. */
-	for (height_type h = height - 1; h-- > 0;) {
-		auto const idx =
-			parlay::filter(parlay::iota<size_t>(item_n),
-						   [&](size_t i) { return pool_heights[i] == h; });
-		if (idx.empty()) {
-			continue;
-		}
-		auto items = parlay::tabulate(
-			idx.size(), [&](size_t i) { return pool_nodes[idx[i]]; });
-		auto const bounds = parlay::tabulate(
-			idx.size(), [&](size_t i) { return pool_bounds[idx[i]]; });
-		auto const start =
-			route(idx.size(), [&](size_type i) { return bounds[i]; });
-
-		auto out = node_split_pair_seq::uninitialized(2 * idx.size());
-		parlay::sequence<size_type> ret(kids.size(), 0);
-		parlay::parallel_for(
-			0, kids.size(),
-			[&](size_t j) {
-				const size_type l = start[j];
-				const size_type r = start[j + 1];
-				if (l == r) {
-					return;
-				}
-				ret[j] = graft_rec(
-					kids[j], height - 1, h, parlay::make_slice(items).cut(l, r),
-					parlay::make_slice(bounds.cbegin(), bounds.cend())
-						.cut(l, r),
-					parlay::make_slice(out).cut(2 * l, 2 * r), edge);
-			},
-			1);
-		splice_kids(ret, start, out);
-
-		if (edge && TT::key_less(bounds[0], *edge)) {
-			edge = bounds[0];
-		}
-	}
-
-	/* The underfull leaves' entries, sorted, back through batch insert. */
-	auto const src =
-		parlay::filter(parlay::iota<size_t>(item_n), [&](size_t i) {
-			return pool_heights[i] == k_entry_source;
-		});
-	if (!src.empty()) {
-		auto const sizes = parlay::tabulate(src.size(), [&](size_t i) {
-			return static_cast<size_t>(pool_nodes[src[i]]->size);
-		});
-		auto const [offsets, total] = parlay::scan(sizes);
-		auto entries = TT::entry_seq::uninitialized(total);
-		parlay::parallel_for(0, src.size(), [&](size_t i) {
-			auto *leaf = pool_nodes[src[i]];
-			extract_points_in_leaf<entry_slice, true>(
-				leaf, parlay::make_slice(entries).cut(offsets[i],
-													  offsets[i] + sizes[i]));
-			free_node<leaf_type>(leaf);
-		});
-		assert(parlay::is_sorted(entries,
-								 [](entry_type const &a, entry_type const &b) {
-									 return !TT::entry_less(b, a);
-								 }));
-
-		if (total > 0) {
-			auto const in =
-				parlay::make_slice(entries.cbegin(), entries.cend());
-			auto const start = route(total, [&](size_type i) {
-				return entry_traits::get_key(in[i]);
-			});
-			auto out = node_split_pair_seq::uninitialized(2 * total);
-			parlay::sequence<size_type> ret(kids.size(), 0);
-			parlay::parallel_for(
-				0, kids.size(),
-				[&](size_t j) {
-					const size_type l = start[j];
-					const size_type r = start[j + 1];
-					if (l == r) {
-						return;
-					}
-					ret[j] = batch_insert_recursive(
-						kids[j], in.cut(l, r),
-						parlay::make_slice(out).cut(2 * l, 2 * r),
-						leaf_entries_pattern, leaf_sort_pred);
-				},
-				1);
-			splice_kids(ret, start, out);
-		}
-	}
-
-	if (kids.size() <= TT::k_buf_ub) {
-		size_type size = 0;
-		for (size_t j = 0; j < kids.size(); ++j) {
-			interior->tree_nodes[j] = kids[j];
-			size += kids[j]->size;
-		}
-		std::copy(seps.begin(), seps.end(), interior->split.begin());
-		interior->node_n = static_cast<buf_size_type>(kids.size());
-		interior->size = size;
-		interior->update_aug();
-		interior->reset_deletion_flag();
-		return {};
-	}
-
-	/* tomb overflowed: regroup its children, its parent splices them. */
-	free_node<interior_type>(tomb);
-	auto up = node_split_pair_seq::uninitialized(get_bkt_num(kids.size()));
-	[[maybe_unused]] const size_type bkt_n = generate_interior_nodes(
-		parlay::make_slice(kids), parlay::make_slice(seps),
-		gen_nodes_output_handler{
-			.set_key = [&](size_type i, auto key) { up[i].second = key; },
-			.set_node = [&](size_type i,
-							auto child) { up[i].first = child; } });
-	assert(bkt_n == up.size());
-	return up;
+	assert(bkt_n >= 2 && bkt_n <= out.size());
+	return bkt_n;
 }
 
 template <typename TT>
