@@ -8,7 +8,8 @@ now run the graft) plus `GraftHandShapes`, `GraftTombOverflow`,
 `GraftHeapAllocator`. Faults injected and caught (2026-09-24):
 shortest-first (`order`), keep right separator (random suites), no bound
 raise (`raised`), no edge update (`edge`), wrong splice separator
-(`GraftTombOverflow`).
+(`GraftTombOverflow`). 2026-09-28 restructure: 10 of 10 caught (see
+CLAUDE.md); the `loose` shapes cover loose entries.
 
 Decisions (user):
 
@@ -27,6 +28,19 @@ Decisions (user):
   rebuild upper nodes once per round, so the pass is a single descent that
   places same-level items before shorter ones route and rebuilds each node
   once.
+- 2026-09-28 (user): "use the implementation in `dev_delete` and optimise
+  it". `dev_delete` (`9e34f95`): box and height augmentation, a separate
+  `MarkValidSubtrees` pass, `FetchValidSubtreeAndInvalidLeaves` into
+  preallocated arrays (entries already sorted), `parlay::sort` of the
+  wrappers by (height desc, box mid), per-height `BatchInsertNodesRecursive`
+  tallest first, then `BatchInsert_` of the entries. Its defects: n scratch
+  slots (a target node can emit more parts than it got items), asserts the
+  root never splits, allocates `node_seq`/`split_seq` at every target
+  node, leaf bounds from a scan when unsorted. Taken: preallocated
+  collection from per-node counts, entries collected sorted, batch-insert
+  routing. Changed: inputs written in key order so nothing is sorted, one
+  descent, sizes by delta. The per-height rounds are kept as a probe
+  variant for timing (`build/scratch_graft/probe`, `rounds`).
 
 ## Idea
 
@@ -87,14 +101,17 @@ Decisions (user):
   1. `graft_detach_rec(root)`: every invalid subtree into one pool sized by
      the root's count; kept nodes compacted (left-absorb, raised bounds);
      the root's raised bound is the global left edge.
-  2. Items plus the underfull leaves' entries in one array sorted by key;
-     per-height position lists; one scratch of 2 slots per input.
+  2. The pool is already in key order: items plus the loose entries of
+     underfull leaves (a raised item is moved behind what was cut below
+     its bound). Per-height position lists by a stable counting sort; one
+     scratch of 2 slots per input.
   3. Inputs left of all content (rare): tallest-first rounds along the
      leftmost path with the edge (`graft_rec`), then their entries.
-  4. `graft_all_rec` from the root: items one level below a node join its
-     child list, shorter inputs route by the merged list, children in
-     parallel, node rebuilt once; overflow goes up through the scratch;
-     a root split adds levels (`assemble_interior_levels`).
+  4. `graft_all_rec` from the root: a node without items one level below
+     routes as batch insert; `graft_join` merges items into a node's child
+     list, shorter inputs route by the merged list, children in parallel,
+     node rebuilt once; sizes by delta; overflow goes up through the
+     scratch; a root split adds levels (`assemble_interior_levels`).
 - Collapse single-child roots, now after every delete.
 
 Unchanged: batch insert, `balance_over_leaves`.
@@ -106,6 +123,11 @@ Unchanged: batch insert, `balance_over_leaves`.
   stay); items are valid subtrees.
 - Grafting only adds children; splits make 2B..3B. No node changes height.
 - Sizes: kept + items + loose entries = size after marking.
+- The pool is strictly increasing in key (asserted).
+- Between operations every interior has default deletion flags: the detach
+  resets every node it keeps, invalid nodes are freed, new nodes start
+  clean. Checked 2026-09-28 by an assert-only copy (walk the tree after
+  every delete) over the delete tests.
 
 ## Steps
 
@@ -120,5 +142,28 @@ Unchanged: batch insert, `balance_over_leaves`.
 3. Benchmark ABBA against `dev` at 1e9, uni/norm/seg x 4 ratios. `build/`
    is a DEBUG build: use a release build directory.
 
+## Results (2026-09-28, 1e9, `b_test -t 128`)
+
+Full table in CLAUDE.md (Graft). In short, chain seconds at 0.01%:
+
+| | seg | uni | norm |
+|---|---|---|---|
+| `dev` repair | 6.98 | 76.47 | 55.09 |
+| `dev` + touched-only mark | 7.04 | 40.46 | 36.18 |
+| graft + touched-only mark (this branch) | 6.59 | 39.45 | 35.55 |
+
+- The graft's fix-up is 5-13x cheaper than `repair_rec` (0.16-0.39 s vs
+  ~2 s per chain), but the mark pass is 80-90% of a uni/norm chain, so
+  the algorithm moves the total by 1-2.5% (6% on seg; -8% on seg 0.1%).
+- The mark pass read every child's size at each touched node; reading
+  only the touched ones halves uni 0.01% on both branches. `dev` does not
+  have it yet: port it before comparing the two fix-ups.
+- Per-height rounds (`dev_delete`'s order) match the single descent.
+
+Next, by measured cost: the batch sort (3.3-3.7 s per 0.01% chain; keys
+are u32, a radix sort would do); leaf balancing (half of it `std::sort` of
+a merged leaf); balancing on the mark's critical path (seg 0.1%);
+`batch_insert_update_interior` still sums every child.
+
 Later, optional: the invalid root through the same pool (assemble the
-tallest group, graft the rest); one descent for all heights.
+tallest group, graft the rest).

@@ -445,9 +445,11 @@ btree<TT>::batch_delete_recursive(node_type *node, TT::const_key_slice in,
 		}
 	}
 
+	size_buf_ub_arr old_size;
 	parlay::parallel_for(
 		0, cnt,
 		[&](buf_size_type i) {
+			old_size[i] = interior->tree_nodes[nodes_map[i]]->size;
 			std::tie(invalid_subtree_flag[nodes_map[i]],
 					 contain_invalid_subtree[nodes_map[i]],
 					 reinsert_num[nodes_map[i]]) =
@@ -457,8 +459,28 @@ btree<TT>::batch_delete_recursive(node_type *node, TT::const_key_slice in,
 		},
 		1);
 
+	/*
+	 * Only the touched children changed: the size drops by what they lost,
+	 * and a leaf that went underfull is one of them (between operations
+	 * every leaf below a leaf-parent holds at least k_buf_lb). Reading
+	 * every child is a miss per child: half the 1e9 uni 0.01% chain.
+	 */
+	size_type gone = 0;
+	size_type underfull_n = 0;
+	size_type underfull_sum = 0;
+	for (buf_size_type i = 0; i < cnt; ++i) {
+		const size_type sz = interior->tree_nodes[nodes_map[i]]->size;
+		gone += old_size[i] - sz;
+		if (!children_are_interior && sz < TT::k_buf_lb) {
+			underfull_n++;
+			underfull_sum += sz;
+		}
+	}
+	interior->size -= gone;
+
 	if (!children_are_interior) {
-		return batch_delete_update_leaf_parent(node, leaf_entries_pattern,
+		return batch_delete_update_leaf_parent(node, underfull_n, underfull_sum,
+											   leaf_entries_pattern,
 											   leaf_sort_pred);
 	}
 	return batch_delete_update_interior_size(

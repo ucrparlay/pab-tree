@@ -239,10 +239,10 @@ TT::size_type btree<TT>::handling_interior_split_overflow(
 }
 
 /*
- * An interior whose children are interior, after they returned. It is valid
- * with k_buf_lb valid children (the root: one). reinsert_size counts the
- * items for its tomb: the children's, plus each valid child of an invalid
- * node.
+ * An interior whose children are interior, after they returned; its size is
+ * already down by what they lost. It is valid with k_buf_lb valid children
+ * (the root: one). reinsert_size counts the inputs for its tomb: the
+ * children's, plus each valid child of an invalid node.
  */
 template <typename TT>
 std::tuple<bool, bool, typename TT::size_type>
@@ -253,18 +253,15 @@ btree<TT>::batch_delete_update_interior_size(
 {
 	assert(!node->is_leaf && !node_has_leaf_children(node));
 	auto interior = static_cast<interior_type *>(node);
-	size_type tot_entry_sz = 0;
 	bool contain_invalid = 0;
 	size_type reinsert_n = 0;
 	buf_size_type invalid_tree_n = 0;
 	for (buf_size_type i = 0; i < interior->get_node_n(); i++) {
-		tot_entry_sz += interior->tree_nodes[i]->size;
 		invalid_tree_n += invalid_subtree_flag_arr[i] ? 1 : 0;
 		contain_invalid |= invalid_subtree_num_arr[i];
 		reinsert_n += reinsert_num_arr[i];
 	}
 	const buf_size_type valid_n = interior->get_node_n() - invalid_tree_n;
-	interior->size = tot_entry_sz;
 	interior->update_aug();
 	interior->valid =
 		node != this->root_ ? valid_n >= TT::k_buf_lb : valid_n > 0;
@@ -277,51 +274,65 @@ btree<TT>::batch_delete_update_interior_size(
 }
 
 /*
- * A leaf-parent after its leaves lost keys: the underfull leaves merge with
- * their siblings first, then the flags follow from what is left. An
- * invalid one hands every leaf to its tomb; an all-empty one stays whole
- * for whoever drops it.
+ * A leaf-parent after its leaves lost keys; its size is already down, and
+ * underfull_n / underfull_sum count its underfull leaves and their entries
+ * (all among the touched ones). The underfull leaves merge with their
+ * siblings first, then the flags follow from what is left. An invalid one
+ * hands every leaf to its tomb; an all-empty one stays whole for whoever
+ * drops it.
  */
 template <typename TT>
 template <typename LeafSortPred>
 std::tuple<bool, bool, typename TT::size_type>
 btree<TT>::batch_delete_update_leaf_parent(
-	node_type *node, const TT::pattern_type leaf_entries_pattern,
+	node_type *node, size_type underfull_n, size_type underfull_sum,
+	const TT::pattern_type leaf_entries_pattern,
 	LeafSortPred const &leaf_sort_pred)
 {
 	assert(node_has_leaf_children(node));
 	auto interior = static_cast<interior_type *>(node);
+	const size_type total = interior->size;
 
-	size_type total = 0;
-	size_type underfull_n = 0;
-	size_type underfull_sum = 0; /* what balance_over_leaves moves */
-	for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-		const size_type sz = interior->tree_nodes[i]->size;
-		total += sz;
-		if (sz < TT::k_buf_lb) {
-			underfull_n++;
-			underfull_sum += sz;
+#ifdef DEBUG
+	{
+		size_type sum = 0;
+		size_type under = 0;
+		for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
+			sum += interior->tree_nodes[i]->size;
+			under += interior->tree_nodes[i]->size < TT::k_buf_lb ? 1 : 0;
 		}
+		assert(sum == total && under == underfull_n);
 	}
-	interior->size = total;
+#endif /* DEBUG */
+
+	buf_size_type valid_n = 0;
 	if (total > 0 && underfull_n > 0 && interior->get_node_n() >= 2) {
 		balance_over_leaves(node, underfull_sum, leaf_entries_pattern,
 							leaf_sort_pred);
+		for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
+			valid_n += node_is_valid(interior->tree_nodes[i]) ? 1 : 0;
+		}
 	} else {
 		interior->update_aug();
-	}
-
-	buf_size_type valid_n = 0;
-	for (buf_size_type i = 0; i < interior->get_node_n(); ++i) {
-		valid_n += node_is_valid(interior->tree_nodes[i]) ? 1 : 0;
+		valid_n =
+			static_cast<buf_size_type>(interior->get_node_n() - underfull_n);
 	}
 	interior->valid =
 		node != this->root_ ? valid_n >= TT::k_buf_lb : valid_n > 0;
 	/* Balanced: a valid leaf-parent has no underfull leaf left. */
 	assert(!interior->valid || valid_n == interior->get_node_n());
 	interior->contain_invalid_subtree = !interior->valid;
-	interior->reinsert_size =
-		interior->valid || total == 0 ? 0 : interior->get_node_n();
+	/*
+	 * Inputs for the tomb: every leaf as an item, or, when the leaves
+	 * merged into one underfull leaf, its entries.
+	 */
+	size_type inputs = 0;
+	if (!interior->valid && total > 0) {
+		assert(valid_n == interior->get_node_n() ||
+			   (interior->get_node_n() == 1 && valid_n == 0));
+		inputs = valid_n > 0 ? valid_n : total;
+	}
+	interior->reinsert_size = inputs;
 	return std::make_tuple(get_node_invalid_status(node),
 						   node_contain_invalid_subtree(node),
 						   get_node_reinsert_size(node));

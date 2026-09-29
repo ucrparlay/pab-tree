@@ -192,6 +192,12 @@ Each batch of `m` is drawn **uniformly from the leading `mult * m` surviving
 keys** (`-batch_param mult`, default 2), then removed. So the hot region is a
 fixed-width window of *ranks* that advances by exactly `m` per batch.
 
+For the tree (2026-09-28, 1e9, `-t 128`): each batch halves the leaves in its
+window, so most touched leaves go underfull and leaf balancing
+(`balance_over_leaves`, half of it `std::sort`) is the delete's main
+structural cost; the batch sort is ~45% of the 0.01% chain. Batch k of the
+0.01% file spans keys `[0, (k + 2) * 1e5)`.
+
 Implemented as `TargetDensity == 1.0` (flat, like `uni`) plus
 `WindowSize == mult * want`. All of the shape lives in the window; nothing else
 in the sampler changes.

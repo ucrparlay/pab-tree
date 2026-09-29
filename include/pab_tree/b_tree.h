@@ -636,13 +636,14 @@ private:
 	}
 
 	/*
-	 * Items a subtree hands to its tomb: the largest valid subtrees of
-	 * what is invalid below it, and its underfull leaves.
+	 * Inputs a subtree hands to its tomb: the largest valid subtrees of
+	 * what is invalid below it, one each, and the entries of its underfull
+	 * leaves.
 	 */
 	static size_type get_node_reinsert_size(const node_type *node)
 	{
 		return node->is_leaf ?
-				   (node->size < type_trait::k_buf_lb ? 1 : 0) :
+				   (node->size < type_trait::k_buf_lb ? node->size : 0) :
 				   static_cast<const interior_type *>(node)->reinsert_size;
 	}
 
@@ -732,42 +733,62 @@ private:
 
 	using opt_key_buf_ub_arr = std::array<opt_key, type_trait::k_buf_ub>;
 
-	/* Height recorded for an underfull leaf, reinserted entry by entry. */
+	/* Height recorded for a loose entry. */
 	static constexpr height_type k_entry_source =
 		std::numeric_limits<height_type>::max();
 
 	/*
-	 * Items cut out of invalid subtrees, in structural order (sorted by
-	 * bound within each height): a node, the lower bound of its key range,
-	 * its height.
+	 * What is cut out of the invalid subtrees, written in key order: an
+	 * item is a node, the lower bound of its key range and its height; a
+	 * loose entry (from an underfull leaf) has no node.
 	 */
 	struct graft_pool {
+		type_trait::key_slice keys;
 		type_trait::node_slice nodes;
-		type_trait::key_slice bounds;
+		type_trait::entry_slice entries;
 		parlay::slice<height_type *, height_type *> heights;
 
 		graft_pool cut(size_t l, size_t r) const
 		{
-			return { nodes.cut(l, r), bounds.cut(l, r), heights.cut(l, r) };
+			return { keys.cut(l, r), nodes.cut(l, r), entries.cut(l, r),
+					 heights.cut(l, r) };
 		}
 
 		size_t size() const
 		{
-			return nodes.size();
+			return keys.size();
+		}
+
+		void put(size_t i, node_type *node, key_type const &bound,
+				 height_type h) const
+		{
+			keys[i] = bound;
+			nodes[i] = node;
+			heights[i] = h;
+		}
+
+		void move(size_t to, size_t from) const
+		{
+			keys[to] = keys[from];
+			nodes[to] = nodes[from];
+			heights[to] = heights[from];
+			if (nodes[from] == nullptr) {
+				entries[to] = entries[from];
+			}
 		}
 	};
 
 	/*
-	 * Everything the descent puts back, sorted by key: items (a node and
-	 * its height) and the entries of underfull leaves (height
-	 * k_entry_source). hpos[h] lists the positions of the items of height h.
+	 * The pool as the descent reads it. The items of height h sit at
+	 * positions hpos[hoff[h], hoff[h + 1]), increasing.
 	 */
 	struct graft_batch {
 		key_type const *keys;
 		node_type *const *nodes;
 		entry_type const *entries;
-		parlay::sequence<size_type> const *hpos;
-		size_type level_n;
+		size_type const *hpos;
+		size_t const *hoff;
+		height_type level_n;
 	};
 
 	/* A valid root with an invalid node below: cut out, then put back. */
@@ -777,8 +798,9 @@ private:
 
 	/*
 	 * One descent for in[l, r): items one level below node join its child
-	 * list, the rest route through it. Returns 0 or node's replacement
-	 * count, written to out as in batch insert.
+	 * list (graft_join), the rest route through it as in batch insert.
+	 * Returns 0 or node's replacement count, written to out as in batch
+	 * insert.
 	 */
 	template <typename LeafSortPred>
 	size_type graft_all_rec(node_type *node, height_type height, size_type l,
@@ -786,6 +808,14 @@ private:
 							node_split_pair_slice out,
 							const type_trait::pattern_type leaf_entries_pattern,
 							LeafSortPred const &leaf_sort_pred);
+
+	/* node takes the items at own[0, own_n) as children. */
+	template <typename LeafSortPred>
+	size_type graft_join(node_type *node, height_type height, size_type l,
+						 size_type r, size_type const *own, size_type own_n,
+						 graft_batch const &in, node_split_pair_slice out,
+						 const type_trait::pattern_type leaf_entries_pattern,
+						 LeafSortPred const &leaf_sort_pred);
 
 	/* Valid node: detach what is invalid below it. Returns its new bound. */
 	static opt_key graft_detach_rec(node_type *node, opt_key const &lo,
@@ -797,11 +827,13 @@ private:
 
 	/*
 	 * Drop the freed children; each one's range joins its left neighbour.
-	 * Returns node's new lower bound when its first child went.
+	 * size is what node keeps. Returns node's new lower bound when its
+	 * first child went.
 	 */
 	static opt_key graft_compact(node_type *node,
 								 boolean_buf_ub_arr const &drop,
-								 opt_key_buf_ub_arr const &raised);
+								 opt_key_buf_ub_arr const &raised,
+								 size_type size);
 
 	/*
 	 * Items of height target, sorted by bound, into node's subtree one level
@@ -838,7 +870,8 @@ private:
 	/* A leaf-parent: balance its underfull leaves, then set its flags. */
 	template <typename LeafSortPred>
 	std::tuple<bool, bool, size_type> batch_delete_update_leaf_parent(
-		node_type *node, const type_trait::pattern_type leaf_entries_pattern,
+		node_type *node, size_type underfull_n, size_type underfull_sum,
+		const type_trait::pattern_type leaf_entries_pattern,
 		LeafSortPred const &leaf_sort_pred);
 
 	/* PARA: return bucket_num */

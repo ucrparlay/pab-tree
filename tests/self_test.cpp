@@ -1198,14 +1198,16 @@ enum class expect { consolidation, rebuild, graft, any };
 template <typename tree>
 void delete_and_check(tree &t, oracle &ref, std::vector<uint32_t> const &gone,
 					  std::vector<uint32_t> const &probes, uint64_t seed,
-					  expect path)
+					  expect path,
+					  typename tree::type_trait::pattern_type pattern =
+						  tree::type_trait::leaf_entries_pattern::hybrid)
 {
 	using tt = typename tree::type_trait;
 	constexpr bool counted =
 		std::is_same_v<typename tt::node_alloc, typed_counting_alloc>;
 
 	[[maybe_unused]] auto const before = node_allocs<tree>();
-	t.batch_delete(gone);
+	t.batch_delete(gone, pattern, false, typename tree::default_hybrid_pred{});
 	for (auto k : gone) {
 		ref.erase(k);
 	}
@@ -2537,12 +2539,14 @@ namespace
 {
 /*
  * A subtree to build node by node: a leaf of `entries` keys when kids is
- * empty. The test deletes every key under a doomed subtree.
+ * empty. The test deletes every key under a doomed subtree, and a leaf's
+ * keys before its last `keep`.
  */
 struct shape_spec {
 	size_t entries = 0;
 	std::vector<shape_spec> kids;
 	bool doomed = false;
+	size_t keep = SIZE_MAX;
 };
 
 shape_spec leaf_of(size_t n)
@@ -2558,6 +2562,13 @@ shape_spec node_of(std::vector<shape_spec> kids)
 shape_spec doomed(shape_spec s)
 {
 	s.doomed = true;
+	return s;
+}
+
+shape_spec leaf_keeping(size_t n, size_t k)
+{
+	shape_spec s = leaf_of(n);
+	s.keep = k;
 	return s;
 }
 
@@ -2599,7 +2610,7 @@ struct shape_builder {
 			for (size_t i = 0; i < s.entries; ++i, ++next) {
 				es.push_back(entry{ next, next ^ 0x5bf03635u });
 				ref[next] = next ^ 0x5bf03635u;
-				if (dead) {
+				if (dead || (s.keep < s.entries && i < s.entries - s.keep)) {
 					doomed_keys.push_back(next);
 				}
 			}
@@ -2671,7 +2682,9 @@ size_t tree_height(tree const &t)
  * height_after is the height the tree must have afterwards.
  */
 template <typename tree>
-void hand_shape(shape_spec const &s, char const *name, size_t height_after = 0)
+void hand_shape(shape_spec const &s, char const *name, size_t height_after = 0,
+				typename tree::type_trait::pattern_type pattern =
+					tree::type_trait::leaf_entries_pattern::hybrid)
 {
 	using tt = typename tree::type_trait;
 	SCOPED_TRACE(std::string("shape ") + name +
@@ -2686,8 +2699,8 @@ void hand_shape(shape_spec const &s, char const *name, size_t height_after = 0)
 
 	std::vector<uint32_t> probes(b.next + 1);
 	std::iota(probes.begin(), probes.end(), 0u);
-	ASSERT_NO_FATAL_FAILURE(
-		delete_and_check(t, ref, b.doomed_keys, probes, g_seed, expect::any));
+	ASSERT_NO_FATAL_FAILURE(delete_and_check(t, ref, b.doomed_keys, probes,
+											 g_seed, expect::any, pattern));
 	if (height_after != 0) {
 		ASSERT_EQ(tree_height(t), height_after);
 	}
@@ -2701,6 +2714,9 @@ void hand_shape(shape_spec const &s, char const *name, size_t height_after = 0)
  *   edge    X is the leftmost node: all items lie left of T's content
  *   inner   the same one level down, below the root
  *   raised  X keeps only a valid V whose first child went; V's bound rises
+ *   loose   X keeps a valid leaf-parent P, then a leaf-parent left with
+ *           one underfull leaf; its entries follow P and must land in P
+ *   loose_edge  the same with X leftmost
  */
 template <unsigned B>
 struct hand_shapes {
@@ -2741,6 +2757,26 @@ struct hand_shapes {
 			node_of(cat({ v }, times(B - 1, doomed(thinnest(2, B)))));
 		return node_of({ thinnest(3, B), thinnest(3, B), x, thinnest(3, B) });
 	}
+
+	/* height 2: P, then a leaf-parent whose leaves merge into B - 1 entries */
+	static shape_spec x2_loose()
+	{
+		auto const lp = node_of(cat({ leaf_keeping(B, B > 2 ? B - 1 : 1) },
+									times(B - 1, doomed(leaf_of(B)))));
+		return node_of(cat({ thinnest(1, B), lp },
+						   times(B > 2 ? B - 2 : 0, doomed(thinnest(1, B)))));
+	}
+
+	static shape_spec loose()
+	{
+		return node_of(
+			{ thinnest(2, B), thinnest(2, B), x2_loose(), thinnest(2, B) });
+	}
+
+	static shape_spec loose_edge()
+	{
+		return node_of({ x2_loose(), thinnest(2, B), thinnest(2, B) });
+	}
 };
 
 /*
@@ -2770,6 +2806,13 @@ void hand_shapes_at()
 	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<B>::inner(), "inner"));
 	ASSERT_NO_FATAL_FAILURE(
 		hand_shape<tree>(hand_shapes<B>::raised(), "raised"));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<B>::loose(), "loose"));
+	ASSERT_NO_FATAL_FAILURE(
+		hand_shape<tree>(hand_shapes<B>::loose_edge(), "loose_edge"));
+	/* The loose leaf comes out unsorted: its entries are sorted on the way. */
+	ASSERT_NO_FATAL_FAILURE(
+		hand_shape<tree>(hand_shapes<B>::loose(), "loose unsorted", 0,
+						 tree::type_trait::leaf_entries_pattern::unsorted));
 	EXPECT_EQ(typed_counting_alloc::allocs<typename tree::leaf_type>.load(),
 			  typed_counting_alloc::frees<typename tree::leaf_type>.load())
 		<< "leaf leak or double free";
@@ -2821,6 +2864,9 @@ TEST(SelfTest, GraftHeapAllocator)
 	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<8>::inner(), "inner"));
 	ASSERT_NO_FATAL_FAILURE(
 		hand_shape<tree>(hand_shapes<8>::raised(), "raised"));
+	ASSERT_NO_FATAL_FAILURE(hand_shape<tree>(hand_shapes<8>::loose(), "loose"));
+	ASSERT_NO_FATAL_FAILURE(
+		hand_shape<tree>(hand_shapes<8>::loose_edge(), "loose_edge"));
 	ASSERT_NO_FATAL_FAILURE(
 		hand_shape<tree4>(tomb_overflow(), "tomb overflow", 5));
 }

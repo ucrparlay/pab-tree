@@ -191,8 +191,16 @@ leaf-parent first balances its underfull leaves, then takes its flags from
 what is left (`batch_delete_update_leaf_parent` -> `balance_over_leaves`);
 an interior with interior children takes them from its children
 (`batch_delete_update_interior_size`). Flags: `size`, `valid`,
-`contain_invalid_subtree`, `reinsert_size` (items for the tomb, see Graft);
-untouched interior children get `reset_deletion_flag()`.
+`contain_invalid_subtree`, `reinsert_size` (inputs for the tomb, see Graft);
+untouched interior children get `reset_deletion_flag()`. Bookkeeping reads
+the **touched** children only (2026-09-28, this branch): a node's `size`
+drops by what they lost (sizes read before the recursion), and a
+leaf-parent looks for underfull leaves among its touched leaves, because
+between operations every leaf below a leaf-parent holds `>= k_buf_lb`
+(`#ifdef DEBUG` checks both against a full scan). Reading every child was
+a cache miss per child: at 1e9 uni 0.01% the chain went 76.2 -> 40.6 s on
+`dev`'s code and 84.3 -> 39.5 s here (probe copies, `-t 128 -r 1`); seg and
+10% are unchanged. `dev` still reads every child.
 `delete_points_4_leaf` compacts the leaf (linear find per key, swap to the
 end: O(keys × leaf size), sorted leaf or not) and
 `post_process_leaf_change` decides `is_sorted`. Deleting an absent key is a
@@ -317,47 +325,61 @@ the surplus. Writes go straight into the node's arrays; `tree_idx <= i`
 throughout is what makes that safe. Epilogue: `node_n`, `update_aug`,
 `reset_deletion_flag`; `size` is not recomputed.
 
-**Graft** (2026-09-24/25, branch `graft-delete`; idea
+**Graft** (2026-09-24/28, branch `graft-delete`; idea
 `docs/new_delete_alg.md`, plan `docs/plan_graft_delete_2026-09.md`). The
 fix-up below a valid root on this branch; compare against `dev`, which
 keeps `repair_rec`. `c937b45`'s reinsert, but whole valid subtrees go back
 instead of flattened entries. History: `00e8c80` had a `delete_policy`
 option, a separate settle pass and per-tomb rounds with allocations in
 the recursion; the settle pass went into the mark, then (user,
-2026-09-25) the per-tomb rounds became one global pool and one descent.
+2026-09-25) the per-tomb rounds became one global pool and one descent
+(`529ef36`, which still sorted all inputs). 2026-09-28 (user: use
+`dev_delete`'s implementation, optimise it): restructured after
+`dev_delete` (`9e34f95`, the user's March version: box and height
+augmentation, a separate `MarkValidSubtrees` pass, per-height
+`BatchInsertNodesRecursive` tallest first, entries last by `BatchInsert_`,
+scratch of n slots although a target can emit more, asserts the root never
+splits, allocates at every target node). Kept from it: preallocated
+collection from per-node counts, entries collected already sorted,
+batch-insert routing. Not kept: the augmentation (bounds from separators do
+the same) and the extra passes.
 
-The mark pass leaves `reinsert_size` = items a subtree hands over:
+The mark pass leaves `reinsert_size` = inputs a subtree hands over:
 children's counts, plus the valid children of an invalid node; an invalid
-leaf-parent hands every leaf; an all-empty one is left whole. Validity is
+leaf-parent hands every leaf, or, when its leaves merged into one underfull
+leaf, that leaf's entries; an all-empty one is left whole. Validity is
 decided after leaf balancing. Then `graft_repair`:
 
-1. `graft_detach_rec(root)` cuts every invalid subtree into one pool,
-   preallocated from the root's count: items (node, lower bound, height)
-   in structural order, underfull leaves as entry sources (height
-   `k_entry_source`). The raw pool is not sorted by bound (a valid node can
-   have a raised bound yet precede its detached lower descendants); within
-   a height it is. Kept nodes are compacted (left-absorb, raised
-   separators); the root's raised bound is the global left edge.
-   `graft_detach_rec` visits valid nodes retained in the tree or pool;
-   it removes their invalid children, compacts them and returns a raised
-   first bound.
-   `graft_decompose_rec` frees an invalid node, emits its valid children
-   as subtree items (after detaching their invalid descendants), and
-   marks underfull leaves as entry sources.
-2. Items and the underfull leaves' entries go into one array sorted by key
-   (`parlay::sort_inplace`); `hpos[h]` = positions of height-h items; one
-   scratch of 2 `node_split_pair`s per input.
+1. `graft_detach_rec(root)` writes every invalid subtree into one pool
+   (SoA: keys, nodes, entries, heights), preallocated from the root's
+   count, **in key order**: an item is (node, lower bound, height), a
+   loose entry has no node (height `k_entry_source`), sorted per leaf on
+   the way. Structural order is key order except that a valid item whose
+   bound rose must follow what was cut from below that bound;
+   `graft_decompose_rec` moves it there (usually 0 steps). Kept nodes are
+   compacted (left-absorb, raised separators); the root's raised bound is
+   the global left edge. `graft_detach_rec` visits valid nodes retained in
+   the tree or pool; it removes their invalid children, compacts them
+   (size from the children it visited, not a re-read of every child) and
+   returns a raised first bound. `graft_decompose_rec` frees an invalid
+   node and emits its valid children as items (after detaching their
+   invalid descendants).
+2. `parlay::counting_sort` of the positions by height (stable, O(n))
+   gives `hpos`/`hoff`: group h = the height-h items, increasing. No
+   comparison sort. One scratch of 2 `node_split_pair`s per input.
 3. Inputs left of all content (keys < edge; rare): tallest-first rounds
    along the leftmost path (`graft_rec` / `graft_into_node` with the edge,
    moved after each round), then their entries.
-4. Everything else in one descent, `graft_all_rec`: at each node the items
-   one level below it (from `hpos`, binary search) join its child list
-   right after the child their bound routes to; every shorter input then
-   routes by that merged list (binary search per separator), so it can
-   land inside a just-joined item; children run in parallel; the node is
-   rebuilt once after they return, and a split hands its parts up through
-   the scratch, as in batch insert. Buffers are on the stack; the heap
-   only when a node takes more than `k_buf_ub` children.
+4. Everything else in one descent, `graft_all_rec`. A node with no items
+   one level below it routes like batch insert (`partition_batch`, touched
+   children in parallel; no child split: only `size` changes). A node that
+   takes items goes to `graft_join`: each item joins right after the child
+   its bound routes to; every shorter input routes by that merged list, so
+   it can land inside a just-joined item; the node is rebuilt once after
+   its children return, and a split hands its parts up through the
+   scratch. Sizes move by what the touched children gained; untouched
+   children are not read. Buffers are on the stack; the heap only when a
+   node takes more than `k_buf_ub` children.
 
 A whole item at input position p is consumed at its parent: the previous
 child's input range ends at p, and the grafted child's starts at p + 1.
@@ -380,25 +402,49 @@ raised bound below the root routes lower items into its left sibling in
 the single descent. A node that
 lost a child can overflow when the rest comes back (`GraftTombOverflow`,
 B = 4: root 16 children -> 17, height 4 -> 5), so `c937b45`'s no-split
-argument does not carry over. Faults injected and caught (2026-09-25):
-shortest-first edge rounds and no raise (`GraftHandShapes`); keep right
-separator, no edge update, wrong separator between a split child's parts
-(`RepairShapes`). The `#ifdef DEBUG` `validate<false>()` before the fix-up
+argument does not carry over. `loose`/`loose_edge` (and `loose` under the
+`unsorted` policy): a leaf-parent left with one underfull leaf, whose
+entries must land inside the grafted leaf-parent before it. Faults
+injected and caught (2026-09-25): shortest-first edge rounds and no raise
+(`GraftHandShapes`); keep right separator, no edge update, wrong separator
+between a split child's parts (`RepairShapes`). 2026-09-28, the
+restructure, 10 of 10 caught: no reorder of a raised item, size not grown
+(route, join, join delta), wrong separator after a split, item placed one
+child late, the heap path, loose count 1, no sort of an unsorted loose
+leaf, left-edge entries dropped; the loose shapes were added because the
+count fault survived. The `#ifdef DEBUG` `validate<false>()` before the fix-up
 is gone: after the mark, a leaf-parent can be thin until grafted;
 `graft_repair` validates the result under `DEBUG`. 38/38 at `-O1
 -UNDEBUG`; delete tests under `-DDEBUG -UNDEBUG` and ASAN/UBSan.
 
-Timings, 1e8 (`bench_one`: build, then delete in batches of the ratio; A
-B .. B A, mean of 2), repair (`dev`) / graft + settle pass (`00e8c80`) /
-single descent: random 0.1% 3.10 / 3.06 / 3.10 s, 1% 1.35 / 1.35 / 1.35,
-10% 0.53 / 0.53 / 0.54; key-sorted 0.1% 0.59 / 0.60 / 0.61; graft-heavy
-(key-sorted, keeping every 8th run of 128 keys) 0.1% 0.321 / 0.333 /
-0.321, 1% 0.188 / 0.198 / 0.194, 10% 0.183 / 0.182 / 0.180. At 1e8 the
-mark pass dominates; 1e9 norm/seg not yet run for the single descent.
-Earlier 1e9 single runs (`00e8c80`, uni, `-r 1 -t 128`): repair 70.2 /
-28.9 / 13.3 / 4.72 s, graft 78.9 / 30.4 / 13.9 / 4.78 s; the same repair
-command gave 32.6 s at 0.01% in the table above, so compare only within
-one session.
+Timings, 2026-09-28, 1e9 `b_test -t 128 -r 1` (chain s; seg one run,
+uni/norm A B B A mean of 2, repeats within 1%), probe copies in
+`build/scratch_graft/probe` (phase timers on stderr; `summarize.py`):
+
+| chain s | seg 0.01 / 0.1 / 1 / 10 % | uni | norm |
+|---|---|---|---|
+| `dev` repair | 6.98 / 4.09 / 3.70 / 3.59 | 76.47 / 30.91 / 13.97 / 4.81 | 55.09 / 24.81 / 9.36 / 4.27 |
+| graft `529ef36` | 6.73 / 4.47 / 3.78 / 3.63 | | |
+| graft, restructured | 6.58 / 4.46 / 3.75 / 3.64 | 84.28 / 31.31 / 13.91 / 4.78 | 58.96 / 24.98 / 9.36 / 4.36 |
+| per-height rounds | 6.57 / 4.37 / 3.70 / 3.61 | | |
+| `dev` + touched-only | 7.04 / 4.10 / 3.70 / 3.66 | 40.46 / 26.96 / 13.76 / 4.80 | 36.18 / 22.59 / 9.20 / 4.31 |
+| graft + touched-only (this tree) | 6.59 / 4.44 / 3.74 / 3.65 | 39.45 / 26.73 / 13.58 / 4.76 | 35.55 / 22.30 / 9.09 / 4.31 |
+
+Phases (timed chain, 0.01%): the batch sort is ~3.3-3.7 s everywhere (45%
+of seg). Fix-up: repair 1.99 / 2.05 / 1.97 s (seg/uni/norm), graft 0.23 /
+0.16 / 0.39 (`529ef36`: 0.42 on seg, input prep 0.16 -> 0.02). The mark
+pass is the rest: uni 70.7 s on `dev` (92% of the chain), 34.1 with
+touched-only reads; the graft's mark is +1.4..1.5 s over `dev`'s because
+leaf balancing lives there (in `repair_rec` on `dev`; same CPU per perf).
+With equal bookkeeping the graft wins 1-2.5% on uni/norm and 6% on seg
+0.01%, loses 8% on seg 0.1% (balancing on the mark's critical path; seg
+halves every leaf in its window). `dev_delete`-style per-height rounds
+equal the single descent within noise. A run takes 8-14 min, mostly the
+five 8 GB reads and the dedup sort in `read_entries`; each chain runs twice
+(`time_loop` warm-up), the timed one is the second `[probe]` line.
+Older numbers: `00e8c80` at 1e9 uni, repair 70.2 / 28.9 / 13.3 / 4.72 s,
+graft 78.9 / 30.4 / 13.9 / 4.78 s (single runs); at 1e8 all three within
+2% (the mark pass dominates).
 
 ## Leaf sort policy
 
@@ -451,7 +497,9 @@ in-process pair sees the same addresses and proves nothing);
 chain does not always collapse the root at small n). `GraftHandShapes`,
 `GraftTombOverflow`, `GraftHeapAllocator`: shapes built node by node
 (`shape_spec`, `shape_builder`, `install` copies a built root into the
-tree's root node).
+tree's root node); `leaf_keeping(n, k)` deletes all but a leaf's last k
+keys, and `hand_shape`/`delete_and_check` take a leaf policy (default
+`hybrid`).
 
 Validate a new test by injecting a fault and watching it fail. An
 equivalent mutant (`<` → `<=` on a covered edge) and a replacement that
