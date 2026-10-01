@@ -4,13 +4,13 @@ import sys
 from pathlib import Path
 
 
-# Usage:
-#   python3 scripts/filter_incremental_updates.py
-#   python3 scripts/filter_incremental_updates.py <input_csv> [output_csv]
+# Usage, from any directory:
+#   python3 filter_incremental_updates.py
+#   python3 filter_incremental_updates.py <input_csv> [output_csv]
 #
 # Defaults:
-#   input  = scripts/data/incremental_updates_new/incremental_updates_new.csv
-#   output = scripts/data/incremental_updates_new/incremental_updates_new_filtered.csv
+#   input  = data/incremental_updates_new/incre_updates_new.csv beside this script
+#   output = next to the input, <input name>_filtered.csv
 #
 # The default input is merge_incre_updates_new.py's 36-value CSV (uni, norm and
 # seg; one BTree row per leaf size run).  The columns below are a subset of both
@@ -22,10 +22,9 @@ from pathlib import Path
 #
 # BTree keeps only its leaf_wrap 64 rows; every other tree keeps all its rows.
 
-DEFAULT_INPUT = Path("scripts/data/incremental_updates_new/incremental_updates_new.csv")
-DEFAULT_OUTPUT = Path(
-    "scripts/data/incremental_updates_new/incremental_updates_new_filtered.csv"
-)
+# anchored at this file, not the working directory
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_INPUT = SCRIPT_DIR / "data/incremental_updates_new/incre_updates_new.csv"
 
 KEEP_COLUMNS = [
     "benchmark",
@@ -53,7 +52,11 @@ BTREE_LEAF_WRAP = "64"
 
 def main() -> int:
     input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_INPUT
-    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_OUTPUT
+    output_path = (
+        Path(sys.argv[2])
+        if len(sys.argv) > 2
+        else input_path.with_name(input_path.stem + "_filtered.csv")
+    )
 
     with input_path.open(newline="") as fin:
         reader = csv.DictReader(fin)

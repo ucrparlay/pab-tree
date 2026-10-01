@@ -838,6 +838,34 @@ The kept columns are a subset of **both** layouts, so passing the old
 `merge_incre_updates_new.py` deliberately has no `--slim` flag, so the two
 cannot drift apart.
 
+**Paths fixed 2026-10-01.** The defaults were relative to the working
+directory and named `incremental_updates_new.csv`, which `1bf5576` removed: run
+from `scripts/` with only an input path, the output went to
+`scripts/scripts/data/incremental_updates_new/`. Now the default input is
+`data/incremental_updates_new/incre_updates_new.csv` beside the script
+(`__file__`), and the output is `<input name>_filtered.csv` next to the input
+unless a second argument names it. Any cwd works. It keeps 18 columns, not 20:
+the build block's queries were dropped.
+
+### `scripts/compare_incre_delete.py` (2026-10-01)
+
+Graft vs repair vs CPAM. Reads `logs/incremental_updates_new/{0,1}/<dis>/64.log`
+at two revisions with `git show` (defaults `92886ba` graft, `1bf5576` repair;
+the repair run is only in history on this branch) and writes
+`data/incremental_updates_new/incre_updates_new_graft_vs_repair.csv`. Per
+distribution: `BTree-graft`, `BTree-repair`, `CPAM` (graft session), then
+`repair/graft`, `CPAM/graft`, `CPAM/repair` as time ratios (above 1: the second
+is faster), in the filter script's columns. Paths come from `__file__`, so any
+cwd works. It checks each log's header against its path and wants exactly 36
+values.
+
+Build, insert and query code is identical at the two revisions, so those
+columns of `repair/graft` measure session drift, not the algorithm. The numbers
+and the drift found are in CLAUDE.md under Graft.
+
+`#!/usr/bin/env python3` is 3.6.8 here; 3.12 is only a zsh alias. Scripts must
+avoid `capture_output` and `str.removeprefix`.
+
 ### Merging the logs (`scripts/merge_incre_updates.py`)
 
 Concatenates `logs/incremental_updates/<tree>/<dis>/<leaf_wrap>.log` (tree dirs

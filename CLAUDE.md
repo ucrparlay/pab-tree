@@ -49,9 +49,10 @@ and `unit_test` compile `-UNDEBUG` (asserts live); everything else is
 `-O3 -march=native -DNDEBUG`. The CMake option `DEBUG=ON` makes every
 target, benchmarks included, a `-g -DDEBUG` Debug build: no `-O`, asserts
 live, plus the `#ifdef DEBUG` box-vs-split loops (O(subtree) per touched
-node). `build/` was configured that way on 2026-09-21; check
-`grep DEBUG build/CMakeCache.txt` before timing. The recipes under Tests
-give `-DDEBUG` at `-O1` for one binary.
+node). `build/` was configured that way on 2026-09-21; the 2026-09-29
+sweep left it `DEBUG=OFF JEMA=ON LEAF=64` (`incre_updates.sh` wipes and
+reconfigures it). Check `grep DEBUG build/CMakeCache.txt` before timing.
+The recipes under Tests give `-DDEBUG` at `-O1` for one binary.
 
 ## Conventions
 
@@ -445,6 +446,41 @@ five 8 GB reads and the dedup sort in `read_entries`; each chain runs twice
 Older numbers: `00e8c80` at 1e9 uni, repair 70.2 / 28.9 / 13.3 / 4.72 s,
 graft 78.9 / 30.4 / 13.9 / 4.78 s (single runs); at 1e8 all three within
 2% (the mark pass dominates).
+
+Sweep (`incre_updates.sh`: tag 224, `-r 3`, leaf 64, `numactl -i all`,
+JEMA), delete chain s. Graft is `92886ba` (2026-09-29), repair is `dev`'s
+`1bf5576` (2026-09-22), CPAM from the graft session.
+`scripts/compare_incre_delete.py` writes them with insert, queries and
+ratios to `incre_updates_new_graft_vs_repair.csv`:
+
+| dis | run | 0.01% | 0.1% | 1% | 10% |
+|---|---|---|---|---|---|
+| uni | repair | 33.66 | 13.38 | 5.61 | 1.80 |
+| uni | graft | **19.60** | **11.49** | 5.40 | 1.77 |
+| uni | CPAM | 54.37 | 30.89 | 7.03 | 1.58 |
+| norm | repair | 28.75 | 12.44 | 4.00 | 1.81 |
+| norm | graft | **19.23** | **9.96** | 3.70 | 1.82 |
+| norm | CPAM | 48.04 | 21.12 | 4.43 | 1.36 |
+| seg | repair | 8.72 | 3.14 | 1.91 | 1.43 |
+| seg | graft | 7.14 | 2.60 | 1.68 | 1.36 |
+| seg | CPAM | 4.96 | 2.13 | 1.35 | 1.13 |
+
+The repair session ran slow on norm and seg: its insert chain (same code
+as the graft run) is 22% / 8% over on norm 0.01% / 0.1% and 9% / 10% on
+seg 0.01% / 1%, and its delete is up to 18% (norm) and 23% (seg) over the
+2026-09-21 ABBA numbers above; uni agrees within 4% on both. Against the
+ABBA repair numbers the graft run is 1.66 / 1.14 / 1.03 / 1.02x on uni,
+1.27 / 1.08 / 1.02 / 0.97x on norm, 1.07 / 0.98 / 0.95 / 1.01x on seg: a
+small-batch gain on uni and norm (the touched-only reads), nothing on seg.
+CPAM's update chains repeat within 2% between the sessions (4.5% worst,
+seg ins 0.01%) apart from one 512 s outlier, uni del 0.01% at `1bf5576`.
+Against CPAM the graft run wins up to 1% batches on uni and norm
+(insert 1.4-2.0x, delete 1.2-2.8x), loses 10% deletes (0.89x, 0.75x) and
+all of seg (insert 0.76-0.98x, delete 0.69-0.83x).
+
+Sweep and probe numbers do not compare: same repair code, uni 0.01%, 33.7 s
+in the sweep and 76.5 s in the probe (cause not checked). The sweep's
+`run_cmake` runs `rm -rf *` in `build/`; the probe copies are gone.
 
 ## Leaf sort policy
 
