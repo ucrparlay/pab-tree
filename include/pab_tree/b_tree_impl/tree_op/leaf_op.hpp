@@ -98,20 +98,19 @@ btree<TT>::handling_leaf_split_overflow(node_type *node, R in,
 										node_split_pair_slice node_split_slice)
 {
 	leaf_type *leaf = static_cast<leaf_type *>(node);
-	auto entry_seq = TT::entry_seq::uninitialized(node->size + in.size());
+	typename TT::entry_seq entry_seq;
 
 	if (leaf->is_sorted) {
-		/*
-		 * in is always sorted (sorted by batch_insert_ before descent).
-		 * Both halves sorted: O(n) merge instead of O(n log n) sort.
-		 */
-		std::ranges::merge(leaf->get_ele_begin_iter(), leaf->get_ele_end_iter(),
-						   in.begin(), in.end(), entry_seq.begin(),
-						   [](entry_type const &a, entry_type const &b) {
-							   return TT::entry_less(a, b);
-						   });
+		/* in is sorted by batch_insert_. Parallel merge of two sorted runs. */
+		entry_seq = parlay::merge(
+			parlay::make_slice(leaf->get_ele_begin_iter(),
+							   leaf->get_ele_end_iter()),
+			in, [](entry_type const &a, entry_type const &b) {
+				return TT::entry_less(a, b);
+			});
 		free_node<leaf_type>(node);
 	} else {
+		entry_seq = TT::entry_seq::uninitialized(node->size + in.size());
 		std::ranges::copy_n(leaf->get_ele_begin_iter(), leaf->size,
 							entry_seq.begin());
 		parlay::copy(in, parlay::make_slice(entry_seq.begin() + leaf->size,
