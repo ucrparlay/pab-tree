@@ -281,7 +281,7 @@ template <typename TT>
 void btree<TT>::erase(const_iterator pos)
 {
 	assert(pos != this->end());
-	this->batch_delete(std::array<key_type, 1>{ entry_traits::get_key(*pos) });
+	this->erase(entry_traits::get_key(*pos));
 }
 
 template <typename TT>

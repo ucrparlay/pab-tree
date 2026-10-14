@@ -291,6 +291,20 @@ public:
 				 const bool sorted_input,
 				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 
+	/*
+	 * batch_delete's interface, run serially: one key at a time, in input
+	 * order, each by its own descent from the root. An underfull node
+	 * borrows from a sibling or merges with it. sorted_input is not used.
+	 */
+	template <typename R>
+	void serial_delete(R &&in);
+
+	template <typename R, typename LeafSortPred = default_hybrid_pred>
+	void
+	serial_delete(R &&in, const type_trait::pattern_type leaf_entries_pattern,
+				  const bool sorted_input,
+				  LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
+
 	void delete_tree();
 
 	/*
@@ -403,22 +417,30 @@ public:
 	}
 
 	/*
-	 * Insert or erase one entry. Both go through the batch path, so a
-	 * loop over them is much slower than one batch call.
+	 * Insert or erase one entry: serial_insert/serial_delete, one descent
+	 * from the root. A loop over them is still much slower than one batch
+	 * call.
 	 */
 	void insert(entry_type const &e)
 	{
-		this->batch_insert(std::array<entry_type, 1>{ e });
+		this->serial_insert(std::array<entry_type, 1>{ e });
 	}
 
 	/* Returns whether the key was present. */
 	bool erase(key_type const &k)
 	{
-		if (!this->contain(k)) {
-			return false;
+		/* serial_delete needs k_buf_lb >= 2. */
+		if constexpr (TT::k_buf_lb < 2) {
+			if (!this->contain(k)) {
+				return false;
+			}
+			this->batch_delete(std::array<key_type, 1>{ k });
+			return true;
+		} else {
+			size_type const n = this->size();
+			this->serial_delete(std::array<key_type, 1>{ k });
+			return this->size() != n;
 		}
-		this->batch_delete(std::array<key_type, 1>{ k });
-		return true;
 	}
 
 	/* Entries in key order. Sorts any unsorted leaf as a side effect. */
@@ -717,6 +739,46 @@ private:
 	[[gnu::noinline]] static node_split_pair
 	serial_split_interior(node_type *node, buf_size_type i,
 						  node_split_pair const &right);
+
+	template <typename R, typename LeafSortPred>
+		requires std::predicate<LeafSortPred, node_type *, R>
+	void serial_delete_(R in,
+						const type_trait::pattern_type leaf_entries_pattern,
+						LeafSortPred const &leaf_sort_pred);
+
+	/*
+	 * Deletes in's single key below node; a child left underfull borrows
+	 * from a sibling or merges with it. Returns whether the key was there.
+	 */
+	template <typename LeafSortPred>
+	static bool
+	serial_delete_rec(node_type *node, type_trait::const_key_slice in,
+					  const type_trait::pattern_type leaf_entries_pattern,
+					  LeafSortPred const &leaf_sort_pred);
+
+	/* Takes in's key out of a leaf, sorted or not as the pattern says. */
+	template <typename LeafSortPred>
+	static bool
+	serial_delete_leaf(node_type *node, type_trait::const_key_slice in,
+					   const type_trait::pattern_type leaf_entries_pattern,
+					   LeafSortPred const &leaf_sort_pred);
+
+	/*
+	 * Child i of node is underfull. With its larger sibling, the left one
+	 * on a tie, it evens out, or merges when the two hold fewer than
+	 * k_buf_md.
+	 */
+	static void serial_rebalance(interior_type *node, buf_size_type i);
+
+	/*
+	 * Neighbours l and r, sep between them: r merges into l, or each takes
+	 * half and sep moves. Returns whether r merged.
+	 */
+	static bool serial_balance_leaves(leaf_type *l, leaf_type *r,
+									  key_type &sep);
+
+	static bool serial_balance_interiors(interior_type *l, interior_type *r,
+										 key_type &sep);
 
 	template <typename R, typename LeafSortPred>
 		requires std::predicate<LeafSortPred, node_type *, R>
@@ -1144,6 +1206,7 @@ private:
 #include "pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_build_tree.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_delete_tree.hpp"
+#include "pab_tree/b_tree_impl/batch_op/b_serial_delete.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_serial_insert.hpp"
 #include "pab_tree/b_tree_impl/points_op.hpp"
 #include "pab_tree/b_tree_impl/query_op/iterator.hpp"

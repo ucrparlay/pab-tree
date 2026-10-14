@@ -117,9 +117,9 @@ t.erase(it, t.upper_bound(200));     // one batch_delete underneath
 if (t.contains(500)) { … }
 ```
 
-Single-element `insert`/`erase` go through the batch path, so a loop over them
-is far slower than one batch call. `insert` and `erase` take a range when you
-give them one.
+Single-element `insert`/`erase` run `serial_insert`/`serial_delete`: one descent
+from the root, no sort. A loop over them is still far slower than one batch
+call. `insert` and `erase` take a range when you give them one.
 
 **Iteration writes to the tree.** Leaves hold their entries unsorted on
 purpose, so the leaf under the cursor gets sorted as the iterator reaches it.

@@ -19,6 +19,10 @@ concurrent-index sweep live in `docs/harness_notes.md` (moved 2026-09-12).
   `#!/bin/bash` script; guard `rm` paths with `${v:?}`.
 - Stop everything else before timing, even at nice 19: four single-core
   compiles slowed a 224-thread run 17% from batch 0.
+- `/` (70 GB; holds `/tmp` and the scratchpad) fills up on this shared
+  box: on 2026-10-14 it hit 0 bytes free and every compile died writing
+  its temporaries. For big compiles set `TMPDIR` to a dir under `build/`
+  (on `/home`).
 
 ## What it is
 
@@ -35,6 +39,7 @@ count/report, plus a `std::set`-like interface. Keys are distinct (a set).
 | `b_tree_impl/batch_op/b_build_tree.hpp` | `build_`, `build_recursive`, `assemble_interior_levels` |
 | `b_tree_impl/batch_op/b_batch_insert.hpp` | `batch_insert_`, `batch_insert_recursive` |
 | `b_tree_impl/batch_op/b_serial_insert.hpp` | `serial_insert_`, `serial_insert_rec`, `serial_insert_leaf`, `serial_split_leaf`, `serial_split_interior` |
+| `b_tree_impl/batch_op/b_serial_delete.hpp` | `serial_delete_`, `serial_delete_rec`, `serial_delete_leaf`, `serial_rebalance`, `serial_balance_leaves`, `serial_balance_interiors` |
 | `b_tree_impl/batch_op/b_batch_delete.hpp` | `batch_delete_`, `batch_delete_recursive`, `rebuild_from_flatten`, `consolidate_invalid_root` |
 | `b_tree_impl/batch_op/b_batch_delete_graft.hpp` | the fix-up below a valid root: `graft_repair`, `graft_all_rec`, `graft_detach_rec`, `graft_decompose_rec`, `graft_compact`, `graft_rec` / `graft_into_node` (left-edge rounds) |
 | `b_tree_impl/tree_op/node_op.hpp` | `generate_*_nodes`, `batch_insert_update_interior`, `handling_interior_split_overflow`, `batch_delete_update_interior_size`, `batch_delete_update_leaf_parent`, `balance_over_leaves` |
@@ -214,9 +219,46 @@ Sanity timing, one run, not ABBA (leaf 64, 1e7 built, 1e6 random, best of
 3), ns/entry, all threads / `PARLAY_NUM_THREADS=1`: `batch_insert` 3.2 /
 155; `serial_insert` sorted 496 / 449, unsorted 158 / 138, hybrid 977 /
 934, sorted on a key-sorted batch 132 / 98; one-entry `batch_insert` loop
-(what `insert(entry)` costs) 3331 / 2857; tlx `insert` 562 / 550. Sorted
-pays dependent misses in the leaf's binary search; unsorted touches only
-the leaf's end. Serial code ran ~10% slower with parlay's workers alive.
+(old `insert(entry)`) 3331 / 2857; tlx `insert` 562 / 550. Sorted pays
+dependent misses in the leaf's binary search; unsorted touches only the
+leaf's end. Serial code ran ~10% slower with parlay's workers alive.
+
+**`serial_delete`** (2026-10-14, user asked: classical or re-insert;
+classical chosen). `batch_delete`'s interface, one key at a time in input
+order, one descent per key; no sort, no parlay, no node allocated. Absent
+key: no-op; null root: return; an emptied root leaf stays, as in
+`batch_delete`. Leaf: binary search if sorted, else a scan; a sorted leaf
+the pattern may keep sorted closes the gap by shift, else the last entry
+fills it; then the pattern decides as in `post_process_leaf_change`
+(hybrid asks after the removal). Interior: `size -= 1`; a child left
+underfull (leaf `size < B`, interior `node_n < B`) pairs with its larger
+sibling, the left one on a tie. Together `< 2B`: the right one merges into
+the left (an interior's separator comes down). Else both even out at
+`n / 2`, the cut `generate_*_nodes` makes: a leaf giver is sorted first
+and the separator becomes the right leaf's first key; interiors rotate the
+separator through the parent. Merging and evening out keep `is_sorted`
+exact and do not ask the pattern. The root collapses while it has one
+child. Needs `B >= 2` (`static_assert`): at B = 1 an underfull interior
+has no child left. On a one-key slice of 4-byte keys the default hybrid
+predicate's address terms do not cancel (as they do for 8- and 16-byte
+entries): bit 2 of the slice address flips the answer, so two call sites
+can leave different `is_sorted` (read from the code).
+
+Why not the graft/re-insert fix-up: one key leaves at most one underfull
+node per level, all on its path, and a sibling fixes each in O(B). The
+pool and counting sort exist to fix many subtrees at once, in parallel.
+That path run one key at a time is one-key `batch_delete`, which is what
+`erase(key)` did before 2026-10-14.
+
+Sanity timing, one run, not ABBA (leaf 64, 1e7 built, random keys, best
+of 3), ns/key, all threads / `PARLAY_NUM_THREADS=1`. 1e6 deleted:
+`batch_delete` 4.1 / 169; `serial_delete` sorted 659 / 459, unsorted
+495 / 345, hybrid 608 / 573, sorted on a key-sorted batch 131 / 100;
+one-key `batch_delete` loop (old `erase(key)`) 1843 / 1758; tlx
+`erase` 392 / 402. 6e6 deleted (more merging): `batch_delete` 2.0 / 115;
+sorted 413 / 402, unsorted 345 / 341, hybrid 507 / 514, key-sorted 86 /
+78; tlx 392 / 400. At 1e6 the serial calls ran up to 43% slower with
+parlay's workers alive (cause not checked); at 6e6 within 10%.
 
 `batch_delete_`: sort once; `batch_delete_recursive` marks bottom-up. A
 leaf-parent first balances its underfull leaves, then takes its flags from
@@ -543,7 +585,14 @@ count find lower_bound upper_bound equal_range`, `begin/end/rbegin/rend`,
 `to_seq`, `bulk_load insert erase`, `==`/`<=>`, `key_comp`. `const_iterator`
 is three words and re-descends at leaf boundaries. Range overloads are
 constrained with `requires std::ranges::range`; without it `erase(500u)`
-binds to the template.
+binds to the template. `insert(entry)`, `erase(key)` and `erase(iterator)`
+run `serial_insert`/`serial_delete` (user, 2026-10-14; were one-entry
+batch calls); `erase(key)` reads `size()` before and after for its return
+value. At `k_buf_lb` 1, which `serial_delete` rejects, `erase` stays on
+`contain` + `batch_delete` (`if constexpr`). Loops of 1e6 calls on 1e7
+(leaf 64, best of 3, A B B A, repeats within 1%), ns/call, one thread /
+all: `erase(key)` 2018 / 2109 -> 621 / 645, `insert(entry)` 2159 / 2177
+-> 889 / 881.
 
 ## Tests
 
@@ -575,6 +624,25 @@ leaf 256 at 600 K ascending to split the root; `Shapes` is
 checks after each of 3000 one-entry calls, because a revisit refreshes a
 stale augmentation; plus churn, `std::greater`, leak, heap allocator, an
 empty interior root. 26 mutants of `b_serial_insert.hpp`, all caught.
+`SerialDelete*` (10): `HandShapes` pins 17 shapes at leaf 4 (leaf borrows
+left/right, evens out, merges on a tie / first / last leaf, unsorted
+givers, the interior cases, a node at the minimum, root collapse, a
+cascade to the root) and asserts no node is allocated; `ToEmpty` empties
+with unsorted, hybrid, sorted calls at leaf 2/8/64, three key orders, plus
+leaf 2 at 200 K and leaf 256 at 600 K; `Shapes` is `run_scenario<KBuf,
+SerialInsert, SerialDelete>`; plus absent keys, leaf patterns, churn mixed
+with batch ops, augmentation, `std::greater`, leak, heap allocator.
+`SerialNonContiguousInput` feeds a `std::deque` to both serial calls (a
+copy that drops the last element fails it, in either call). 49 mutants of
+`b_serial_delete.hpp`, all caught; the policy ones (which sibling, when to
+merge, where to cut) only by `HandShapes`. 58/58 in the CMake build;
+`Serial*` 20/20 under ASAN/UBSan, 19/19 (before the deque test) under
+`-DDEBUG`. `SerialSingleElementOps`: `erase(key)`, `insert(entry)`,
+`erase(iterator)` leave the shapes `serial_delete`/`serial_insert` leave
+(`describe`, not `same_structure`: see the predicate note above);
+`...LeafOne` runs the `k_buf_lb` 1 fallback. Routing mutants: 4 of 5
+caught; `insert(entry)` back on `batch_insert` survives, as it builds the
+same nodes. 60/60 in the CMake build.
 
 Validate a new test by injecting a fault and watching it fail. An
 equivalent mutant (`<` → `<=` on a covered edge) and a replacement that

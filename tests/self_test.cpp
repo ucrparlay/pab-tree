@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <map>
 #include <new>
@@ -502,10 +503,10 @@ uint64_t g_seed = 20260817;
 int g_rounds = 1;
 
 /*
- * One full scenario: build, query, insert, delete, re-query. Serial inserts
- * with serial_insert instead of batch_insert.
+ * One full scenario: build, query, insert, delete, re-query. SerialInsert
+ * inserts with serial_insert, SerialDelete deletes with serial_delete.
  */
-template <unsigned KBuf, bool Serial = false>
+template <unsigned KBuf, bool SerialInsert = false, bool SerialDelete = false>
 void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 {
 	/* No adaptor: the whole matrix runs on the entry itself. */
@@ -514,7 +515,8 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 	SCOPED_TRACE("k_buf=" + std::to_string(KBuf) + " n=" + std::to_string(n) +
 				 " dist=" + dist_name(d) + " seed=" + std::to_string(seed) +
-				 (Serial ? " serial" : "") +
+				 (SerialInsert ? " serial_insert" : "") +
+				 (SerialDelete ? " serial_delete" : "") +
 				 "  (rerun: ./self_test --seed=" + std::to_string(seed) + ")");
 
 	auto const all = gen_keys(n, d, seed);
@@ -558,7 +560,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 	}
 
 	/* Insert the rest. */
-	if constexpr (Serial) {
+	if constexpr (SerialInsert) {
 		t.serial_insert(extra_e);
 	} else {
 		t.batch_insert(extra_e);
@@ -580,7 +582,11 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 		std::shuffle(live.begin(), live.end(), rng);
 		live.resize(live.size() / 2);
 
-		t.batch_delete(live);
+		if constexpr (SerialDelete) {
+			t.serial_delete(live);
+		} else {
+			t.batch_delete(live);
+		}
 		for (auto k : live) {
 			ref.erase(k);
 		}
@@ -597,7 +603,11 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 		for (auto const &kv : ref) {
 			live.push_back(kv.first);
 		}
-		t.batch_delete(live);
+		if constexpr (SerialDelete) {
+			t.serial_delete(live);
+		} else {
+			t.batch_delete(live);
+		}
 		ref.clear();
 		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 		ASSERT_TRUE(t.empty());
@@ -2194,15 +2204,17 @@ TEST(SelfTest, RepairReverseComparator)
 
 /* ---- edge cases: the sizes where the structure changes shape ---- */
 
-template <unsigned KBuf, bool Serial = false>
+template <unsigned KBuf, bool SerialInsert = false, bool SerialDelete = false>
 void small_sizes()
 {
 	for (size_t n :
 		 { 0u,	 1u,   2u,	 3u,   4u,	 5u,   7u,	 8u,	9u,
 		   15u,	 16u,  17u,	 31u,  32u,	 33u,  63u,	 64u,	65u,
 		   127u, 128u, 129u, 255u, 256u, 257u, 511u, 1023u, 1025u }) {
-		run_scenario<KBuf, Serial>(n, dist::sequential, g_seed + n);
-		run_scenario<KBuf, Serial>(n, dist::uniform, g_seed + n + 1);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::sequential,
+													   g_seed + n);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::uniform,
+													   g_seed + n + 1);
 	}
 }
 
@@ -2233,16 +2245,19 @@ TEST(SelfTest, SmallSizesLeaf64)
 
 /* ---- the shapes, at a size that builds a real multi-level tree ---- */
 
-template <unsigned KBuf, bool Serial = false>
+template <unsigned KBuf, bool SerialInsert = false, bool SerialDelete = false>
 void shapes(size_t n)
 {
 	for (int r = 0; r < g_rounds; ++r) {
 		auto const s = g_seed + static_cast<uint64_t>(r) * 7919;
-		run_scenario<KBuf, Serial>(n, dist::uniform, s);
-		run_scenario<KBuf, Serial>(n, dist::clustered, s + 1);
-		run_scenario<KBuf, Serial>(n, dist::sequential, s + 2);
-		run_scenario<KBuf, Serial>(n, dist::sparse, s + 3);
-		run_scenario<KBuf, Serial>(n, dist::boundary, s + 4);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::uniform, s);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::clustered,
+													   s + 1);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::sequential,
+													   s + 2);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::sparse, s + 3);
+		run_scenario<KBuf, SerialInsert, SerialDelete>(n, dist::boundary,
+													   s + 4);
 	}
 }
 
@@ -3327,6 +3342,732 @@ TEST(SelfTest, SerialInsertEmptyInteriorRoot)
 	t.serial_insert(e);
 	oracle ref;
 	add_to_oracle(ref, e);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+}
+
+/* ---- serial_delete: one key at a time ---- */
+
+namespace
+{
+/* A tree's shape: a leaf's size, an interior's children in parentheses. */
+template <typename tree>
+std::string describe(typename tree::node_type const *n)
+{
+	if (n->is_leaf) {
+		return std::to_string(n->size);
+	}
+	auto const *in = static_cast<typename tree::interior_type const *>(n);
+	std::string s = "(";
+	for (size_t i = 0; i < in->get_node_n(); ++i) {
+		s += (i == 0 ? "" : " ") + describe<tree>(in->tree_nodes[i]);
+	}
+	return s + ")";
+}
+
+/*
+ * Build n keys, delete two thirds in three serial_delete calls, unsorted,
+ * hybrid, then sorted, so later calls meet leaves the earlier ones left
+ * unsorted; then the rest. Between calls only validate() and contain():
+ * iterating would sort every leaf.
+ */
+template <unsigned KBuf>
+void serial_to_empty(size_t n, dist d, order o, uint64_t seed)
+{
+	using tt = pab_tree::btree_type_trait<entry, KBuf>;
+	using tree = pab_tree::btree<tt>;
+	SCOPED_TRACE("serial to empty k_buf=" + std::to_string(KBuf) +
+				 " n=" + std::to_string(n) + " dist=" + dist_name(d) +
+				 " order=" + std::to_string(static_cast<int>(o)) +
+				 " seed=" + std::to_string(seed));
+
+	auto keys = gen_keys(n, d, seed);
+	auto const all = to_entries(keys);
+	if (o != order::shuffled) {
+		std::sort(keys.begin(), keys.end());
+	}
+	if (o == order::descending) {
+		std::reverse(keys.begin(), keys.end());
+	}
+
+	tree t;
+	oracle ref;
+	t.build(all);
+	add_to_oracle(ref, all);
+
+	size_t const cut[] = { 0, keys.size() / 6, keys.size() / 3,
+						   keys.size() * 2 / 3 };
+	typename tt::pattern_type const patterns[] = {
+		tt::leaf_entries_pattern::unsorted, tt::leaf_entries_pattern::hybrid,
+		tt::leaf_entries_pattern::sorted
+	};
+	for (int c = 0; c < 3; ++c) {
+		std::vector<uint32_t> const part(keys.begin() + cut[c],
+										 keys.begin() + cut[c + 1]);
+		t.serial_delete(part, patterns[c], false);
+		for (auto k : part) {
+			ref.erase(k);
+		}
+		bool const ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok) << "validate() failed after call " << c;
+		ASSERT_EQ(t.size(), ref.size());
+		for (size_t i = 0; i < keys.size(); i += 1 + keys.size() / 500) {
+			ASSERT_EQ(t.contain(keys[i]), ref.count(keys[i]) != 0)
+				<< "contain(" << keys[i] << ") after call " << c;
+		}
+	}
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes_near(all, seed)));
+	ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 1, 12));
+
+	std::vector<uint32_t> const rest(keys.begin() + cut[3], keys.end());
+	t.serial_delete(rest);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_TRUE(t.empty());
+}
+
+/*
+ * Every update one at a time: grow, delete half, put it back, empty the
+ * tree, grow again, empty it again. serial_delete takes no node.
+ */
+template <typename tree>
+void serial_delete_lifecycle(size_t n, uint64_t seed)
+{
+	using tt = typename tree::type_trait;
+	constexpr bool counted =
+		std::is_same_v<typename tt::node_alloc, typed_counting_alloc>;
+	SCOPED_TRACE("serial delete lifecycle n=" + std::to_string(n) +
+				 " seed=" + std::to_string(seed));
+
+	auto const all = to_entries(gen_keys(n, dist::uniform, seed));
+	std::vector<uint32_t> half;
+	std::vector<entry> back;
+	for (size_t i = 0; i < all.size(); i += 2) {
+		half.push_back(all[i].key);
+		back.push_back(all[i]);
+	}
+	std::vector<uint32_t> every;
+	for (auto const &e : all) {
+		every.push_back(e.key);
+	}
+
+	tree t;
+	oracle ref;
+	auto const erase = [&](std::vector<uint32_t> const &keys) {
+		[[maybe_unused]] auto const before = node_allocs<tree>();
+		t.serial_delete(keys);
+		for (auto k : keys) {
+			ref.erase(k);
+		}
+		if constexpr (counted) {
+			ASSERT_EQ(node_allocs<tree>(), before) << "serial_delete allocated";
+		}
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	};
+
+	t.serial_insert(all);
+	add_to_oracle(ref, all);
+	ASSERT_NO_FATAL_FAILURE(erase(half));
+	t.serial_insert(back);
+	add_to_oracle(ref, back);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_NO_FATAL_FAILURE(erase(every));
+	ASSERT_TRUE(t.empty());
+
+	t.serial_insert(all);
+	add_to_oracle(ref, all);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_NO_FATAL_FAILURE(erase(every));
+	ASSERT_TRUE(t.empty());
+}
+} /* namespace */
+
+/*
+ * B = 4: a leaf holds 4..16 entries, an interior 4..16 children, and two
+ * neighbours merge below 8 in all. Keys run 1, 2, ... in leaf order. Each
+ * case deletes one key per call, then checks the shape.
+ */
+TEST(SelfTest, SerialDeleteHandShapes)
+{
+	using tree = counted_tree<4>;
+	using tt = tree::type_trait;
+	constexpr auto sorted = tt::leaf_entries_pattern::sorted;
+	constexpr auto unsorted = tt::leaf_entries_pattern::unsorted;
+	struct step {
+		uint32_t key;
+		tt::pattern_type pattern;
+	};
+
+	auto const run = [](char const *name, shape_spec const &s,
+						std::vector<step> const &steps,
+						std::string const &want) {
+		SCOPED_TRACE(name);
+		tree t;
+		shape_builder<tree> b;
+		ASSERT_NO_FATAL_FAILURE(install(t, b, s));
+		oracle ref = b.ref;
+		auto const before = node_allocs<tree>();
+		for (auto const &st : steps) {
+			ASSERT_EQ(ref.count(st.key), 1u) << "the case names an absent key";
+			t.serial_delete(std::array<uint32_t, 1>{ st.key }, st.pattern,
+							false);
+			ref.erase(st.key);
+			bool const ok = t.template validate<true, false>();
+			ASSERT_TRUE(ok) << "validate() failed after deleting " << st.key;
+		}
+		ASSERT_EQ(node_allocs<tree>(), before) << "serial_delete allocated";
+		ASSERT_EQ(describe<tree>(t.get_root()), want);
+
+		std::vector<uint32_t> probes(b.next + 1);
+		std::iota(probes.begin(), probes.end(), 0u);
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+		ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes));
+	};
+
+	auto const l4 = leaf_of(4);
+	auto const lp = thinnest(1, 4);
+	auto const lp6 = node_of(times(6, l4));
+	auto const lp16 = node_of(times(16, l4));
+
+	/* Leaves: the larger sibling gives half of the surplus, else merge. */
+	run("leaf borrows right", node_of({ l4, l4, leaf_of(6) }),
+		{ { 5, sorted } }, "(4 4 5)");
+	run("leaf borrows left", node_of({ leaf_of(6), l4, l4 }), { { 7, sorted } },
+		"(4 5 4)");
+	run("leaf evens out a full sibling", node_of({ l4, leaf_of(16) }),
+		{ { 1, sorted } }, "(9 10)");
+	run("leaf merges left on a tie", node_of({ l4, l4, l4 }), { { 5, sorted } },
+		"(7 4)");
+	run("first leaf merges right", node_of({ l4, l4, l4 }), { { 1, sorted } },
+		"(7 4)");
+	run("last leaf merges left", node_of({ l4, l4, l4 }), { { 9, sorted } },
+		"(4 7)");
+	run("root collapses to a leaf", node_of({ l4, l4 }), { { 1, sorted } },
+		"7");
+	run("leaf at the minimum stays", node_of({ leaf_of(5), leaf_of(16) }),
+		{ { 1, sorted } }, "(4 16)");
+
+	/*
+	 * An unsorted giver is sorted first: 9 out leaves 14 at the front of the
+	 * last leaf, and 1 out leaves 6 at the end of the first.
+	 */
+	run("unsorted right giver", node_of({ l4, l4, leaf_of(6) }),
+		{ { 9, unsorted }, { 5, sorted } }, "(4 4 4)");
+	run("unsorted left giver", node_of({ leaf_of(6), l4, l4 }),
+		{ { 1, unsorted }, { 7, sorted } }, "(4 4 4)");
+
+	/* Interiors: the same, with the parent's separator rotating through. */
+	run("interior borrows right", node_of({ lp, lp, lp6 }), { { 17, sorted } },
+		"((4 4 4 4) (7 4 4 4) (4 4 4 4 4))");
+	run("interior borrows left", node_of({ lp6, lp, lp }), { { 25, sorted } },
+		"((4 4 4 4) (4 4 7 4 4) (4 4 4 4))");
+	run("interior evens out a full sibling", node_of({ lp, lp16 }),
+		{ { 1, sorted } }, "((7 4 4 4 4 4 4 4 4) (4 4 4 4 4 4 4 4 4 4))");
+	run("interiors merge", node_of({ lp, lp, lp }), { { 17, sorted } },
+		"((4 4 4 4 7 4 4) (4 4 4 4))");
+	run("root collapses", node_of({ lp, lp }), { { 1, sorted } },
+		"(7 4 4 4 4 4 4)");
+	run("interior at the minimum stays",
+		node_of({ node_of(times(5, l4)), lp16 }), { { 1, sorted } },
+		"((7 4 4 4) (4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4))");
+	run("merges cascade to the root",
+		node_of({ thinnest(2, 4), thinnest(2, 4) }), { { 1, sorted } },
+		"((7 4 4 4 4 4 4) (4 4 4 4) (4 4 4 4) (4 4 4 4) (4 4 4 4) (4 4 4 4) "
+		"(4 4 4 4))");
+}
+
+/* Absent keys, repeats and an empty tree change nothing. */
+TEST(SelfTest, SerialDeleteAbsentKeys)
+{
+	using tt = pab_tree::btree_type_trait<entry, 4>;
+	using tree = pab_tree::btree<tt>;
+
+	tree none;
+	none.serial_delete(std::vector<uint32_t>{ 1, 2, 3 });
+	ASSERT_EQ(none.get_root(), nullptr);
+
+	/* Sparse keys are 65521 apart, so k + 1 is never live. */
+	auto const all = to_entries(gen_keys(5000, dist::sparse, g_seed));
+	std::vector<uint32_t> absent{ 0xFFFFFFFFu };
+	for (auto const &e : all) {
+		absent.push_back(e.key + 1);
+	}
+	tree a;
+	tree b;
+	a.build(all);
+	b.build(all);
+	for (auto const pattern :
+		 { tt::leaf_entries_pattern::sorted, tt::leaf_entries_pattern::unsorted,
+		   tt::leaf_entries_pattern::hybrid }) {
+		b.serial_delete(absent, pattern, false);
+	}
+	ASSERT_NO_FATAL_FAILURE(same_structure<tree>(a.get_root(), b.get_root()));
+
+	/* A repeat finds nothing the second time. */
+	oracle ref;
+	add_to_oracle(ref, all);
+	std::vector<uint32_t> twice;
+	for (size_t i = 0; i < 1000; ++i) {
+		twice.push_back(all[i].key);
+		twice.push_back(all[i].key);
+		ref.erase(all[i].key);
+	}
+	b.serial_delete(twice);
+	ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
+
+	/* Emptied, the root is an empty leaf, as batch_delete leaves it. */
+	std::vector<uint32_t> every;
+	for (auto const &e : all) {
+		every.push_back(e.key);
+	}
+	b.serial_delete(every);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
+	ASSERT_NE(b.get_root(), nullptr);
+	ASSERT_TRUE(b.get_root()->is_leaf);
+	b.serial_delete(every);
+	ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
+}
+
+TEST(SelfTest, SerialDeleteToEmpty)
+{
+	for (size_t n : { 0u, 1u, 2u, 3u, 4u, 5u, 8u, 9u, 16u, 17u, 33u, 64u, 65u,
+					  129u, 257u, 1025u, 20000u }) {
+		for (order o :
+			 { order::shuffled, order::ascending, order::descending }) {
+			auto const s = g_seed + n;
+			ASSERT_NO_FATAL_FAILURE(serial_to_empty<2>(n, dist::uniform, o, s));
+			ASSERT_NO_FATAL_FAILURE(
+				serial_to_empty<8>(n, dist::clustered, o, s + 1));
+			ASSERT_NO_FATAL_FAILURE(
+				serial_to_empty<64>(n, dist::boundary, o, s + 2));
+		}
+	}
+	/* Deep at leaf 2; at leaf 256, two root children that must merge. */
+	ASSERT_NO_FATAL_FAILURE(
+		serial_to_empty<2>(200000, dist::uniform, order::shuffled, g_seed));
+	ASSERT_NO_FATAL_FAILURE(serial_to_empty<256>(600000, dist::sequential,
+												 order::ascending, g_seed + 1));
+}
+
+/* run_scenario with serial_delete, then with every update serial. */
+TEST(SelfTest, SerialDeleteShapes)
+{
+	small_sizes<2, false, true>();
+	small_sizes<64, false, true>();
+	shapes<8, false, true>(50000);
+	shapes<64, false, true>(200000);
+	small_sizes<4, true, true>();
+	shapes<2, true, true>(20000);
+}
+
+/*
+ * sorted keeps every leaf sorted; unsorted, or hybrid on a predicate that
+ * says no, leaves them unsorted.
+ */
+TEST(SelfTest, SerialDeleteLeafPatterns)
+{
+	using tt = pab_tree::btree_type_trait<entry, 8>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x9a7u;
+	auto const all = to_entries(gen_keys(50000, dist::uniform, seed));
+	std::vector<uint32_t> gone;
+	oracle ref;
+	add_to_oracle(ref, all);
+	for (size_t i = 0; i < all.size(); i += 2) {
+		gone.push_back(all[i].key);
+		ref.erase(all[i].key);
+	}
+	auto const yes = [](auto const *, auto) { return true; };
+	auto const no = [](auto const *, auto) { return false; };
+
+	tree s;
+	tree hs;
+	tree u;
+	tree hu;
+	for (tree *t : { &s, &hs, &u, &hu }) {
+		t->build(all);
+	}
+	s.serial_delete(gone, tt::leaf_entries_pattern::sorted, false);
+	hs.serial_delete(gone, tt::leaf_entries_pattern::hybrid, false, yes);
+	u.serial_delete(gone, tt::leaf_entries_pattern::unsorted, false);
+	hu.serial_delete(gone, tt::leaf_entries_pattern::hybrid, false, no);
+
+	EXPECT_EQ(s.sorted_leaf_ratio(), 1.0);
+	EXPECT_EQ(hs.sorted_leaf_ratio(), 1.0);
+	EXPECT_LT(u.sorted_leaf_ratio(), 0.5);
+	EXPECT_LT(hu.sorted_leaf_ratio(), 0.5);
+	for (tree *t : { &s, &hs, &u, &hu }) {
+		ASSERT_NO_FATAL_FAILURE(check_against(*t, ref));
+	}
+
+	/* One leaf: a sorting call sorts what an unsorted one left. */
+	std::vector<entry> const twenty(all.begin(), all.begin() + 20);
+	oracle one_ref;
+	add_to_oracle(one_ref, twenty);
+	tree one;
+	one.build(twenty);
+	auto const drop = [&](size_t i, typename tt::pattern_type pattern,
+						  auto const &pred) {
+		one.serial_delete(std::array<uint32_t, 1>{ twenty[i].key }, pattern,
+						  false, pred);
+		one_ref.erase(twenty[i].key);
+	};
+	drop(0, tt::leaf_entries_pattern::unsorted, no);
+	EXPECT_EQ(one.sorted_leaf_ratio(), 0.0);
+	drop(1, tt::leaf_entries_pattern::sorted, no);
+	EXPECT_EQ(one.sorted_leaf_ratio(), 1.0);
+	drop(2, tt::leaf_entries_pattern::unsorted, no);
+	drop(3, tt::leaf_entries_pattern::hybrid, yes);
+	EXPECT_EQ(one.sorted_leaf_ratio(), 1.0);
+	ASSERT_NO_FATAL_FAILURE(check_against(one, one_ref));
+}
+
+/* Serial and batch updates on one tree, in every leaf pattern. */
+TEST(SelfTest, SerialDeleteChurn)
+{
+	using tt = pab_tree::btree_type_trait<ele, 4>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x5de1u;
+	SCOPED_TRACE("serial delete churn seed=" + std::to_string(seed) +
+				 "  (rerun: ./self_test --seed=" + std::to_string(g_seed) +
+				 " --gtest_filter=SelfTest.SerialDeleteChurn)");
+
+	std::mt19937_64 rng(seed);
+	tree t;
+	oracle ref;
+	auto const pool = gen_keys(40000, dist::uniform, seed);
+	typename tt::pattern_type const patterns[] = {
+		tt::leaf_entries_pattern::sorted, tt::leaf_entries_pattern::unsorted,
+		tt::leaf_entries_pattern::hybrid
+	};
+
+	for (int round = 0; round < 60; ++round) {
+		SCOPED_TRACE("round " + std::to_string(round));
+		auto const pattern = patterns[round % 3];
+
+		std::vector<entry> add;
+		for (size_t i = 0; i < 1500; ++i) {
+			auto const k = pool[rng() % pool.size()];
+			if (ref.count(k) == 0) {
+				add.push_back(entry{ k, k ^ 0x5bf03635u });
+				ref[k] = k ^ 0x5bf03635u;
+			}
+		}
+		if (round % 4 != 3) {
+			t.serial_insert(add, pattern, false);
+		} else if (t.empty()) {
+			t.build(add);
+		} else {
+			t.batch_insert(add);
+		}
+
+		/* Live keys, repeats, and keys never inserted. */
+		std::vector<uint32_t> live;
+		for (auto const &kv : ref) {
+			live.push_back(kv.first);
+		}
+		std::shuffle(live.begin(), live.end(), rng);
+		if (round % 10 != 9) {
+			live.resize(std::min<size_t>(live.size(), 1200));
+		}
+		std::vector<uint32_t> gone = live;
+		for (size_t i = 0; i < 100 && i < live.size(); ++i) {
+			gone.push_back(live[i]);
+			gone.push_back(pool[rng() % pool.size()]);
+		}
+		std::shuffle(gone.begin(), gone.end(), rng);
+		if (round % 4 != 1) {
+			t.serial_delete(gone, pattern, false);
+		} else {
+			std::sort(gone.begin(), gone.end());
+			gone.erase(std::unique(gone.begin(), gone.end()), gone.end());
+			t.batch_delete(gone);
+		}
+		for (auto k : gone) {
+			ref.erase(k);
+		}
+
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	}
+}
+
+TEST(SelfTest, SerialDeleteAugmentation)
+{
+	using tt =
+		pab_tree::btree_type_trait<ele, 8, sum_leaf_aug, subtree_size_aug>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x5da6u;
+	SCOPED_TRACE("serial delete augmentation seed=" + std::to_string(seed));
+
+	auto const keys = gen_keys(30000, dist::uniform, seed);
+	auto const all = to_entries(keys);
+	auto const up = [&] {
+		auto v = keys;
+		std::sort(v.begin(), v.end());
+		return v;
+	}();
+	std::vector<uint32_t> const down(up.rbegin(), up.rend());
+
+	auto verify = [](auto const &t, char const *stage) {
+		using T = std::remove_cvref_t<decltype(t)>;
+		SCOPED_TRACE(stage);
+		size_t leaves = 0;
+		size_t interiors = 0;
+		ASSERT_NE(t.get_root(), nullptr);
+		ASSERT_NO_FATAL_FAILURE(check_aug<T>(t.get_root(), leaves, interiors));
+	};
+
+	for (auto const pattern :
+		 { tt::leaf_entries_pattern::sorted, tt::leaf_entries_pattern::unsorted,
+		   tt::leaf_entries_pattern::hybrid }) {
+		SCOPED_TRACE("pattern " + std::to_string(static_cast<int>(pattern)));
+		for (auto const *in : { &keys, &up, &down }) {
+			tree t;
+			t.build(all);
+			std::vector<uint32_t> const part(in->begin(),
+											 in->begin() + in->size() * 3 / 4);
+			t.serial_delete(part, pattern, false);
+			ASSERT_NO_FATAL_FAILURE(verify(t, "three quarters deleted"));
+		}
+	}
+
+	/*
+	 * One call per key, checked after each: a sibling that gave or took is
+	 * not on the next path, so nothing refreshes it.
+	 */
+	using tt2 =
+		pab_tree::btree_type_trait<ele, 2, sum_leaf_aug, subtree_size_aug>;
+	using tree2 = pab_tree::btree<tt2>;
+	std::vector<entry> const few(all.begin(), all.begin() + 3000);
+	for (int o = 0; o < 2; ++o) {
+		tree2 t;
+		t.build(few);
+		std::vector<uint32_t> gone;
+		for (auto const &e : few) {
+			gone.push_back(e.key);
+		}
+		if (o == 1) {
+			std::sort(gone.begin(), gone.end(), std::greater<>());
+		}
+		for (size_t i = 0; i < gone.size(); ++i) {
+			t.serial_delete(std::array<uint32_t, 1>{ gone[i] });
+			ASSERT_NO_FATAL_FAILURE(verify(t, "one key per call"))
+				<< "after key " << i;
+		}
+	}
+}
+
+TEST(SelfTest, SerialDeleteReverseComparator)
+{
+	struct desc : pab_tree::default_options {
+		using key_compare = std::greater<uint32_t>;
+	};
+	using tt = pab_tree::btree_trait<ele, 4, desc>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x5de9u;
+	SCOPED_TRACE("serial delete reverse comparator seed=" +
+				 std::to_string(seed));
+
+	auto const all = to_entries(gen_keys(20000, dist::uniform, seed));
+	std::map<uint32_t, uint32_t, std::greater<uint32_t>> ref;
+	for (auto const &e : all) {
+		ref[e.key] = e.val;
+	}
+	std::vector<uint32_t> gone;
+	for (size_t i = 0; i < all.size() * 3 / 4; ++i) {
+		gone.push_back(all[i].key);
+		ref.erase(all[i].key);
+	}
+
+	tree built;
+	built.build(all);
+	built.serial_delete(gone);
+	tree grown;
+	grown.serial_insert(all, tt::leaf_entries_pattern::unsorted, false);
+	grown.serial_delete(gone, tt::leaf_entries_pattern::unsorted, false);
+
+	for (tree *t : { &built, &grown }) {
+		bool const ok = t->template validate<true, false>();
+		ASSERT_TRUE(ok) << "validate() failed under std::greater";
+		ASSERT_EQ(t->size(), ref.size());
+		for (size_t i = 0; i < all.size(); i += 37) {
+			ASSERT_EQ(t->contain(all[i].key), ref.count(all[i].key) != 0);
+		}
+
+		/* High to low. Iterating sorts every leaf, as ranges need. */
+		auto rt = ref.begin();
+		for (auto it = t->begin(); it != t->end(); ++it, ++rt) {
+			ASSERT_NE(rt, ref.end());
+			ASSERT_EQ(it->key, rt->first);
+			ASSERT_EQ(it->val, rt->second);
+		}
+		ASSERT_EQ(rt, ref.end());
+
+		std::mt19937_64 rng(seed);
+		for (int b = 0; b < 20; ++b) {
+			auto lo = all[rng() % all.size()].key;
+			auto hi = all[rng() % all.size()].key;
+			if (lo < hi) {
+				std::swap(lo, hi);
+			}
+			auto const want = static_cast<size_t>(
+				std::distance(ref.lower_bound(lo), ref.lower_bound(hi)));
+			ASSERT_EQ(t->range_count({ lo, hi }), want)
+				<< "range_count [" << lo << ", " << hi << ")";
+		}
+	}
+}
+
+/* Every node goes back, each as its own type. */
+TEST(SelfTest, SerialDeleteLeakCheck)
+{
+	using tree = counted_tree<4>;
+	using leaf = tree::leaf_type;
+	using interior = tree::interior_type;
+	long const leaf_out = typed_counting_alloc::allocs<leaf>.load() -
+						  typed_counting_alloc::frees<leaf>.load();
+	long const interior_out = typed_counting_alloc::allocs<interior>.load() -
+							  typed_counting_alloc::frees<interior>.load();
+
+	ASSERT_NO_FATAL_FAILURE(
+		serial_delete_lifecycle<tree>(30000, g_seed ^ 0xde1u));
+	EXPECT_EQ(typed_counting_alloc::allocs<leaf>.load() -
+				  typed_counting_alloc::frees<leaf>.load(),
+			  leaf_out)
+		<< "leaf leak or double free";
+	EXPECT_EQ(typed_counting_alloc::allocs<interior>.load() -
+				  typed_counting_alloc::frees<interior>.load(),
+			  interior_out)
+		<< "interior leak or double free";
+}
+
+/* The same on plain new/delete, for the sanitizer build. */
+TEST(SelfTest, SerialDeleteHeapAllocator)
+{
+	struct heap_opts : pab_tree::default_options {
+		using node_alloc = heap_alloc;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 4, heap_opts>>;
+
+	ASSERT_NO_FATAL_FAILURE(
+		serial_delete_lifecycle<tree>(30000, g_seed ^ 0xde2u));
+}
+
+/*
+ * Input not in contiguous memory is copied first; the tree comes out the
+ * same. A predicate of the leaf size, as the default one reads addresses.
+ */
+TEST(SelfTest, SerialNonContiguousInput)
+{
+	using tt = pab_tree::btree_type_trait<entry, 4>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const all = to_entries(gen_keys(5000, dist::uniform, g_seed ^ 0xdeu));
+	std::vector<uint32_t> gone;
+	oracle ref;
+	add_to_oracle(ref, all);
+	for (size_t i = 0; i < all.size(); i += 2) {
+		gone.push_back(all[i].key);
+		ref.erase(all[i].key);
+	}
+	auto const by_size = [](auto const *node, auto) {
+		return node->size % 3 != 0;
+	};
+	auto const hybrid = tt::leaf_entries_pattern::hybrid;
+
+	tree a;
+	tree b;
+	a.serial_insert(all, hybrid, false, by_size);
+	a.serial_delete(gone, hybrid, false, by_size);
+	b.serial_insert(std::deque<entry>(all.begin(), all.end()), hybrid, false,
+					by_size);
+	b.serial_delete(std::deque<uint32_t>(gone.begin(), gone.end()), hybrid,
+					false, by_size);
+	ASSERT_NO_FATAL_FAILURE(same_structure<tree>(a.get_root(), b.get_root()));
+	ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
+}
+
+/*
+ * insert(entry), erase(key) and erase(iterator) are serial_insert and
+ * serial_delete of one entry: the same shapes (batch_delete would merge
+ * where serial_delete borrows). Sortedness may differ: the default
+ * predicate reads the slice's address.
+ */
+TEST(SelfTest, SerialSingleElementOps)
+{
+	using tt = pab_tree::btree_type_trait<entry, 4>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const keys = gen_keys(4000, dist::uniform, g_seed ^ 0x5e1u);
+	auto const all = to_entries(keys);
+	tree a;
+	tree b;
+	a.build(all);
+	b.build(all);
+	oracle ref;
+	add_to_oracle(ref, all);
+	auto const one = [](auto const &x) { return std::array{ x }; };
+
+	/* Three quarters out, with repeats and absent keys. */
+	for (size_t i = 0; i < 3000; ++i) {
+		uint32_t const k = keys[i];
+		ASSERT_TRUE(a.erase(k)) << "key " << k;
+		b.serial_delete(one(k));
+		ref.erase(k);
+		if (i % 7 == 0) {
+			ASSERT_FALSE(a.erase(k)) << "repeat " << k;
+			ASSERT_FALSE(a.erase(0x80000000u + static_cast<uint32_t>(i)));
+		}
+		ASSERT_EQ(a.size(), ref.size());
+	}
+	ASSERT_EQ(describe<tree>(a.get_root()), describe<tree>(b.get_root()));
+
+	/* Half of them back. */
+	for (size_t i = 0; i < 3000; i += 2) {
+		a.insert(all[i]);
+		b.serial_insert(one(all[i]));
+		ref[all[i].key] = all[i].val;
+	}
+	ASSERT_EQ(describe<tree>(a.get_root()), describe<tree>(b.get_root()));
+
+	/* find sorts a leaf; no entry moves between leaves. */
+	for (size_t i = 3000; i < 3500; ++i) {
+		a.erase(a.find(keys[i]));
+		b.serial_delete(one(keys[i]));
+		ref.erase(keys[i]);
+	}
+	ASSERT_EQ(describe<tree>(a.get_root()), describe<tree>(b.get_root()));
+	ASSERT_NO_FATAL_FAILURE(check_against(a, ref));
+	ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
+}
+
+/* At k_buf_lb 1 insert is serial; erase stays on batch_delete. */
+TEST(SelfTest, SerialSingleElementOpsLeafOne)
+{
+	using tt = pab_tree::btree_type_trait<entry, 1>;
+	using tree = pab_tree::btree<tt>;
+	static_assert(tt::k_buf_lb == 1);
+
+	auto const keys = gen_keys(600, dist::uniform, g_seed ^ 0x5e2u);
+	tree t;
+	oracle ref;
+	for (auto const &e : to_entries(keys)) {
+		t.insert(e);
+		ref[e.key] = e.val;
+	}
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	for (size_t i = 0; i < keys.size(); i += 2) {
+		ASSERT_TRUE(t.erase(keys[i])) << "key " << keys[i];
+		ASSERT_FALSE(t.erase(keys[i])) << "repeat " << keys[i];
+		ref.erase(keys[i]);
+	}
+	ASSERT_FALSE(t.erase(0x80000000u));
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 }
 
