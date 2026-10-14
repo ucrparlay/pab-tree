@@ -34,6 +34,7 @@ count/report, plus a `std::set`-like interface. Keys are distinct (a set).
 | `dependence/{concepts,node_base,binary_search}.h` | concepts; `proto_node`, `parlay_node_alloc`; branchless `binary_search<Base>` |
 | `b_tree_impl/batch_op/b_build_tree.hpp` | `build_`, `build_recursive`, `assemble_interior_levels` |
 | `b_tree_impl/batch_op/b_batch_insert.hpp` | `batch_insert_`, `batch_insert_recursive` |
+| `b_tree_impl/batch_op/b_serial_insert.hpp` | `serial_insert_`, `serial_insert_rec`, `serial_insert_leaf`, `serial_split_leaf`, `serial_split_interior` |
 | `b_tree_impl/batch_op/b_batch_delete.hpp` | `batch_delete_`, `batch_delete_recursive`, `rebuild_from_flatten`, `consolidate_invalid_root` |
 | `b_tree_impl/batch_op/b_batch_delete_graft.hpp` | the fix-up below a valid root: `graft_repair`, `graft_all_rec`, `graft_detach_rec`, `graft_decompose_rec`, `graft_compact`, `graft_rec` / `graft_into_node` (left-edge rounds) |
 | `b_tree_impl/tree_op/node_op.hpp` | `generate_*_nodes`, `batch_insert_update_interior`, `handling_interior_split_overflow`, `batch_delete_update_interior_size`, `batch_delete_update_leaf_parent`, `balance_over_leaves` |
@@ -82,7 +83,9 @@ The recipes under Tests give `-DDEBUG` at `-O1` for one binary.
   session; a 3-round `-r 3` at 1e9 repeats within 0.05 s, a 2 ms benchmark
   does not.
 - After a rename: `-Wshadow` over `self_test` (baseline 3 warnings, all
-  pre-existing; a nested-scope collision compiles and changes meaning) and
+  pre-existing; a plain `-I` `-fsyntax-only` compile shows 31, all in
+  parlay/gtest headers; a nested-scope collision compiles and changes
+  meaning) and
   a grep of string literals for the old names (an `EXPECT_DEATH` regex once
   matched an assert's text).
 
@@ -180,12 +183,40 @@ from the second level on).
 `partition_batch` (binary search when `n > k_split_factor(8) * split_n`,
 else merge; `[[gnu::always_inline]]`, or it costs 9 calls), recurses with
 grain 1; leaf fits → `insert_points_2_leaf`, else
-`handling_leaf_split_overflow` (sorted leaf: `std::ranges::merge`);
+`handling_leaf_split_overflow` (sorted leaf: `parlay::merge`, `fbb03b1`);
 `batch_insert_update_interior` has a fast path when no child split; a root
 split goes through `assemble_interior_levels`. Scratch: `2n`
 `node_split_pair`s, 32 B per input entry. Slots `2i`, `2i+1` belong to
 input element i; that mapping is what makes the parallel sub-ranges
 disjoint, so it cannot be shrunk.
+
+**`serial_insert`** (2026-10-14, user: one entry at a time, same interface
+as `batch_insert`, own file). Input order, one descent per entry; no sort
+(`sorted_input` unused), no parlay, no scratch. Null root or an interior
+root of size 0: grows from an empty leaf (`batch_insert_` builds instead).
+Leaf with room: append, `update_aug`, then the pattern decides as in
+`post_process_leaf_change` (hybrid asks after the append); a sorted leaf
+kept sorted takes the entry by shift, an unsorted one is `std::sort`ed.
+Full leaf + 1: sorted, cut at `n / 2` as `generate_leaf_nodes` cuts (old
+leaf keeps `2B`, new leaf `2B + 1`, separator = its first key). Interior:
+`size += 1` on the way up; a split child's right half goes in after it; a
+full node cuts at `n / 2` as `generate_interior_nodes` (new sibling `2B +
+1`, merged separator `2B - 1` goes up). Root split: new root over both. So
+it builds node for node what `batch_insert` of one-entry batches builds.
+`serial_split_interior` is `[[gnu::noinline]]`: its merged arrays (3 KB at
+leaf 64) would sit in every recursion frame (136 B without).
+
+The default hybrid predicate on one-entry slices is leaf-size parity (the
+address terms cancel; 8-byte entries sort iff the new size is odd, 16-byte
+iff even, checked), so half the inserts `std::sort` their leaf.
+
+Sanity timing, one run, not ABBA (leaf 64, 1e7 built, 1e6 random, best of
+3), ns/entry, all threads / `PARLAY_NUM_THREADS=1`: `batch_insert` 3.2 /
+155; `serial_insert` sorted 496 / 449, unsorted 158 / 138, hybrid 977 /
+934, sorted on a key-sorted batch 132 / 98; one-entry `batch_insert` loop
+(what `insert(entry)` costs) 3331 / 2857; tlx `insert` 562 / 550. Sorted
+pays dependent misses in the leaf's binary search; unsorted touches only
+the leaf's end. Serial code ran ~10% slower with parlay's workers alive.
 
 `batch_delete_`: sort once; `batch_delete_recursive` marks bottom-up. A
 leaf-parent first balances its underfull leaves, then takes its flags from
@@ -535,7 +566,15 @@ chain does not always collapse the root at small n). `GraftHandShapes`,
 (`shape_spec`, `shape_builder`, `install` copies a built root into the
 tree's root node); `leaf_keeping(n, k)` deletes all but a leaf's last k
 keys, and `hand_shape`/`delete_and_check` take a leaf policy (default
-`hybrid`).
+`hybrid`). `SerialInsert*` (9, end of file): `MatchesBatch` compares
+node by node with per-entry `batch_insert` (three patterns, hybrid on a
+size-only predicate); `FromEmpty` runs unsorted, hybrid, sorted calls with
+only `validate()` between (iteration sorts leaves), three key orders, and
+leaf 256 at 600 K ascending to split the root; `Shapes` is
+`run_scenario<KBuf, true>`; `Augmentation` grows in both key orders and
+checks after each of 3000 one-entry calls, because a revisit refreshes a
+stale augmentation; plus churn, `std::greater`, leak, heap allocator, an
+empty interior root. 26 mutants of `b_serial_insert.hpp`, all caught.
 
 Validate a new test by injecting a fault and watching it fail. An
 equivalent mutant (`<` → `<=` on a covered edge) and a replacement that

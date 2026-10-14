@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -500,8 +501,11 @@ void check_ranges(Tree const &t, oracle const &ref, uint64_t seed, int boxes)
 uint64_t g_seed = 20260817;
 int g_rounds = 1;
 
-/* One full scenario: build, query, insert, delete, re-query. */
-template <unsigned KBuf>
+/*
+ * One full scenario: build, query, insert, delete, re-query. Serial inserts
+ * with serial_insert instead of batch_insert.
+ */
+template <unsigned KBuf, bool Serial = false>
 void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 {
 	/* No adaptor: the whole matrix runs on the entry itself. */
@@ -510,6 +514,7 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 
 	SCOPED_TRACE("k_buf=" + std::to_string(KBuf) + " n=" + std::to_string(n) +
 				 " dist=" + dist_name(d) + " seed=" + std::to_string(seed) +
+				 (Serial ? " serial" : "") +
 				 "  (rerun: ./self_test --seed=" + std::to_string(seed) + ")");
 
 	auto const all = gen_keys(n, d, seed);
@@ -553,7 +558,11 @@ void run_scenario(size_t n, dist d, uint64_t seed, bool with_ranges = true)
 	}
 
 	/* Insert the rest. */
-	t.batch_insert(extra_e);
+	if constexpr (Serial) {
+		t.serial_insert(extra_e);
+	} else {
+		t.batch_insert(extra_e);
+	}
 	add_to_oracle(ref, extra_e);
 	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 	ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes));
@@ -2185,15 +2194,15 @@ TEST(SelfTest, RepairReverseComparator)
 
 /* ---- edge cases: the sizes where the structure changes shape ---- */
 
-template <unsigned KBuf>
+template <unsigned KBuf, bool Serial = false>
 void small_sizes()
 {
 	for (size_t n :
 		 { 0u,	 1u,   2u,	 3u,   4u,	 5u,   7u,	 8u,	9u,
 		   15u,	 16u,  17u,	 31u,  32u,	 33u,  63u,	 64u,	65u,
 		   127u, 128u, 129u, 255u, 256u, 257u, 511u, 1023u, 1025u }) {
-		run_scenario<KBuf>(n, dist::sequential, g_seed + n);
-		run_scenario<KBuf>(n, dist::uniform, g_seed + n + 1);
+		run_scenario<KBuf, Serial>(n, dist::sequential, g_seed + n);
+		run_scenario<KBuf, Serial>(n, dist::uniform, g_seed + n + 1);
 	}
 }
 
@@ -2224,16 +2233,16 @@ TEST(SelfTest, SmallSizesLeaf64)
 
 /* ---- the shapes, at a size that builds a real multi-level tree ---- */
 
-template <unsigned KBuf>
+template <unsigned KBuf, bool Serial = false>
 void shapes(size_t n)
 {
 	for (int r = 0; r < g_rounds; ++r) {
 		auto const s = g_seed + static_cast<uint64_t>(r) * 7919;
-		run_scenario<KBuf>(n, dist::uniform, s);
-		run_scenario<KBuf>(n, dist::clustered, s + 1);
-		run_scenario<KBuf>(n, dist::sequential, s + 2);
-		run_scenario<KBuf>(n, dist::sparse, s + 3);
-		run_scenario<KBuf>(n, dist::boundary, s + 4);
+		run_scenario<KBuf, Serial>(n, dist::uniform, s);
+		run_scenario<KBuf, Serial>(n, dist::clustered, s + 1);
+		run_scenario<KBuf, Serial>(n, dist::sequential, s + 2);
+		run_scenario<KBuf, Serial>(n, dist::sparse, s + 3);
+		run_scenario<KBuf, Serial>(n, dist::boundary, s + 4);
 	}
 }
 
@@ -2869,6 +2878,456 @@ TEST(SelfTest, GraftHeapAllocator)
 		hand_shape<tree>(hand_shapes<8>::loose_edge(), "loose_edge"));
 	ASSERT_NO_FATAL_FAILURE(
 		hand_shape<tree4>(tomb_overflow(), "tomb overflow", 5));
+}
+
+/* ---- serial_insert: one entry at a time ---- */
+
+namespace
+{
+/*
+ * a and b hold the same nodes: shape, sizes, separators, and each leaf's
+ * entries in the same order with the same sortedness.
+ */
+template <typename tree>
+void same_structure(typename tree::node_type const *a,
+					typename tree::node_type const *b)
+{
+	using leaf = typename tree::leaf_type;
+	using interior = typename tree::interior_type;
+
+	ASSERT_EQ(a->is_leaf, b->is_leaf);
+	ASSERT_EQ(a->size, b->size);
+	if (a->is_leaf) {
+		auto const *x = static_cast<leaf const *>(a);
+		auto const *y = static_cast<leaf const *>(b);
+		ASSERT_EQ(x->is_sorted, y->is_sorted);
+		for (size_t i = 0; i < x->size; ++i) {
+			ASSERT_EQ(x->elements[i].key, y->elements[i].key) << "entry " << i;
+			ASSERT_EQ(x->elements[i].val, y->elements[i].val) << "entry " << i;
+		}
+		return;
+	}
+	auto const *x = static_cast<interior const *>(a);
+	auto const *y = static_cast<interior const *>(b);
+	ASSERT_EQ(x->get_node_n(), y->get_node_n());
+	for (size_t i = 0; i + 1 < x->get_node_n(); ++i) {
+		ASSERT_EQ(x->split[i], y->split[i]) << "separator " << i;
+	}
+	for (size_t i = 0; i < x->get_node_n(); ++i) {
+		ASSERT_NO_FATAL_FAILURE(
+			same_structure<tree>(x->tree_nodes[i], y->tree_nodes[i]));
+	}
+}
+
+/* Live keys and their neighbours, and both ends of the key space. */
+std::vector<uint32_t> probes_near(std::vector<entry> const &v, uint64_t seed)
+{
+	std::vector<uint32_t> probes{ 0, 0xFFFFFFFFu };
+	std::mt19937_64 rng(seed);
+	for (size_t i = 0; i < std::min<size_t>(v.size(), 64); ++i) {
+		auto const k = v[rng() % v.size()].key;
+		probes.push_back(k);
+		probes.push_back(k + 1);
+		probes.push_back(k - 1);
+	}
+	return probes;
+}
+
+/*
+ * serial_insert is batch_insert fed one entry at a time: from the same built
+ * tree, both make the same nodes under every leaf pattern. hybrid runs on a
+ * predicate of the leaf size; the default one also reads addresses.
+ */
+template <unsigned KBuf>
+void serial_matches_batch(size_t n, dist d, uint64_t seed)
+{
+	using tt = pab_tree::btree_type_trait<entry, KBuf>;
+	using tree = pab_tree::btree<tt>;
+	SCOPED_TRACE("serial vs batch k_buf=" + std::to_string(KBuf) +
+				 " n=" + std::to_string(n) + " dist=" + dist_name(d) +
+				 " seed=" + std::to_string(seed));
+
+	auto const all = to_entries(gen_keys(n, d, seed));
+	std::vector<entry> const base(all.begin(), all.begin() + all.size() / 3);
+	std::vector<entry> const rest(all.begin() + all.size() / 3, all.end());
+	auto const by_size = [](auto const *node, auto) {
+		return node->size % 3 != 0;
+	};
+	oracle ref;
+	add_to_oracle(ref, all);
+
+	for (auto const pattern :
+		 { tt::leaf_entries_pattern::sorted, tt::leaf_entries_pattern::unsorted,
+		   tt::leaf_entries_pattern::hybrid }) {
+		SCOPED_TRACE("pattern " + std::to_string(static_cast<int>(pattern)));
+		tree a;
+		tree b;
+		a.build(base);
+		b.build(base);
+		for (auto const &e : rest) {
+			a.batch_insert(std::array<entry, 1>{ e }, pattern, true, by_size);
+		}
+		b.serial_insert(rest, pattern, false, by_size);
+		ASSERT_NO_FATAL_FAILURE(
+			same_structure<tree>(a.get_root(), b.get_root()));
+
+		if (pattern == tt::leaf_entries_pattern::sorted) {
+			ASSERT_EQ(b.sorted_leaf_ratio(), 1.0);
+		} else if (pattern == tt::leaf_entries_pattern::unsorted) {
+			ASSERT_LT(b.sorted_leaf_ratio(), 1.0);
+		}
+		ASSERT_NO_FATAL_FAILURE(check_against(b, ref));
+	}
+}
+
+enum class order { shuffled, ascending, descending };
+
+/*
+ * Grow a tree from nothing in three serial_insert calls, unsorted, hybrid,
+ * then sorted, so later calls meet leaves the earlier ones left unsorted.
+ * Only validate() between the calls: iterating would sort every leaf.
+ */
+template <unsigned KBuf>
+void serial_from_empty(size_t n, dist d, order o, uint64_t seed)
+{
+	using tt = pab_tree::btree_type_trait<entry, KBuf>;
+	using tree = pab_tree::btree<tt>;
+	SCOPED_TRACE("serial from empty k_buf=" + std::to_string(KBuf) +
+				 " n=" + std::to_string(n) + " dist=" + dist_name(d) +
+				 " order=" + std::to_string(static_cast<int>(o)) +
+				 " seed=" + std::to_string(seed));
+
+	auto keys = gen_keys(n, d, seed);
+	if (o != order::shuffled) {
+		std::sort(keys.begin(), keys.end());
+	}
+	if (o == order::descending) {
+		std::reverse(keys.begin(), keys.end());
+	}
+	auto const all = to_entries(keys);
+
+	tree t;
+	oracle ref;
+	size_t const cut[] = { 0, all.size() / 7, all.size() / 2, all.size() };
+	typename tt::pattern_type const patterns[] = {
+		tt::leaf_entries_pattern::unsorted, tt::leaf_entries_pattern::hybrid,
+		tt::leaf_entries_pattern::sorted
+	};
+	for (int c = 0; c < 3; ++c) {
+		std::vector<entry> const part(all.begin() + cut[c],
+									  all.begin() + cut[c + 1]);
+		t.serial_insert(part, patterns[c], false);
+		add_to_oracle(ref, part);
+		bool const ok = t.template validate<true, false>();
+		ASSERT_TRUE(ok) << "validate() failed after call " << c;
+		ASSERT_EQ(t.size(), ref.size());
+	}
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	ASSERT_NO_FATAL_FAILURE(check_lookups(t, ref, probes_near(all, seed)));
+	ASSERT_NO_FATAL_FAILURE(check_ranges(t, ref, seed ^ 1, 12));
+}
+
+/*
+ * Every insert through serial_insert: grow from nothing, delete half, put it
+ * back, empty the tree, grow again.
+ */
+template <typename tree>
+void serial_lifecycle(size_t n, uint64_t seed)
+{
+	SCOPED_TRACE("serial lifecycle n=" + std::to_string(n) +
+				 " seed=" + std::to_string(seed));
+	auto const all = to_entries(gen_keys(n, dist::uniform, seed));
+	std::vector<uint32_t> half;
+	std::vector<entry> back;
+	for (size_t i = 0; i < all.size(); i += 2) {
+		half.push_back(all[i].key);
+		back.push_back(all[i]);
+	}
+	std::vector<uint32_t> every;
+	for (auto const &e : all) {
+		every.push_back(e.key);
+	}
+
+	tree t;
+	oracle ref;
+	t.serial_insert(all);
+	add_to_oracle(ref, all);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	t.batch_delete(half);
+	for (auto k : half) {
+		ref.erase(k);
+	}
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	t.serial_insert(back);
+	add_to_oracle(ref, back);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	t.batch_delete(every);
+	ref.clear();
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+
+	t.serial_insert(all);
+	add_to_oracle(ref, all);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+}
+} /* namespace */
+
+TEST(SelfTest, SerialInsertMatchesBatch)
+{
+	ASSERT_NO_FATAL_FAILURE(
+		serial_matches_batch<2>(20000, dist::uniform, g_seed));
+	ASSERT_NO_FATAL_FAILURE(
+		serial_matches_batch<8>(50000, dist::clustered, g_seed + 1));
+	ASSERT_NO_FATAL_FAILURE(
+		serial_matches_batch<64>(200000, dist::uniform, g_seed + 2));
+}
+
+TEST(SelfTest, SerialInsertFromEmpty)
+{
+	for (size_t n : { 0u, 1u, 2u, 3u, 4u, 5u, 8u, 9u, 16u, 17u, 33u, 64u, 65u,
+					  129u, 257u, 1025u, 20000u }) {
+		for (order o :
+			 { order::shuffled, order::ascending, order::descending }) {
+			auto const s = g_seed + n;
+			ASSERT_NO_FATAL_FAILURE(
+				serial_from_empty<2>(n, dist::uniform, o, s));
+			ASSERT_NO_FATAL_FAILURE(
+				serial_from_empty<8>(n, dist::clustered, o, s + 1));
+			ASSERT_NO_FATAL_FAILURE(
+				serial_from_empty<64>(n, dist::boundary, o, s + 2));
+		}
+	}
+	/* Deep at leaf 2; at leaf 256, enough leaves to split the root. */
+	ASSERT_NO_FATAL_FAILURE(
+		serial_from_empty<2>(200000, dist::uniform, order::shuffled, g_seed));
+	ASSERT_NO_FATAL_FAILURE(serial_from_empty<256>(
+		600000, dist::sequential, order::ascending, g_seed + 1));
+}
+
+/* run_scenario with serial_insert: onto a built tree, then deletes. */
+TEST(SelfTest, SerialInsertShapes)
+{
+	small_sizes<2, true>();
+	small_sizes<64, true>();
+	shapes<8, true>(50000);
+	shapes<64, true>(200000);
+}
+
+TEST(SelfTest, SerialInsertChurn)
+{
+	using tt = pab_tree::btree_type_trait<ele, 4>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x5e7c4u;
+	SCOPED_TRACE("serial churn seed=" + std::to_string(seed) +
+				 "  (rerun: ./self_test --seed=" + std::to_string(g_seed) +
+				 " --gtest_filter=SelfTest.SerialInsertChurn)");
+
+	std::mt19937_64 rng(seed);
+	tree t;
+	oracle ref;
+	auto const pool = gen_keys(40000, dist::uniform, seed);
+
+	for (int round = 0; round < 40; ++round) {
+		SCOPED_TRACE("round " + std::to_string(round));
+
+		std::vector<entry> add;
+		for (size_t i = 0; i < 1500; ++i) {
+			auto const k = pool[rng() % pool.size()];
+			if (ref.count(k) == 0) {
+				add.push_back(entry{ k, k ^ 0x5bf03635u });
+				ref[k] = k ^ 0x5bf03635u;
+			}
+		}
+		t.serial_insert(add);
+
+		/* Every tenth round empties the tree, so the next grows anew. */
+		std::vector<uint32_t> live;
+		for (auto const &kv : ref) {
+			live.push_back(kv.first);
+		}
+		if (round % 10 != 9) {
+			std::shuffle(live.begin(), live.end(), rng);
+			live.resize(std::min<size_t>(live.size(), 1000));
+		}
+		t.batch_delete(live);
+		for (auto k : live) {
+			ref.erase(k);
+		}
+
+		ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
+	}
+}
+
+TEST(SelfTest, SerialInsertAugmentation)
+{
+	using tt =
+		pab_tree::btree_type_trait<ele, 8, sum_leaf_aug, subtree_size_aug>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x5a06u;
+	SCOPED_TRACE("serial augmentation seed=" + std::to_string(seed));
+
+	auto const all = to_entries(gen_keys(30000, dist::uniform, seed));
+	std::vector<entry> const base(all.begin(), all.begin() + all.size() / 3);
+	std::vector<entry> const rest(all.begin() + all.size() / 3, all.end());
+
+	auto verify = [](tree const &t, char const *stage) {
+		SCOPED_TRACE(stage);
+		size_t leaves = 0;
+		size_t interiors = 0;
+		ASSERT_NE(t.get_root(), nullptr);
+		ASSERT_NO_FATAL_FAILURE(
+			check_aug<tree>(t.get_root(), leaves, interiors));
+		ASSERT_GT(interiors, 0u) << "expected a multi-level tree";
+	};
+
+	/*
+	 * In key order, a node split off on the side the keys move away from
+	 * is never visited again, so its augmentation must be right at birth.
+	 */
+	auto const up = [&] {
+		auto v = all;
+		std::sort(v.begin(), v.end(),
+				  [](entry const &a, entry const &b) { return a.key < b.key; });
+		return v;
+	}();
+	auto const down = std::vector<entry>(up.rbegin(), up.rend());
+
+	for (auto const pattern :
+		 { tt::leaf_entries_pattern::sorted, tt::leaf_entries_pattern::unsorted,
+		   tt::leaf_entries_pattern::hybrid }) {
+		SCOPED_TRACE("pattern " + std::to_string(static_cast<int>(pattern)));
+		for (auto const *in : { &all, &up, &down }) {
+			tree grown;
+			grown.serial_insert(*in, pattern, false);
+			ASSERT_NO_FATAL_FAILURE(verify(grown, "grown from nothing"));
+		}
+
+		tree onto;
+		onto.build(base);
+		onto.serial_insert(rest, pattern, false);
+		ASSERT_NO_FATAL_FAILURE(verify(onto, "onto a built tree"));
+	}
+
+	/* One call per entry, checked after each: nothing is stale between. */
+	using tt2 =
+		pab_tree::btree_type_trait<ele, 2, sum_leaf_aug, subtree_size_aug>;
+	using tree2 = pab_tree::btree<tt2>;
+	tree2 t;
+	for (size_t i = 0; i < 3000; ++i) {
+		t.serial_insert(std::array<entry, 1>{ all[i] });
+		size_t leaves = 0;
+		size_t interiors = 0;
+		ASSERT_NO_FATAL_FAILURE(
+			check_aug<tree2>(t.get_root(), leaves, interiors))
+			<< "after entry " << i;
+	}
+}
+
+TEST(SelfTest, SerialInsertReverseComparator)
+{
+	struct desc : pab_tree::default_options {
+		using key_compare = std::greater<uint32_t>;
+	};
+	using tt = pab_tree::btree_trait<ele, 4, desc>;
+	using tree = pab_tree::btree<tt>;
+
+	auto const seed = g_seed ^ 0x5e9u;
+	SCOPED_TRACE("serial reverse comparator seed=" + std::to_string(seed));
+
+	auto const all = to_entries(gen_keys(20000, dist::uniform, seed));
+	std::vector<entry> const base(all.begin(), all.begin() + all.size() / 4);
+	std::vector<entry> const rest(all.begin() + all.size() / 4, all.end());
+	std::map<uint32_t, uint32_t, std::greater<uint32_t>> ref;
+	for (auto const &e : all) {
+		ref[e.key] = e.val;
+	}
+
+	tree grown;
+	grown.serial_insert(base);
+	grown.serial_insert(rest);
+	tree onto;
+	onto.build(base);
+	onto.serial_insert(rest);
+
+	for (tree const *t : { &grown, &onto }) {
+		bool const ok = t->template validate<true, false>();
+		ASSERT_TRUE(ok) << "validate() failed under std::greater";
+		ASSERT_EQ(t->size(), ref.size());
+
+		/* High to low. Iterating sorts every leaf, as ranges need. */
+		auto rt = ref.begin();
+		for (auto it = t->begin(); it != t->end(); ++it, ++rt) {
+			ASSERT_NE(rt, ref.end());
+			ASSERT_EQ(it->key, rt->first);
+			ASSERT_EQ(it->val, rt->second);
+		}
+		ASSERT_EQ(rt, ref.end());
+
+		std::mt19937_64 rng(seed);
+		for (int b = 0; b < 20; ++b) {
+			auto lo = all[rng() % all.size()].key;
+			auto hi = all[rng() % all.size()].key;
+			if (lo < hi) {
+				std::swap(lo, hi);
+			}
+			auto const want = static_cast<size_t>(
+				std::distance(ref.lower_bound(lo), ref.lower_bound(hi)));
+			ASSERT_EQ(t->range_count({ lo, hi }), want)
+				<< "range_count [" << lo << ", " << hi << ")";
+		}
+		for (size_t i = 0; i < all.size(); i += 97) {
+			ASSERT_TRUE(t->contain(all[i].key));
+		}
+	}
+}
+
+/* Every node serial_insert takes comes back. */
+TEST(SelfTest, SerialInsertLeakCheck)
+{
+	struct opts : pab_tree::default_options {
+		using node_alloc = counting_alloc;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 4, opts>>;
+
+	counting_alloc::live = 0;
+	counting_alloc::total = 0;
+	ASSERT_NO_FATAL_FAILURE(serial_lifecycle<tree>(30000, g_seed ^ 0x1ea4u));
+	EXPECT_EQ(counting_alloc::live.load(), 0)
+		<< "leaked " << counting_alloc::live.load() << " nodes of "
+		<< counting_alloc::total.load();
+}
+
+/* The same on plain new/delete, for the sanitizer build. */
+TEST(SelfTest, SerialInsertHeapAllocator)
+{
+	struct heap_opts : pab_tree::default_options {
+		using node_alloc = heap_alloc;
+	};
+	using tree = pab_tree::btree<pab_tree::btree_trait<ele, 4, heap_opts>>;
+
+	ASSERT_NO_FATAL_FAILURE(serial_lifecycle<tree>(30000, g_seed ^ 0x4ea9u));
+}
+
+/* An interior root holding nothing is dropped, as batch_insert drops it. */
+TEST(SelfTest, SerialInsertEmptyInteriorRoot)
+{
+	using tree = counted_tree<4>;
+	tree t;
+	shape_builder<tree> b;
+	ASSERT_NO_FATAL_FAILURE(
+		install(t, b, node_of({ leaf_of(0), leaf_of(0), leaf_of(0) })));
+	ASSERT_FALSE(t.get_root()->is_leaf);
+	ASSERT_EQ(t.size(), 0u);
+
+	auto const e = to_entries(gen_keys(1000, dist::uniform, g_seed ^ 0x60u));
+	t.serial_insert(e);
+	oracle ref;
+	add_to_oracle(ref, e);
+	ASSERT_NO_FATAL_FAILURE(check_against(t, ref));
 }
 
 /*

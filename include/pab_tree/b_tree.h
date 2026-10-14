@@ -268,6 +268,20 @@ public:
 				 const bool sorted_input,
 				 LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
 
+	/*
+	 * batch_insert's interface, run serially: one entry at a time, in input
+	 * order, each by its own descent from the root. Nothing is sorted, so
+	 * sorted_input is not used.
+	 */
+	template <typename R>
+	void serial_insert(R &&in);
+
+	template <typename R, typename LeafSortPred = default_hybrid_pred>
+	void
+	serial_insert(R &&in, const type_trait::pattern_type leaf_entries_pattern,
+				  const bool sorted_input,
+				  LeafSortPred const &leaf_sort_pred = default_hybrid_pred{});
+
 	template <typename R>
 	void batch_delete(R &&in);
 
@@ -668,6 +682,41 @@ private:
 						   node_split_pair_slice node_split_slice,
 						   const type_trait::pattern_type leaf_entries_pattern,
 						   LeafSortPred const &leaf_sort_pred);
+
+	template <typename R, typename LeafSortPred>
+		requires std::predicate<LeafSortPred, node_type *, R>
+	void serial_insert_(R in,
+						const type_trait::pattern_type leaf_entries_pattern,
+						LeafSortPred const &leaf_sort_pred);
+
+	/*
+	 * Inserts in's single entry below node. Returns node's new right
+	 * sibling and the separator before it when node split, else nullptr.
+	 */
+	template <typename R, typename LeafSortPred>
+	static node_split_pair
+	serial_insert_rec(node_type *node, R in,
+					  const type_trait::pattern_type leaf_entries_pattern,
+					  LeafSortPred const &leaf_sort_pred);
+
+	/* A leaf with room takes in, sorted or not as the pattern says. */
+	template <typename R, typename LeafSortPred>
+	static void
+	serial_insert_leaf(node_type *node, R in,
+					   const type_trait::pattern_type leaf_entries_pattern,
+					   LeafSortPred const &leaf_sort_pred);
+
+	/* A full leaf and e, as two sorted leaves. */
+	static node_split_pair serial_split_leaf(node_type *node,
+											 entry_type const &e);
+
+	/*
+	 * A full node whose child i split into child i and right. Out of line:
+	 * its frame holds k_buf_ub + 1 children.
+	 */
+	[[gnu::noinline]] static node_split_pair
+	serial_split_interior(node_type *node, buf_size_type i,
+						  node_split_pair const &right);
 
 	template <typename R, typename LeafSortPred>
 		requires std::predicate<LeafSortPred, node_type *, R>
@@ -1095,6 +1144,7 @@ private:
 #include "pab_tree/b_tree_impl/batch_op/b_batch_insert.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_build_tree.hpp"
 #include "pab_tree/b_tree_impl/batch_op/b_delete_tree.hpp"
+#include "pab_tree/b_tree_impl/batch_op/b_serial_insert.hpp"
 #include "pab_tree/b_tree_impl/points_op.hpp"
 #include "pab_tree/b_tree_impl/query_op/iterator.hpp"
 #include "pab_tree/b_tree_impl/query_op/membership.hpp"
