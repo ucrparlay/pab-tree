@@ -1,12 +1,16 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <ios>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -608,6 +612,113 @@ void batch_delete(Tree &pkd, typename TT::entry_seq const &wp_in,
 		pkd.batch_delete(wi);
 		std::cout << "finish ccp delete" << std::endl;
 	}
+}
+
+/*
+ * NOTE: the first k entries of wi_in, for every k in sizes, as one batch into
+ * (Insert) or out of a tree built from wp_in: once by batch_insert or
+ * batch_delete, once by serial_insert or serial_delete. Every timed call starts
+ * from a tree freshly built from wp_in. Returns {batch, serial} seconds per k,
+ * NaN where wi_in holds fewer than k entries.
+ */
+template <typename TT, typename Tree, bool Insert>
+auto batch_vs_serial_by_size(Tree &pkd, typename TT::entry_seq const &wp_in,
+							 typename TT::entry_seq const &wi_in,
+							 parlay::sequence<size_t> const &sizes,
+							 int const rounds)
+	-> parlay::sequence<std::pair<double, double>>
+{
+	auto const wp = Tree::parse_input(wp_in);
+	auto const wi = [&]() {
+		if constexpr (Insert) {
+			return Tree::parse_input(wi_in);
+		} else {
+			return Tree::parse_delete_input(wi_in);
+		}
+	}();
+	double const nan = std::numeric_limits<double>::quiet_NaN();
+
+	/*
+	 * NOTE: time_loop's protocol (an untimed warm-up run when rounds > 1, then
+	 * the mean of rounds runs, each on a fresh build) on steady_clock: parlay's
+	 * timer truncates to microseconds, about what one entry takes. The size
+	 * check after each run is untimed.
+	 */
+	auto time_one = [&](size_t const k, auto const &run) {
+		size_t const want = Insert ? wp.size() + k : wp.size() - k;
+		double total = 0;
+		for (int r = rounds > 1 ? -1 : 0; r < rounds; r++) {
+			pkd.delete_tree();
+			pkd.build(wp);
+			auto const t0 = std::chrono::steady_clock::now();
+			run();
+			auto const t1 = std::chrono::steady_clock::now();
+			if (pkd.size() != want) {
+				std::cerr << "batch size " << k << ": tree holds " << pkd.size()
+						  << ", expected " << want << std::endl;
+			}
+			if (r >= 0) {
+				total += std::chrono::duration<double>(t1 - t0).count();
+			}
+		}
+		pkd.delete_tree();
+		return total / rounds;
+	};
+
+	parlay::sequence<std::pair<double, double>> res(sizes.size(), { nan, nan });
+	for (size_t i = 0; i < sizes.size(); i++) {
+		size_t const k = sizes[i];
+		if (k > wi.size()) {
+			std::cerr << "batch size " << k << " skipped: the batch holds "
+					  << wi.size() << std::endl;
+			continue;
+		}
+		auto const batch = wi.cut(0, k);
+		if constexpr (Insert) {
+			res[i].first = time_one(k, [&]() { pkd.batch_insert(batch); });
+			res[i].second = time_one(k, [&]() { pkd.serial_insert(batch); });
+		} else {
+			res[i].first = time_one(k, [&]() { pkd.batch_delete(batch); });
+			res[i].second = time_one(k, [&]() { pkd.serial_delete(batch); });
+		}
+		std::cout << (Insert ? "insert " : "delete ") << k << " "
+				  << res[i].first << " " << res[i].second << std::endl;
+	}
+	return res;
+}
+
+/* NOTE: one row per batch size, seconds; empty where k was skipped. */
+inline void
+write_batch_size_csv(std::string const &path,
+					 parlay::sequence<size_t> const &sizes,
+					 parlay::sequence<std::pair<double, double>> const &ins,
+					 parlay::sequence<std::pair<double, double>> const &del)
+{
+	std::ofstream out(path);
+	if (!out) {
+		std::cerr << "cannot write " << path << std::endl;
+		return;
+	}
+	out << "batch_size,insert_time_batch,insert_time_serial,"
+		   "delete_time_batch,delete_time_serial\n"
+		<< std::setprecision(6);
+	auto const cell = [&](double const t) -> std::ofstream & {
+		if (!std::isnan(t)) {
+			out << t;
+		}
+		return out;
+	};
+	for (size_t i = 0; i < sizes.size(); i++) {
+		if (std::isnan(ins[i].first) && std::isnan(del[i].first)) {
+			continue;
+		}
+		out << sizes[i] << ",";
+		cell(ins[i].first) << ",";
+		cell(ins[i].second) << ",";
+		cell(del[i].first) << ",";
+		cell(del[i].second) << "\n";
+	}
+	std::cout << "wrote " << path << std::endl;
 }
 
 template <typename TT, typename Tree>
@@ -2090,6 +2201,36 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TT,
 			incre_update_query(wi.cut(wi.size() / 2, wi.size()),
 							   wi.cut(0, wi.size() / 2));
 		}
+	}
+
+	/*
+	 * NOTE: batch vs serial update, one batch of the first k entries per size,
+	 * from ins/<1/b>/ and del/<1/b>/ next to -p. -b 1 (batch == base) has
+	 * entries for every size. CSV to -o.
+	 */
+	if (opts.tag & (1 << 8)) {
+		parlay::sequence<size_t> const sizes = {
+			1,		 10,		100,		1'000,		10'000,
+			100'000, 1'000'000, 10'000'000, 100'000'000
+		};
+
+		auto const [ins_base, ins_batch] =
+			opts.parse_insert_batch_path(opts.batch_ratio);
+		std::cout << "\n" << ins_base << " " << ins_batch << std::endl;
+		read_entries<typename TT::entry_type>(ins_base.c_str(), wp);
+		read_entries<typename TT::entry_type>(ins_batch.c_str(), wi);
+		auto const ins = batch_vs_serial_by_size<TT, Tree, true>(
+			tree, wp, wi, sizes, opts.rounds);
+
+		auto const [del_base, del_batch] =
+			opts.parse_delete_batch_path(opts.batch_ratio);
+		std::cout << del_base << " " << del_batch << std::endl;
+		read_entries<typename TT::entry_type>(del_base.c_str(), wp);
+		read_entries<typename TT::entry_type>(del_batch.c_str(), wi);
+		auto const del = batch_vs_serial_by_size<TT, Tree, false>(
+			tree, wp, wi, sizes, opts.rounds);
+
+		write_batch_size_csv(opts.csv_path, sizes, ins, del);
 	}
 
 	std::cout << "\n" << std::flush;

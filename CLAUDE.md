@@ -260,6 +260,14 @@ sorted 413 / 402, unsorted 345 / 341, hybrid 507 / 514, key-sorted 86 /
 78; tlx 392 / 400. At 1e6 the serial calls ran up to 43% slower with
 parlay's workers alive (cause not checked); at 6e6 within 10%.
 
+One at a time against tlx and std::set (2026-10-14, same session, 1e7
+random entries in input order, insert / delete s): 1e8 tree, ours hybrid
+12.0 / 10.3, sorted 9.8 / 10.1, unsorted 3.1 / 8.5, tlx 11.7 / 11.8,
+std::set 26.2 / 25.6; 1e9 tree, hybrid 13.3-15.5 / 14.0, sorted 13.8 /
+14.1, unsorted 7.0 / 12.3, tlx 19.3 / 18.8, std::set 39.8 / 41.9.
+`logs/summary_serial` is a 1e8 tree and its 1% column is 1e6 entries, not
+1e7 (user read it as 1e7 at 1e9). Details: `docs/harness_notes.md`.
+
 `batch_delete_`: sort once; `batch_delete_recursive` marks bottom-up. A
 leaf-parent first balances its underfull leaves, then takes its flags from
 what is left (`batch_delete_update_leaf_parent` -> `balance_over_leaves`);
@@ -592,7 +600,8 @@ value. At `k_buf_lb` 1, which `serial_delete` rejects, `erase` stays on
 `contain` + `batch_delete` (`if constexpr`). Loops of 1e6 calls on 1e7
 (leaf 64, best of 3, A B B A, repeats within 1%), ns/call, one thread /
 all: `erase(key)` 2018 / 2109 -> 621 / 645, `insert(entry)` 2159 / 2177
--> 889 / 881.
+-> 889 / 881. Batch vs serial by batch size, 1 to 1e8 at 1e9: `b_test -t
+256` (`docs/harness_notes.md`).
 
 ## Tests
 

@@ -17,6 +17,8 @@ struct Options {
 		this->tree_type = params.getOptionIntValue("-T", 0);
 		this->dis_type = std::string(params.getOptionValue("-D"));
 		this->temporal_graph = params.getOptionIntValue("-G", 0);
+		this->csv_path =
+			params.getOptionValue("-o", std::string("batch_size_measure.csv"));
 	}
 
 	void print_options() const
@@ -135,6 +137,7 @@ struct Options {
 		std::cout << "batch_ratio: " << batch_ratio << std::endl;
 		std::cout << "tree_type: " << tree_type << std::endl;
 		std::cout << "dis_type: " << dis_type << std::endl;
+		std::cout << "csv_path: " << csv_path << std::endl;
 	}
 
 	int val_n;
@@ -147,4 +150,5 @@ struct Options {
 	int tree_type;
 	int temporal_graph;
 	std::string dis_type;
+	std::string csv_path; /* tag 1 << 8 writes its CSV here */
 };

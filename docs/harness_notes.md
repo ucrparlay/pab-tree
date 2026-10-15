@@ -1182,3 +1182,104 @@ One stray `logs/scalability/3/uni/.log` (empty filename stem, header only, no
 timings) is skipped with a note — note that both bash's `*` and Python's `glob`
 skip leading-dot names, so it is invisible to the concatenation but *is* seen by
 the per-file walk, which uses `os.listdir`.
+
+## Tag `1<<8` — batch vs serial update by batch size (2026-10-14)
+
+Spec: `batch_size_measure.md` (repo root). `b_test -t 256`: for k in 1, 10,
+…, 1e8, the first k entries of `ins/<1/b>/1.batch` into a tree built from
+`ins/<1/b>/1.base`, by `batch_insert` and by `serial_insert`; then the first
+k keys of `del/<1/b>/1.batch` out of a tree built from `del/<1/b>/1.base`, by
+`batch_delete` and by `serial_delete`. Every timed call starts from a fresh
+build (untimed). `batch_vs_serial_by_size` in `test_framework.h`.
+
+```
+./b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/1/1.base.bin -b 1 \
+  -t 256 -r 1 -D uni -o batch_size_measure.csv
+```
+
+Driver: `scripts/batch_size_measure.sh`, run from `scripts/` like the others
+(it wipes and reconfigures `build/`: `DEBUG=OFF JEMA=ON LEAF=64`; `numactl -i
+all`; `round=3`). Log, CSV and table:
+`scripts/logs/batch_size_measure/0/uni/64.log`, `64_1.csv`, `64_1.md`.
+
+- CSV (`-o`, default `batch_size_measure.csv` in the working directory):
+  `batch_size,insert_time_batch,insert_time_serial,delete_time_batch,
+  delete_time_serial`, seconds, mean of `-r` runs (one untimed warm-up run
+  first when `-r > 1`, as `time_loop`). A k larger than the batch file is
+  skipped (stderr, no row). The tree size is checked after each run
+  (untimed; stderr on a mismatch).
+- The spec names `.in` files; only `.bin` exist. `-b 1` selects `ins/1`,
+  `del/1` (batch == base, 1e9 each); the default `-b 0.1` reads `ins/10`.
+- As with a lone `1<<6`/`1<<7`, the shared primal block first reads `-p`
+  and times a build.
+- Timed on `steady_clock`, not `time_loop`: parlay's timer truncates to
+  microseconds, and one serial entry takes ~3 µs at 1e8.
+- A 500 ms pause after each build (so parlay's workers sleep) changed
+  nothing at k >= 1e5 and made small k slower (serial k = 1: 2.9 -> 5.0
+  µs; batch k = 10: 0.04 -> 0.65-0.9 ms). Not kept.
+- Smoke run, 1e8 uni, `-b 0.1 -r 1`, 31 s (k = 1e8 skipped): serial wins
+  below ~100 entries (k = 1: insert 2.9 µs vs 86 µs, delete 2.9 vs 37 µs);
+  at k = 1e7, batch 0.04 s vs serial 12.2 s (insert) and 7.7 s (delete).
+  `batch_delete` of 10-1000 keys took 0.06-0.64 ms across runs, against
+  0.02-0.04 ms for one key; not looked into.
+
+Full run, 2026-10-14 (`scripts/batch_size_measure.sh`, 1e9 uni, `-r 3`, leaf
+64, 27.5 min, machine quiet at the start; every size check passed). Seconds
+per batch:
+
+| k | insert batch | insert serial | delete batch | delete serial |
+|---|---|---|---|---|
+| 1 | 1.74e-05 | 2.60e-06 | 2.35e-05 | 3.16e-06 |
+| 10 | 7.03e-05 | 2.46e-05 | 4.32e-05 | 2.45e-05 |
+| 100 | 9.52e-05 | 2.14e-04 | 6.10e-05 | 2.23e-04 |
+| 1e3 | 3.17e-04 | 1.90e-03 | 1.74e-04 | 1.96e-03 |
+| 1e4 | 1.14e-03 | 0.0166 | 5.83e-04 | 0.0171 |
+| 1e5 | 4.86e-03 | 0.146 | 2.16e-03 | 0.148 |
+| 1e6 | 0.0190 | 1.357 | 0.0127 | 1.407 |
+| 1e7 | 0.0754 | 13.01 | 0.0809 | 13.56 |
+| 1e8 | 0.193 | 168.1 | 0.207 | 137.5 |
+
+Serial wins at k = 1 (6.7x insert, 7.4x delete) and k = 10 (2.9x, 1.8x);
+batch from k = 100 on, 660-870x at 1e8. Serial costs 1.3-1.7 µs per entry
+from k = 1e5 on. The smoke run's 0.06-0.64 ms `batch_delete` at k = 10-1000
+did not recur (43-174 µs).
+
+### Serial vs tlx and std::set (2026-10-14)
+
+Question (user): std::set and tlx take "~3 s for 1e7 into 1e9", ours 13 s.
+Those numbers are `logs/summary_serial` (`summary_serial_bench.sh`): a 1e8
+tree (`Nodes=(100000000)`), and its 1% column is 1e6 entries (std::set
+2.91 s insert, 2.50 s delete; tlx 1.14 / 1.13 s). Its 1e7 column is 28.3 /
+25.4 s and 11.5 / 11.3 s. The harness links jemalloc only into `b_test` and
+`cpam`; `stdset` and `tlxbtree` run on glibc malloc.
+
+Same-session re-run, one process per structure, `numactl -i all`, machine
+quiet (load ~1.4). Driver (scratchpad, not kept): read `ins/<x>/1.base.bin`
+and `1.batch.bin`, build once (ours `build`; tlx and std::set the wrappers'
+insert loop in file order, as the harness does), then per round insert the
+first k batch entries one at a time in file order (timed) and delete the
+same k keys (timed), so the tree holds the base again. Ours calls
+`serial_insert`/`serial_delete` with an explicit leaf pattern. Every size
+check passed. k = 1e7, seconds, mean of 2 rounds:
+
+| tree | structure | insert | delete |
+|---|---|---|---|
+| 1e8 | ours hybrid (default) | 12.0 | 10.3 |
+| 1e8 | ours sorted | 9.8 | 10.1 |
+| 1e8 | ours unsorted | 3.1 | 8.5 |
+| 1e8 | tlx | 11.7 | 11.8 |
+| 1e8 | tlx + jemalloc | 10.0 | 10.0 |
+| 1e8 | std::set | 26.2 | 25.6 |
+| 1e9 | ours hybrid | 13.3, 15.5 | 14.0 |
+| 1e9 | ours sorted | 13.8 | 14.1 |
+| 1e9 | ours unsorted | 7.0 | 12.3 |
+| 1e9 | tlx | 19.3 | 18.8 |
+| 1e9 | std::set, sorted build | 39.8 | 41.9 |
+
+k = 1e6 costs the same per entry. Builds: tlx 95 s at 1e8 and 1576 s at
+1e9 (insert loop), std::set 227 s at 1e8; at 1e9 std::set was built from
+the sorted base with an end hint (72 s; key-ordered nodes, which favours
+std::set). Hybrid's second round at 1e9 was slower (13.3 -> 15.5 s; 1e6:
+1.32 -> 1.71 s); probably the first round's deletes leave leaves unsorted
+and the next insert into one sorts it whole (not checked). Tables and raw
+output: `scripts/logs/serial_vs_baselines/`.
