@@ -1283,3 +1283,65 @@ std::set). Hybrid's second round at 1e9 was slower (13.3 -> 15.5 s; 1e6:
 1.32 -> 1.71 s); probably the first round's deletes leave leaves unsorted
 and the next insert into one sorts it whole (not checked). Tables and raw
 output: `scripts/logs/serial_vs_baselines/`.
+
+## OSM and temporal-signal re-run (2026-10-20)
+
+`b0d964e` re-ran BTree and CPAM (`run_osm.sh`, `run_dynamic_graph_signal.sh`:
+leaf 64, JEMA, `-r 4`, window 3); the PAM, PMA, MassTree and BwTree rows are
+untouched. The old BTree/CPAM rows are `1bf5576` (2026-09-22, `repair_rec`).
+BTree changes in between: the graft delete with touched-only bookkeeping, and
+`parlay::merge` in an overflowing sorted leaf (`fbb03b1`). CPAM did not
+change, so its drift is the noise (within 4% on every sum).
+
+Total seconds over all batches, new / old:
+
+| data | tree | insert | delete | find | range | flatten |
+|---|---|---|---|---|---|---|
+| osm | BTree | 1.01 | **0.84** | 1.02 | 1.00 | |
+| osm | CPAM | 1.04 | 0.96 | 0.97 | 1.01 | |
+| redd | BTree | **0.71** | 0.98 | 1.01 | 1.01 | 1.01 |
+| redd | CPAM | 0.97 | 0.96 | 1.00 | 1.00 | 1.01 |
+| ref | BTree | 1.01 | **0.92** | 1.00 | 1.00 | 1.01 |
+| ref | CPAM | 1.02 | 1.03 | 1.00 | 1.00 | 1.01 |
+| sem | BTree | 1.02 | **0.94** | 1.01 | 0.96 | 1.01 |
+| sem | CPAM | 1.01 | 1.02 | 1.01 | 1.00 | 1.00 |
+
+CPAM time / BTree time, old -> new (above 1: BTree faster):
+
+| data | insert | delete | find | range | flatten |
+|---|---|---|---|---|---|
+| osm | 1.52 -> 1.56 | 1.28 -> 1.46 | 1.18 -> 1.12 | 1.13 -> 1.13 | |
+| redd | 1.10 -> 1.49 | 1.26 -> 1.24 | 0.83 -> 0.82 | 1.17 -> 1.16 | 1.16 -> 1.16 |
+| ref | 1.59 -> 1.61 | 1.26 -> 1.42 | 0.74 -> 0.75 | 1.09 -> 1.08 | 1.13 -> 1.13 |
+| sem | 1.65 -> 1.63 | 1.31 -> 1.42 | 0.73 -> 0.73 | 1.01 -> 1.05 | 1.13 -> 1.12 |
+
+- osm delete: every year 0.81-0.86 (CPAM 0.89-1.07).
+- ref delete: 0.90-1.15 through batch 15, then 0.84-0.95 (deletes of
+  49-106 M).
+- sem delete: the gain is in the 32 batches deleting >= 1e7 (3.73 -> 3.48 s;
+  CPAM 1.01); smaller batches unchanged.
+- redd insert: every batch from 1 on 0.56-0.74; the merge change. redd puts
+  31-99% of each batch past the tree's last key (batch 15: 65.8 M of 180 M),
+  all into the rightmost leaf, which `std::ranges::merge` merged on one
+  thread before `fbb03b1`. Saved 2.0-2.9 ns per such key (batch 15: 137 ms).
+  ref's longest run of new keys between two old keys is 33 K, so the change
+  cannot show there. (Scratchpad C++ over `signal/<d>/0.bin`, not kept.)
+- sem range: BTree -11% over the 181 batches with a tree < 1e7 (-15..20% at
+  1 K-500 K entries), equal above; CPAM flat; query code is the same in both
+  runs, so probably tree shape after graft deletes (not checked).
+- The CSV's `geomean` column: BTree sem flatten +25% and ref flatten +7.5%
+  are microsecond-batch noise (`sum_t` +1%); sem's delete gain shows only in
+  `sum_t`.
+
+Harness findings, from the code, not fixed:
+
+- `insert_osm_by_time` and `test_temporal_signal` zero the insert, delete and
+  find timers after the warm-up round but not range (or flatten), and divide
+  all by `rounds - 1`: at `-r 4`, range_t and flatten_t are 4 runs / 3, about
+  1.33x one run, for every tree run through `test_framework.h` (BTree, CPAM,
+  PAM, PMA). Ratios among those hold. `workload.cpp` times MassTree and
+  BwTree once, so OSM range against them is ~1.33x against the others.
+- `merge_osm.py` numbers the columns from `START_YEAR = 2014`, but
+  `TestTemporalGraph` reads years 2015-2024 (`asia_year_zcode.bin`: 2015 has
+  93 614 984 records, batch 0's size). The CSV's 2014..2023 are 2015..2024;
+  2014 (55 954 522 records) is not used.

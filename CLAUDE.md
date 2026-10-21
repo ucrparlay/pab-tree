@@ -188,7 +188,9 @@ from the second level on).
 `partition_batch` (binary search when `n > k_split_factor(8) * split_n`,
 else merge; `[[gnu::always_inline]]`, or it costs 9 calls), recurses with
 grain 1; leaf fits → `insert_points_2_leaf`, else
-`handling_leaf_split_overflow` (sorted leaf: `parlay::merge`, `fbb03b1`);
+`handling_leaf_split_overflow` (sorted leaf: `parlay::merge`, `fbb03b1`;
+redd puts up to 66 M keys of a batch past the last key, into one leaf, and
+this cut its insert chain 29%);
 `batch_insert_update_interior` has a fast path when no child split; a root
 split goes through `assemble_interior_levels`. Scratch: `2n`
 `node_split_pair`s, 32 B per input entry. Slots `2i`, `2i+1` belong to
@@ -562,6 +564,10 @@ all of seg (insert 0.76-0.98x, delete 0.69-0.83x).
 Sweep and probe numbers do not compare: same repair code, uni 0.01%, 33.7 s
 in the sweep and 76.5 s in the probe (cause not checked). The sweep's
 `run_cmake` runs `rm -rf *` in `build/`; the probe copies are gone.
+
+Real data (`b0d964e`, 2026-10-20, against `1bf5576`'s repair; CPAM drift
+within 4%): delete chain osm 0.84x, ref 0.92x, sem 0.94x, redd 0.98x.
+Tables and harness caveats: `docs/harness_notes.md`.
 
 ## Leaf sort policy
 
