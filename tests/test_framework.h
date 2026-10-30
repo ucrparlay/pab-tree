@@ -2203,36 +2203,6 @@ static auto constexpr DefaultTestFunc = []<class TreeDesc, typename TT,
 		}
 	}
 
-	/*
-	 * NOTE: batch vs serial update, one batch of the first k entries per size,
-	 * from ins/<1/b>/ and del/<1/b>/ next to -p. -b 1 (batch == base) has
-	 * entries for every size. CSV to -o.
-	 */
-	if (opts.tag & (1 << 8)) {
-		parlay::sequence<size_t> const sizes = {
-			1,		 10,		100,		1'000,		10'000,
-			100'000, 1'000'000, 10'000'000, 100'000'000
-		};
-
-		auto const [ins_base, ins_batch] =
-			opts.parse_insert_batch_path(opts.batch_ratio);
-		std::cout << "\n" << ins_base << " " << ins_batch << std::endl;
-		read_entries<typename TT::entry_type>(ins_base.c_str(), wp);
-		read_entries<typename TT::entry_type>(ins_batch.c_str(), wi);
-		auto const ins = batch_vs_serial_by_size<TT, Tree, true>(
-			tree, wp, wi, sizes, opts.rounds);
-
-		auto const [del_base, del_batch] =
-			opts.parse_delete_batch_path(opts.batch_ratio);
-		std::cout << del_base << " " << del_batch << std::endl;
-		read_entries<typename TT::entry_type>(del_base.c_str(), wp);
-		read_entries<typename TT::entry_type>(del_batch.c_str(), wi);
-		auto const del = batch_vs_serial_by_size<TT, Tree, false>(
-			tree, wp, wi, sizes, opts.rounds);
-
-		write_batch_size_csv(opts.csv_path, sizes, ins, del);
-	}
-
 	std::cout << "\n" << std::flush;
 
 	tree.delete_tree();
