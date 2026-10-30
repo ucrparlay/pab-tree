@@ -1,0 +1,32 @@
+ 18:42:23 up 27 days,  3:47,  4 users,  load average: 1.33, 2.02, 5.04
+base 1000000000 batch 1000000000
+ours-hybrid build 3.058 s
+ours-hybrid k=1000000 round=0 insert 1.316 s (1316 ns/entry) delete 1.370 s (1370 ns/entry)
+ours-hybrid k=1000000 round=1 insert 1.706 s (1706 ns/entry) delete 1.350 s (1350 ns/entry)
+ours-hybrid k=10000000 round=0 insert 13.336 s (1334 ns/entry) delete 14.013 s (1401 ns/entry)
+ours-hybrid k=10000000 round=1 insert 15.507 s (1551 ns/entry) delete 13.986 s (1399 ns/entry)
+base 1000000000 batch 1000000000
+ours-sorted build 2.882 s
+ours-sorted k=1000000 round=0 insert 1.365 s (1365 ns/entry) delete 1.380 s (1380 ns/entry)
+ours-sorted k=1000000 round=1 insert 1.350 s (1350 ns/entry) delete 1.392 s (1392 ns/entry)
+ours-sorted k=10000000 round=0 insert 13.667 s (1367 ns/entry) delete 14.112 s (1411 ns/entry)
+ours-sorted k=10000000 round=1 insert 13.868 s (1387 ns/entry) delete 14.146 s (1415 ns/entry)
+base 1000000000 batch 1000000000
+ours-unsorted build 2.842 s
+ours-unsorted k=1000000 round=0 insert 0.751 s (751 ns/entry) delete 1.110 s (1110 ns/entry)
+ours-unsorted k=1000000 round=1 insert 0.703 s (703 ns/entry) delete 1.233 s (1233 ns/entry)
+ours-unsorted k=10000000 round=0 insert 7.122 s (712 ns/entry) delete 11.996 s (1200 ns/entry)
+ours-unsorted k=10000000 round=1 insert 6.913 s (691 ns/entry) delete 12.539 s (1254 ns/entry)
+base 1000000000 batch 1000000000
+set-sorted build 71.707 s
+set-sorted k=1000000 round=0 insert 3.624 s (3624 ns/entry) delete 4.175 s (4175 ns/entry)
+set-sorted k=1000000 round=1 insert 4.081 s (4081 ns/entry) delete 4.170 s (4170 ns/entry)
+set-sorted k=10000000 round=0 insert 38.714 s (3871 ns/entry) delete 41.721 s (4172 ns/entry)
+set-sorted k=10000000 round=1 insert 40.921 s (4092 ns/entry) delete 42.140 s (4214 ns/entry)
+base 1000000000 batch 1000000000
+tlx build 1575.975 s
+tlx k=1000000 round=0 insert 1.934 s (1934 ns/entry) delete 1.873 s (1873 ns/entry)
+tlx k=1000000 round=1 insert 1.879 s (1879 ns/entry) delete 1.881 s (1881 ns/entry)
+tlx k=10000000 round=0 insert 19.509 s (1951 ns/entry) delete 18.835 s (1883 ns/entry)
+tlx k=10000000 round=1 insert 19.098 s (1910 ns/entry) delete 18.826 s (1883 ns/entry)
+ 19:19:52 up 27 days,  4:25,  3 users,  load average: 1.37, 1.41, 3.23

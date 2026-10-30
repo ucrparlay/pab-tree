@@ -1,0 +1,1347 @@
+# Harness, datasets, baselines and the concurrent-index sweep
+
+Moved out of CLAUDE.md on 2026-09-12, verbatim. CLAUDE.md now covers the
+tree only.
+
+## `external/` consumers were stale; all of them build again
+
+Every consumer of the library outside `tests/` predated the
+`pb_tree` → `pab_tree` rename and did not compile. Confirmed pre-existing by
+`git stash` before touching anything. All are fixed now.
+
+| file | was broken on | fixed by |
+|---|---|---|
+| `stdset.h`, `tlxbtree.h` | `pb_tree/b_tree.h: No such file` | include path, trait aliases, loggers, API → `snake_case` |
+| `cpam.h`, `pma.h` | `dependence/loggers.h: No such file` | same |
+| `pam.h`, `spma.h` | pulled in by `cpam.cpp`/`pma.cpp` | same |
+| `BwTree.h` | same | deleted -- dead, nothing included it |
+| `workload.cpp` | `Wrapper::E`, `pb_tree::`, `TT` | same, plus the trait's dropped `kSkHeight` parameter |
+
+**The API contract is what `test_framework.h` calls**, and it is worth deriving
+rather than guessing: `build batch_insert batch_delete contain delete_tree
+get_entries range_count range_report sorted_leaf_ratio validate`, plus
+`box_type entry_traits input_range_type input_delete_range_type interior_type
+leaf_type parse_input parse_delete_input` and `tree_type::type_trait`.
+
+```bash
+grep -ohE '\bpkd\.[A-Za-z_]\w*' tests/test_framework.h | sed 's/pkd\.//' | sort -u
+```
+
+Loggers were removed rather than reinstated: `contain` returns `bool`,
+`range_count`/`range_report` return `size_t`. **CPAM was the one that could not
+just drop it** — `zmap::range_report_filter2` takes a logger and the algorithm
+is frozen, so `cpam.h` now passes a local `visit_counter` holding the only two
+fields CPAM touches (`vis_leaf_num`, `vis_interior_num`).
+
+Two latent bugs surfaced and were fixed: `workload.cpp` referenced
+`InputType::kOSM`, which the enum never had (the `-DOSM` path could not have
+compiled), and `cpam.h`/`pam.h` both carried `using key_type = K;` beside the
+inherited `key_type`, a redeclaration once `K` *was* `key_type`.
+
+**All 14 targets build**: `self_test unit_test b_test data_generator
+incre_data_generator data_to_binary filter_csv_year temporal_graph_osm
+temporal_graph_signal stdset tlxbtree cpam pma index_microbench_workload`.
+
+### `INDEX_MICROBENCH` — MassTree/BwTree are out of `all` (added 2026-08-03)
+
+`index_microbench_workload` (the concurrent-index driver: MassTree, BwTree,
+ARTOLC, skiplists) is still **configured** on every run, but carries
+`EXCLUDE_FROM_ALL` unless `-DINDEX_MICROBENCH=ON` is passed:
+
+| | default | `-DINDEX_MICROBENCH=ON` |
+|---|---|---|
+| part of `all` (plain `make`) | no | yes |
+| `make index_microbench_workload` | works | works |
+| configure-time warning | printed | silent |
+
+`EXCLUDE_FROM_ALL` rather than an `if()` around the whole block **on purpose**:
+the 8 benchmark scripts name the target explicitly (`make "${solver}"`), so
+gating its *existence* would break `scalability_concurrent.sh` and
+`range_query_with_log.sh`. This way the change stays entirely inside
+`CMakeLists.txt` and no script needs the flag. Verified in the generated
+`CMakeFiles/Makefile2`: with ON there is an `all:
+CMakeFiles/index_microbench_workload.dir/all` line, without it there is not,
+while the target's own `.dir/all` rule is present either way. (`make -n all` at
+the top level is *not* a usable check — it only prints the recursive
+`$(MAKE) -f CMakeFiles/Makefile2 all`, never the sub-make's commands.)
+
+Why it is out of `all`: the target hard-codes `-lpapi -ltcmalloc_minimal -ltbb
+-latomic` as naked link names (no `find_library`, so a miss is a link-time
+error, not a configure one), and `-include masstree/config.h` pulls in a
+**checked-in Linux configure output** (`HAVE_MADV_HUGEPAGE`,
+`HAVE_SYS_EPOLL_H`). PAPI has no macOS port, so the target cannot build on a
+Mac at all — in `all`, a plain `make` there fails on work nobody asked for.
+None of it is needed to build or test the tree itself.
+
+Package list (also in the warning): PAPI (`libpapi-dev` / `papi-devel`),
+gperftools (`libgoogle-perftools-dev` / `gperftools-devel`), oneTBB
+(`libtbb-dev` / `tbb-devel`), libatomic, pthreads+libm. MassTree additionally
+wants `external/index-microbench/masstree/config.h` (tracked in-tree; `git
+ls-files` confirms it, so no autotools run is normally needed) or a prebuilt
+`mtIndexAPI.a` beside it — absent that `.a`, CMake compiles the 17 masstree
+`.cc`/`.c` sources directly and says so in a warning. That `mtIndexAPI.a`
+warning and the `libatomic was not found` one (macOS only) fire on every
+configure, exactly as they did before this change, since the target is still
+configured.
+
+**Formatting gotcha**: `message()` reflows any line starting at column 0, which
+mangled the package table on the first attempt. Every line of that warning is
+indented by ≥2 spaces on purpose — CMake leaves indented lines preformatted.
+
+## Benchmark dataset files (`/data/zmen002/kv_pair/...`)
+
+Generated by `data_generator` (`tests/data_generate.cpp` + `tests/data_op.h`).
+
+### Directory layout
+
+`<root>/<dis>/<base_n>_<val_n>/<ins|del>/<base_n/batch_n>/<i>.{base,batch}.in`
+e.g. `uni/100000000_1/del/10/1.base.in` = uniform, 100M base entries, 1 value
+column, delete workload, batch = 10% of base, file #1 (rand_seed = 0).
+
+### Text `.in` format
+
+Header line `<N> <dim>` (dim = 1 key + #value columns), then N lines of
+`<key> <val>`. Keys are **rank-discretized** distribution draws: real samples
+from base+batch are sorted together and each key is its rank — distinct
+integers preserving the distribution shape. Entries are then random-shuffled
+and `val` = post-shuffle position (0,1,2,...). For delete workloads the base
+is a dense permutation of `0..base_n-1` and the batch keys ⊆ base; for insert
+workloads base and batch keys are disjoint, jointly covering
+`0..base_n+batch_n-1`.
+
+### Binary `.bin` format (`tests/binary_io.h` — single source of truth)
+
+Little-endian: `uint64_t header[3] = {N, dim, width}` followed by `N*dim`
+values of `width` bytes each, row-major (`key, val, ...`). `width` is 4 when
+every value fits in uint32 (writers narrow automatically via
+`WriteBinaryEntries`), else 8. `ReadBinaryEntries` widens back to uint64
+transparently. All writers/readers go through these two helpers — **older
+2-word-header `.bin` files are incompatible; regenerate them**. Producers:
+
+- `data_to_binary -p <file.in> [-o <file.bin>]` — converts an existing text
+  file (default output replaces `.in` with `.bin`).
+- `scripts/convert_to_binary.sh <dir> [-f] [-d]` — recursively converts every
+  `.in` under `<dir>`; skips up-to-date `.bin` twins unless `-f`; `-d` deletes
+  each `.in` after its successful conversion (skipped files are kept).
+- `data_generator ... -binary 1` — generates directly to `.base.bin`/
+  `.batch.bin` via `PrintToBinaryFile` (`data_op.h`) instead of text.
+- `temporal_graph_osm -p <graph> -o <out_dir> [-binary {0,1}]` — `-binary 1`
+  writes `<i>_insert.bin`/`<i>_delete.bin` (`[N, 2, src, dest, ...]`) instead of
+  `.in`. Uses the `commandLine` parser (`common/parse_command_line.h`): `-p`/`-o`
+  are required (empty → usage), `-h`/`-help` print usage.
+- `temporal_graph_signal -p <graph> -o <out_dir> [-binary {0,1}]
+  [-group_by_year {0,1}]` — converts a *signal* graph (edge appearances, no
+  insert/delete) into a single `0.in`/`0.bin` (`[N, 3, src, dest, timestamp,
+  ...]`). Timestamps are Unix epoch seconds; `-group_by_year 1` (default) labels
+  edges by calendar year `1..#batches`, `-group_by_year 0` renumbers distinct
+  timestamps `1..#timestamps`. Same `commandLine` interface as above.
+- `filter_csv_year <in.csv> <out>` — if `<out>` ends with `.bin`, writes
+  binary (`[N, 2, code, time, ...]`) instead of text.
+
+### Generator gotcha
+
+`data_generator` **segfaults** if `-base_param`/`-batch_param` are omitted
+(`std::string(nullptr)` from `getOptionValue`) — pass dummies (e.g. `1`) even
+for uniform, which ignores them. `incre_data_generator` uses the
+`getOptionValue(opt, default)` **string** overload instead and does not have
+this bug.
+
+### `incre_data_generator` (`tests/incre_data_generate.cpp`)
+
+Datasets for the incremental-update tags (`1<<6` / `1<<7`), added 2026-07-30.
+
+**The problem it solves.** `data_generator`'s `Generator::ToEntry`
+random-shuffles the whole key set before writing, so slicing that file into
+consecutive chunks — exactly what `BatchInsertByStep`/`BatchDeleteByStep` do —
+gives every batch a *uniform* sample of the key space no matter what `-dis`
+said. The distribution survives only globally, never per batch, so `exp` and
+`uni` produce statistically identical incremental workloads.
+
+**Construction.** Base keys are the dense uniform space `[0, base_n)` (key ==
+rank; a rank-discretised base comes out dense anyway, see `Discreatize`). Then
+repeatedly, over a shrinking pool of surviving keys:
+
+```
+draw batch_n positions from the requested distribution, mapped onto [0, |pool|)
+  -- these are RANKS INTO THE POOL, not keys
+batch <- pool entries at those ranks;  pool <- pool minus batch
+```
+
+Output = the batches concatenated **in generation order**, shuffled *within*
+each batch but not across. So the harness's existing slicing picks the batches
+up unchanged. Verified at 1e6/1e4 (`exp`, λ=10): batch mean walks 0.10 → 0.15 →
+… → 0.99 of the key space with a tight p10–p90 band, i.e. a clustered hotspot
+that migrates as the front is thinned. `norm` starts tight around 0.5 and
+spreads outward as the middle is consumed; `uni` stays flat (correctly).
+
+**Flags.** Same shape as `data_generator`: `-path -base_n -batch_n -val_n 1
+-file_num -dis {0,1,2,3} -batch_op {0,1} -binary {0,1} -batch_param <csv>`,
+plus `-validate {0,1}` (full distinctness check; the cheap count/sum/max
+permutation check always runs). `-batch_param` is now a **fraction of the
+surviving pool**: exp → λ (default 10); norm → mean,dev (0.5,0.2); dual_norm →
+mean1,dev1,mean2,dev2 (0.25,0.05,0.75,0.05).
+
+**`dual_norm` changed meaning.** In `data_generator` "dual" meant base *and*
+batch normal. Here the base distribution is meaningless (the base is the whole
+dense key space), so `-dis 3` is a **two-mode batch** instead — otherwise it
+would be identical to `-dis 2`.
+
+### `seg` (`-dis 4`) — a sliding segment
+
+Each batch of `m` is drawn **uniformly from the leading `mult * m` surviving
+keys** (`-batch_param mult`, default 2), then removed. So the hot region is a
+fixed-width window of *ranks* that advances by exactly `m` per batch.
+
+For the tree (2026-09-28, 1e9, `-t 128`): each batch halves the leaves in its
+window, so most touched leaves go underfull and leaf balancing
+(`balance_over_leaves`, half of it `std::sort`) is the delete's main
+structural cost; the batch sort is ~45% of the 0.01% chain. Batch k of the
+0.01% file spans keys `[0, (k + 2) * 1e5)`.
+
+Implemented as `TargetDensity == 1.0` (flat, like `uni`) plus
+`WindowSize == mult * want`. All of the shape lives in the window; nothing else
+in the sampler changes.
+
+**It has the one property `exp` cannot.** `exp`'s concentration is capped by
+`lambda <= pool/batch` and its demand rises as the pool drains, so the shape
+degrades over a run and needs per-ratio `lambda` tuning. `seg`'s window is
+defined relative to `batch_n`, not to the pool, so **one parameter is equally
+concentrated at every ratio and every point in the run** — no tuning, no
+degradation, no capping.
+
+Measured at 1e6 / 100 batches, `mult = 2`:
+
+- max rank used is `19999` of a `20000` window in every batch — the draw never
+  escapes the leading `2m`.
+- rank spread `p10/p50/p90 = 2000/9950/18000` of 20000 — exactly uniform inside.
+- key-space `p10..p90` width settles at **3.2%** of the key space and slides
+  0.002 → 0.036 → 0.235 → 0.487 → 0.736 → 0.966.
+
+The key span (~3.2m) is wider than the rank span (2m) because a key that
+survives a draw stays in the window and can be re-exposed — survival decays
+geometrically at `1/mult` per batch, so a thin tail trails behind.
+
+`mult` is a clean knob: `1` is **exactly sequential** (batch b is literally keys
+`[b*m, (b+1)*m)`), `2` gives a 3.2%-wide window, `16` a 31%-wide one.
+
+Also the cheapest shape to generate: pool-work saving is `pool_n / (mult*m)`,
+which at ratio 100 is already 25x and grows with the ratio.
+
+**Writes one file, not a pair, and the stem is `.batch` for BOTH ops** (renamed
+2026-07-31): `ins/<base_n/batch_n>/<i>.batch.<ext>` and
+`del/<base_n/batch_n>/<i>.batch.<ext>`. There is no base/batch pair in these
+datasets — the whole file *is* the batch stream, sliced into equal windows by
+the harness — so the old `.base` stem on the insert side (inherited from what
+tag `1<<6` happened to read) made two identical things look different. Both
+tags now read `ParseXBatchPath(ratio).batch_path`.
+
+This required `Options::ExtractPrefixes` to also strip `.batch` — it stripped
+only `.bin`/`.in`/`.base`, so a `-p` pointing at a batch file left the prefix as
+`<i>.batch` and every derived path became `<i>.batch.base.<ext>`. Verified: `-p`
+on `ins/<x>/<i>.batch.bin` now resolves all four ratios on both sides, and
+`tag=224` emits 36 tokens from `b_test`, masstree and bwtree alike. The change is
+additive — the standard `/data/zmen002/kv_pair` datasets still have real
+base/batch pairs and tags `1<<0`/`1<<1`/`1<<3` still read `base_path`.
+
+The layout is otherwise identical to the standard datasets so
+`ParseInsertBatchPath`/`ParseDeleteBatchPath` resolve it unchanged — which also
+means **point `-path` at a fresh root** or it overwrites them.
+
+**λ must track the batch ratio — there is a hard arithmetic ceiling.** The
+exponential asks for `batch_n · λ / pool` of the ranks at the very front of the
+pool ("demand"), and nothing can supply more than 100% of them, so
+
+```
+λ ≤ pool / batch_n   ==  the number of batches still to come
+```
+
+Demand rises through a run because the pool drains: `demand_b = demand_0 /
+(1 − b/batch_num)`. So the **fraction of the run that is exactly on-shape is
+`1 − demand_0`**. Past the ceiling the excess probability is capped at 1 and the
+batch becomes the sharpest achievable rather than the requested shape (reported
+as a NOTE with the count of capped rank-slots).
+
+### Sampler — three generations, and why the last one won
+
+`SelectBatchFlags` computes an inclusion probability per surviving rank and then
+flips an independent weighted coin for each. Measured shape error and scatter at
+batch 50/100, ratio 100 (scatter 1.0 = what a genuine random draw gives):
+
+| sampler | λ=10 | λ=20 | λ=50 | scatter |
+|---|---|---|---|---|
+| guess-and-retry (v1) | −2.0% | −4.6% | −11.7% | 1.1 / 1.8 / 13.6 |
+| running-total sweep (v2) | −0.0% | −0.0% | −0.0% | **0.007** |
+| independent coins (v3, current) | −0.3% | −0.5% | −0.1% | **1.07 / 1.00 / 0.89** |
+
+- **v1 was wrong, not just noisy.** Rejection sampling wastes every draw that
+  lands on an already-taken rank, and in a crowded region nearly all of them do,
+  so keys leaked out of the peak into the tail. Its inflated "scatter" at λ=50 is
+  the systematic bias showing up in the chi-square, not real scatter.
+- **v2 got the shape exactly right but killed the randomness** — picks spaced
+  evenly along the cumulative curve by construction, ~150× less scatter than a
+  real draw. Every stretch of the key range got almost precisely its predicted
+  count, so there were no lucky hot spots, which is most of what makes a skewed
+  workload hard on a tree.
+- **v3 keeps v2's accuracy and restores v1's randomness.** Residual shape errors
+  of ±0.5% are within one standard deviation of the per-batch count — they *are*
+  the scatter, not bias. Also ~25% faster than v2 (no prefix scan).
+
+Inclusion probabilities: `π_i = min(1, w_i/t)` where `w_i` is the unnormalised
+target density at rank i and `t` solves `#{w_i ≥ t} + (Σ_{w_i<t} w_i)/t = want`.
+Since `π ∝ w` for every uncapped rank, "capped" is exactly `w_i ≥ t` for a single
+scalar `t`, so the solve is a scalar fixed-point iteration (`g(t)` is strictly
+decreasing; the step always moves the right way), not a per-element search.
+
+Independent coins give a count near `want`, not on it (±√want ≈ 0.03%), and the
+file is sliced into equal windows downstream, so the count is repaired: drop
+uniformly at random when over (uniform dropping scales every π by the same
+factor, leaving the shape untouched), add uniformly at random from the unselected
+when under. Both repairs are ≪ the natural scatter. The repair draws positions by
+oversample-and-dedupe rather than materialising and shuffling a `pool_n`-sized
+index array.
+
+**Bug that v2 introduced and the permutation check caught** (worth remembering,
+since the same shape of error can recur): under heavy capping the scalar solve
+does not fully converge, the running total lands just under `want`, the rescale
+goes slightly *above* 1, and a capped slot (π = 1) can then straddle two whole
+numbers while the sweep can only ever pick that rank once. One lost pick leaves
+an **uninitialised** output slot, and the file stops being a permutation. The
+cheap sum/max check in `ValidatePermutation` is what surfaced it — keep it.
+
+Other implementation notes: distribution objects are constructed inside the
+lambda because `std::normal_distribution` caches a spare deviate (sharing one
+across workers, as `data_op.h`'s generators do, is a data race). `parlay::filter`
+must not be used with a side-effecting predicate — its predicate runs over a
+delayed sequence and may be evaluated more than once per element.
+
+### Per-ratio datasets — the harness now reloads per ratio
+
+Tags `1<<6`/`1<<7` used to read *one* file and slice it four ways. As of
+2026-07-30 the loops in `test_framework.h` hoist `incre_ratio_seq =
+{1e-4, 1e-3, 1e-2, 1e-1}` above both blocks and call
+`ParseInsertBatchPath(ratio)` / `ParseDeleteBatchPath(ratio)` **inside** the
+loop, reloading `ins/<1/ratio>/` and `del/<1/ratio>/` each time. That matches
+`incre_data_generator`'s ratio dir (`base_n / batch_n` == `1/ratio`), so each
+ratio gets batches laid out for the step it slices at.
+
+Consequences:
+
+- **`-b` / `opts.batch_ratio` is now unused by tags `1<<6`/`1<<7`.** It only
+  picks the file handed to `-p`, which tag `1<<5` builds its control from.
+- 4 file reads per block instead of 1 (~64 GB of extra I/O per run at 1e9).
+- Under the new root both sides are 1e9 entries; under the old root
+  `del/<x>/*.batch.bin` is `base_n/x` entries, so the insert and delete blocks
+  were not comparable at `-b != 1`. That asymmetry is gone.
+
+**Silent-wrong-data hazard.** The old root `/data/zmen002/kv_pair` *also* has
+`ins/{10,100,1000,10000}/`, so pointing the sweep there still runs to
+completion — it just measures the globally-shuffled data. `incre_updates.sh`
+now sets `data_prefix=/data/zmen002/kv_pair_incre` and `batch_ratio=0.01`
+(so `-p` resolves to `ins/100/1.base.bin`); the old prefix is kept commented
+one line below.
+
+**The two halves are no longer interchangeable.** With globally-shuffled data
+both halves of `wp` were uniform samples of the whole key space. With the new
+data the first half is the low-key region (for `exp`) and the second the high-key
+region, so in `incre_update_query`: membership `IND` probes only low keys and
+`OOD` only high keys, and `GenRectangles` builds every range box out of
+`entry_in_tree`, i.e. entirely inside the low half. Arguably what a skewed
+workload should do, but the columns do not mean what they did.
+
+### `scripts/gen_incre_data.sh`
+
+Generates the whole sweep: 4 ratios x 4 distributions x 2 ops = 32 files x 8 GB
+= **~256 GB** (the volume had 698 GB free on 2026-07-30). Ratios are generated
+**cheapest first** (`10 100 1000 10000`) and existing non-empty outputs are
+skipped unless `-f` is passed, so it is resumable.
+
+**λ = `batch_ratio / 2`** → `{5, 50, 500, 5000}`. That puts demand at 0.5 at the
+start of a run, so it reaches the ceiling of 1.0 exactly at the half-way point:
+**every batch in the first half is exactly on-shape**, and the first half is what
+builds the tree state the queries run against. Front-vs-back odds inside a batch
+are `e^λ`, so even the widest batches (10% of the pool, λ=5) lean ~148x. The
+earlier `batch_ratio / 10` was 5x flatter for no accuracy gain once the sampler
+became exact. `norm`/`dual_norm` need no scaling — their mass sits in a band
+~`2*dev` wide, so even the widest batch here stays under the ceiling.
+
+### Front-window optimization (2026-07-31)
+
+`WindowSize()` restricts each batch to the leading `win_n` ranks; only that
+prefix is scanned, and **compaction shifts the window's survivors right against
+a moving `lo` offset** so the untouched suffix never moves. Per-batch cost drops
+from `O(pool_n)` to `O(win_n)`.
+
+- `exp`: window is `40/lambda` of the pool (mass beyond is `e^-40`, and the
+  expected picks lost are bounded by `lambda*want*e^-40` ≈ 1e-9), floored at
+  `8*want` so a capped batch can still reach. **123.8x less pool-work** at
+  lambda 5000; measured 1e8/10000 batches **~22 min → 18 s (77x)**.
+- `seg`: window is `mult*want` by definition — 25x at ratio 100, more at finer
+  ratios.
+- `norm`/`dual_norm`: window is the whole pool (a centred window would work for
+  them but is a different change), so they behave as before.
+- `uni`: **closed form, no carve at all** (2026-07-31). For a flat density the
+  batch-by-batch process is provably one global shuffle — cut a uniform random
+  permutation of `[0, base_n)` into consecutive `batch_n` blocks and block 0 is
+  a uniform random subset of the key space, block 1 a uniform random subset of
+  what is left, and so on, which is exactly what the loop computes. `O(base_n)`
+  instead of `O(base_n * batch_num / 2)`. Measured at 1e8: **9.3 s at every
+  ratio** (was ~4.6 min at ratio 10000); at 1e9 it should drop 46 min → ~90 s.
+  Verified empirically before the change: `uni` batch 0 at ratio 100 had
+  p10/p50/p90 = 0.0999/0.5002/0.9000 of the key space, i.e. already a plain
+  uniform subset, so the carve was producing nothing the shuffle does not.
+
+  Corollary worth remembering: for `uni` this generator's output is
+  distributionally identical to `data_generator`'s. The new generator only earns
+  its keep on shapes that *have* per-batch structure.
+
+**`parlay::random_shuffle` defaults to a FIXED seed.** Both the uniform closed
+form and the per-batch within-batch shuffle now pass `parlay::random(seed)`
+explicitly. Without it every `-file_num` instance of a `uni` dataset would have
+come out byte-identical (verified: files 1 and 2 now differ).
+
+**Bug this surfaced.** The count repair used to top up **uniformly** over the
+free ranks. Harmless when the shape is gentle, badly wrong when it is steep: at
+lambda 5000 it sprayed ~0.5% of the batch flat across the window and pushed the
+largest key to **4x** where the exponential could plausibly reach (0.0078 vs an
+expected max of 0.0018). Fixed by rejection-sampling the additions from the
+shape itself (accept with probability `w/max(w)`). KS 0.0144 → **0.0073**, head
+error −0.72% → **+0.09%**, max key 0.0078 → **0.0017**. Dedupe the *accepted*
+set, not the raw candidate draw, or the repair costs more than the optimization
+saves (41 s vs 18 s at 1e8).
+
+### Rank-skew is not key-skew — what `exp` actually produces
+
+The sampler shapes **ranks in the surviving pool**, and the pool is sorted
+throughout (`pack` preserves order, the window is a prefix, survivors shift
+right, the untouched suffix holds strictly larger keys). Confirmed empirically:
+ranks computed as index-in-`sorted(pool)` match `exp(lambda)` to KS ≈ 0.005.
+
+But once the front is thinned the survivors are no longer evenly spaced, so the
+rank→key map goes nonlinear. Measured at lambda 50 (shape indicator
+`(p50-p10)/(p90-p10)`; 0.268 = exponential, 0.500 = symmetric):
+
+| batch | 0 | 5 | 25 | 50 | 90 |
+|---|---|---|---|---|---|
+| in rank space | 0.265 | 0.279 | 0.264 | 0.269 | 0.476 |
+| **in key space** | **0.265** | **0.447** | **0.452** | **0.419** | **0.508** |
+
+So each `exp` batch is a **tight migrating cluster in key space** (p10–p90 width
+3–7% of the key space, centre walking 0.014 → 0.25 → 0.50 → 0.90), but the shape
+*inside* the cluster is exponential only for batch 0 — afterwards it is roughly
+symmetric. At batch 25 the leading 10% of the pool's key span holds just **0.04x**
+the average survivor density, which is what bends the mapping.
+
+If per-batch key-space exponentiality is required, feed `TargetDensity` the key
+position `(pool[lo+i] - klo)/(khi - klo)` instead of `(i+0.5)/pool_n`; the window
+would then need a binary search on keys and would come out smaller. Not done.
+`seg` sidesteps the whole issue — its window is a rank count by definition.
+
+**Generation cost is the real constraint, and it is worse than first estimated.**
+Cost is linear in total pool-work `base_n * batch_num / 2`, measured at ~2.9 ns
+per unit (n=1e7, 100/1000/10000 batches → 1.6 / 13.3 / ~145 s). Projected at
+base_n=1e9, per file and per 8-file tier:
+
+| ratio dir | per file | tier |
+|---|---|---|
+| 10 | 0.2 min | 0.03 h |
+| 100 | 2.4 min | 0.3 h |
+| 1000 | 24 min | 3.2 h |
+| **10000** | **4.0 h** | **32 h** |
+
+~36 h total, **90% of it in the finest tier**. Not yet implemented, but the clear
+fix: at λ=5000 the density is negligible beyond ~0.6% of the pool, so 99.4% of
+every pass is spent on ranks with essentially zero chance of selection.
+Restricting the work to that front window, and compacting by shifting survivors
+rightward against a moving start offset instead of rebuilding the whole pool,
+would cut the finest tier by roughly 160x (≈15 min). Do this before generating at
+1e9.
+
+### `temporal_graph_signal` driver (`tests/temporal_graph_signal.cpp`)
+
+Converts a **signal graph** — a stream of edge *appearances* `(src, dest,
+timestamp)` with no INSERT/DELETE semantics — into one timestamp-labeled output
+file (`0.in`/`0.bin`; rows `src dest timestamp`, binary `[N, 3, src, dest,
+timestamp, ...]`). Pipeline:
+
+1. **Read & sort** edges by raw timestamp (Unix epoch seconds, read as
+   `double`).
+2. **Deduplicate** `(src, dest)` keeping the earliest (smallest raw-timestamp)
+   copy via `remove_duplicates_ordered` (input is timestamp-sorted, so the
+   stable sort by `(src, dest)` keeps the earliest copy of each group).
+3. **Re-label timestamps** on the deduplicated edges (the label becomes the
+   output timestamp). Dedup leaves the result sorted by `(src, dest)`, so it is
+   **re-sorted by raw timestamp first** to make group adjacency valid, then:
+   - `-group_by_year 1` (default): convert each epoch second to its UTC calendar
+     year via `gmtime_r` (`tm_year + 1900`), then label the distinct years
+     `1..#batches` by ascending year — one batch per year. Years with no edges
+     are skipped, so labels stay contiguous.
+   - `-group_by_year 0`: renumber the distinct raw timestamps `1..#timestamps`
+     by ascending value (each distinct timestamp = its own label). Ranks are
+     computed over the **deduplicated** set.
+   - Both share the same group-flag + `scan_inclusive` machinery; only the flag
+     predicate differs (year change vs raw-timestamp change). The result
+     `labels` sequence overwrites `deduped_edges[i].timestamp`.
+4. **Shuffle within equal labels**: global `random_shuffle` then `stable_sort`
+   on the label → uniform order within each label group, globally ordered across
+   groups.
+5. **Stats + write**: prints max vertex ids, max degree, average degree, and a
+   post-dedup per-batch summary (`Batch N: M edges`, listed only in year mode
+   since rank mode can have a huge number of labels; the aggregate distinct-label
+   count prints in both modes).
+
+Note the **dedup-before-relabel** order: relabeling operates on the final edge
+set, so rank-mode labels (and the printed distinct counts) reflect deduped data,
+not the raw stream.
+
+CLI (`commandLine`, `common/parse_command_line.h`): `-p` input (required), `-o`
+output dir (required), `-binary {0,1}`, `-group_by_year {0,1}`. Missing required
+arg or `-h`/`-help` → usage.
+
+## `ReadEntries` (`test_framework.h`) — the dataset loader
+
+```cpp
+template<typename E, int kInputType = 0>
+auto ReadEntries(char const* iFile, parlay::sequence<E>& wp, size_t offset = 0)
+  -> std::pair<size_t, int>;  // returns (N, dim)
+```
+
+`ReadEntries` is a **dispatch layer**: path ends in `.bin` →
+`ReadEntriesBinary`; anything else → `ReadEntriesText`. No filesystem probing —
+the given path is the file that gets read. `ParseInsertBatchPath`/
+`ParseDeleteBatchPath` (`options.h`) derive base/batch paths that **inherit the
+input file's extension** (`InputExtension()`), so a `.bin` input (`-p`) makes
+all derived batch files load as binary too. `ExtractPrefixes` strips `.bin`,
+`.in`, then `.base`.
+
+**Debugging note**: `unit_test` redirects stdout during `RunTest`, so an
+`abort()` from a missing data file used to die silently (no gtest summary).
+`binary_io.h` errors go to **stderr** for this reason.
+
+### `ReadEntriesText` (the original text parser)
+
+- Reads whole file via `benchIO::readStringFromFile`, tokenizes in parallel via
+  `stringToWords`, parses `N`/`dim` from the first two tokens, then a
+  `parallel_for` fills `wp[i]` via `E::ReadKey`/`E::ReadVal` (`std::stoul`).
+- **Overwrites** `wp` (`clear()` + `resize(N)`), never appends.
+- Only ever reads 2 columns (`pts[i*dim]`, `pts[i*dim+1]`) regardless of dim.
+- `kInputType` (enum `InputType` in `wrapper.h`): `kNormalInput`/`kOsmInput`
+  read key+val from the two columns; `kDynamicGraphInput` packs two uint32
+  columns into a uint64 key `(u<<32)|v` and sets `val = i + offset`.
+- `offset` is only used by `kDynamicGraphInput`: callers thread a running
+  `total_entries` across multiple files so vals stay globally unique.
+- Call sites: `DefaultTestFunc` (base file from `-p`, then per-ratio
+  base/batch pairs via `opts.ParseInsertBatchPath`/`ParseDeleteBatchPath`),
+  `TestTemporalGraph` (OSM single file; dynamic graph 10×`{i}_insert.in`/
+  `{i}_delete.in` pairs), `unit_test.cpp`.
+- `ReadPointsSerial` (serial fallback) is used only under `-DMEMCHECK`.
+
+### `ReadEntriesBinary`
+
+Same interface/semantics, reads the `.bin` format via `ReadBinaryEntries`
+(`binary_io.h`; handles 32/64-bit payload widths transparently). Assigns
+`wp[i].key`/`wp[i].val` directly (no string parse); `kDynamicGraphInput`
+packs `(u<<32)|v` and uses `offset` like the text reader. Aborts on
+missing/truncated file or bad header.
+
+### Baseline targets build again (fixed 2026-08-18)
+
+They were broken from 2026-06 until the naming pass; see "`external/` consumers
+were stale" above. All 14 targets compile.
+
+## Baselines (`external/baselines/*.h` + `tests/<name>.cpp`)
+
+Single-threaded / external reference implementations that conform to the same
+test-framework interface as `BTree<TT>` (methods: `Build`, `BatchInsert`,
+`BatchDelete`, `Contain`, `RangeCount`, `RangeReport`, `GetEntries`,
+`DeleteTree`, `GetSize`, plus `ParseInput`/`ParseDeleteInput`/`KeyProbe` adapters
+and the `Leaf`/`Interior` aliases). Each has a thin `tests/<name>.cpp` driver
+(mirror of `tests/stdset.cpp`) and its own executable target in CMake.
+
+| Baseline | Wrapper header | Backing store | Notes |
+|---|---|---|---|
+| StdSet | `stdset.h` | `std::set<E, KeyLess>` | serial loops; ordered by key only |
+| TlxBTree | `tlxbtree.h` | `tlx::btree_set<E, KeyLess>` | serial loops; in-memory B+ tree |
+
+- **TLX** is a git **submodule** at `external/tlx` (header-only btree). Added with
+  `git submodule add -f` because `.gitignore` ignores all extensionless paths
+  (`*` on line 2). Include dir `${PROJECT_SOURCE_DIR}/external/tlx` is added only
+  to the `tlxbtree` target; header is `<tlx/container/btree_set.hpp>`.
+- `tlxbtree.h` differs from `stdset.h` only in: include, `SetType`, and
+  `Contain` uses `set_.exists(k)` (tlx) vs `set_.find(k) != end()` (std::set).
+- **Build caveat**: baselines have **no `Validate()` method**, so they only
+  compile on the `DefaultTestFunc` path. Under `-DOSM`/`-DDYNAMIC_GRAPH` the
+  driver selects `TestTemporalGraph`, which calls `pkd.Validate()` →
+  compile error. Build baselines with `OSM=OFF DYNAMIC_GRAPH=OFF` (the default).
+- **Membership-query segfault fix** (`DefaultTestFunc`, `test_framework.h`): the
+  `query_type & (1<<0)` (membership) branch sliced the membership probe set from
+  `wi` (the insert/delete batch) in its `wi.size()==0` case. With `-t 0` (no
+  insert/delete batch) `wi` is empty, so `wi.subseq(0, batch_size)` with
+  `batch_size = wp.size()*kMemberQueryRatio (0.01) > 0` did an out-of-bounds copy
+  → SIGSEGV inside parlay's parallel `sequence` construction (crash is in the
+  framework, *before* any `Contain` call — affected every baseline equally, not
+  TLX-specific). Fixed to slice `wp` (the keys actually built into the tree).
+
+## Concurrent-index incremental sweep (`external/index-microbench/workload.cpp`)
+
+Three tags, **numbered identically in `workload.cpp` and `tests/test_framework.h`**
+(renumbered 2026-07-28 — anything older that says "tag 5 = insert" predates this):
+
+| tag | block | b_test | concurrent |
+|---|---|---|---|
+| `1<<5` | static build, then query — the control | `BuildTree<…,kOutputRatio=2>` | `ConBuild` |
+| `1<<6` | incremental insert | `BatchInsertByStep` | `ConInsertByStep` |
+| `1<<7` | incremental delete | `BatchDeleteByStep` | `ConDeleteByStep` |
+
+Driven by `scripts/incre_updates.sh` (`tag=2#11100000` = 224, all three).
+
+All three end in the same query suite on a **half-filled** tree, factored into one
+helper per side — `incre_update_query` (`test_framework.h`, a lambda beside
+`membership_query`/`range_query`/`range_count`) and `ConQueryAfterStep`
+(`workload.cpp`). Both take `(entry_in_tree, entry_not_in_tree)` and run: one
+membership pass over `random_shuffle(append(both halves))` truncated to
+`batch_size`, then `kRangeQueryType` range queries and `kRangeQueryType` range
+counts, all on `entry_in_tree`. `batch_size` is `kMemberQueryRatio` of the
+**whole** input, not of one half.
+
+Tag `1<<5` being set also skips the shared primal build block (`if ((opts.tag &
+(1<<5)) == 0)`) in both files, since that block builds from the same input.
+
+### `ConInsertByStep` / `ConDeleteByStep`
+
+Both slice the input into `1/ratio` batches over
+`ratio_seq = {0.0001, 0.001, 0.01, 0.1}`, time the whole chain **once** (no
+`rounds` loop — `-r` is ignored), then **rebuild** to reach a half state rather
+than unwinding, because masstree's `remove` never reclaims (measured: 1e9 delete
+grows RSS 98GB → 1491GB and dies).
+
+The half state is `slice_num / 2` batches, and callers split the input at
+`size() / 2` to decide which keys are in the index — these agree exactly only
+when `step` divides `n` (true for every real dataset). Both sides use `size()/2`
+so the two drivers classify keys identically.
+
+### Timing vs. query state (tag `1<<5`)
+
+The timed build covers the **whole** input; only the final untimed build is the
+half one. `BuildTree`'s `kOutputRatio` template parameter does this (times
+`Build(wp)`, ends with `Build(wp[0, n/kOutputRatio))`), and the tag `1<<5` block
+in `workload.cpp` mirrors it with `ConBuild<1>(wp)` → drop → `ConBuild<0>(half)`.
+This is what makes the control comparable to tags `1<<6`/`1<<7`, which likewise
+time the full chain and then rebuild to half.
+
+### `ConRunBatched` — why threads are spawned once
+
+`threadinfo::make` mallocs 8KB, links into a never-pruned global `allthreads`,
+and grabs a 2MB superpage pool. One `StartThreads` per batch would leak
+`slice_num * num_thread` threadinfos (1e9 @ ratio 1e-4 → 2.24M ≈ 4.4TB, killing
+the run via `pthread_create` EAGAIN). `ConRunBatched` spawns one thread per
+worker, one threadinfo each, and walks all batches inside with a `std::barrier`
+between them. Work split inside a batch is **proportional**
+(`in.size()*tid/num_thread`), unlike `ConInsert`/`ConDelete`, which use
+`key_per_thread*tid` and drop the remainder.
+
+### Output format
+
+**The suite was trimmed at some point after the 2026-07-28 notes below, and both
+drivers were trimmed identically** — verify against the code before trusting any
+column count here. As of 2026-07-31 `incre_update_query` (`test_framework.h`) and
+`ConQueryAfterStep` (`workload.cpp`) each run:
+
+- **one** membership pass — `MIX` only (both halves appended, shuffled, truncated
+  to `batch_size`). The `IND` and `OOD` passes are commented out in both files.
+- **one** range query, `rec_type = 1` only (the `for rec_type` loop is commented
+  out in both).
+- **one** range count, `rec_type = 1` only.
+
+So per ratio it is **4 columns** = 1 timing + 1 membership + 1 range query + 1
+range count, not 10. Whole-run totals: tag `1<<5` → 4 tokens; tags `1<<6`/`1<<7`
+→ 4 ratios × 4 = 16 each, **plus** 1 primal build token when tag `1<<5` is not
+also set. `tag=2#11100000` (all three, what `incre_updates.sh` runs) is
+`4 + 16 + 16 = 36` tokens; a lone `1<<6` or `1<<7` is 17.
+
+Every column is a real number for every index type as of 2026-07-31 — masstree's
+range-count `-` placeholders are gone (see the `q_[0]` race fix below), and it
+reported all range queries from 2026-07-28 (the `scan` stack-array fix).
+
+**`merge_incre_updates.py` still expects the old 90-value layout** and has not
+been updated for the trim; it will treat a current 36-value run as a short row
+and pad it. Fix the parser before merging new logs.
+
+The primal build is **always** run and always a real number, in both drivers —
+`workload.cpp` used to skip it and print `-` when only the incremental bits were
+set. Restoring it costs masstree a full 98GB / ~66s index at 1e9 that tags
+`1<<6`/`1<<7` immediately release; it is paid only to keep that column
+comparable against `b_test`.
+
+### Merging the trimmed logs (`scripts/merge_incre_updates_new.py`)
+
+Merges **both** log trees into one 36-value CSV at
+`data/incremental_updates_new/<name>.csv`, and writes a concatenation of every
+source log (with `>>> <path>` markers) beside it for reading by hand.
+
+Row layout is `build | 3 queries | 8 x (update_time, 3 queries)` = **36 values**,
+9 blocks of 4. The 3 queries are `MIX`, `RRM`, `RCM` — the driver dropped the
+`IND`/`OOD` membership passes and the `RRS`/`RRL`/`RCS`/`RCL` box sizes, taking
+the row from 90 to 36. Block order is unchanged: build, then ins then del at
+0.01% / 0.1% / 1% / 10%. Field mapping was confirmed by magnitude against the
+old 90-column CSV (`exp,BTree,64` gives RRM 0.0837 vs 0.0804, RCM 0.00215 vs
+0.00205; MassTree's del timings track the old row within a few percent).
+
+**The 36 columns are a strict subset of the 90**, so the old logs are *projected*
+down rather than skipped — keep the timing plus MIX/RRM/RCM per block, drop the
+other six. Projection is **by column name**, not index, so it cannot drift if
+either layout changes. Only the 73-value pre-MIX layout is unprojectable (no MIX
+column at all) and still skipped.
+
+`kSources` decides which sweep supplies which distribution. **Order matters**:
+sources are tried in turn and the first to supply a given
+`(benchmark, tree, leaf_wrap)` wins, so a later entry only fills gaps.
+
+| order | source | values | supplies |
+|---|---|---|---|
+| 1 | `logs/incremental_updates_new/` | 36 | `uni`, `norm`, `seg` |
+| 2 | `logs/incremental_updates/` | 90 | `uni` — **backfill only** |
+
+As of 2026-08-02 the tag=224 sweep is primary for all three distributions, and
+the old 90-value sweep backfills `uni`: a `(tree, leaf_wrap)` it has that the new
+sweep lacks is taken from there and projected onto the 36 columns by name. This
+was requested explicitly; it is **not** the safe default — see the caution
+below.
+
+**The CSV reports `norm` as `skew` and `seg` as `adversary`** (`kBenchDisplay`).
+This is a display mapping applied at row construction, *not* a rename of the
+logs: the driver writes `Dis: norm` / `Dis: seg` from the generator's own `-dis`
+values, so renaming directories and headers would be undone by the next
+benchmark run. `kWantBench`, `kSources` and the dedupe key all stay in
+generator names; only the emitted `benchmark` column changes.
+
+For `norm`/`seg` there is no second source, so a tree with no run under
+`logs/incremental_updates_new/<tree>/<dis>/` is **absent** from that
+distribution. A distribution in `kWantBench` that supplies **no** rows at all is
+warned about on stderr (`warn: no rows for …`), since it is otherwise invisible:
+the CSV simply has no such row.
+
+**The `uni` backfill mixes two sweeps inside one distribution, and the merger
+says so.** `report_coverage()` prints every backfilled row, then a `WARN:` for
+any `(benchmark, tree)` drawing from more than one sweep — the dangerous case,
+because such a curve steps where the *source* changes rather than where the
+parameter does. Concretely, if the new sweep's `uni` has only `64.log`, then
+`uni/BTree` leaf 64 comes from the new sweep and 2..1024 from the old, so the
+leaf-size curve has an artificial discontinuity at 64. Read those lines before
+plotting; the real fix is rerunning the missing leaf sizes into the new sweep,
+after which the backfill goes quiet on its own (no backfill lines, no `WARN`).
+
+Whether a row was backfilled is **not** a CSV column — the schema is unchanged
+so downstream consumers keep working — it exists only in the stderr report.
+
+**`exp`, `seg_10` and `dual_norm` are dropped from the output**, their logs
+still on disk. Adding a name back to `kWantBench` *and* `kSources` restores it.
+
+`seg` and `seg_10` are the same sliding-segment shape at two window widths (the
+generator's `-batch_param mult`), so they are separate distributions rather than
+two runs of one — do not dedupe them. They differ per tree in *direction*, which
+is how you can tell: ins_0.01%, `seg` → `seg_10`, CPAM 7.43 → 12.60 and PAM
+8.40 → 12.66 (slower), but PMA 191.98 → 178.85 (faster).
+
+**How far apart the two sweeps are** — the evidence behind the caution above.
+They are not interchangeable, and the difference is **per tree, not a uniform
+scale factor** — same tree, `exp` ins_0.01%, old → new:
+
+| BTree | CPAM | PAM | PMA | MassTree | BwTree |
+|---|---|---|---|---|---|
+| 29.25 → 6.40 | 55.60 → 6.41 | 29.75 → 8.24 | 29.90 → **181.17** | 87.29 → 84.70 | 55.68 → 55.15 |
+
+PMA got ~6x *slower* while MassTree and BwTree barely moved, so a backfilled row
+sits at its own unrelated operating point next to rows measured on the new
+sweep — which is why the `uni` backfill is reported per row rather than applied
+silently. Rerunning the missing runs into `incremental_updates_new/` is the only
+thing that actually removes the mismatch. (`exp` itself is no longer emitted —
+the table is kept because it is the evidence for this.)
+
+(An earlier revision of this note claimed a "~9x" factor between the sweeps.
+That was derived by comparing `exp/BwTree`-old against `exp/BTree`-new — two
+different trees — and is wrong. The table above is the same-tree comparison.)
+
+**Every leaf size that was run is emitted** (`kBTreeLeafWraps = None`, changed
+2026-08-02 — it was previously `kBTreeLeafWrap = 64`, a hard pin). BTree is the
+only tree swept over leaf sizes, so a distribution holds one BTree row per leaf
+size it was run at against 1 row for each other tree. Set
+`kBTreeLeafWraps` to a collection — `{64}` reproduces the old 18-row output
+exactly — to pin it back for a plot that wants one line per tree.
+
+Because coverage is a property of the logs and not of the merger, the script
+prints a `note:` per `(benchmark, tree)` for any tree that is swept *somewhere*,
+including the distributions where it is not — so `adversary/BTree spans 1 leaf
+size(s): 64` appears next to `uni/BTree spans 10`, rather than the gap being
+silent.
+
+**`leaf_wrap` must come from the header's `Buf:` field, not the filename.** The
+new sweep names every file `64.log` after the BTree leaf size, so PAM, PMA and
+MassTree runs sit in a `64.log` while reporting `Buf: 1`. A merger written
+against the path would mislabel three of the six trees.
+
+Expected state: the 3 × 6 grid, `uni`/`skew`/`adversary` × BTree, PAM, CPAM,
+PMA, MassTree, BwTree, with BTree expanded over its leaf sizes — 18 rows when
+pinned, more once the leaf sweep is included. How many depends on which
+`logs/incremental_updates_new/<tree>/<dis>/<leaf_wrap>.log` files exist; read the
+`note:`/`warn:` lines the merger prints rather than assuming the grid is full.
+Every row should parse at exactly 36 values.
+
+The row counts and values recorded below predate the 2026-08-02 switch to a
+single source, when `uni` came from the old 90-value sweep — re-derive them from
+a current run before quoting. (The old `uni/MassTree` `-` in every `RCM` column
+was an artefact of those logs predating the `q_[0]` race fix; a `uni` run from
+the current sweep should have real numbers there.)
+
+`skew` lands between `uni` and `adversary`, as its centred band should — BTree
+ins_0.01%: uni 29.35, skew 25.03, adversary 7.61.
+
+**`adversary/MassTree` and `adversary/BwTree` are byte-identical to those trees'
+`exp` logs** (ins_0.01% 84.7021 and 55.145, matching to every digit) — they were
+copied from `exp` and relabelled, so they are placeholders, not `seg` runs. The
+other four `adversary` rows and all six `skew` rows are genuine. Re-run those
+two against the `seg` dataset before publishing, or the table reads as "MassTree
+and BwTree are insensitive to distribution", which the other four trees
+contradict.
+
+**The `seg` in the CSV is `45f7a2c6`'s data**, restored on 2026-08-01 (BTree
+ins_0.01% 7.61, CPAM 7.43, PAM 8.40, PMA 191.98). The set that had been there is
+now `seg_10`, moved into `<tree>/seg_10/64.log`.
+
+**Moving a log between distributions means editing its header, not just the
+path.** The merger reads `benchmark` from the `Dis:` field; the directory is
+never consulted. The `seg` → `seg_10` move needed
+`sed 's/Dis: seg;/Dis: seg_10;/'` on each file — without it the moved logs would
+still have come out labelled `seg` and collided with the restored ones, and
+first-seen-wins would have silently produced a mix of the two.
+
+BTree's `exp` logs in the new sweep now carry the full leaf-size sweep
+(2..1024), not just 64 — though `exp` is not emitted (see `kWantBench`). The
+`exp/BTree` values shifted slightly (build 1.3142 → 1.31545) when `64.log` was
+rerun — expected, not a merge bug.
+
+**A short row means a lost token, and it shifts every later column.** The
+BwTree `exp` log arrived once at 35 values, missing `del_0.01%_MIX`; the parser
+pads at the *end*, so `del_0.01%_MIX` read as 0.455 (a membership probe with a
+range-report magnitude) and `del_0.01%_RCM` as 38.6 seconds. The count is the
+cheap check — `sed -n '2,$p' <log> | tr -s ' \n' '\n' | grep -c .` should be 36
+for every file before trusting a merge.
+
+### `scripts/filter_incremental_updates.py`
+
+Cuts a merged CSV down to 20 columns: `benchmark, tree, leaf_wrap`, the 8 update
+timings, and the `build` and `1%` blocks' `MIX`/`RRM`/`RCM`. Defaults to the
+36-value CSV above, writing `<name>_filtered.csv` next to it.
+
+The kept columns are a subset of **both** layouts, so passing the old
+`data/incremental_updates/incremental_updates.csv` explicitly still works
+(verified). This script is the only place the 20-column list lives —
+`merge_incre_updates_new.py` deliberately has no `--slim` flag, so the two
+cannot drift apart.
+
+**Paths fixed 2026-10-01.** The defaults were relative to the working
+directory and named `incremental_updates_new.csv`, which `1bf5576` removed: run
+from `scripts/` with only an input path, the output went to
+`scripts/scripts/data/incremental_updates_new/`. Now the default input is
+`data/incremental_updates_new/incre_updates_new.csv` beside the script
+(`__file__`), and the output is `<input name>_filtered.csv` next to the input
+unless a second argument names it. Any cwd works. It keeps 18 columns, not 20:
+the build block's queries were dropped.
+
+### `scripts/compare_incre_delete.py` (2026-10-01)
+
+Graft vs repair vs CPAM. Reads `logs/incremental_updates_new/{0,1}/<dis>/64.log`
+at two revisions with `git show` (defaults `92886ba` graft, `1bf5576` repair;
+the repair run is only in history on this branch) and writes
+`data/incremental_updates_new/incre_updates_new_graft_vs_repair.csv`. Per
+distribution: `BTree-graft`, `BTree-repair`, `CPAM` (graft session), then
+`repair/graft`, `CPAM/graft`, `CPAM/repair` as time ratios (above 1: the second
+is faster), in the filter script's columns. Paths come from `__file__`, so any
+cwd works. It checks each log's header against its path and wants exactly 36
+values.
+
+Build, insert and query code is identical at the two revisions, so those
+columns of `repair/graft` measure session drift, not the algorithm. The numbers
+and the drift found are in CLAUDE.md under Graft.
+
+`#!/usr/bin/env python3` is 3.6.8 here; 3.12 is only a zsh alias. Scripts must
+avoid `capture_output` and `str.removeprefix`.
+
+### Merging the logs (`scripts/merge_incre_updates.py`)
+
+Concatenates `logs/incremental_updates/<tree>/<dis>/<leaf_wrap>.log` (tree dirs
+are the numeric `-T` values: 0=BTree, 1=CPAM, 2=PAM, 3=PMA, 5=MassTree,
+6=BwTree) into one log, then writes `data/incremental_updates/<name>.csv` — one
+row per run, 93 columns = `benchmark, tree, leaf_wrap` + the 90 values.
+
+Column names are prefixed by their block (`build`, `ins_0.01%` … `del_10%`)
+because the 9 query names repeat once per block; a bare repeated `IND` × 9 is
+ambiguous to any consumer. Nothing reads this CSV yet — `merge_incre_updates.py`
+is its only reference.
+
+Three log realities the parser has to absorb:
+
+- **`-` is a legal value**, not a parse error (masstree's 27 range-count cells in
+  logs recorded before 2026-07-31). The pre-2026-07-29 version tested
+  `float(tok)` on every token and therefore dropped every masstree row silently.
+  Runs after the `q_[0]` race fix emit no `-` at all, but keep the handling for
+  the older logs.
+- **A row can be split across lines.** Masstree's allocator writes `madvise
+  superpage: Cannot allocate memory` to stderr while the row is going to stdout,
+  and `2>&1 | tee` splices it mid-row. The parser strips known noise phrases
+  (`kNoisePhrases`) and accumulates values until the *next header*, rather than
+  expecting one row per line. Verified against a saved noisy log.
+- **A run can end short.** A killed process leaves a partial row (BwTree at 1e9
+  uniform died mid-`del 1%`, 76 of 90 values). Those are padded to keep columns
+  aligned and reported on stderr — the valid prefix is real data.
+
+**Stale logs are dropped, deliberately.** A `2.log`/`32.log` from the older
+73-value layout (`build + 8 × 9`, no MIX and no static query block) carries a
+header *identical* to a current run's — `Buf` is the tree's internal block size,
+not the filename — so padding it would emit a duplicate
+`(benchmark, tree, leaf_wrap)` key holding shifted values. `kLegacyFieldNum`
+catches exactly 73 values and skips with a note.
+
+The 16 pre-MIX logs that existed (CPAM `32.log`, PAM/PMA/BwTree `2.log`, × 4
+distributions) were `git mv`d to `logs/incremental_updates_old/<tree>/<dis>/` on
+2026-07-29, keeping the `<tree>/<dis>/` structure because the bare filenames
+(`2.log` under three different trees) collide if flattened. That folder is a
+**sibling** of `logs/incremental_updates/`, deliberately outside
+`concat_logs()`'s `logs/incremental_updates/*/*/*.log` glob. `kLegacyFieldNum`
+stays as a net for future stragglers.
+
+### Gotchas found 2026-07-27
+
+- **Running the incremental blocks together used to yield only the insert half
+  for masstree** — the insert block ran first in the same process, masstree
+  returned nothing to the OS, and the `ConDeleteSweepFits` guard then saw a
+  depleted `MemAvailable` and skipped the delete block. **Fixed**:
+  `ReclaimMassTreeMemory` frees the memory between phases and the guard is gone,
+  so one process now produces both halves (verified at 1e8 for masstree and
+  bwtree). Splitting into one tag per process is no longer needed.
+- **Ratio 0.0001 is noisy.** Observed 7.16–14.51s for the same insert chain
+  across runs, while the other three ratios hold within a few percent — 10000
+  batches means 10000 barrier syncs. These are single-shot (`-r` is ignored on
+  this path), so average before trusting that column.
+- **Insert/delete blocks read different files**: tag `1<<6` reads `base_path`
+  into `wp`, tag `1<<7` reads `batch_path` into `wi`. Equal only when `-b 1`. At
+  `-b 0.1` the delete sweep is 10x smaller, and since `batch_size` derives from
+  `wp.size()` vs `wi.size()`, the membership columns differ 10x too — the two
+  blocks are not comparable as logged.
+- **Build config trap**: `main` dispatches to `ApplyConcurrentIndexDynamicGraph`
+  when `DYNAMIC_GRAPH` or `OSM` is defined, and that function only handles tags
+  3 and 4 — tags `1<<5`/`1<<6`/`1<<7` produce *no output at all*, silently.
+  Rebuild with `-DDYNAMIC_GRAPH=OFF -DOSM=OFF` before running them by hand.
+  `incre_updates.sh` is safe because its `run_cmake` passes those flags.
+- **`BatchInsertByStep` divides by zero when `ratio * n < 1`** (SIGFPE, rc 136):
+  `step` has no `max(…, 1)` guard, unlike `BatchDeleteByStep`. Only bites tiny
+  smoke datasets — at n ≥ 1e8 the smallest ratio still gives `step = 10000`.
+
+### Dataset note
+
+Ratio-1 dirs (`ins/1`, `del/1`, i.e. batch == base) exist only for some
+`<dis>/<n>` combinations — at 1e8 only `dual_norm` has them; `uni/100000000_1`
+has just `10/100/1000/10000`. `-b 1` against a distribution lacking `1/` aborts
+in `ReadEntries` before any work.
+
+### `ConRangeQuery` dead-allocation fix (2026-07-27)
+
+`ConRangeQuery` used to prefix-sum the per-query result sizes and allocate
+`parlay::sequence<std::pair<keytype,uint64_t>> v(tot_size)` up front. Nothing
+ever wrote to `v` — its only reader was the commented-out `range_report`
+branch — but at 1e8 with rectangle type 2 that is 2.5e10 pairs = **372GiB**,
+and bwtree died there with `std::bad_alloc`. Removed `v`, `offset`, and the
+`parlay::scan`; `rec_num` is now unused (`(void)rec_num`).
+
+Masstree never reached it only because `ConQueryAfterStep` skipped rectangle
+type 2 for it — masstree had the *same* bug in its own `scan` (`index.h:829`),
+`Str results[range]`, a stack array sized to the result count, ~8MB at 5e5
+elements on an 8MB stack. Same shape, different memory. **Both are fixed now**
+(see below); the range query skips are gone.
+
+Both index types implement `scan(key, range)` as "walk `range` elements from
+`key`" (masstree `get_next_n`, bwtree iterator walk), so the timings are
+comparable. If the `range_report` branch is ever restored, note
+`v.begin() + offset[start_index]` is wrong — it offsets by the thread's first
+query index, not per-query, so queries within a thread would overlap.
+
+### `GenRectangles` non-FixSize path never sets the lower bound
+
+In `tests/test_framework.h:126-139` (the `FixSize == false` branch, which is
+what `GenRectangles<TT, false, false>` — every concurrent-index call site —
+uses), `range.first` is never assigned for types 1 and 2; `range.second` is
+assigned twice instead. `std::pair`'s default ctor value-initializes, so
+`range.first == 0`:
+
+| type | intended | actual |
+|---|---|---|
+| 0 | `[1, n^0.25)` | `[1, n^0.25)` — correct |
+| 1 | `[n^0.25, sqrt(n))` | `[0, sqrt(n))` |
+| 2 | `[sqrt(n), 1e6)` | `[0, 1e6)` |
+
+So the three "brackets" are nested rather than disjoint (compare the `FixSize`
+branch, which correctly sets both bounds to `[1,100) [100,10000) [10000,1e6)`).
+Large-bracket measurements therefore include arbitrarily small boxes and
+understate large-range cost. Cross-tree comparisons stay valid — `srand(10)`
+makes the box sequence identical for every tree at a given `(rec_num, type, n)`
+— but the brackets do not measure what their names say.
+
+### BwTree incremental results (1e8 uni, `-t 96 -b 0.1`)
+
+Works end to end after the fix (bwtree was never subject to the old memory
+guard, which only applied to masstree and has since been removed). Notable: rectangle-type-2 scans cost **17.0s in the delete block vs 10.5s in
+the insert block** despite the delete-block tree holding 10x fewer live entries
+(5e6 vs 5e7). Because type 2 caps at `[0,1e6)` for both and `srand(10)` fixes
+the length sequence, both blocks walk an *identical* number of elements — so
+that 1.6x is a real per-element slowdown, consistent with BwTree delta/tombstone
+chains left behind by the bulk deletion.
+
+### Masstree memory reclamation (2026-07-27)
+
+**Where masstree's memory actually lives.** Not in the tree. `threadinfo::make`
+(`masstree/kvthread.cc:98`) mallocs a *fresh* 8KB threadinfo with zeroed
+`pool_[]` on every call, and `StartThreads`/`ConRunBatched` call it once per
+thread per invocation. Pools are per-threadinfo, refilled from `posix_memalign`
+superpages recorded in `pool_ptrs_`. So nothing an index frees is ever returned
+to the OS or reused by a later index.
+
+Consequence: **restoring `~mt_index` would reclaim nothing.** Its body is
+commented out (`masstree/mtIndexAPI.hh:76`) and references a `ti_` that is not a
+member, but even a correct `table_->destroy(ti)` would only push nodes onto a
+freelist no subsequent build consults, because that build gets new threadinfos.
+Don't spend time on it.
+
+**What does work** — `threadinfo::release_all_pools()` (added to `kvthread.hh`
+next to `deallocate_ti`): walks the global `allthreads` list, calls
+`deallocate_ti()` on each (frees its superpages plus the `pool_ptrs_` buffer),
+frees the threadinfo struct, and nulls `allthreads`. `deallocate_ti()` already
+existed and had **no callers** — it is the only thing in the tree that releases
+pool pages.
+
+`ReclaimMassTreeMemory()` in `workload.cpp` wraps it and is called at six points
+where the workers have joined and no index is live: inside
+`ConInsertByStep`/`ConDeleteByStep` between the full and half builds, and after
+each `delete idx` in tags 3, 5 and 6. All six are **outside** the timed regions
+(each follows a `t.stop()`).
+
+**Stop at the allocator — do not release to the OS.** An earlier version also
+called `MallocExtension::instance()->ReleaseFreeMemory()` (this binary links
+`tcmalloc_minimal`, CMakeLists.txt:246, which parks freed pages in its page
+heap). That was only ever needed to raise `MemAvailable` for the guard, and the
+guard is gone. Worse, it made the *next* build fault every page back in, and
+that cost lands inside its timed region — ratio 0.0001 swung 7.16–14.51s with
+it, and settled to 6.30–7.26s once removed. Leaving the pages with tcmalloc
+still prevents growth, because tcmalloc reuses them for the next build.
+
+**SAFETY**: `release_all_pools()` frees the pages masstree nodes live in and the
+threadinfo objects themselves. Only call it with no masstree index live, no
+`threadinfo*` held, and the Con* worker threads joined. Deliberately *not*
+called in tags 0/1, where `primal_idx` stays live across ratios.
+
+**The `ConDeleteSweepFits` guard is gone** (removed 2026-07-27). It multiplied
+the input size by a hand-picked 1000 bytes/entry, compared that against
+`MemAvailable`, and skipped the whole delete block when it did not fit — the
+`fits` flag, the 36 `-` placeholders, and all. It was ~2.3x over (93.1GiB
+demanded at 1e8 for a sweep peaking near 40GB) and its constant had been
+calibrated against the leaking behaviour that `ReclaimMassTreeMemory` now
+prevents. The delete sweep runs unconditionally.
+
+### Tag 3 (batch update by size) fixes
+
+- Removed the post-measurement `ConDelete` "reset" sweeps from both masstree
+  branches. `idx` is freshly built each iteration and dropped on the next line,
+  so emptying it bought nothing while costing ~1.4KB of unreclaimed RSS per
+  entry — `ConDelete(append(wi, wp))` was ~1.4TB at 1e9, plus a full
+  concatenated copy of the input. Both branches then became identical to the
+  bwtree branch, so they are now one path.
+- Tag 3 honours `opts.summary`: `1` keeps the in-process 13-ratio sweep, `0`
+  runs the single `-b` ratio so the sweep can be driven one process per ratio.
+- **Blocked on data**: tag 3's `ratio_seq` needs ratio dirs
+  `{10000,5000,2000,1000,500,200,100,50,20,10,5,2,1}`; only
+  `{1,10,100,1000,10000}` exist for any distribution, so it aborts on ratio 2.
+  Regenerate with `gen_graph.sh`'s full `batch_ratio_seq` uncommented before
+  trying to validate. `merge_batch_updates.py` expects one `Tree:` header
+  followed by a single line of 26 values, which a per-process sweep would break.
+
+### Masstree range query — `scan` stack array (fixed 2026-07-28)
+
+`MassTreeIndex::scan` sized a stack array from the caller's argument:
+
+```cpp
+Str results[range];   // Str is 16B; range reaches ~5e5 on rec_type 2 => ~8MB
+```
+
+That overruns the 8MB thread stack, which is the crash `ConQueryAfterStep` and
+the `range_query` lambdas were dodging with `if (index_type == TYPE_MASSTREE &&
+rec_type == kRangeQueryType - 1)`. Replaced with a `thread_local
+std::vector<Str>` grown on demand and reused (bounded ~16MB/thread by the 1e6
+box cap), and **all three range query skips removed**.
+
+Measured at 1e8 after the fix — rec2 is correct but expensive:
+
+| | rec0 | rec1 | rec2 |
+|---|---|---|---|
+| insert block | 0.015 | 0.55 | **~76s** |
+| delete block | 0.020 | 0.71 | **~105s** |
+
+rec2 boxes hold ~141x the elements of rec1 and cost ~138x the time, i.e. time
+tracks element count — evidence the scan is doing complete work, not bailing
+early. Cost: ~12 min/run vs ~1 min before, since rec2 adds 75-105s per ratio
+across 8 ratios. Masstree is ~7.5x slower per element than bwtree here (3.3e8
+vs 2.5e9 elements/s) because its scanner writes a 16-byte `Str` per element.
+
+### Masstree range count — shared `q_[0]` data race (fixed 2026-07-31)
+
+**The old note here was wrong.** It claimed the count path "cannot crash" and was
+merely slow, so the skip was cosmetic. It is not: with the skip removed, masstree
+**SIGSEGVs inside tcmalloc** (`CentralFreeList::ReleaseListToSpans`) at n=1e6 on
+16 threads, within a second. Reproduce with
+`./build/index_microbench_workload -p <file.bin> -D uni -t 0 -q 4 -T 5 -r 1`.
+
+**Root cause — one shared `query` object, not slowness.** `mt_index` holds a
+single `query<row_type> q_[1]` member (`mtIndexAPI.hh`), and the old
+`range_count` walked the range by calling `dynamic_get_next` once per key, which
+runs its scan through that shared `q_[0]`. `query_json_scanner::visit_value`
+(`kvrow.hh:405`) rewrites `q_.scankey_` — a **refcounted `lcdf::String` it
+reallocates whenever the key no longer fits** — and `run_scan` clears/refills
+`q_.f_`, a `std::vector`, on entry. Two threads scanning at once therefore free
+the same buffer twice. `get_next_n` never had the problem because its scanner is
+a plain stack local and it calls `table_->table().scan()` directly, bypassing
+`q_` entirely — which is why range *query* worked and range *count* did not.
+
+**The fix**: `mt_index::count_range` (`mtIndexAPI.hh`, next to `get_next_n`) —
+a stack-local `count_scanner` whose `visit_value` compares the key bytes against
+the upper bound and returns false to stop. `MassTreeIndex::range_count`
+(`index.h`) byte-swaps both ends of the box and makes one `count_range` call.
+This is thread safe *and* one tree descent per query instead of one per key,
+with no Json allocation at all.
+
+Correctness checked against `GenRectangles`' own oracle — the boxes are built as
+`(wp[l].key, wp[r].key)` over the sorted deduplicated input, so `.second == r-l`
+is the exact expected count. 50 000 boxes, 0 mismatches, at 8 and 32 threads.
+
+**Both masstree range-count skips are gone** (`ConQueryAfterStep` and the
+`range_count` lambda in `ApplyConcurrentIndex`), so masstree no longer emits `-`
+in any column. Measured at n=1e6 / 64 threads, rec_type 1: masstree 0.064s vs
+bwtree 0.096s — it is now the *faster* of the two on this column.
+
+**`range_report` still has the identical race** and is marked `WARN` in
+`index.h`. It is dead code (`ConRangeQuery` calls `scan()`, the branch that would
+use it is commented out), but it drives the same `dynamic_get_next`. Rebuild it
+on a stack-local scanner before ever calling it from more than one thread.
+
+## Scalability sweep (`scripts/scalability.sh`)
+
+Sweeps `PARLAY_NUM_THREADS` over `1 4 16 32 64 112 224` at n=1e9, pinning each
+step with `taskset` (stride 4 at 1/4/16 threads, stride 2 at 32, then dense) plus
+`numactl -i all` above 1 thread. `scalability_concurrent.sh` is the same sweep
+without the taskset/numactl prefixes, for the concurrent indexes.
+
+`round` is set **per thread count** — 1 round at 1 and 4 threads, 2 above — so a
+1-thread run does not cost 4× a 224-thread one. Timings are per-round averages,
+so they stay comparable across the sweep.
+
+Config: `tag=2#0011` (batch insert 1<<0 + batch delete 1<<1), `query_type=0`,
+`batch_ratio=0.01`, `dis_seq=("uni" "exp")` — norm/dual_norm are commented out.
+`scalability.sh` currently has only MassTree and BwTree uncommented; the tree
+side (0–3) is commented out but its logs are present from an earlier run.
+
+### Log layout — the core count is only in the filename
+
+`logs/scalability/<tree>/<dis>/<cores>.log`, one run each: a `Tree:` header then
+**3 values — build, insert, delete** (the primal build always reports, then the
+two tag bits; `query_type=0` means no query columns, unlike the incremental
+sweep's 90).
+
+The thread count appears **nowhere in the log body** — `Buf:` is the leaf size
+(64 for BTree, 1 for the rest), not the core count. So `merge_scalability.py`
+walks `<tree>/<dis>/<cores>.log` per file and takes cores from the stem;
+concatenating first and parsing the flat file, the way
+`merge_incre_updates.py` does, would silently lose the sweep's x axis. The
+concatenated log is still written (with a `>>> <path>` marker per file) for
+reading by hand.
+
+### `merge_scalability.py`
+
+Writes `data/scalability/<name>.csv`, **long/tidy**: one row per
+`(benchmark, tree, cores)` = 9 columns, `build/insert/delete` plus
+`build_su/insert_su/delete_su`, where `*_su` is self-relative speedup
+`t(1 core) / t(n cores)`. Long rather than cores-as-columns because cores is the
+x axis of every plot this feeds. Speedup cells are left **blank** when the 1-core
+baseline for that `(benchmark, tree)` is missing or blank — never fabricated from
+a partial baseline. Sorting is `bench_order`, `tree_order`, then cores
+**numerically** (a lexical sort gives 1, 112, 16, 224…).
+
+Shares the incremental merge's three robustness rules: `-` is a legal value,
+values accumulate until the next header so a `madvise`-spliced row still parses,
+and a short row is padded with a warning. A header with no timings at all (a run
+that died before printing) is reported and skipped rather than emitted as an
+empty row.
+
+Current state: 84 rows = 6 trees × 2 distributions × 7 core counts, all clean.
+One stray `logs/scalability/3/uni/.log` (empty filename stem, header only, no
+timings) is skipped with a note — note that both bash's `*` and Python's `glob`
+skip leading-dot names, so it is invisible to the concatenation but *is* seen by
+the per-file walk, which uses `os.listdir`.
+
+## Tag `1<<8` — batch vs serial update by batch size (2026-10-14)
+
+Spec: `batch_size_measure.md` (repo root). `b_test -t 256`: for k in 1, 10,
+…, 1e8, the first k entries of `ins/<1/b>/1.batch` into a tree built from
+`ins/<1/b>/1.base`, by `batch_insert` and by `serial_insert`; then the first
+k keys of `del/<1/b>/1.batch` out of a tree built from `del/<1/b>/1.base`, by
+`batch_delete` and by `serial_delete`. Every timed call starts from a fresh
+build (untimed). `batch_vs_serial_by_size` in `test_framework.h`.
+
+```
+./b_test -p /data/zmen002/kv_pair/uni/1000000000_1/ins/1/1.base.bin -b 1 \
+  -t 256 -r 1 -D uni -o batch_size_measure.csv
+```
+
+Driver: `scripts/batch_size_measure.sh`, run from `scripts/` like the others
+(it wipes and reconfigures `build/`: `DEBUG=OFF JEMA=ON LEAF=64`; `numactl -i
+all`; `round=3`). Log, CSV and table:
+`scripts/logs/batch_size_measure/0/uni/64.log`, `64_1.csv`, `64_1.md`.
+
+- CSV (`-o`, default `batch_size_measure.csv` in the working directory):
+  `batch_size,insert_time_batch,insert_time_serial,delete_time_batch,
+  delete_time_serial`, seconds, mean of `-r` runs (one untimed warm-up run
+  first when `-r > 1`, as `time_loop`). A k larger than the batch file is
+  skipped (stderr, no row). The tree size is checked after each run
+  (untimed; stderr on a mismatch).
+- The spec names `.in` files; only `.bin` exist. `-b 1` selects `ins/1`,
+  `del/1` (batch == base, 1e9 each); the default `-b 0.1` reads `ins/10`.
+- As with a lone `1<<6`/`1<<7`, the shared primal block first reads `-p`
+  and times a build.
+- Timed on `steady_clock`, not `time_loop`: parlay's timer truncates to
+  microseconds, and one serial entry takes ~3 µs at 1e8.
+- A 500 ms pause after each build (so parlay's workers sleep) changed
+  nothing at k >= 1e5 and made small k slower (serial k = 1: 2.9 -> 5.0
+  µs; batch k = 10: 0.04 -> 0.65-0.9 ms). Not kept.
+- Smoke run, 1e8 uni, `-b 0.1 -r 1`, 31 s (k = 1e8 skipped): serial wins
+  below ~100 entries (k = 1: insert 2.9 µs vs 86 µs, delete 2.9 vs 37 µs);
+  at k = 1e7, batch 0.04 s vs serial 12.2 s (insert) and 7.7 s (delete).
+  `batch_delete` of 10-1000 keys took 0.06-0.64 ms across runs, against
+  0.02-0.04 ms for one key; not looked into.
+
+Full run, 2026-10-14 (`scripts/batch_size_measure.sh`, 1e9 uni, `-r 3`, leaf
+64, 27.5 min, machine quiet at the start; every size check passed). Seconds
+per batch:
+
+| k | insert batch | insert serial | delete batch | delete serial |
+|---|---|---|---|---|
+| 1 | 1.74e-05 | 2.60e-06 | 2.35e-05 | 3.16e-06 |
+| 10 | 7.03e-05 | 2.46e-05 | 4.32e-05 | 2.45e-05 |
+| 100 | 9.52e-05 | 2.14e-04 | 6.10e-05 | 2.23e-04 |
+| 1e3 | 3.17e-04 | 1.90e-03 | 1.74e-04 | 1.96e-03 |
+| 1e4 | 1.14e-03 | 0.0166 | 5.83e-04 | 0.0171 |
+| 1e5 | 4.86e-03 | 0.146 | 2.16e-03 | 0.148 |
+| 1e6 | 0.0190 | 1.357 | 0.0127 | 1.407 |
+| 1e7 | 0.0754 | 13.01 | 0.0809 | 13.56 |
+| 1e8 | 0.193 | 168.1 | 0.207 | 137.5 |
+
+Serial wins at k = 1 (6.7x insert, 7.4x delete) and k = 10 (2.9x, 1.8x);
+batch from k = 100 on, 660-870x at 1e8. Serial costs 1.3-1.7 µs per entry
+from k = 1e5 on. The smoke run's 0.06-0.64 ms `batch_delete` at k = 10-1000
+did not recur (43-174 µs).
+
+### Serial vs tlx and std::set (2026-10-14)
+
+Question (user): std::set and tlx take "~3 s for 1e7 into 1e9", ours 13 s.
+Those numbers are `logs/summary_serial` (`summary_serial_bench.sh`): a 1e8
+tree (`Nodes=(100000000)`), and its 1% column is 1e6 entries (std::set
+2.91 s insert, 2.50 s delete; tlx 1.14 / 1.13 s). Its 1e7 column is 28.3 /
+25.4 s and 11.5 / 11.3 s. The harness links jemalloc only into `b_test` and
+`cpam`; `stdset` and `tlxbtree` run on glibc malloc.
+
+Same-session re-run, one process per structure, `numactl -i all`, machine
+quiet (load ~1.4). Driver (scratchpad, not kept): read `ins/<x>/1.base.bin`
+and `1.batch.bin`, build once (ours `build`; tlx and std::set the wrappers'
+insert loop in file order, as the harness does), then per round insert the
+first k batch entries one at a time in file order (timed) and delete the
+same k keys (timed), so the tree holds the base again. Ours calls
+`serial_insert`/`serial_delete` with an explicit leaf pattern. Every size
+check passed. k = 1e7, seconds, mean of 2 rounds:
+
+| tree | structure | insert | delete |
+|---|---|---|---|
+| 1e8 | ours hybrid (default) | 12.0 | 10.3 |
+| 1e8 | ours sorted | 9.8 | 10.1 |
+| 1e8 | ours unsorted | 3.1 | 8.5 |
+| 1e8 | tlx | 11.7 | 11.8 |
+| 1e8 | tlx + jemalloc | 10.0 | 10.0 |
+| 1e8 | std::set | 26.2 | 25.6 |
+| 1e9 | ours hybrid | 13.3, 15.5 | 14.0 |
+| 1e9 | ours sorted | 13.8 | 14.1 |
+| 1e9 | ours unsorted | 7.0 | 12.3 |
+| 1e9 | tlx | 19.3 | 18.8 |
+| 1e9 | std::set, sorted build | 39.8 | 41.9 |
+
+k = 1e6 costs the same per entry. Builds: tlx 95 s at 1e8 and 1576 s at
+1e9 (insert loop), std::set 227 s at 1e8; at 1e9 std::set was built from
+the sorted base with an end hint (72 s; key-ordered nodes, which favours
+std::set). Hybrid's second round at 1e9 was slower (13.3 -> 15.5 s; 1e6:
+1.32 -> 1.71 s); probably the first round's deletes leave leaves unsorted
+and the next insert into one sorts it whole (not checked). Tables and raw
+output: `scripts/logs/serial_vs_baselines/`.
+
+## OSM and temporal-signal re-run (2026-10-20)
+
+`b0d964e` re-ran BTree and CPAM (`run_osm.sh`, `run_dynamic_graph_signal.sh`:
+leaf 64, JEMA, `-r 4`, window 3); the PAM, PMA, MassTree and BwTree rows are
+untouched. The old BTree/CPAM rows are `1bf5576` (2026-09-22, `repair_rec`).
+BTree changes in between: the graft delete with touched-only bookkeeping, and
+`parlay::merge` in an overflowing sorted leaf (`fbb03b1`). CPAM did not
+change, so its drift is the noise (within 4% on every sum).
+
+Total seconds over all batches, new / old:
+
+| data | tree | insert | delete | find | range | flatten |
+|---|---|---|---|---|---|---|
+| osm | BTree | 1.01 | **0.84** | 1.02 | 1.00 | |
+| osm | CPAM | 1.04 | 0.96 | 0.97 | 1.01 | |
+| redd | BTree | **0.71** | 0.98 | 1.01 | 1.01 | 1.01 |
+| redd | CPAM | 0.97 | 0.96 | 1.00 | 1.00 | 1.01 |
+| ref | BTree | 1.01 | **0.92** | 1.00 | 1.00 | 1.01 |
+| ref | CPAM | 1.02 | 1.03 | 1.00 | 1.00 | 1.01 |
+| sem | BTree | 1.02 | **0.94** | 1.01 | 0.96 | 1.01 |
+| sem | CPAM | 1.01 | 1.02 | 1.01 | 1.00 | 1.00 |
+
+CPAM time / BTree time, old -> new (above 1: BTree faster):
+
+| data | insert | delete | find | range | flatten |
+|---|---|---|---|---|---|
+| osm | 1.52 -> 1.56 | 1.28 -> 1.46 | 1.18 -> 1.12 | 1.13 -> 1.13 | |
+| redd | 1.10 -> 1.49 | 1.26 -> 1.24 | 0.83 -> 0.82 | 1.17 -> 1.16 | 1.16 -> 1.16 |
+| ref | 1.59 -> 1.61 | 1.26 -> 1.42 | 0.74 -> 0.75 | 1.09 -> 1.08 | 1.13 -> 1.13 |
+| sem | 1.65 -> 1.63 | 1.31 -> 1.42 | 0.73 -> 0.73 | 1.01 -> 1.05 | 1.13 -> 1.12 |
+
+- osm delete: every year 0.81-0.86 (CPAM 0.89-1.07).
+- ref delete: 0.90-1.15 through batch 15, then 0.84-0.95 (deletes of
+  49-106 M).
+- sem delete: the gain is in the 32 batches deleting >= 1e7 (3.73 -> 3.48 s;
+  CPAM 1.01); smaller batches unchanged.
+- redd insert: every batch from 1 on 0.56-0.74; the merge change. redd puts
+  31-99% of each batch past the tree's last key (batch 15: 65.8 M of 180 M),
+  all into the rightmost leaf, which `std::ranges::merge` merged on one
+  thread before `fbb03b1`. Saved 2.0-2.9 ns per such key (batch 15: 137 ms).
+  ref's longest run of new keys between two old keys is 33 K, so the change
+  cannot show there. (Scratchpad C++ over `signal/<d>/0.bin`, not kept.)
+- sem range: BTree -11% over the 181 batches with a tree < 1e7 (-15..20% at
+  1 K-500 K entries), equal above; CPAM flat; query code is the same in both
+  runs, so probably tree shape after graft deletes (not checked).
+- The CSV's `geomean` column: BTree sem flatten +25% and ref flatten +7.5%
+  are microsecond-batch noise (`sum_t` +1%); sem's delete gain shows only in
+  `sum_t`.
+
+Harness findings, from the code, not fixed:
+
+- `insert_osm_by_time` and `test_temporal_signal` zero the insert, delete and
+  find timers after the warm-up round but not range (or flatten), and divide
+  all by `rounds - 1`: at `-r 4`, range_t and flatten_t are 4 runs / 3, about
+  1.33x one run, for every tree run through `test_framework.h` (BTree, CPAM,
+  PAM, PMA). Ratios among those hold. `workload.cpp` times MassTree and
+  BwTree once, so OSM range against them is ~1.33x against the others.
+- `merge_osm.py` numbers the columns from `START_YEAR = 2014`, but
+  `TestTemporalGraph` reads years 2015-2024 (`asia_year_zcode.bin`: 2015 has
+  93 614 984 records, batch 0's size). The CSV's 2014..2023 are 2015..2024;
+  2014 (55 954 522 records) is not used.

@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.15)
 #     - -I/home/ziyang/code/ParallelMultiwayOrderedSet/include/
 
 project(
-	PMOS
+	pab_tree
 	VERSION 0.1
 	DESCRIPTION "Parallel Multi-way Ordered Set"
 	HOMEPAGE_URL ""
@@ -20,7 +20,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # works
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --gcc-toolchain=/opt/rh/gcc-toolset-14/root/usr/")
 # add_compile_options(-Wall -Wextra -Wshadow -Wconversion -Wunused -Wsign-conversion -Wfloat-equal -Wpedantic -Wuninitialized -Wformat -Wformat-security -Wmissing-braces -Wparentheses -Wsequence-point -Wswitch -Wswitch-enum -Wstrict-aliasing -Wdeprecated-declarations -Wreturn-type -Wunused-result)
 # add_compile_options(-Wall -Wextra -Werror)
-add_compile_options(-w)
+add_compile_options(-Wall -Wextra)
 
 option(DEBUG "" OFF)
 option(CILKPLUS "" OFF)
@@ -108,42 +108,69 @@ add_subdirectory(external/parlaylib)
 
 # NOTE: clear CMAKE_MODULE_PATH to avoid finding parlay's cmake files
 list(REMOVE_ITEM CMAKE_MODULE_PATH "${PARLAY_SOURCE_DIR}/cmake")
-list(APPEND CMAKE_MODULE_PATH "${PMOS_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${pab_tree_SOURCE_DIR}/cmake")
 
 # NOTE: GoogleTest
 add_subdirectory(external/googletest)
 enable_testing()
 
 
-# NOTE: PMOS
-add_library(PMOS INTERFACE)
-set(PMOS_INCLUDE_DIR "${PMOS_SOURCE_DIR}/include/pb_tree" "${PMOS_SOURCE_DIR}/include/" "${PMOS_SOURCE_DIR}/external")
-target_link_libraries(PMOS INTERFACE parlay)
-target_include_directories(PMOS INTERFACE $<BUILD_INTERFACE:${PMOS_INCLUDE_DIR}>
+# The library itself: header-only, one include root.
+include(GNUInstallDirs)
+add_library(pab_tree INTERFACE)
+add_library(pab_tree::pab_tree ALIAS pab_tree)
+set(PAB_TREE_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/include" "${pab_tree_SOURCE_DIR}/external")
+target_link_libraries(pab_tree INTERFACE parlay)
+target_compile_features(pab_tree INTERFACE cxx_std_20)
+target_include_directories(pab_tree INTERFACE
+	$<BUILD_INTERFACE:${pab_tree_SOURCE_DIR}/include>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
+# install(): lets a downstream project find_package(pab_tree).
+install(DIRECTORY "${pab_tree_SOURCE_DIR}/include/pab_tree"
+	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(TARGETS pab_tree EXPORT pab_treeTargets)
+install(EXPORT pab_treeTargets
+	FILE pab_treeTargets.cmake
+	NAMESPACE pab_tree::
+	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pab_tree")
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+	"${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfigVersion.cmake"
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY SameMajorVersion)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfig.cmake"
+"include(CMakeFindDependencyMacro)
+find_dependency(Parlay)
+include(\"\${CMAKE_CURRENT_LIST_DIR}/pab_treeTargets.cmake\")
+")
+install(FILES
+	"${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfig.cmake"
+	"${CMAKE_CURRENT_BINARY_DIR}/pab_treeConfigVersion.cmake"
+	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/pab_tree")
+
 # add_executable(b_ccp ${PROJECT_SOURCE_DIR}/tests/b_ccp.cpp)
-# target_link_libraries(b_ccp PUBLIC PMOS)
+# target_link_libraries(b_ccp PUBLIC pab_tree)
 # target_include_directories(b_ccp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 # NOTE: CPAM
 add_library(CPAM INTERFACE)
-set(CPAM_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/CPAM/include/cpam" "${PMOS_SOURCE_DIR}/external/CPAM/include/pam")
-target_link_libraries(CPAM INTERFACE parlay PMOS)
+set(CPAM_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/external/CPAM/include/cpam" "${pab_tree_SOURCE_DIR}/external/CPAM/include/pam")
+target_link_libraries(CPAM INTERFACE parlay pab_tree)
 target_include_directories(CPAM INTERFACE ${CPAM_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
 
 # NOTE: PMA
 if(NOT APPLE)
 	add_library(PMA INTERFACE)
-	set(PMA_INCLUDE_DIR "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${PMOS_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
-	target_link_libraries(PMA INTERFACE parlay PMOS)
+	set(PMA_INCLUDE_DIR "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array" "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array/include" "${PROJECT_SOURCE_DIR}/external/Packed-Memory-Array/tlx" "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array/ParallelTools" "${pab_tree_SOURCE_DIR}/external/Packed-Memory-Array/StructOfArrays/include")
+	target_link_libraries(PMA INTERFACE parlay pab_tree)
 	target_include_directories(PMA INTERFACE ${PMA_INCLUDE_DIR} ${PARLAY_INCLUDE_DIR})
 endif()
 
 # NOTE: TEST_FRAME
 add_library(TEST_FRAME INTERFACE)
-set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PMOS_INCLUDE_DIR})
-target_link_libraries(TEST_FRAME INTERFACE parlay PMOS)
+set(TEST_FRAME_INCLUDE_DIR ${PARLAY_INCLUDE_DIR} ${PAB_TREE_INCLUDE_DIR})
+target_link_libraries(TEST_FRAME INTERFACE parlay pab_tree)
 
 # NOTE: executables for tests
 add_executable(b_test ${PROJECT_SOURCE_DIR}/tests/b_test.cpp)
@@ -175,9 +202,19 @@ if(NOT APPLE)
 endif()
 
 # NOTE: GoogleTest for correctness check
+# self_test generates its own data and needs no files; unit_test reads the
+# benchmark datasets and skips without them. Both are registered with ctest.
+add_executable(self_test ${PROJECT_SOURCE_DIR}/tests/self_test.cpp)
+target_link_libraries(self_test PUBLIC pab_tree gtest_main)
+# Undo the build type's -DNDEBUG so asserts run. Not -DDEBUG=ON, which also
+# enables the slow GetNodeBoxRec checks.
+target_compile_options(self_test PRIVATE -UNDEBUG)
+add_test(NAME SelfTest COMMAND self_test)
+
 add_executable(unit_test ${PROJECT_SOURCE_DIR}/tests/unit_test.cpp)
 target_link_libraries(unit_test PUBLIC TEST_FRAME gtest_main)
 target_include_directories(unit_test PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+target_compile_options(unit_test PRIVATE -UNDEBUG)
 add_test(NAME UnitTest COMMAND unit_test)
 # ctest -R BCCPTest -V
 
@@ -326,7 +363,7 @@ endif()
 
 
 # add_executable(data_washer ${PROJECT_SOURCE_DIR}/tests/data_wash.cpp)
-# target_link_libraries(data_washer PUBLIC PMOS)
+# target_link_libraries(data_washer PUBLIC pab_tree)
 # target_include_directories(data_washer PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 # Generate .clangd configuration from compile_commands.json

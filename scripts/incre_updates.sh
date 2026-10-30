@@ -4,8 +4,8 @@ set -o xtrace
 
 /usr/bin/drop_caches
 
-declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
-# declare -a leaf_wrap_seq=(64)
+# declare -a leaf_wrap_seq=(2 4 8 16 32 64 128 256 512 1024)
+declare -a leaf_wrap_seq=(64)
 
 Nodes=(1000000000)
 Dim=(1)
@@ -89,11 +89,11 @@ function run_cmake() {
 # run_cmake 0 "${solver}"
 # run_test 0 "${solver}" "${tree}"
 
-# # CPAM
-# tree=1
-# solver="cpam"
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}"
+# CPAM
+tree=1
+solver="cpam"
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}"
 
 # ours
 solver="b_test"

@@ -2,52 +2,36 @@
 
 #include "baselines/stdset.h"
 
-template<typename TypeTrait>
-struct StdSetWrapper
-{
-  using TreeType = typename StdSetTree::StdSetRaw<TypeTrait>;
+template <typename TT>
+struct stdset_wrapper {
+	using tree_type = typename StdSetTree::stdset_raw<TT>;
 };
 
-template<typename Options, typename RunFunc>
-void
-ApplyStdSet(Options const& opts, RunFunc test_func)
+template <typename Options, typename RunFunc>
+void apply_stdset(Options const &opts, RunFunc test_func)
 {
 #if defined(DYNAMIC_GRAPH)
-  using Wrapper = Wrapper<uint64_t, uint32_t>;
+	using entry_type = element<uint64_t, uint32_t>;
 #elif defined(OSM)
-  using Wrapper = Wrapper<uint64_t, uint32_t>;
+	using entry_type = element<uint64_t, uint32_t>;
 #else
-  using Wrapper = Wrapper<uint32_t, uint32_t>;
+	using entry_type = element<uint32_t, uint32_t>;
 #endif
 
-  using K = Wrapper::K;
-  using V = Wrapper::V;
-  using E = Wrapper::E;
-  using TypeTrait = pb_tree::BTreeTypeTrait<Wrapper::ElementWrapper<E>,
-                                            16,
-                                            Wrapper::LeafAugEmpty,
-                                            Wrapper::InteriorAugEmpty,
-                                            8,
-                                            pb_tree::ProtoNode>;
-  Run<StdSetWrapper<TypeTrait>>(opts, test_func);
+	using TT = pab_tree::btree_type_trait<entry_type, 16>;
+	Run<stdset_wrapper<TT>>(opts, test_func);
 }
 
-int
-main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-  commandLine params(argc, argv);
-  Options opts(params);
-
-  auto test_func =
-    []<class TreeDesc, typename TypeTrait, typename Options>(Options& opts) {
-
-    };
+	commandLine params(argc, argv);
+	Options opts(params);
 
 #if defined(DYNAMIC_GRAPH) || defined(OSM)
-  ApplyStdSet(opts, TestTemporalGraph);
+	apply_stdset(opts, TestTemporalGraph);
 #else
-  ApplyStdSet(opts, DefaultTestFunc);
-#endif // DYNAMIC_GRAPH
+	apply_stdset(opts, DefaultTestFunc);
+#endif /* DYNAMIC_GRAPH */
 
-  return 0;
+	return 0;
 }

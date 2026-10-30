@@ -76,11 +76,11 @@ function run_cmake() {
 # run_test 0 "${solver}" "${tree}"
 
 # PMA
-tree=3
-solver="pma"
-round=4
-run_cmake 0 "${solver}"
-run_test 0 "${solver}" "${tree}" "${round}"
+# tree=3
+# solver="pma"
+# round=4
+# run_cmake 0 "${solver}"
+# run_test 0 "${solver}" "${tree}" "${round}"
 
 # PAM
 # tree=2
@@ -90,17 +90,17 @@ run_test 0 "${solver}" "${tree}" "${round}"
 # run_test 0 "${solver}" "${tree}" "${round}"
 
 # CPAM
-# tree=1
-# solver="cpam"
-# round=4
-# run_cmake 0 "${solver}"
-# run_test 0 "${solver}" "${tree}" "${round}"
+tree=1
+solver="cpam"
+round=4
+run_cmake 0 "${solver}"
+run_test 0 "${solver}" "${tree}" "${round}"
 
 # ours
-# solver="b_test"
-# tree=0
-# round=4
-# for idx in "${!leaf_wrap_seq[@]}"; do
-# 	run_cmake "${idx}" "${solver}"
-# 	run_test "${idx}" "${solver}" "${tree}" "${round}"
-# done
+solver="b_test"
+tree=0
+round=4
+for idx in "${!leaf_wrap_seq[@]}"; do
+	run_cmake "${idx}" "${solver}"
+	run_test "${idx}" "${solver}" "${tree}" "${round}"
+done
