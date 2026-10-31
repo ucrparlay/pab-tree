@@ -3,8 +3,20 @@
 !*.*
 !*/
 !Makefile
+!/Dockerfile
+!/LICENSE
 /.cache
-/docs
+# Notes stay local; the user docs are tracked
+/docs/*
+!/docs/QUICK_START.md
+!/docs/MANUAL.md
+!/docs/DOCKER_QUICK_REFERENCE.md
+!/docs/ARTIFACT_EVALUATION.md
+# Artifact-evaluation results and local Compose settings
+/scripts_ae/data
+/scripts_ae/logs
+/scripts_ae/plots
+.env
 /script/backup_data
 /script/plots
 run_transfer.sh
