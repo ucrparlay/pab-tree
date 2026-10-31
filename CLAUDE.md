@@ -7,6 +7,7 @@ concurrent-index sweep live in `docs/harness_notes.md` (moved 2026-09-12).
 
 - Human-facing text (comments, commit messages, replies): as few words as
   possible. State the fact; no jargon, no paragraphs.
+- Commit messages carry no `Co-Authored-By` trailer (user, 2026-10-30).
 - Keep this file updated; it is the persistent knowledge store. Also read
   the `.claude/` memory files at session start.
 - No need to run `unit_test` after edits; compilation must pass.
@@ -16,7 +17,9 @@ concurrent-index sweep live in `docs/harness_notes.md` (moved 2026-09-12).
   tlx}`, overlay the changed files.
 - **zsh does not word-split unquoted variables** (`$FILES`, `set -- $pair`);
   a `rm -rf $S/src/$2` once ran with `$2` empty. Multi-step shell goes in a
-  `#!/bin/bash` script; guard `rm` paths with `${v:?}`.
+  `#!/bin/bash` script; guard `rm` paths with `${v:?}`. zsh also aborts a
+  whole command on one unmatched glob: `ls LICENSE* COPYING*` listed
+  nothing and hid a tracked `LICENSE`. Check a file with `test -e`.
 - Stop everything else before timing, even at nice 19: four single-core
   compiles slowed a 224-thread run 17% from batch 0.
 - `/` (70 GB; holds `/tmp` and the scratchpad) fills up on this shared
@@ -719,9 +722,147 @@ no implementation changes:
   says `needs_repair` is "not stored in node" (it is
   `contain_invalid_subtree`).
 
+## Artifact evaluation (PPoPP 2027)
+
+Plan: `docs/ae.md`, paper `docs/btree_paper.pdf` (both untracked). Runners
+in `scripts/`; plots in `~/btree_paper/figures/data-plots/plots/
+plot_scripts` (R). Template: `~/SpaceTreeLib` (PSI, PPoPP '26), read
+2026-10-30:
+
+- `README.md`: pitch, emoji bullets, Docs links, BibTeX, license, "Have a
+  good day! ☀️". AE steps only in `docs/ARTIFACT_EVALUATION.md` (hardware,
+  three `docker-run.sh` commands, options, result dirs);
+  `docs/DOCKER_QUICK_REFERENCE.md` is the long form.
+- `Dockerfile`: Ubuntu 24.04, g++-14, Boost, jemalloc, numactl, Python, R +
+  ggplot2/dplyr/tidyr/ggsci/ggpubr/latex2exp/scales; portable build.
+  `.github/workflows/docker-build.yml` pushes it to ghcr.io on every push.
+- `docker-run.sh build|pull|run|full|shell|stop|clean`, `--data-path`
+  (required), `--node-size`, `--cpus`, `--memory`: downloads real data on
+  the host (Dropbox), runs with `--cap-add=SYS_NICE`, mounts
+  `script_ae/{data,logs,plots}` and the data path at `/data`; `full` runs
+  `script_ae/run.sh /data $NODE_SIZE`.
+- `run.sh`: native rebuild, generate synthetic data, `ae_run_*.sh` (args
+  `DATA_PREFIX NODE_SIZE DIM`, `tee -a logs/<exp>/*.log`), `merge_*.py` ->
+  `data/<exp>/<exp>.csv`, `plot_figN_*.R` -> `plots/figN_*.{pdf,csv}`
+  (tables as csv), delete the data. No reference numbers: compared by eye.
+- Defects, do not copy: fig 10 reads the 2D csv, not `incre_update_3d/`;
+  the container runs as root (`-u` commented out, `0e7b96d`) and `clean`
+  cannot remove its files (its `docker run` was dropped in `978d705`);
+  `.dockerignore` drops `.git`, so the submodule step is a no-op; dead doc
+  links (`QUICKREF.md`, `DOCKER.md`, `results/`); interactive `run` times
+  the portable build; scalability hard-codes 224 threads; unguarded
+  `cd ../build; rm -rf *`.
+
+Track rules (fetched 2026-10-30): submit by 2026-11-09 AoE
+(ppopp27ae.hotcrp.com), evaluation 11-10..12-13. README (text or PDF): a
+~30 min getting-started test, then per-claim steps with time, resources,
+expected output. Archive <= 600 MB or a link; no appendix. Badges:
+Functional/Reusable, Results Reproduced, Available (Zenodo-style DOI).
+
+Paper figure -> runner (`scripts/`) -> merge -> plot. Plots take the data
+path as `args[1]` (defaults are the authors' machines) and write
+`../figures/<name>.pdf`; font Linux Libertine; R: dplyr tidyr ggplot2
+scales ggsci gtable latex2exp ggpubr zoo ggpattern.
+
+| fig | runner | merge | plot |
+|---|---|---|---|
+| 1 | `summary_serial_bench.sh` (1e8; caption 1e9) | `merge_summary_serial.py` | `plot_serial_baseline.R` |
+| 4 | `incre_updates.sh` | `merge_incre_updates_new.py` | none: `figures/summary.pdf`, a spreadsheet |
+| 5 | `run_osm.sh` | `merge_osm.py` | `plot_osm_graph.R` |
+| 6 | `run_dynamic_graph_signal.sh` (redd ref sem), `run_dynamic_graph_osm.sh` (PLANET, called `temp_osm`/`osm`) | `merge_dynamic_graph.py` | `plot_signal_bench.R` |
+| 7, Tab 1 | none (`logs/cache/perf/*.data`) | none | `plot_perf_cache.R`, csv not in repo; Tab 1 Excel2LaTeX |
+| 8 | none (temporal tag `1<<5`, `DYNAMIC_GRAPH=ON`) | `merge_randomness.py` | `plot_randomness_dynamic_graph.R` |
+| 9 | `scalability.sh`, `scalability_concurrent.sh` | `merge_scalability.py` | `plot_scalability.R` |
+| 10 | `run_batch_updates.sh` | `merge_batch_updates.py` | `plot_batch_updates.R` |
+| 11 | `incre_updates.sh`, leaf 2..1024 | `merge_incre_updates_new.py` | `plot_btree_blocks.R` |
+
+Runners are hand-edited (each baseline a commented block), hard-code
+`/data/zmen002`, `${HOME}/ParallelMultiwayOrderedSet`, `/usr/bin/drop_caches`.
+"Adversarial" is `seg` in Fig 4, `norm` in Fig 9 (`plot_scalability.R:39`,
+Skewed = `exp`), `exp` in Fig 10 (`plot_batch_updates.R:40`); the paper
+defines Adv as sorted batches and Skew as normal(0.5, 0.1), while
+`gen_incre_data.sh` passes `0.5,0.05`. Inputs on `/data/zmen002`: Fig 4/11
+179 GB, Fig 10 222 GB per dis, OSM 28 GB, graphs 107 GB.
+
+Docker (2026-10-30; user: Rocky Linux 8.10, Red Hat's `gcc-toolset-15`, GCC
+15.2.1, not built from source). `Dockerfile` on `rockylinux/rockylinux:8.10`
+(no official `rockylinux:8.10` tag). `PATH` puts the toolset first; nothing
+else of `scl enable` is needed (its libstdc++ is the system `libstdc++.so.6`
+plus a static `libstdc++_nonshared.a`; CMake links the system
+`libatomic.so.1`). A GCC 15.2.0 build stage (~10 min; needed binutils 2.44,
+as EL8's 2.30 predates newer `-march=native` instructions) was dropped the
+same day. The paper says 15.2.0; this box's `g++` (alternatives) is 15.2.1.
+`LANG=C.UTF-8`: unset, R is not UTF-8 and draws the plots' "×" as two
+dots. EPEL + PowerTools; Python 3.12 (EL8's 3.6 lacks `dataclasses`); R packages
+as Posit `centos8` binaries (`rhel8` 404s), snapshot 2026-10-29; Linux
+Libertine from fixed CTAN mirrors (`mirrors.ctan.org` redirects to some
+failing TLS) plus a fontconfig alias (its family is "Linux Libertine O"). No
+`ggpattern`: it needs `sf` (GDAL) and only `plot_dynamic_graph.R`, not in
+the paper, uses it. No binaries in the image (CMake hard-codes
+`-march=native`): everything builds in the container. `docker-run.sh` runs
+as the caller (`-u`); `--perf` runs as root with `SYS_ADMIN`, then chowns
+`scripts_ae/` back. CI `.github/workflows/docker-build.yml`: build,
+`self_test` in the image, push `ghcr.io/ucrparlay/pb-tree`. `.gitignore`'s
+`*` ignores files with no extension: hence `!/Dockerfile`, `!/LICENSE`.
+
+`scripts_ae/` (2026-10-30; the user's answers are in `docs/ae.md`): the
+paper's body only, Fig 4 to 9; no Fig 1 and no appendix (Fig 10, Fig 11,
+Table 1) (user). `run.sh [--with-masstree-bwtree] [all|synthetic|real|
+figN...|merge|plot]` over `ae_run_*.sh` (one per figure),
+`ae_data_generate.sh` (`incre [X...]`; `single` at x = 100 only, all Fig 9
+reads), copies of the merges (only the distribution order changed) and of
+the paper's plot scripts (`plot_figN_*.R`: inputs under `data/`, PNG at
+300 dpi via `png(type = "cairo")` in `plots/` (user); Fig 9 takes its core
+list from the data, a top count twice the next is labelled `<n>h`; Fig 8
+takes CPAM's lines from `temp_osm.csv`, they were hard-coded). Fig 5's
+by-year csvs come from the paper's `scripts/plot_scripts/plot_osm_{insert,
+delete,range,member}.py`, copied as `merge_osm_*.py`; their split and
+reinsert sizes are hard-coded numbers. `table_fig4.py` writes Fig 4 with the
+paper's column names (Find and Range Report are the 1% blocks' `MIX` and
+`RRM`); figure and table text must match the paper, the numbers need not
+(user). Mass-tree and Bw-tree run only with `--with-masstree-bwtree`
+(`WITH_MASSTREE_BWTREE=1`, `trees` in `common.sh`; user). `common.sh`: one
+build tree per configuration under `build/ae/<leafN|osm|graph>`,
+configured once; `run_tree` retries a failed run (`RETRIES=2`, Bw-tree
+segfaults now and then: exit 139 at different points, same input) and
+keeps only the last attempt, since the merges drop a run logged twice.
+Data: `incre/` from `incre_data_generator` (uni; norm `0.5,0.1`; seg `2`);
+`single/` uni/norm from `data_generator`, seg cut from a seg stream by
+`make_single_batch.py` (insert stream over n + m keys, so the tree keeps
+n). Fig 9 threads: 1, 4, 16, 32, 64 below the cores, the cores, all
+hyper-threads; one CPU per core round-robin over sockets (`taskset`),
+Mass-tree/Bw-tree unpinned as in `scalability_concurrent.sh`.
+
+Fig 7 (2026-10-30): `measure-cache`'s perf hooks ported as a separate
+driver, test_framework.h untouched (user): `tests/perf_cache.cpp` and
+`tests/perf_control.h`, targets `perf_btree` (-T 0), `perf_cpam` (-T 1
+CPAM, 2 PAM), `perf_pma` (-T 3). `-pcr build|membership|incre_insert|
+incre_delete` picks the one region a process runs and counts; `-pcf`/`-pcaf`
+are the `perf stat -D -1 --control fd:CTL,ACK` fds. Each region runs once,
+after the builds and frees DefaultTestFunc runs before it (tags 1 << 5/6/7,
+1% step), so the allocator starts as it did for `measure-cache`'s numbers;
+`membership` probes n/100 keys, half hits, on a tree of the first n/2.
+`ae_run_perf.sh` (norm only: Fig 7 is the Skew panel; `RETRIES=0`, a retry
+would reuse the control fifos) -> `merge_perf_cache.py` ->
+`plot_fig7_perf_cache.R`. On this box `perf` without root falls back to `:u`
+events (`perf_event_paranoid` 2); in a `--perf` container the counts include
+the kernel, as the paper's did; the csv's `scope` column says which. EL8's
+`perf` (4.18.0-553) has `--control` and `-D -1`.
+
+The AE runs on gazelle; this box (cheetah) is for development: 2x16-core
+Xeon Silver 4314, 64 threads, 125 GB. Tested at 1e6 in the image with data
+on `/ssd1/zmen002/ae` (2026-10-30): `run.sh synthetic` with `--perf` (Fig 4,
+7, 9); Fig 5's merges give the original scripts' csvs on
+`scripts/logs/osm` and the plot renders (`scripts/data/osm` is older than
+those logs). Progress and the questions for the user: `docs/ae.md`.
+
+Open: real-data hosting and URLs (`download_data.sh`); Zenodo DOI; BibTeX;
+the ghcr.io package must be made public.
+
 ## History
 
-`docs/` is gitignored; its files are tracked with `-f`:
+`docs/*` is gitignored except the four user docs (`QUICK_START`, `MANUAL`,
+`DOCKER_QUICK_REFERENCE`, `ARTIFACT_EVALUATION`); notes are tracked with `-f`:
 `code_review_2026-08.md`, `refactor_plan_2026-08.md`, `findings_register.md`,
 `open_issues.md`, `plan_structural_delete_2026-09.md`, `harness_notes.md`,
 `new_delete_alg.md`.
