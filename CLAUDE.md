@@ -802,7 +802,7 @@ the paper, uses it. No binaries in the image (CMake hard-codes
 `-march=native`): everything builds in the container. `docker-run.sh` runs
 as the caller (`-u`); `--perf` runs as root with `SYS_ADMIN`, then chowns
 `scripts_ae/` back. CI `.github/workflows/docker-build.yml`: build,
-`self_test` in the image, push `ghcr.io/ucrparlay/pb-tree`. `.gitignore`'s
+`self_test` in the image, push `ghcr.io/ucrparlay/pab-tree`. `.gitignore`'s
 `*` ignores files with no extension: hence `!/Dockerfile`, `!/LICENSE`.
 
 `scripts_ae/` (2026-10-30; the user's answers are in `docs/ae.md`): the
@@ -811,8 +811,8 @@ Table 1) (user). `run.sh [--with-masstree-bwtree] [all|synthetic|real|
 figN...|merge|plot]` over `ae_run_*.sh` (one per figure),
 `ae_data_generate.sh` (`incre [X...]`; `single` at x = 100 only, all Fig 9
 reads), copies of the merges (only the distribution order changed) and of
-the paper's plot scripts (`plot_figN_*.R`: inputs under `data/`, PNG at
-300 dpi via `png(type = "cairo")` in `plots/` (user); Fig 9 takes its core
+the paper's plot scripts (`plot_figN_*.R`: inputs under `data/`, PDF via
+`cairo_pdf` in `plots/` (user: PDF, after a PNG round); Fig 9 takes its core
 list from the data, a top count twice the next is labelled `<n>h`; Fig 8
 takes CPAM's lines from `temp_osm.csv`, they were hard-coded). Fig 5's
 by-year csvs come from the paper's `scripts/plot_scripts/plot_osm_{insert,
@@ -856,8 +856,13 @@ on `/ssd1/zmen002/ae` (2026-10-30): `run.sh synthetic` with `--perf` (Fig 4,
 `scripts/logs/osm` and the plot renders (`scripts/data/osm` is older than
 those logs). Progress and the questions for the user: `docs/ae.md`.
 
-Open: real-data hosting and URLs (`download_data.sh`); Zenodo DOI; BibTeX;
-the ghcr.io package must be made public.
+GitHub: the repository is `ucrparlay/pab-tree` (renamed from `pb-tree`,
+which redirects; the local remote still says `pb-tree`), so CI publishes
+`ghcr.io/ucrparlay/pab-tree`, public since 2026-10-30; anonymous pulls
+work. Check runs without `gh` (not installed): `curl -sSL
+https://api.github.com/repos/ucrparlay/pab-tree/actions/runs`.
+
+Open: real-data hosting and URLs (`download_data.sh`); Zenodo DOI; BibTeX.
 
 ## History
 
