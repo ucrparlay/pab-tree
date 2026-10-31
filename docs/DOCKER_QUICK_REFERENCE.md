@@ -73,16 +73,16 @@ For `run` and `full`:
 What `docker-run.sh run` does, without the helper:
 
 ```bash
-docker pull ghcr.io/ucrparlay/pb-tree:latest
+docker pull ghcr.io/ucrparlay/pab-tree:latest
 
 docker run -it --rm \
   --cap-add=SYS_NICE \
   -u "$(id -u):$(id -g)" -e HOME=/tmp \
   -v /mnt/large-disk/pab-tree:/data \
-  -v "$PWD/scripts_ae/data:/workspace/pb-tree/scripts_ae/data" \
-  -v "$PWD/scripts_ae/logs:/workspace/pb-tree/scripts_ae/logs" \
-  -v "$PWD/scripts_ae/plots:/workspace/pb-tree/scripts_ae/plots" \
-  ghcr.io/ucrparlay/pb-tree:latest
+  -v "$PWD/scripts_ae/data:/workspace/pab-tree/scripts_ae/data" \
+  -v "$PWD/scripts_ae/logs:/workspace/pab-tree/scripts_ae/logs" \
+  -v "$PWD/scripts_ae/plots:/workspace/pab-tree/scripts_ae/plots" \
+  ghcr.io/ucrparlay/pab-tree:latest
 ```
 
 `--cap-add=SYS_NICE` lets `numactl -i all` interleave memory across sockets;
@@ -98,7 +98,7 @@ Relative to the repository root:
 | Datasets | the host path given to `--data-path` |
 | Summarized results (csv) | `scripts_ae/data/` |
 | Logs | `scripts_ae/logs/` |
-| Figures (png) and tables (csv) | `scripts_ae/plots/` |
+| Figures (pdf) and Fig. 4 (csv) | `scripts_ae/plots/` |
 
 ## Hardware Counters (Fig. 7)
 

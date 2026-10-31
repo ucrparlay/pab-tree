@@ -12,8 +12,8 @@ library(ggpubr)
 library(ggsci)
 
 # the body font of the paper, so that the figure sets its text in the same face
-# as the surrounding prose. cairo resolves the family through fontconfig, so the
-# name has to match `fc-list` exactly.
+# as the surrounding prose. cairo_pdf resolves the family through fontconfig and
+# embeds it, so the name has to match `fc-list` exactly.
 FONT <- "Linux Libertine"
 
 TREE_ORDER <- c("BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree")
@@ -228,8 +228,8 @@ FIG_H <- 8
 
 # a grob is measured with whatever device is open when it is built, so the
 # figure is assembled with a cairo device open, matching the one it is drawn on
-scratch_dev <- tempfile(fileext = ".png")
-png(scratch_dev, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+scratch_dev <- tempfile(fileext = ".pdf")
+cairo_pdf(scratch_dev, width = FIG_W, height = FIG_H)
 
 t <- read_csv_scalability()
 
@@ -302,8 +302,8 @@ g <- gridExtra::arrangeGrob(
 invisible(dev.off())
 unlink(scratch_dev)
 
-out_path <- file.path("plots", "fig9_scalability.png")
-png(out_path, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+out_path <- file.path("plots", "fig9_scalability.pdf")
+cairo_pdf(out_path, width = FIG_W, height = FIG_H)
 grid::grid.draw(g)
 invisible(dev.off())
 cat("Saved to", out_path, "\n")

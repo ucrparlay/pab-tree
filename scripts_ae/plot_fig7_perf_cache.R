@@ -11,8 +11,8 @@ library(scales)
 library(ggpubr)
 
 # the body font of the paper, so that the figure sets its text in the same face
-# as the surrounding prose. cairo resolves the family through fontconfig, so the
-# name has to match `fc-list` exactly.
+# as the surrounding prose. cairo_pdf resolves the family through fontconfig and
+# embeds it, so the name has to match `fc-list` exactly.
 FONT <- "Linux Libertine"
 
 # Rscript plot_fig7_perf_cache.R data/perf_cache/perf_cache.csv norm
@@ -205,8 +205,8 @@ FIG_H <- 5
 
 # a grob is measured with whatever device is open when it is built, so the
 # figure is assembled with a cairo device open, matching the one it is drawn on
-scratch_dev <- tempfile(fileext = ".png")
-png(scratch_dev, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+scratch_dev <- tempfile(fileext = ".pdf")
+cairo_pdf(scratch_dev, width = FIG_W, height = FIG_H)
 
 # ggpubr lays the legend out against its own device rather than the one the
 # figure is drawn on, so the label cells come out at the default font's widths
@@ -266,9 +266,9 @@ unlink(scratch_dev)
 
 # the figure the paper includes keeps the plain name; any other distribution is
 # written beside it under its own name
-out_name <- if (DIS == "norm") "fig7_perf_cache.png" else paste0("fig7_perf_cache_", DIS, ".png")
+out_name <- if (DIS == "norm") "fig7_perf_cache.pdf" else paste0("fig7_perf_cache_", DIS, ".pdf")
 out_path <- file.path("plots", out_name)
-png(out_path, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+cairo_pdf(out_path, width = FIG_W, height = FIG_H)
 grid::grid.draw(g)
 invisible(dev.off())
 cat("Saved to", out_path, "\n")

@@ -14,7 +14,7 @@
 # A step that needs synthetic data generates it first, and data no later
 # step needs is deleted unless KEEP_DATA=1. Mass-tree and Bw-tree (Fig. 4,
 # 5, 9) run only with --with-masstree-bwtree. Results: logs/, data/ (csv),
-# plots/ (png; Fig. 4 is a csv table). A step that fails is listed in
+# plots/ (pdf; Fig. 4 is a csv table). A step that fails is listed in
 # logs/failed.txt and the rest go on.
 
 set -euo pipefail

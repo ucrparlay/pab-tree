@@ -1,6 +1,6 @@
 # PaB-tree: Parallel B+-trees with Batch Updates
 
-[![docker](https://img.shields.io/github/actions/workflow/status/ucrparlay/pb-tree/docker-build.yml?branch=main&logo=docker&logoColor=white&label=docker&labelColor=0D1117)](https://github.com/ucrparlay/pb-tree/actions/workflows/docker-build.yml)
+[![docker](https://img.shields.io/github/actions/workflow/status/ucrparlay/pab-tree/docker-build.yml?branch=main&logo=docker&logoColor=white&label=docker&labelColor=0D1117)](https://github.com/ucrparlay/pab-tree/actions/workflows/docker-build.yml)
 [![C++20, header-only](https://img.shields.io/badge/C%2B%2B-20%20%C2%B7%20header--only-0F80FF?logo=cplusplus&logoColor=white&labelColor=0D1117)](CMakeLists.txt)
 
 PaB-tree is a parallel, in-memory B+-tree built for batch updates, which is:

@@ -14,9 +14,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-image="${PAB_TREE_IMAGE:-ghcr.io/ucrparlay/pb-tree:latest}"
+image="${PAB_TREE_IMAGE:-ghcr.io/ucrparlay/pab-tree:latest}"
 container="pab-tree-ae"
-workdir="/workspace/pb-tree"
+workdir="/workspace/pab-tree"
 
 red='\033[0;31m'
 green='\033[0;32m'

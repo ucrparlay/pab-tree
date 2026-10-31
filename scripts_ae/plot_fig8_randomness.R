@@ -11,8 +11,8 @@ library(ggsci)
 library(gtable)
 
 # the body font of the paper, so that the figure sets its text in the same face
-# as the surrounding prose. cairo resolves the family through fontconfig, so the
-# name has to match `fc-list` exactly.
+# as the surrounding prose. cairo_pdf resolves the family through fontconfig and
+# embeds it, so the name has to match `fc-list` exactly.
 FONT <- "Linux Libertine"
 
 # Rscript plot_randomness.R /path/to/100batches.csv /path/to/summary_filtered.csv
@@ -136,8 +136,8 @@ FIG_H <- 4
 
 # a grob is measured with whatever device is open when it is built, so the
 # figure is assembled with a cairo device open, matching the one it is drawn on
-scratch_dev <- tempfile(fileext = ".png")
-png(scratch_dev, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+scratch_dev <- tempfile(fileext = ".pdf")
+cairo_pdf(scratch_dev, width = FIG_W, height = FIG_H)
 
 # the bar row and the line row are separate guides, and ggplot places each at
 # its own offset inside the guide box, so a bar never sits above its line. the
@@ -228,8 +228,8 @@ final <- gridExtra::arrangeGrob(
 invisible(dev.off())
 unlink(scratch_dev)
 
-out_path <- "plots/fig8_randomness.png"
-png(out_path, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+out_path <- "plots/fig8_randomness.pdf"
+cairo_pdf(out_path, width = FIG_W, height = FIG_H)
 grid::grid.draw(final)
 invisible(dev.off())
 cat("Saved to", out_path, "\n")

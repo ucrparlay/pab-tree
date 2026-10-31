@@ -2,7 +2,7 @@
 #
 # HOW TO RUN (from the repository root)
 #   ./docker-run.sh build
-#   docker build -t ghcr.io/ucrparlay/pb-tree:latest .    # the same, by hand
+#   docker build -t ghcr.io/ucrparlay/pab-tree:latest .    # the same, by hand
 #
 # Environment for the PaB-tree artifact evaluation (PPoPP 2027): Rocky Linux
 # 8.10 and Red Hat's GCC 15.2.1 (gcc-toolset-15). The image holds the
@@ -10,7 +10,7 @@
 # container with -march=native, on the machine that runs it.
 FROM rockylinux/rockylinux:8.10
 
-LABEL org.opencontainers.image.source="https://github.com/ucrparlay/pb-tree" \
+LABEL org.opencontainers.image.source="https://github.com/ucrparlay/pab-tree" \
 	org.opencontainers.image.description="PaB-tree artifact evaluation environment"
 
 # EPEL has jemalloc, gperftools and R; their dependencies need PowerTools.
@@ -78,7 +78,7 @@ ENV DATA_PREFIX=/data \
 ARG GIT_SHA=unknown
 ENV PAB_TREE_COMMIT=$GIT_SHA
 
-WORKDIR /workspace/pb-tree
+WORKDIR /workspace/pab-tree
 COPY . .
 
 # docker-run.sh runs as the calling user, whose uid the image cannot know:

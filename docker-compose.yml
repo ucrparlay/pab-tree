@@ -7,7 +7,7 @@
 # result directories first: Docker would create them as root.
 services:
   pab-tree-ae:
-    image: ghcr.io/ucrparlay/pb-tree:latest
+    image: ghcr.io/ucrparlay/pab-tree:latest
     build: .
     container_name: pab-tree-ae
     user: "${AE_UID:-1000}:${AE_GID:-1000}"
@@ -20,8 +20,8 @@ services:
       WITH_MASSTREE_BWTREE: ${WITH_MASSTREE_BWTREE:-0}
     volumes:
       - ${DATA_PATH:?set DATA_PATH in .env}:/data
-      - ./scripts_ae/data:/workspace/pb-tree/scripts_ae/data
-      - ./scripts_ae/logs:/workspace/pb-tree/scripts_ae/logs
-      - ./scripts_ae/plots:/workspace/pb-tree/scripts_ae/plots
+      - ./scripts_ae/data:/workspace/pab-tree/scripts_ae/data
+      - ./scripts_ae/logs:/workspace/pab-tree/scripts_ae/logs
+      - ./scripts_ae/plots:/workspace/pab-tree/scripts_ae/plots
     stdin_open: true
     tty: true

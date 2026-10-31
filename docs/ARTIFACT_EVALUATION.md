@@ -30,8 +30,8 @@ runs.
 cd scripts_ae && ./run.sh synthetic
 ```
 
-Expected: `scripts_ae/plots/` holds `fig4_synthetic.csv`, `fig7_perf_cache.png`
-and `fig9_scalability.png`, and the run ends with `done`. Without `--perf`,
+Expected: `scripts_ae/plots/` holds `fig4_synthetic.csv`, `fig7_perf_cache.pdf`
+and `fig9_scalability.pdf`, and the run ends with `done`. Without `--perf`,
 Fig. 7 is skipped and listed in `scripts_ae/logs/failed.txt`.
 
 ## Full Evaluation
@@ -43,7 +43,7 @@ Fig. 7 is skipped and listed in `scripts_ae/logs/failed.txt`.
 This runs `scripts_ae/run.sh` at 10^9 entries: it generates each synthetic
 dataset just before the experiments that read it, deletes it afterwards, runs
 every experiment, merges the logs into `scripts_ae/data/` and writes
-`scripts_ae/plots/`: each figure as a PNG, Fig. 4 as a csv table. A step that
+`scripts_ae/plots/`: each figure as a PDF, Fig. 4 as a csv table. A step that
 fails is listed in `scripts_ae/logs/failed.txt` and the rest go on;
 `scripts_ae/logs/env.txt` records the machine, compiler and commit. Run it
 inside `tmux` or `screen`: it takes many hours.
@@ -65,11 +65,11 @@ cd scripts_ae
 | Paper | `run.sh` step | Script | Output in `scripts_ae/plots/` |
 |---|---|---|---|
 | Fig. 4 | `fig4` | `ae_run_incre_updates.sh` | `fig4_synthetic.csv` |
-| Fig. 5 | `fig5` | `ae_run_osm.sh` | `fig5_osm.png` |
-| Fig. 6 | `fig6` | `ae_run_temporal_graph.sh` | `fig6_temporal_graph.png` |
-| Fig. 7 | `fig7` (needs `--perf`) | `ae_run_perf.sh` | `fig7_perf_cache.png` |
-| Fig. 8 | `fig8` | `ae_run_randomness.sh` | `fig8_randomness.png` |
-| Fig. 9 | `fig9` | `ae_run_scalability.sh` | `fig9_scalability.png` |
+| Fig. 5 | `fig5` | `ae_run_osm.sh` | `fig5_osm.pdf` |
+| Fig. 6 | `fig6` | `ae_run_temporal_graph.sh` | `fig6_temporal_graph.pdf` |
+| Fig. 7 | `fig7` (needs `--perf`) | `ae_run_perf.sh` | `fig7_perf_cache.pdf` |
+| Fig. 8 | `fig8` | `ae_run_randomness.sh` | `fig8_randomness.pdf` |
+| Fig. 9 | `fig9` | `ae_run_scalability.sh` | `fig9_scalability.pdf` |
 
 `./run.sh synthetic` runs Fig. 4, 7 and 9; `./run.sh real` runs Fig. 5, 6
 and 8, which need the real-world datasets.

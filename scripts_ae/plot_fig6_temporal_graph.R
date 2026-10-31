@@ -11,8 +11,8 @@ library(scales)
 library(ggpubr)
 
 # the body font of the paper, so that the figure sets its text in the same face
-# as the surrounding prose. cairo resolves the family through fontconfig, so the
-# name has to match `fc-list` exactly.
+# as the surrounding prose. cairo_pdf resolves the family through fontconfig and
+# embeds it, so the name has to match `fc-list` exactly.
 FONT <- "Linux Libertine"
 
 # tree (baseline) order; "BTree" is ours
@@ -198,8 +198,8 @@ FIG_H <- 8
 # device open, the legend reserves label cells that do not match the text cairo
 # then draws, and the error shows up as uneven gaps between the entries. so the
 # figure is assembled with a cairo device open, matching the one it is saved on.
-scratch_dev <- tempfile(fileext = ".png")
-png(scratch_dev, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+scratch_dev <- tempfile(fileext = ".pdf")
+cairo_pdf(scratch_dev, width = FIG_W, height = FIG_H)
 
 # ggpubr lays the legend out against its own device rather than the one the
 # figure is drawn on, so the label cells come out at the default font's widths
@@ -255,8 +255,8 @@ g <- gridExtra::arrangeGrob(
 invisible(dev.off())
 unlink(scratch_dev)
 
-out_path <- file.path("plots", "fig6_temporal_graph.png")
-png(out_path, width = FIG_W, height = FIG_H, units = "in", res = 300, type = "cairo")
+out_path <- file.path("plots", "fig6_temporal_graph.pdf")
+cairo_pdf(out_path, width = FIG_W, height = FIG_H)
 grid::grid.draw(g)
 invisible(dev.off())
 cat("Saved to", out_path, "\n")

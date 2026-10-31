@@ -40,8 +40,8 @@ Optional:
 1. Clone the repository.
 
 ```bash
-git clone https://github.com/ucrparlay/pb-tree.git
-cd pb-tree
+git clone https://github.com/ucrparlay/pab-tree.git
+cd pab-tree
 ```
 
 2. Initialize the submodules:
