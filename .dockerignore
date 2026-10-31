@@ -1,0 +1,22 @@
+# Local build output and editor state
+build/
+.cache/
+.claude/
+.clangd
+.vscode/
+.git
+**/.git
+.env
+**/__pycache__/
+
+# Results: mounted from the host at run time
+scripts_ae/data/
+scripts_ae/logs/
+scripts_ae/plots/
+
+# Raw logs of the development sweeps, and a local virtualenv
+scripts/logs/
+scripts/osm/venv/
+
+# Notes and the paper
+docs/

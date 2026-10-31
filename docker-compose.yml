@@ -1,0 +1,27 @@
+# HOW TO RUN (from the repository root)
+#   cp .env.example .env                       # then set DATA_PATH, AE_UID, AE_GID
+#   mkdir -p scripts_ae/data scripts_ae/logs scripts_ae/plots
+#   docker compose run --rm pab-tree-ae
+#
+# The container docker-run.sh starts, for those who prefer Compose. Create the
+# result directories first: Docker would create them as root.
+services:
+  pab-tree-ae:
+    image: ghcr.io/ucrparlay/pb-tree:latest
+    build: .
+    container_name: pab-tree-ae
+    user: "${AE_UID:-1000}:${AE_GID:-1000}"
+    cap_add:
+      - SYS_NICE # numactl -i all
+    environment:
+      HOME: /tmp
+      DATA_PREFIX: /data
+      INPUT_SIZE: ${INPUT_SIZE:-1000000000}
+      WITH_MASSTREE_BWTREE: ${WITH_MASSTREE_BWTREE:-0}
+    volumes:
+      - ${DATA_PATH:?set DATA_PATH in .env}:/data
+      - ./scripts_ae/data:/workspace/pb-tree/scripts_ae/data
+      - ./scripts_ae/logs:/workspace/pb-tree/scripts_ae/logs
+      - ./scripts_ae/plots:/workspace/pb-tree/scripts_ae/plots
+    stdin_open: true
+    tty: true

@@ -1,0 +1,64 @@
+# HOW TO RUN (from the repository root)
+#   make -f Makefile.docker help
+#   make -f Makefile.docker docker-run DATA=/mnt/disk/pab-tree
+#   make -f Makefile.docker docker-full DATA=/mnt/disk/pab-tree ARGS=--perf
+#
+# Make targets over docker-run.sh, plus a native build.
+
+DATA ?=
+SIZE ?= 1000000000
+ARGS ?=
+
+.PHONY: help docker-build docker-pull docker-run docker-full docker-shell \
+	docker-stop docker-clean build test clean
+
+help:
+	@echo "PaB-tree artifact evaluation"
+	@echo ""
+	@echo "Docker (DATA= is the host directory for the datasets):"
+	@echo "  docker-build   Build the image from this checkout"
+	@echo "  docker-pull    Pull the prebuilt image"
+	@echo "  docker-run     Start a shell in the container (DATA=, SIZE=, ARGS=)"
+	@echo "  docker-full    Run every experiment (DATA=, SIZE=, ARGS=)"
+	@echo "  ARGS= passes docker-run.sh options, e.g. --perf"
+	@echo "  docker-shell   Open another shell in the running container"
+	@echo "  docker-stop    Stop the running container"
+	@echo "  docker-clean   Remove the results in scripts_ae/ and the image"
+	@echo ""
+	@echo "Native:"
+	@echo "  build          Configure and build everything in build/"
+	@echo "  test           Build, then run the tests"
+	@echo "  clean          Remove build/"
+	@echo ""
+	@echo "More: ./docker-run.sh help, docs/DOCKER_QUICK_REFERENCE.md"
+
+docker-build:
+	./docker-run.sh build
+
+docker-pull:
+	./docker-run.sh pull
+
+docker-run:
+	./docker-run.sh run --data-path "$(DATA)" --input-size $(SIZE) $(ARGS)
+
+docker-full:
+	./docker-run.sh full --data-path "$(DATA)" --input-size $(SIZE) $(ARGS)
+
+docker-shell:
+	./docker-run.sh shell
+
+docker-stop:
+	./docker-run.sh stop
+
+docker-clean:
+	./docker-run.sh clean
+
+build:
+	cmake -S . -B build
+	cmake --build build -j
+
+test: build
+	ctest --test-dir build --output-on-failure
+
+clean:
+	rm -rf build
