@@ -201,6 +201,24 @@ if(NOT APPLE)
 	target_compile_definitions(pma PUBLIC PARALLEL=1 PARLAY=1)
 endif()
 
+# NOTE: hardware counters of one region under perf (Fig. 7); one binary
+# per tree family, as above
+add_executable(perf_btree ${PROJECT_SOURCE_DIR}/tests/perf_cache.cpp)
+target_link_libraries(perf_btree PUBLIC TEST_FRAME)
+target_include_directories(perf_btree PUBLIC ${TEST_FRAME_INCLUDE_DIR})
+
+add_executable(perf_cpam ${PROJECT_SOURCE_DIR}/tests/perf_cache.cpp)
+target_link_libraries(perf_cpam PUBLIC TEST_FRAME CPAM)
+target_include_directories(perf_cpam PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${CPAM_INCLUDE_DIR})
+target_compile_definitions(perf_cpam PUBLIC PERF_CPAM)
+
+if(NOT APPLE)
+	add_executable(perf_pma ${PROJECT_SOURCE_DIR}/tests/perf_cache.cpp)
+	target_link_libraries(perf_pma PUBLIC TEST_FRAME PMA)
+	target_include_directories(perf_pma PUBLIC ${TEST_FRAME_INCLUDE_DIR} ${PMA_INCLUDE_DIR})
+	target_compile_definitions(perf_pma PUBLIC PERF_PMA PARALLEL=1 PARLAY=1)
+endif()
+
 # NOTE: GoogleTest for correctness check
 # self_test generates its own data and needs no files; unit_test reads the
 # benchmark datasets and skips without them. Both are registered with ctest.
