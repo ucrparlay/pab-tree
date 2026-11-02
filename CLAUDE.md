@@ -874,23 +874,52 @@ share a del base (8 GB each). The paths are as under `--data-path`. License
 under ODbL, so `real_world/osm/` and `real_world/temporal_graph/osm/` stay
 there (card `license: [mit, odbl]`). PLANET's OSM origin is read off names
 (`temporal_graph/osm/`, `planet.bin`); neither paper nor converter says so.
-`common.sh`'s `fetch` reads
-`scripts_ae/datasets.sha256`; `download_data.sh` gets `real_world/`,
-`ae_data_generate.sh` downloads at 10^9 and generates at other sizes, on a
-failed download, or with `DOWNLOAD=0` (`--no-download`). `run.sh` still drops
-each set after use. The image's curl 7.61 has no `--retry-all-errors`, hence
-`fetch`'s loop. `hf` is `huggingface_hub` 2.4 in `~/.local` (Python 3.12):
+The image's curl 7.61 has no `--retry-all-errors`, hence `fetch`'s loop. `hf` is
+`huggingface_hub` 2.4 in `~/.local` (Python 3.12):
 it has no `upload-large-folder`; `hf upload` follows file symlinks and resumes
 by rerun, so the stage is a symlink tree, `/ssd1/zmen002/ae/hf_stage` (`incre`
 and `real_world` the paper's files on `/data`; `single` made with the image).
-Regenerated with the image at 1e9: `norm`, `seg` at x = 10 and `single/uni`
-(= `kv_pair/uni`) are the same bytes; `incre/uni` is another permutation, its
-files predate `d5cff3e`/`01f74fc`. Today's generator: uni, seg seconds per
-file; norm about 5 h, mostly x = 10000 (pool compaction). NFS reads total ~150
-MB/s.
+NFS reads total ~150 MB/s.
+
+Download only `real_world/`, generate the rest (user, 2026-11-02: downloading
+takes too long; keep the Hub's synthetic copy for now). `download_data.sh` holds
+`fetch` and reads `scripts_ae/datasets.sha256`, now the 46 `real_world/` lines
+(all 82: `a7d267c`'s). `--no-download` skips only that; `DOWNLOAD` is
+`docker-run.sh`'s, no longer `run.sh`'s. `run.sh` still drops each set after use.
+`del` streams are hard links to `ins` (`cp` where links fail), half the time and
+disk. `stale` compares a file's size to its header: `write_binary_entries`
+writes in place and does not check `close`, so a killed run leaves a short file
+(the reader aborts on it, "Truncated binary file"). `data_generator` writes
+`base` then `batch`, `make_single_batch.py` `batch` then `base`.
+
+Generation at 1e9, 2026-11-02, image, 64 threads, other users' jobs alongside
+(load to 87; the 5 h once written here came from August mtimes: half was `del`,
+and NFS): `incre` 58 min: uni 15 s per file, seg 13-30 s, norm x = 10 29 s, 100
+2 min, 1000 5:49, 10000 47 min; `single` 3.5 min. Downloading the same 240 GB:
+73 min at 55 MB/s. Memory: `data_generator` 106 GB (`Discreatize`: draws 8 GB,
+then 24 GB each for the flagged pairs, `append`, `sort`'s output, its scratch),
+`incre_data_generator` 40-44 GB (norm at x = 10, 100, 1000; uni, seg at 100,
+10000). Short of that: uncaught `bad_alloc`, exit 134, not an OOM kill. 9 times
+that day on this 125 GiB box, holding 56.6 GB: MemAvailable fell to 11 GiB with
+others at about 60 GiB, and 7 in a row each began with 106-112 GiB free, about
+a minute apart, as another user's benchmark ran; then it passed. Finished
+files stay, so a rerun goes on from there.
+`data_generator`'s `create_directory` wants `-path`'s parent to exist, hence
+`gen_pairs`'s `mkdir -p`; without it `run.sh fig9` died on a fresh path.
+
+Bytes at 1e9: `incre/norm`, `incre/seg` all 16 files = the paper's; `single/uni`
+= `kv_pair/uni`; `incre/uni` is another permutation, its files predate
+`d5cff3e`/`01f74fc`. `single`: 9 of 12 as hosted; the 3 others are norm's, all
+but its `del` base (a permutation of all ids). `data_generator`'s norm is not
+repeatable: 4 runs, 4
+outputs at 64 threads, 1 at one thread, as `NormalGenerator` shares one
+`std::normal_distribution` (`_M_saved` races). Left alone: the keys stay right
+(batch rank mean 0.49996, std 0.1018; a uniform base stretches 0.1 by 1.02), and
+Fig 9's `kv_pair/norm` was never this file. `incre_data_generator` repeats.
 
 Uploaded 2026-11-01: 41 min, 209 GB sent, Hub `usedStorage` 216.5 GB (copies
-count once); 82/82 Hub sha256 equal `scripts_ae/datasets.sha256`. All files
+count once); 82/82 Hub sha256 equal `a7d267c`'s `scripts_ae/datasets.sha256`. All
+files
 join one batch, so one commit at the very end; a rerun resumes by chunk dedup.
 `hf_xet` hashes in one read pass. From the Hub in the image, no token: 55 MB/s
 with checksums, 329 GB in about 1 h 40 min. curl 7.61 with `-f` exits 22 on HTTP
@@ -899,16 +928,20 @@ with checksums, 329 GB in about 1 h 40 min. curl 7.61 with `-f` exits 22 on HTTP
 real repo: `.part` whole, partial, corrupt, too long, whole with a wrong byte,
 and a 404. The image takes `datasets.sha256` by `COPY . .`.
 
-Hosted is what `scripts_ae` reads, and it reads all 82 (read from the code,
+Hosted is what `scripts_ae` read at `a7d267c`, all 82 (read from the code,
 2026-11-02). Left on `/data`: 499 GB of `geometry` (pbf, csv, `.in`, africa;
 signal `<g>.bin`, `all_batch.bin`; `planet.bin`; `planet/`, 10 batches, while
 the paper's runner reads `planet_year/`; `europe`, `north_america`),
 `kv_pair` (1,026 GB), `kv_pair_incre/{exp,seg_10}`.
 
 Open: Zenodo DOI; BibTeX; a full 1e9 run on gazelle for the time and memory
-in `ARTIFACT_EVALUATION.md`.
+in `ARTIFACT_EVALUATION.md`; the Hub card still says `DOWNLOAD=0`, about 5 h
+(corrected copy waits for the user's go-ahead).
 Paper text vs. files: the OSM run keeps 2015-2024, 1.67 B records (text:
-1.35 B, 2014-2023); PLANET has 21 year files (text: 20 batches).
+1.35 B, 2014-2023); PLANET has 21 year files (text: 20 batches); `seg` is
+multiplier 2 (text: consecutive ranges, which is 1). Measured by replaying the
+files: batches reach 2.0 m deep at x = 10 to 10000 and in `single/seg`;
+`seg_10` reads 10. No `seg_4` exists; the 4 is `-dis 4`.
 
 ## History
 
