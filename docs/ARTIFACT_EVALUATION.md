@@ -9,7 +9,9 @@ cores, 224 hyper-threads) with 1.47 TB RAM, compiled with GCC 15.2.0 at `-O3`.
 
 - **Memory**: to be measured; the experiments build trees of 10^9 entries.
 - **CPU**: all available cores. Fig. 9 sweeps the thread count.
-- **Disk**: about 330 GB at 10^9 entries (see [Datasets](#datasets)).
+- **Disk**: about 290 GB at 10^9 entries (see [Datasets](#datasets)).
+- **Network**: the datasets download from Hugging Face, 330 GB in all, about
+  1 hour 40 minutes at the 55 MB/s we measured, checksums included.
 - **Docker**, and permission to run containers.
 - **Hardware counters** for Fig. 7: `perf` must be able to read them in a
   container (`--perf` below). Most virtual machines cannot.
@@ -25,7 +27,7 @@ runs.
 
 ```bash
 ./docker-run.sh pull        # or: ./docker-run.sh build
-./docker-run.sh run --data-path /mnt/large-disk/pab-tree --input-size 1000000 --perf
+./docker-run.sh run --data-path /mnt/large-disk/pab-tree --input-size 1000000 --no-download --perf
 # in the container:
 cd scripts_ae && ./run.sh synthetic
 ```
@@ -40,9 +42,10 @@ Fig. 7 is skipped and listed in `scripts_ae/logs/failed.txt`.
 ./docker-run.sh full --data-path /mnt/large-disk/pab-tree --perf
 ```
 
-This runs `scripts_ae/run.sh` at 10^9 entries: it generates each synthetic
-dataset just before the experiments that read it, deletes it afterwards, runs
-every experiment, merges the logs into `scripts_ae/data/` and writes
+This downloads the real-world datasets, then runs `scripts_ae/run.sh` at 10^9
+entries: it downloads each synthetic dataset just before the experiments that
+read it, deletes it afterwards, runs every experiment, merges the logs into
+`scripts_ae/data/` and writes
 `scripts_ae/plots/`: each figure as a PDF, Fig. 4 as a csv table. A step that
 fails is listed in `scripts_ae/logs/failed.txt` and the rest go on;
 `scripts_ae/logs/env.txt` records the machine, compiler and commit. Run it
@@ -85,7 +88,8 @@ overflow and underflow shares come from numbers the paper's scripts hold.
 
 - `--data-path PATH` - Host directory for the datasets (required)
 - `--input-size N` - Entries per synthetic dataset (default: 10^9)
-- `--no-download` - Do not download the real-world datasets
+- `--no-download` - Download nothing: generate the synthetic datasets, and
+  run Fig. 5, 6 and 8 only if their data is already there
 - `--perf` - Allow hardware counters, for Fig. 7; the container runs as
   root
 - `--with-masstree-bwtree` - Also run Mass-tree and Bw-tree
@@ -100,15 +104,21 @@ overflow and underflow shares come from numbers the paper's scripts hold.
 | `ROUNDS` | Timed runs per measurement, after one warm-up | `3` |
 | `THREADS` | Thread counts of Fig. 9 | 1, 4, 16, 32, 64 up to the cores, the cores, all hyper-threads |
 | `WITH_MASSTREE_BWTREE` | `1` also runs Mass-tree and Bw-tree | `0` |
-| `KEEP_DATA` | `1` keeps the generated datasets | delete |
+| `KEEP_DATA` | `1` keeps the synthetic datasets | delete |
+| `DOWNLOAD` | `0` generates the synthetic datasets (about 5 hours at 10^9) | `1` |
 | `RETRIES` | Reruns of a run that fails | `2` |
 
 See the [Docker reference](DOCKER_QUICK_REFERENCE.md) for the rest.
 
 ## Datasets
 
-`scripts_ae/ae_data_generate.sh` generates the synthetic data under
-`<data-path>/synthetic`, with distinct 32-bit keys and values:
+All of it is at
+[romaLzhih/pab-tree-data](https://huggingface.co/datasets/romaLzhih/pab-tree-data),
+the checksums in `scripts_ae/datasets.sha256`. No account is needed.
+
+The synthetic data goes under `<data-path>/synthetic`, with distinct 32-bit
+keys and values. `scripts_ae/ae_data_generate.sh` downloads it at 10^9 entries
+and generates it at other sizes, or with `DOWNLOAD=0`:
 
 | Paper | Name | Each batch is drawn |
 |---|---|---|
@@ -121,7 +131,10 @@ See the [Docker reference](DOCKER_QUICK_REFERENCE.md) for the rest.
 | `incre`: one stream per batch size, sliced into batches | Fig. 4, 7 | 192 GB |
 | `single`: a tree and one batch of n/100 | Fig. 9 | 16 GB per distribution |
 
-`run.sh` keeps one set at a time, so about 200 GB at once.
+`run.sh` keeps one set at a time, so about 200 GB at once. Generating gives
+the hosted bytes (checked on `norm` and `seg` at x = 10, and `single/uni`),
+except `incre/uni`: another permutation of the same distribution, as the hosted
+files predate the generator's last change.
 
 The real-world datasets go under `<data-path>/real_world`;
 `scripts_ae/download_data.sh` fetches them (`docker-run.sh` runs it):
@@ -129,7 +142,7 @@ The real-world datasets go under `<data-path>/real_world`;
 | Dataset | Used by | Size |
 |---|---|---|
 | OpenStreetMap | Fig. 5 | 28 GB |
-| RED, REF, SEM, PLANET (GraphTide) | Fig. 6, 8 | 107 GB |
+| RED, REF, SEM, PLANET (GraphTide) | Fig. 6, 8 | 61 GB |
 
 ## Running on Other Data and Settings
 

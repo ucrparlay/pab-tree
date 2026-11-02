@@ -19,6 +19,11 @@ SYNTH_DIR="$DATA_PREFIX/synthetic"
 REAL_DIR="$DATA_PREFIX/real_world"
 LOG_DIR="$AE_DIR/logs"
 
+# Hosted datasets: datasets.sha256 names each file, relative to $DATA_PREFIX.
+# DOWNLOAD=0 (docker-run.sh --no-download) fetches nothing.
+HF_URL="${HF_URL:-https://huggingface.co/datasets/romaLzhih/pab-tree-data/resolve/main}"
+DOWNLOAD="${DOWNLOAD:-1}"
+
 # the driver of each tree id (-T)
 declare -A TREE_TARGET=(
 	[0]=b_test                    # PaB-tree
@@ -59,6 +64,33 @@ fi
 RUN_PREFIX=("${NUMA[@]}")
 
 log() { echo "[$(date '+%F %T')] $*"; }
+
+# fetch PATH: download PATH, as datasets.sha256 names it, into $DATA_PREFIX
+# and check it. Fails when it is not hosted or will not download. A broken
+# transfer resumes; five tries. HTTP 416: .part already reaches the end of the
+# file, left by a run killed during the checksum, so the checksum decides.
+fetch() {
+	local path=$1 tmp="$DATA_PREFIX/$1.part" sum attempt code
+	sum=$(awk -v path="$path" '$2 == path { print $1 }' "$AE_DIR/datasets.sha256")
+	if [ "$DOWNLOAD" = 0 ] || [ -z "$sum" ]; then
+		return 1
+	fi
+	mkdir -p "$(dirname "$tmp")"
+	log "download $path"
+	for ((attempt = 1; attempt <= 5; attempt++)); do
+		if code=$(curl -fL -C - -o "$tmp" -w '%{http_code}' "$HF_URL/$path") ||
+			[ "$code" = 416 ]; then
+			if echo "$sum  $tmp" | sha256sum -c --quiet -; then
+				mv "$tmp" "$DATA_PREFIX/$path"
+				return 0
+			fi
+			rm -f "$tmp"
+		fi
+		log "failed: attempt $attempt"
+	done
+	rm -f "$tmp"
+	return 1
+}
 
 # cmake options of each build configuration
 config_options() {

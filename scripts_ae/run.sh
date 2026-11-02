@@ -7,15 +7,17 @@
 #   ./run.sh fig4 fig9 merge plot            # chosen steps
 #   ./run.sh --with-masstree-bwtree fig4     # add Mass-tree and Bw-tree
 #   INPUT_SIZE=1000000 ./run.sh synthetic    # a quick check
-#   KEEP_DATA=1 ./run.sh                     # keep the generated datasets
+#   KEEP_DATA=1 ./run.sh                     # keep the synthetic datasets
+#   DOWNLOAD=0 ./run.sh synthetic            # generate them, about 5 hours
 #
 # Steps: fig4 fig5 fig6 fig7 fig8 fig9 merge plot, the paper's experiments
 # outside the appendix but Fig. 1; fig7 needs perf (docker-run.sh --perf).
-# A step that needs synthetic data generates it first, and data no later
-# step needs is deleted unless KEEP_DATA=1. Mass-tree and Bw-tree (Fig. 4,
-# 5, 9) run only with --with-masstree-bwtree. Results: logs/, data/ (csv),
-# plots/ (pdf; Fig. 4 is a csv table). A step that fails is listed in
-# logs/failed.txt and the rest go on.
+# A step that needs synthetic data gets it first (ae_data_generate.sh: hosted
+# at 10^9, else generated), and data no later step needs is deleted unless
+# KEEP_DATA=1. Mass-tree and Bw-tree (Fig. 4, 5, 9) run only with
+# --with-masstree-bwtree. Results: logs/, data/ (csv), plots/ (pdf; Fig. 4 is
+# a csv table). A step that fails is listed in logs/failed.txt and the rest
+# go on.
 
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
@@ -63,7 +65,7 @@ rm -f "$LOG_DIR/failed.txt"
 	echo "date: $(date -Is)"
 	echo "commit: ${PAB_TREE_COMMIT:-$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 	echo "steps: ${steps[*]}"
-	echo "INPUT_SIZE=$INPUT_SIZE ROUNDS=$ROUNDS DATA_PREFIX=$DATA_PREFIX"
+	echo "INPUT_SIZE=$INPUT_SIZE ROUNDS=$ROUNDS DATA_PREFIX=$DATA_PREFIX DOWNLOAD=$DOWNLOAD"
 	echo "WITH_MASSTREE_BWTREE=$WITH_MASSTREE_BWTREE"
 	echo "numactl: ${NUMA[*]:-not available}"
 	g++ --version | head -1

@@ -49,7 +49,7 @@ For `run` and `full`:
 |---|---|---|
 | `--data-path PATH` | Host directory for the datasets, mounted at `/data` (required) | - |
 | `--input-size N` | Entries per synthetic dataset | `1000000000` |
-| `--no-download` | Do not download the real-world datasets | download |
+| `--no-download` | Download nothing: generate the synthetic datasets, and Fig. 5, 6 and 8 run only if their data is already there | download |
 | `--perf` | Allow hardware counters (Fig. 7); runs as root | off |
 | `--with-masstree-bwtree` | Also run Mass-tree and Bw-tree (Fig. 4, 5, 9) | off |
 | `--cpus N` | Limit the CPUs | all |
@@ -119,7 +119,8 @@ mkdir -p scripts_ae/data scripts_ae/logs scripts_ae/plots
 docker compose run --rm pab-tree-ae
 ```
 
-Compose does not download the real-world datasets; `docker-run.sh` does.
+Compose does not download the real-world datasets; `docker-run.sh` does, or
+run `scripts_ae/download_data.sh` in the container.
 
 ## Cleanup
 
