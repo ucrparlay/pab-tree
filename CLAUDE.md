@@ -724,7 +724,7 @@ no implementation changes:
 
 ## Artifact evaluation (PPoPP 2027)
 
-Plan: `docs/ae.md`, paper `docs/btree_paper.pdf` (both untracked). Runners
+Plan: `docs/ae.md`, paper `docs/btree_paper.pdf`. Runners
 in `scripts/`; plots in `~/btree_paper/figures/data-plots/plots/
 plot_scripts` (R). Template: `~/SpaceTreeLib` (PSI, PPoPP '26), read
 2026-10-30:
@@ -946,10 +946,9 @@ files: batches reach 2.0 m deep at x = 10 to 10000 and in `single/seg`;
 ## History
 
 `docs/*` is gitignored except the four user docs (`QUICK_START`, `MANUAL`,
-`DOCKER_QUICK_REFERENCE`, `ARTIFACT_EVALUATION`); notes are tracked with `-f`:
-`code_review_2026-08.md`, `refactor_plan_2026-08.md`, `findings_register.md`,
-`open_issues.md`, `plan_structural_delete_2026-09.md`, `harness_notes.md`,
-`new_delete_alg.md`.
+`DOCKER_QUICK_REFERENCE`, `ARTIFACT_EVALUATION`); everything else there is
+tracked with `-f` (user, 2026-11-02: all of `docs/`, the paper too; the
+repository is public). A new file there needs `-f`.
 
 The 2026-08 refactor renamed `pb_tree` → `pab_tree`, cut 4860 → 4004 lines
 and ~90 → 12 public members, made `-Wall -Wextra` clean and the asserts
