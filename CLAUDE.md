@@ -781,8 +781,11 @@ Runners are hand-edited (each baseline a commented block), hard-code
 "Adversarial" is `seg` in Fig 4, `norm` in Fig 9 (`plot_scalability.R:39`,
 Skewed = `exp`), `exp` in Fig 10 (`plot_batch_updates.R:40`); the paper
 defines Adv as sorted batches and Skew as normal(0.5, 0.1), while
-`gen_incre_data.sh` passes `0.5,0.05`. Inputs on `/data/zmen002`: Fig 4/11
-179 GB, Fig 10 222 GB per dis, OSM 28 GB, graphs 107 GB.
+`gen_incre_data.sh` passes `0.5,0.05` (its 2026-08-01 `kv_pair_incre/norm`
+files measure σ = 0.100; Fig 9's `kv_pair/norm` batch ~0.2). Inputs on
+`/data/zmen002`: Fig 4/11 179 GB, Fig 10 222 GB per dis, OSM 28 GB, graphs
+61 GB (107 with the unused `all_batch.bin` copies). Inventory, origins and
+checks: `docs/ae.md`, "Datasets".
 
 Docker (2026-10-30; user: Rocky Linux 8.10, Red Hat's `gcc-toolset-15`, GCC
 15.2.1, not built from source). `Dockerfile` on `rockylinux/rockylinux:8.10`
@@ -857,12 +860,55 @@ on `/ssd1/zmen002/ae` (2026-10-30): `run.sh synthetic` with `--perf` (Fig 4,
 those logs). Progress and the questions for the user: `docs/ae.md`.
 
 GitHub: the repository is `ucrparlay/pab-tree` (renamed from `pb-tree`,
-which redirects; the local remote still says `pb-tree`), so CI publishes
-`ghcr.io/ucrparlay/pab-tree`, public since 2026-10-30; anonymous pulls
-work. Check runs without `gh` (not installed): `curl -sSL
-https://api.github.com/repos/ucrparlay/pab-tree/actions/runs`.
+which redirects), so CI publishes `ghcr.io/ucrparlay/pab-tree`, public since
+2026-10-30; anonymous pulls work. Check runs without `gh` (not installed):
+`curl -sSL https://api.github.com/repos/ucrparlay/pab-tree/actions/runs`.
 
-Open: real-data hosting and URLs (`download_data.sh`); Zenodo DOI; BibTeX.
+Hosting (2026-10-31; user: Hugging Face, the user's own account, not an org,
+real and synthetic, public; the repo name is mine): `romaLzhih/pab-tree-data`,
+82 files + card + `LICENSE`, 329 GB, 216.5 GB unique: the incre generator's
+`batch_op` only names the directory, so each `del` stream is its `ins` stream
+(96 GB); `single/seg` del base = `incre/seg` x = 100, and `single` uni and norm
+share a del base (8 GB each). The paths are as under `--data-path`. License
+(user, 2026-11-01: MIT): MIT, but ODbL keeps what is built from OpenStreetMap
+under ODbL, so `real_world/osm/` and `real_world/temporal_graph/osm/` stay
+there (card `license: [mit, odbl]`). PLANET's OSM origin is read off names
+(`temporal_graph/osm/`, `planet.bin`); neither paper nor converter says so.
+`common.sh`'s `fetch` reads
+`scripts_ae/datasets.sha256`; `download_data.sh` gets `real_world/`,
+`ae_data_generate.sh` downloads at 10^9 and generates at other sizes, on a
+failed download, or with `DOWNLOAD=0` (`--no-download`). `run.sh` still drops
+each set after use. The image's curl 7.61 has no `--retry-all-errors`, hence
+`fetch`'s loop. `hf` is `huggingface_hub` 2.4 in `~/.local` (Python 3.12):
+it has no `upload-large-folder`; `hf upload` follows file symlinks and resumes
+by rerun, so the stage is a symlink tree, `/ssd1/zmen002/ae/hf_stage` (`incre`
+and `real_world` the paper's files on `/data`; `single` made with the image).
+Regenerated with the image at 1e9: `norm`, `seg` at x = 10 and `single/uni`
+(= `kv_pair/uni`) are the same bytes; `incre/uni` is another permutation, its
+files predate `d5cff3e`/`01f74fc`. Today's generator: uni, seg seconds per
+file; norm about 5 h, mostly x = 10000 (pool compaction). NFS reads total ~150
+MB/s.
+
+Uploaded 2026-11-01: 41 min, 209 GB sent, Hub `usedStorage` 216.5 GB (copies
+count once); 82/82 Hub sha256 equal `scripts_ae/datasets.sha256`. All files
+join one batch, so one commit at the very end; a rerun resumes by chunk dedup.
+`hf_xet` hashes in one read pass. From the Hub in the image, no token: 55 MB/s
+with checksums, 329 GB in about 1 h 40 min. curl 7.61 with `-f` exits 22 on HTTP
+416 (`-C -` on a whole `.part`, left by a run killed during the checksum), hence
+`fetch`'s `%{http_code}` test; other errors must keep the `.part`. Tested on the
+real repo: `.part` whole, partial, corrupt, too long, whole with a wrong byte,
+and a 404. The image takes `datasets.sha256` by `COPY . .`.
+
+Hosted is what `scripts_ae` reads, and it reads all 82 (read from the code,
+2026-11-02). Left on `/data`: 499 GB of `geometry` (pbf, csv, `.in`, africa;
+signal `<g>.bin`, `all_batch.bin`; `planet.bin`; `planet/`, 10 batches, while
+the paper's runner reads `planet_year/`; `europe`, `north_america`),
+`kv_pair` (1,026 GB), `kv_pair_incre/{exp,seg_10}`.
+
+Open: Zenodo DOI; BibTeX; a full 1e9 run on gazelle for the time and memory
+in `ARTIFACT_EVALUATION.md`.
+Paper text vs. files: the OSM run keeps 2015-2024, 1.67 B records (text:
+1.35 B, 2014-2023); PLANET has 21 year files (text: 20 batches).
 
 ## History
 
