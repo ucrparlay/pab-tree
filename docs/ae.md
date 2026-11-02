@@ -186,9 +186,8 @@ Against the paper's copies on `/data/zmen002`:
    hugging face, but insetead generate it locally, since downloading takes too
    long, don't delete the one on the huggingface for now".
    Applied, `8d3ca0b`: the artifact downloads only `real_world/` (88 GB, 27
-   min) and generates the rest. The Hub's synthetic copy is untouched. Its card
-   is stale (`DOWNLOAD=0`, about 5 hours); a corrected copy waits for your
-   go-ahead.
+   min) and generates the rest. The Hub's synthetic copy is untouched; its card
+   was corrected 2026-11-02.
    `a7d267c`'s image, run with nothing overlaid and no token: its
    `download_data.sh` and `fetch` got files that pass the checksums.
    PLANET's OSM origin comes from names only (`temporal_graph/osm/`,

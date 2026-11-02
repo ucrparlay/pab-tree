@@ -935,8 +935,7 @@ the paper's runner reads `planet_year/`; `europe`, `north_america`),
 `kv_pair` (1,026 GB), `kv_pair_incre/{exp,seg_10}`.
 
 Open: Zenodo DOI; BibTeX; a full 1e9 run on gazelle for the time and memory
-in `ARTIFACT_EVALUATION.md`; the Hub card still says `DOWNLOAD=0`, about 5 h
-(corrected copy waits for the user's go-ahead).
+in `ARTIFACT_EVALUATION.md`.
 Paper text vs. files: the OSM run keeps 2015-2024, 1.67 B records (text:
 1.35 B, 2014-2023); PLANET has 21 year files (text: 20 batches); `seg` is
 multiplier 2 (text: consecutive ranges, which is 1). Measured by replaying the
