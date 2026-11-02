@@ -44,7 +44,7 @@ Commands:
 Options for run and full:
     --data-path PATH    Host directory for the datasets, mounted at /data (required)
     --input-size N      Entries per synthetic dataset (default: 1000000000)
-    --no-download       Download nothing: generate the synthetic datasets
+    --no-download       Do not download the real-world datasets
     --perf              Allow hardware counters (Fig. 7): run as root with SYS_ADMIN
     --with-masstree-bwtree
                         Also run Mass-tree and Bw-tree (Fig. 4, 5, 9)

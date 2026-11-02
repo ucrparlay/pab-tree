@@ -6,8 +6,7 @@
 #   ./ae_data_generate.sh single uni seg norm   # Fig. 9
 #   ./ae_data_generate.sh clean incre           # delete them again
 #   ./ae_data_generate.sh clean single uni
-#   FORCE=1 ./ae_data_generate.sh incre         # replace existing files
-#   DOWNLOAD=0 ./ae_data_generate.sh incre      # generate, even at 10^9
+#   FORCE=1 ./ae_data_generate.sh incre         # regenerate existing files
 #
 # The synthetic datasets, INPUT_SIZE (n) entries each, under
 # $DATA_PREFIX/synthetic:
@@ -16,8 +15,10 @@
 # uni is uniform. norm (Skewed) draws each batch from normal(0.5, 0.1) over
 # the keys left; seg (Adversarial) from the leading 2n/x keys left. single
 # is generated at x = 100 only, the one size Fig. 9 uses.
-# At n = 10^9 the files download: incre takes about 5 hours to generate. Other
-# sizes, and a download that fails, generate them.
+#
+# At n = 10^9: about an hour on 64 threads, 47 min of it norm at x = 10000;
+# 106 GB of memory for single uni and norm, 44 GB for the rest. Rerun after a
+# kill: finished files stay, short ones are made again.
 
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
@@ -46,40 +47,42 @@ dis_param() {
 
 op_dir() { if [ "$1" = 0 ]; then echo ins; else echo del; fi; }
 
-# true when FILE has to be (re)generated
-stale() { [ "${FORCE:-0}" = 1 ] || [ ! -s "$1" ]; }
-
-# fetched FILE...: true when each FILE downloaded
-fetched() {
-	local file
-	for file; do
-		fetch "${file#"$DATA_PREFIX"/}" || return 1
-	done
+# true when FILE's size is what its header says; a killed run leaves it short
+whole() {
+	local h=()
+	read -r -a h < <(od -An -tu8 -N24 -w24 "$1" 2>/dev/null)
+	[ ${#h[@]} = 3 ] && [ "$(stat -c %s "$1")" = $((24 + h[0] * h[1] * h[2])) ]
 }
 
+# true when FILE has to be (re)generated
+stale() { [ "${FORCE:-0}" = 1 ] || ! whole "$1"; }
+
 incre_gen() {
-	build leaf64 incre_data_generator
 	"${NUMA[@]}" "$BUILD_ROOT/leaf64/incre_data_generator" -val_n 1 \
 		-file_num 1 -binary 1 "$@" >>"$gen_log" 2>&1
 }
 
-# gen_incre [X...]: batches of n/X, every size by default
+# gen_incre [X...]: batches of n/X, every size by default. The generator's op
+# only names the directory, so del is a hard link to ins: half the time and disk.
 gen_incre() {
-	local dis x op out xs=("$@")
+	build leaf64 incre_data_generator
+	local dis x ins del xs=("$@")
 	if [ ${#xs[@]} -eq 0 ]; then
 		xs=("${incre_x[@]}")
 	fi
 	for dis in uni norm seg; do
 		for x in "${xs[@]}"; do
-			for op in 0 1; do
-				out="$SYNTH_DIR/incre/$dis/${n}_1/$(op_dir $op)/$x/1.batch.bin"
-				stale "$out" || continue
-				fetched "$out" && continue
-				log "generate ${out#"$DATA_PREFIX"/}"
+			ins="$SYNTH_DIR/incre/$dis/${n}_1/ins/$x/1.batch.bin"
+			del="$SYNTH_DIR/incre/$dis/${n}_1/del/$x/1.batch.bin"
+			if stale "$ins"; then
+				log "generate ${ins#"$DATA_PREFIX"/}"
 				incre_gen -path "$SYNTH_DIR/incre" -base_n "$n" \
-					-batch_n $((n / x)) -dis "$(dis_id $dis)" -batch_op $op \
+					-batch_n $((n / x)) -dis "$(dis_id $dis)" -batch_op 0 \
 					-batch_param "$(dis_param $dis)"
-			done
+			fi
+			mkdir -p "$(dirname "$del")"
+			rm -f "$del"
+			ln "$ins" "$del" 2>/dev/null || cp "$ins" "$del"
 		done
 	done
 }
@@ -89,10 +92,9 @@ gen_pairs() {
 	local dis=$1 x=$2 op out
 	for op in 0 1; do
 		out="$SYNTH_DIR/single/$dis/${n}_1/$(op_dir $op)/$x"
-		stale "$out/1.base.bin" || continue
-		fetched "$out/1.batch.bin" "$out/1.base.bin" && continue
+		stale "$out/1.base.bin" || stale "$out/1.batch.bin" || continue
 		log "generate ${out#"$DATA_PREFIX"/}"
-		build leaf64 data_generator
+		mkdir -p "$out"
 		"${NUMA[@]}" "$BUILD_ROOT/leaf64/data_generator" -path "$SYNTH_DIR/single" \
 			-base_n "$n" -batch_n $((n / x)) -val_n 1 -file_num 1 -binary 1 \
 			-dis "$(dis_id "$dis")" -batch_op $op -base_param 1 \
@@ -105,16 +107,14 @@ gen_pairs() {
 gen_seg_pair() {
 	local x=$1 m=$((n / x)) tmp="$SYNTH_DIR/tmp" out
 	out="$SYNTH_DIR/single/seg/${n}_1"
-	if stale "$out/ins/$x/1.base.bin" &&
-		! fetched "$out/ins/$x/1.batch.bin" "$out/ins/$x/1.base.bin"; then
+	if stale "$out/ins/$x/1.base.bin"; then
 		log "generate ${out#"$DATA_PREFIX"/}/ins/$x"
 		incre_gen -path "$tmp" -base_n $((n + m)) -batch_n $m -dis 4 \
 			-batch_op 0 -batch_param 2
 		python3 "$AE_DIR/make_single_batch.py" ins \
 			"$tmp/seg/$((n + m))_1/ins/$(((n + m) / m))/1.batch.bin" $m "$out/ins/$x"
 	fi
-	if stale "$out/del/$x/1.base.bin" &&
-		! fetched "$out/del/$x/1.batch.bin" "$out/del/$x/1.base.bin"; then
+	if stale "$out/del/$x/1.base.bin"; then
 		log "generate ${out#"$DATA_PREFIX"/}/del/$x"
 		incre_gen -path "$tmp" -base_n "$n" -batch_n $m -dis 4 -batch_op 1 \
 			-batch_param 2
@@ -125,6 +125,8 @@ gen_seg_pair() {
 }
 
 gen_single() {
+	build leaf64 data_generator
+	build leaf64 incre_data_generator
 	local dis x
 	for dis; do
 		dis_id "$dis" >/dev/null || {

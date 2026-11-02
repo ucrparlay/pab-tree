@@ -49,7 +49,7 @@ For `run` and `full`:
 |---|---|---|
 | `--data-path PATH` | Host directory for the datasets, mounted at `/data` (required) | - |
 | `--input-size N` | Entries per synthetic dataset | `1000000000` |
-| `--no-download` | Download nothing: generate the synthetic datasets, and Fig. 5, 6 and 8 run only if their data is already there | download |
+| `--no-download` | Do not download the real-world datasets; Fig. 5, 6 and 8 then run only if their data is already there | download |
 | `--perf` | Allow hardware counters (Fig. 7); runs as root | off |
 | `--with-masstree-bwtree` | Also run Mass-tree and Bw-tree (Fig. 4, 5, 9) | off |
 | `--cpus N` | Limit the CPUs | all |
@@ -146,7 +146,9 @@ A container ran as root: a hand-written `docker run` without `-u`, or a
 `--perf` run that was killed. `./docker-run.sh clean` removes them.
 
 **Out of memory**
-Lower `--input-size`.
+`scripts_ae/logs/data_generate.log` ends in `std::bad_alloc`, or a run gets
+killed. Generating the data needs 106 GB at 10^9 entries. Free memory and run it
+again, or lower `--input-size`.
 
 **Changes to the code do not show up**
 The image holds a copy of the checkout. Rebuild it: `./docker-run.sh build`.
