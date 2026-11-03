@@ -58,6 +58,10 @@ appendix (Fig. 10, Fig. 11, Table 1) are not part of the artifact.
 Mass-tree and Bw-tree (Fig. 4, 5 and 9) are left out by default: they are
 the slowest trees by far, and Bw-tree crashes now and then (a crashed run is
 retried twice). Add `--with-masstree-bwtree` to run them too.
+To run only these two, for example after a full run without them, use
+`./run.sh --only-masstree-bwtree` in the container: it runs Fig. 4, 5 and 9
+for Mass-tree and Bw-tree alone and keeps the other trees' logs, so the
+merged figures show every tree.
 
 One figure at a time, in the container:
 
@@ -96,7 +100,8 @@ overflow and underflow shares come from numbers the paper's scripts hold.
 - `--with-masstree-bwtree` - Also run Mass-tree and Bw-tree
 - `--cpus NUM`, `--memory SIZE` - Limit the container; usually left unset
 
-`run.sh` takes the steps, and `--with-masstree-bwtree` as well. It and the
+`run.sh` takes the steps, and `--with-masstree-bwtree` or
+`--only-masstree-bwtree` as well. It and the
 `ae_*.sh` scripts read these from the environment:
 
 | Variable | Meaning | Default |
@@ -105,6 +110,7 @@ overflow and underflow shares come from numbers the paper's scripts hold.
 | `ROUNDS` | Timed runs per measurement, after one warm-up | `3` |
 | `THREADS` | Thread counts of Fig. 9 | 1, 4, 16, 32, 64 up to the cores, the cores, all hyper-threads |
 | `WITH_MASSTREE_BWTREE` | `1` also runs Mass-tree and Bw-tree | `0` |
+| `ONLY_MASSTREE_BWTREE` | `1` runs only Mass-tree and Bw-tree | `0` |
 | `KEEP_DATA` | `1` keeps the generated datasets | delete |
 | `RETRIES` | Reruns of a run that fails | `2` |
 

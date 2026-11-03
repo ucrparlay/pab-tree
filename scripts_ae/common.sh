@@ -31,9 +31,12 @@ declare -A TREE_TARGET=(
 
 # Mass-tree and Bw-tree run only when asked: run.sh --with-masstree-bwtree
 WITH_MASSTREE_BWTREE="${WITH_MASSTREE_BWTREE:-0}"
-export WITH_MASSTREE_BWTREE
+# only them: run.sh --only-masstree-bwtree
+ONLY_MASSTREE_BWTREE="${ONLY_MASSTREE_BWTREE:-0}"
+export WITH_MASSTREE_BWTREE ONLY_MASSTREE_BWTREE
 
-# trees ID...: the ids, less Mass-tree (5) and Bw-tree (6) unless asked for
+# trees ID...: the ids, less Mass-tree (5) and Bw-tree (6) unless asked for;
+# only those two with ONLY_MASSTREE_BWTREE=1
 trees() {
 	local id
 	for id; do
@@ -43,7 +46,11 @@ trees() {
 				echo "$id"
 			fi
 			;;
-		*) echo "$id" ;;
+		*)
+			if [ "$ONLY_MASSTREE_BWTREE" != 1 ]; then
+				echo "$id"
+			fi
+			;;
 		esac
 	done
 }
