@@ -828,7 +828,9 @@ reinsert sizes are hard-coded numbers. `table_fig4.py` writes Fig 4 with the
 paper's column names (Find and Range Report are the 1% blocks' `MIX` and
 `RRM`); figure and table text must match the paper, the numbers need not
 (user). Mass-tree and Bw-tree run only with `--with-masstree-bwtree`
-(`WITH_MASSTREE_BWTREE=1`, `trees` in `common.sh`; user). `common.sh`: one
+(`WITH_MASSTREE_BWTREE=1`, `trees` in `common.sh`; user). `run.sh
+--only-masstree-bwtree` (2026-11-03, user; `docker-run.sh` unchanged): only
+5 and 6, Fig 4, 5, 9; other trees' logs stay, so merges show all. `common.sh`: one
 build tree per configuration under `build/ae/<leafN|osm|graph>`,
 configured once; `run_tree` retries a failed run (`RETRIES=2`, Bw-tree
 segfaults now and then: exit 139 at different points, same input) and
