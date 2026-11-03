@@ -12,7 +12,8 @@ log_folder_name = "randomness"
 input_path = f"logs/{log_folder_name}/{input_type}.log"
 store_path = f"data/{log_folder_name}/{input_type}.csv"
 
-# Column indices within each data row: randomness=0, insert_t=1, delete_t=2, query_t=3
+# Columns of each data row: randomness, insert, delete, find (membership),
+# range (neighbor query), sorted-leaf ratio
 OPERATIONS = ["insert_t(s)", "delete_t(s)", "find(s)", "range(s)", "ratio"]
 OP_COL_IDX = [1, 2, 3, 4, 5]
 

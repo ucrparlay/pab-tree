@@ -563,6 +563,17 @@ void test_leaf_random_dynamic_graph(Tree &pkd, auto const &insert_batch_seq,
 			});
 			t.stop();
 			member_query_time[batch_id] = t.total_time();
+
+			/* NOTE: neighbor query: range report per top vertex */
+			t.reset(), t.start();
+			parlay::parallel_for(0, box_seq.size(), [&](size_t j) {
+				size_seq[j] = pkd.range_report(
+					box_seq[j],
+					range_report_output.cut(range_query_offset[j],
+											range_query_offset[j + 1]));
+			});
+			t.stop();
+			range_query_time[batch_id] = t.total_time();
 		}
 
 		/*
@@ -573,6 +584,7 @@ void test_leaf_random_dynamic_graph(Tree &pkd, auto const &insert_batch_seq,
 			insert_sum += parlay::reduce(insert_time);
 			delete_sum += parlay::reduce(delete_time);
 			member_query_sum += parlay::reduce(member_query_time);
+			range_query_sum += parlay::reduce(range_query_time);
 			/*
 			 * sorted-leaf ratio (measured after all updates, before membership)
 			 */
@@ -585,10 +597,12 @@ void test_leaf_random_dynamic_graph(Tree &pkd, auto const &insert_batch_seq,
 	double const insert_ave = insert_sum / denom;
 	double const delete_ave = delete_sum / denom;
 	double const member_query_ave = member_query_sum / denom;
+	double const range_query_ave = range_query_sum / denom;
 	sorted_leaf_ratio_ave /= denom;
 
 	std::cout << ratio << " " << insert_ave << " " << delete_ave << " "
-			  << member_query_ave << " " << sorted_leaf_ratio_ave << std::endl;
+			  << member_query_ave << " " << range_query_ave << " "
+			  << sorted_leaf_ratio_ave << std::endl;
 }
 
 template <typename TT, typename Tree, bool TestTime = true, bool Serial = false>
