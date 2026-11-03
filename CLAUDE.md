@@ -817,7 +817,11 @@ reads), copies of the merges (only the distribution order changed) and of
 the paper's plot scripts (`plot_figN_*.R`: inputs under `data/`, PDF via
 `cairo_pdf` in `plots/` (user: PDF, after a PNG round); Fig 9 takes its core
 list from the data, a top count twice the next is labelled `<n>h`; Fig 8
-takes CPAM's lines from `temp_osm.csv`, they were hard-coded). Fig 5's
+takes CPAM's lines from `temp_osm.csv`, they were hard-coded). Fig 8's
+neighbor query: `test_leaf_random_dynamic_graph` built the boxes but never
+queried them, so the plot drew the sorted-leaf ratio; it now times
+`range_report` (2026-11-03) and prints `ratio ins del find range sorted`, the
+paper's log format (PLANET, `-r 1`: range 1.47 -> 3.07 s, paper 1.50 -> 3.06). Fig 5's
 by-year csvs come from the paper's `scripts/plot_scripts/plot_osm_{insert,
 delete,range,member}.py`, copied as `merge_osm_*.py`; their split and
 reinsert sizes are hard-coded numbers. `table_fig4.py` writes Fig 4 with the
@@ -858,6 +862,13 @@ on `/ssd1/zmen002/ae` (2026-10-30): `run.sh synthetic` with `--perf` (Fig 4,
 7, 9); Fig 5's merges give the original scripts' csvs on
 `scripts/logs/osm` and the plot renders (`scripts/data/osm` is older than
 those logs). Progress and the questions for the user: `docs/ae.md`.
+
+gazelle (2026-11-02): 224 threads, 1.5 TB. Docker CE 26.1.3, data-root
+`/localdata/docker` (`/localdata` 95% full, 451 GB free). `docker.service`,
+`docker.socket` and `containerd.service` are disabled, so the daemon has
+been off since the 2026-09-17 reboot ("Cannot connect to the Docker
+daemon"; not a permissions problem). `sudo systemctl enable --now docker`
+starts it and keeps it across reboots. The journal is not kept across boots.
 
 GitHub: the repository is `ucrparlay/pab-tree` (renamed from `pb-tree`,
 which redirects), so CI publishes `ghcr.io/ucrparlay/pab-tree`, public since
