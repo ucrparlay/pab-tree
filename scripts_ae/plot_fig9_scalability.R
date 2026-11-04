@@ -46,7 +46,7 @@ data_dir <- ifelse(length(args) >= 1, args[1], "data/scalability")
 
 read_csv_scalability <- function() {
   path <- file.path(data_dir, paste0(input_type, ".csv"))
-  read.csv(path, stringsAsFactors = FALSE)
+  read.csv(path, stringsAsFactors = FALSE, na.strings = c("NA", "N.A."))
 }
 
 # the thread counts in the data; one twice the count before it is the run on

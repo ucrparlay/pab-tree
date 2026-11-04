@@ -58,7 +58,7 @@ cd scripts_ae
 
 `./run.sh synthetic` runs Fig. 4, 7 and 9; `./run.sh real` runs Fig. 5, 6 and 8, which need the real-world datasets.
 
-**Reading the results.** Times depend on the machine; please compare the shape of each figure and the order of the trees with the paper. The titles, labels and legends are the paper's. Fig. 4 is a table presented in a CSV. Fig. 5's overflow and underflow shares come from numbers the paper's scripts hold since their measurement needs to manually edit the source code.
+**Reading the results.** Times depend on the machine; please compare the shape of each figure and the order of the trees with the paper. The titles, labels and legends are the paper's. Fig. 4 is a table presented in a CSV. Fig. 5's overflow and underflow shares come from numbers the paper's scripts hold since their measurement needs to manually edit the source code. N.A. in a csv or table is a number a run did not print: it failed (listed in `logs/failed.txt`), or was stopped.
 
 ## Parameters
 
@@ -82,7 +82,8 @@ cd scripts_ae
 | `WITH_MASSTREE_BWTREE` | `1` also runs Mass-tree and Bw-tree | `0` |
 | `ONLY_MASSTREE_BWTREE` | `1` runs only Mass-tree and Bw-tree | `0` |
 | `KEEP_DATA` | `1` keeps the generated datasets | delete |
-| `RETRIES` | Reruns of a run that fails | `2` |
+| `RETRIES` | Reruns of a Mass-tree or Bw-tree run that fails or times out | `2` |
+| `RUN_TIMEOUT` | Time limit of a Mass-tree or Bw-tree run (`timeout` duration; `0` for none) | `2h`; Fig. 9: 8 h / threads, at least 1 h |
 
 See the [Docker reference](DOCKER_QUICK_REFERENCE.md) for the rest.
 

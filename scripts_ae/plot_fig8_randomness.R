@@ -20,7 +20,8 @@ FONT <- "Linux Libertine"
 args <- commandArgs(trailingOnly = TRUE)
 data_path <- ifelse(length(args) >= 1, args[1], "data/randomness/dynamic.csv")
 
-raw <- read.csv(data_path, stringsAsFactors = FALSE, check.names = TRUE)
+raw <- read.csv(data_path, stringsAsFactors = FALSE, check.names = TRUE,
+                na.strings = c("NA", "N.A."))
 
 # check.names turns "insert_t(s)" -> "insert_t.s." etc.
 colnames(raw)[colnames(raw) == "insert_t.s."] <- "insert_t"
@@ -42,7 +43,8 @@ df <- raw %>%
 # CPAM's lines: its total times on PLANET, from Fig. 6's run
 cpam_path <- ifelse(length(args) >= 2, args[2], "data/temp_osm/temp_osm.csv")
 cpam_ops <- c(insert_t = "insert_t(s)", delete_t = "delete_t(s)", query_t = "range_t(s)")
-cpam <- read.csv(cpam_path, stringsAsFactors = FALSE, check.names = FALSE) %>%
+cpam <- read.csv(cpam_path, stringsAsFactors = FALSE, check.names = FALSE,
+                 na.strings = c("NA", "N.A.")) %>%
   filter(tree == "CPAM", operation %in% cpam_ops)
 hlines <- data.frame(
   operation = factor(names(cpam_ops), levels = c("insert_t", "delete_t", "query_t")),

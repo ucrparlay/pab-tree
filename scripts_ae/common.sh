@@ -15,6 +15,12 @@ INPUT_SIZE="${INPUT_SIZE:-1000000000}" # entries per synthetic dataset
 ROUNDS="${ROUNDS:-3}"                  # timed runs, after one warm-up
 BUILD_ROOT="${BUILD_ROOT:-$REPO_DIR/build/ae}"
 export DATA_PREFIX INPUT_SIZE ROUNDS BUILD_ROOT # the plots read INPUT_SIZE
+# a Mass-tree or Bw-tree run still going after RUN_TIMEOUT is killed and
+# retried (Bw-tree can hang); a timeout(1) duration, 0 for none. Not
+# exported: Fig. 9 sets its own per thread count unless RUN_TIMEOUT comes
+# from the environment.
+RUN_TIMEOUT_SET=${RUN_TIMEOUT:+1}
+RUN_TIMEOUT="${RUN_TIMEOUT:-2h}"
 SYNTH_DIR="$DATA_PREFIX/synthetic"
 REAL_DIR="$DATA_PREFIX/real_world"
 LOG_DIR="$AE_DIR/logs"
@@ -102,30 +108,51 @@ build() {
 }
 
 # run_tree LOG TREE CONFIG [DRIVER_OPTION...]: run tree TREE's driver from
-# build CONFIG with RUN_PREFIX, appending to LOG. A run that fails is retried
-# up to RETRIES times (Bw-tree crashes now and then); only the last attempt
-# reaches LOG, since the merges drop a run logged twice. A final failure goes
-# to logs/failed.txt and does not stop the caller.
+# build CONFIG with RUN_PREFIX, appending to LOG. A Mass-tree or Bw-tree run
+# that fails or passes RUN_TIMEOUT is retried up to RETRIES times (Bw-tree
+# crashes or hangs now and then); only the last attempt reaches LOG, since the
+# merges drop a run logged twice, and the merges write N.A. for what it did
+# not print. The other trees run once, with no limit. A final failure goes to
+# logs/failed.txt and does not stop the caller.
 run_tree() {
 	local log_file=$1 tree=$2 config=$3
 	shift 3
-	local target=${TREE_TARGET[$tree]} attempt tmp="$log_file.part"
+	local target=${TREE_TARGET[$tree]} attempt status why tmp="$log_file.part"
+	local retries=0 limit=() note=""
 	mkdir -p "$(dirname "$log_file")" "$LOG_DIR"
 	if ! build "$config" "$target"; then
 		echo "build $config $target" >>"$LOG_DIR/failed.txt"
 		return 0
 	fi
-	for ((attempt = 0; attempt <= ${RETRIES:-2}; attempt++)); do
-		log "${RUN_PREFIX[*]} $target -T $tree $* >> ${log_file#"$AE_DIR"/}"
-		if "${RUN_PREFIX[@]}" "$BUILD_ROOT/$config/$target" -T "$tree" "$@" \
-			2>&1 | tee "$tmp"; then
+	case $tree in
+	5 | 6)
+		retries=${RETRIES:-2}
+		# right before the driver, so that numactl's memory policy still
+		# applies to it; --foreground keeps Ctrl-C reaching it
+		if [ "$RUN_TIMEOUT" != 0 ]; then
+			limit=(timeout --foreground -k 1m "$RUN_TIMEOUT")
+			note=" (limit $RUN_TIMEOUT)"
+		fi
+		;;
+	esac
+	for ((attempt = 0; attempt <= retries; attempt++)); do
+		log "${RUN_PREFIX[*]} $target -T $tree $* >> ${log_file#"$AE_DIR"/}$note"
+		status=0
+		"${RUN_PREFIX[@]}" "${limit[@]}" "$BUILD_ROOT/$config/$target" \
+			-T "$tree" "$@" 2>&1 | tee "$tmp" || status=${PIPESTATUS[0]}
+		if [ "$status" = 0 ]; then
 			cat "$tmp" >>"$log_file"
 			rm -f "$tmp"
 			return 0
 		fi
-		log "failed: attempt $((attempt + 1))"
+		why="exit $status"
+		if [ "$status" = 124 ]; then
+			why="timed out after $RUN_TIMEOUT"
+		fi
+		log "failed ($why): attempt $((attempt + 1))"
 	done
 	cat "$tmp" >>"$log_file"
 	rm -f "$tmp"
-	echo "${log_file#"$AE_DIR"/}: $target -T $tree $*" >>"$LOG_DIR/failed.txt"
+	echo "${log_file#"$AE_DIR"/}: $target -T $tree $* ($why)" \
+		>>"$LOG_DIR/failed.txt"
 }

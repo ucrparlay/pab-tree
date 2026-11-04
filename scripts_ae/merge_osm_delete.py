@@ -28,9 +28,7 @@ subprocess.run(
     cwd=Path(__file__).parent,
 )
 
-input_path = (
-    Path(__file__).parent / "logs" / log_folder_name / f"{input_type}.log"
-)
+log_dir = Path(__file__).parent / "logs" / log_folder_name
 store_path = (
     Path(__file__).parent
     / "data"
@@ -58,11 +56,19 @@ REINSERT_SIZE = [
 LEAF_BALANCE_SIZE = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
+# the tree of logs/osm/<tree id>/osm/64.log, common.sh's ids
+TREE_IDS = {"0": "BTree", "1": "CPAM", "2": "PAM", "3": "PMA", "5": "MassTree",
+            "6": "BwTree"}
+# a value the run did not print
+NA = "N.A."
 
 
 def parse_log(path):
     blocks = []
-    lines = open(path).readlines()
+    # timeout(1) writes this into the row when a Mass-tree or Bw-tree run
+    # crashes
+    lines = [l.replace("timeout: the monitored command dumped core", " ")
+             for l in open(path).readlines()]
     i = 0
     while i < len(lines):
         tokens = lines[i].split()
@@ -95,7 +101,14 @@ def parse_log(path):
     return blocks
 
 
-blocks = parse_log(input_path)
+# one log at a time, so that a log with no header (the run died first, or
+# never started) still names its tree
+blocks = []
+for log in sorted(log_dir.glob("*/*/*.log")):
+    found = parse_log(log)
+    if not found and log.parent.parent.name in TREE_IDS:
+        found = [(TREE_IDS[log.parent.parent.name], 0, [])]
+    blocks += found
 
 solvers = []
 seen = set()
@@ -110,20 +123,20 @@ solver_labels = [s[0] for s in solvers]
 
 max_steps = max((len(data_rows) for _, _, data_rows in blocks), default=0)
 
-delete_t_by_solver = {label: [""] * max_steps for label in solver_labels}
-delete_n_by_step = [""] * max_steps
-tree_n_by_step = [""] * max_steps
+delete_t_by_solver = {label: [NA] * max_steps for label in solver_labels}
+delete_n_by_step = [NA] * max_steps
+tree_n_by_step = [NA] * max_steps
 
 for tree, buf_value, data_rows in blocks:
     for j, row in enumerate(data_rows):
 
         def get(idx, r=row):
-            return r[idx] if idx < len(r) else ""
+            return r[idx] if idx < len(r) else NA
 
         delete_t_by_solver[tree][j] = get(DELETE_T_COL_IDX)
-        if not delete_n_by_step[j]:
+        if delete_n_by_step[j] == NA:
             delete_n_by_step[j] = get(DELETE_N_COL_IDX)
-        if not tree_n_by_step[j]:
+        if tree_n_by_step[j] == NA:
             tree_n_by_step[j] = get(TREE_N_COL_IDX)
 
 store_path.parent.mkdir(parents=True, exist_ok=True)

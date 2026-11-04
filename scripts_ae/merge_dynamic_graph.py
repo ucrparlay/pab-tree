@@ -18,7 +18,6 @@ subprocess.run(
     shell=True,
 )
 
-input_path = "logs/" + log_folder_name + "/" + input_type + ".log"
 store_path = "data/" + log_folder_name + "/" + input_type + ".csv"
 
 START_YEAR = 0
@@ -29,6 +28,14 @@ OP_COL_IDX = [3, 4, 5, 6, 7]
 BENCH_ORDER = ["temp", "temp_osm", "redd", "ref", "sem"]
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA"]
 EXCLUDE_TREES = {"MassTree", "BwTree"}
+
+# a value the run did not print
+NA = "N.A."
+# the tree of logs/<folder>/<tree id>/<graph>/64.log, common.sh's ids; only
+# BTree and CPAM report the leaf size as Buf, the others report 1
+TREE_IDS = {"0": "BTree", "1": "CPAM", "2": "PAM", "3": "PMA", "5": "MassTree",
+            "6": "BwTree"}
+LEAF_TREES = {"BTree", "CPAM"}
 
 
 def parse_log(path):
@@ -69,6 +76,10 @@ def parse_log(path):
                     sum_t_row = row_tokens
                     i += 1
                     continue
+                if not row_tokens[0].isdigit():
+                    # not a row of numbers: an error message, say
+                    i += 1
+                    continue
                 data_rows.append(row_tokens)
                 i += 1
             blocks.append(
@@ -85,22 +96,27 @@ def build_rows(blocks):
     <year0>, <year1>, ...
     """
     rows = []
+    # a run that stopped early gets N.A. for the years the others have
+    years = {}
+    for benchmark, _, _, data_rows, _, _ in blocks:
+        years[benchmark] = max(years.get(benchmark, 0), len(data_rows))
     for benchmark, tree, buf_value, data_rows, geomean_row, sum_t_row in blocks:
         if tree in EXCLUDE_TREES:
             continue
         for op_name, col_idx in zip(OPERATIONS, OP_COL_IDX):
-            values = [row[col_idx] if col_idx < len(row) else "" for row in data_rows]
+            values = [row[col_idx] if col_idx < len(row) else NA for row in data_rows]
+            values += [NA] * (years[benchmark] - len(values))
             # geomean/sum_t lines have a leading ">"/"#", so columns shift by 1
             mean_idx = col_idx + 1
             geomean = (
                 geomean_row[mean_idx]
                 if geomean_row is not None and mean_idx < len(geomean_row)
-                else ""
+                else NA
             )
             sum_t = (
                 sum_t_row[mean_idx]
                 if sum_t_row is not None and mean_idx < len(sum_t_row)
-                else ""
+                else NA
             )
             rows.append(
                 [benchmark, tree, buf_value, op_name, geomean, sum_t] + values
@@ -134,7 +150,16 @@ def write_csv(rows, path):
     print(f"Written {len(rows)} rows to {path}")
 
 
-blocks = parse_log(input_path)
+# one log at a time, so that a log with no header (the run died first, or
+# never started) still names its run
+blocks = []
+for log in sorted(Path("logs", log_folder_name).glob("*/*/*.log")):
+    found = parse_log(log)
+    tree = TREE_IDS.get(log.parent.parent.name)
+    if not found and tree is not None:
+        buf = 64 if tree in LEAF_TREES else 1
+        found = [(log.parent.name, tree, buf, [], None, None)]
+    blocks += found
 rows = build_rows(blocks)
 rows = sort_rows(rows)
 write_csv(rows, store_path)

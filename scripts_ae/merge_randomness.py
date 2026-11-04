@@ -20,6 +20,13 @@ OP_COL_IDX = [1, 2, 3, 4, 5]
 BENCH_ORDER = ["osm"]
 TREE_ORDER = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
 
+# the randomness levels the driver runs (sort_ratio_seq, test_framework.h)
+LEVELS = list(range(0, 101, 10))
+# a value the run did not print
+NA = "N.A."
+# the run of a log with no header: PaB-tree on PLANET (ae_run_randomness.sh)
+DEFAULT_RUN = ("osm", "BTree", 64)
+
 
 def parse_log(path):
     """Return list of (benchmark, tree, buf_value, data_rows).
@@ -38,7 +45,7 @@ def parse_log(path):
             tree = tokens[1].rstrip(";")
             buf_value = int(tokens[3].rstrip(";"))
             benchmark = tokens[7].rstrip(";")
-            i += 2  # skip Tree: line and the omitted second line
+            i += 1  # skip the Tree: line
             data_rows = []
             while i < len(lines):
                 row_tokens = lines[i].split()
@@ -47,6 +54,10 @@ def parse_log(path):
                     continue
                 if row_tokens[0] == "Tree:":
                     break
+                if not row_tokens[0].isdigit():
+                    # not a row of numbers: an error message, say
+                    i += 1
+                    continue
                 data_rows.append(row_tokens)
                 i += 1
             blocks.append((benchmark, tree, buf_value, data_rows))
@@ -61,10 +72,12 @@ def build_rows(blocks):
     """
     rows = []
     for benchmark, tree, buf_value, data_rows in blocks:
-        for row in data_rows:
-            rand = int(row[0])
+        # every level gets a row: N.A. for those the run did not reach
+        by_level = {int(row[0]): row for row in data_rows}
+        for rand in sorted(set(LEVELS) | set(by_level)):
+            row = by_level.get(rand, [])
             values = [row[col_idx] if col_idx < len(
-                row) else "" for col_idx in OP_COL_IDX]
+                row) else NA for col_idx in OP_COL_IDX]
             rows.append([benchmark, tree, buf_value, rand] + values)
     return rows
 
@@ -90,6 +103,9 @@ def write_csv(rows, path):
 
 
 blocks = parse_log(input_path)
+if not blocks:
+    # no header: the run died first, or never started
+    blocks = [(*DEFAULT_RUN, [])]
 rows = build_rows(blocks)
 rows = sort_rows(rows)
 write_csv(rows, store_path)

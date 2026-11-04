@@ -71,6 +71,12 @@ for dis; do
 			if [ "$t" -le 4 ]; then
 				rounds=1
 			fi
+			# Mass-tree and Bw-tree's limit: 8 h on 1 thread, 2 h on 4, 1 h
+			# from 8 up (Bw-tree on 1 thread builds three times, 34 min each
+			# on the paper's machine)
+			if [ -z "$RUN_TIMEOUT_SET" ]; then
+				RUN_TIMEOUT="$(((8 + t - 1) / t))h"
+			fi
 			log_file="$LOG_DIR/scalability/$tree/$dis/$t.log"
 			mkdir -p "$(dirname "$log_file")"
 			: >"$log_file"

@@ -30,8 +30,11 @@ concatenated log is still written, for reading by hand.
 The CSV is long/tidy -- one row per (dis, tree, cores) rather than one row per
 tree with the core counts spread across columns -- because cores is the x axis
 of every plot this feeds, and because it keeps the speedup columns meaningful.
-`*_su` is self-relative speedup, t(1 core) / t(n cores), left blank when the
+`*_su` is self-relative speedup, t(1 core) / t(n cores), N.A. when the
 1-core run for that (dis, tree) is missing.
+
+N.A. is also every timing a run did not print (it crashed or timed out); a log
+with no header is named by its path.
 """
 import csv
 import os
@@ -58,8 +61,17 @@ kBaseCore = core_seq[0]  # speedup denominator
 # a value masstree writes for the queries it does not implement
 kMissingValue = "-"
 
-# stderr messages that get interleaved into a result row by `2>&1 | tee`
-kNoisePhrases = ("madvise superpage: Cannot allocate memory",)
+# a value the run did not print
+kNA = "N.A."
+
+# the tree of logs/scalability/<tree id>/..., common.sh's ids
+kTreeIds = {"0": "BTree", "1": "CPAM", "2": "PAM", "3": "PMA", "5": "MassTree",
+            "6": "BwTree"}
+
+# stderr messages that get interleaved into a result row by `2>&1 | tee`;
+# timeout(1) writes the second when a Mass-tree or Bw-tree run crashes
+kNoisePhrases = ("madvise superpage: Cannot allocate memory",
+                 "timeout: the monitored command dumped core")
 
 bench_order = ["uni", "norm", "seg"]
 tree_order = ["BTree", "PAM", "CPAM", "PMA", "MassTree", "BwTree"]
@@ -114,9 +126,11 @@ def parse_log(P) -> List:
 
     def flush():
         # one run ends where the next header begins, not at a line break
-        if context is not None and len(values) > 0:
+        nonlocal context
+        if context is not None:
             runs.append((*context, list(values)))
         values.clear()
+        context = None
 
     for line in open(P, "r").readlines():
         for phrase in kNoisePhrases:
@@ -152,8 +166,11 @@ def parse_log(P) -> List:
     flush()  # the last run in the file has no header after it
 
     if len(runs) == 0:
-        # a run that died before printing its timings still leaves the header
-        print(f"{P}: no timings, skipped (aborted run?)", file=sys.stderr)
+        # the run printed nothing: it died first, or never started
+        tree = kTreeIds.get(Path(P).parent.parent.name)
+        if tree is not None:
+            print(f"{P}: no header (all N.A.)", file=sys.stderr)
+            runs.append((Path(P).parent.name, tree, []))
 
     return runs
 
@@ -172,10 +189,11 @@ def combine() -> List:
                 print(
                     f"warn: {benchmark}/{tree}/{cores} has {len(values)} values, "
                     f"expected {kFieldNum}"
-                    + (" (padded)" if len(values) < kFieldNum else " (kept as is)"),
+                    + (" (N.A. for the rest)" if len(values) < kFieldNum
+                       else " (kept as is)"),
                     file=sys.stderr,
                 )
-                values += [""] * (kFieldNum - len(values))  # no-op when long
+                values += [kNA] * (kFieldNum - len(values))  # no-op when long
             all_data.append([benchmark, tree, cores] + values)
 
     return all_data
@@ -192,7 +210,7 @@ def add_speedup(data) -> List:
     for row in data:
         ref = base.get((row[0], row[1]))
         for i in range(len(op_seq)):
-            val = ""
+            val = kNA
             if ref is not None and is_number(row[3 + i]) and is_number(ref[i]):
                 t = float(row[3 + i])
                 if t > 0:

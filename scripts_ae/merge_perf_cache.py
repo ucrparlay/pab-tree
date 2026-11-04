@@ -10,6 +10,7 @@ Writes  data/perf_cache/perf_cache.csv, one row per region, tree and
         driver timed it (time_s), perf's enabled seconds summed over the CPUs
         (enabled_s), and scope: "all" when the counts include the kernel,
         "user" when perf could count user space only (event names end in :u).
+        N.A.: a value a region that failed or timed out did not leave.
 """
 import csv
 import re
@@ -19,26 +20,33 @@ from pathlib import Path
 EVENTS = ["cycles", "instructions", "cache-references", "cache-misses"]
 TREES = {"0": "BTree", "1": "CPAM", "2": "PAM", "3": "PMA"}
 REGIONS = ["build", "membership", "incre_insert", "incre_delete"]
+NA = "N.A."
 
 rows = []
-for stat in sorted(Path("logs/perf_cache").glob("*/*/*.stat")):
-    tree, dis, region = stat.parts[-3], stat.parts[-2], stat.stem
+# every region with a log or a stat: either may be missing for a failed run
+runs = {p.with_suffix("") for p in Path("logs/perf_cache").glob("*/*/*.log")}
+runs |= {p.with_suffix("") for p in Path("logs/perf_cache").glob("*/*/*.stat")}
+for run in sorted(runs):
+    tree, dis, region = run.parts[-3], run.parts[-2], run.name
     if tree not in TREES or region not in REGIONS:
         continue
-    counts, enabled, scope = {}, "", "all"
-    for line in stat.read_text().splitlines():
-        f = line.split(",")
-        if line.startswith("#") or len(f) < 4:
-            continue
-        event = f[2]
-        if event.endswith(":u"):
-            event, scope = event[:-2], "user"
-        if event in EVENTS:
-            counts[event] = f[0] if f[0][:1].isdigit() else ""
-            if event == "cycles" and f[3]:
-                enabled = f"{float(f[3]) / 1e9:.6f}"
-    n = time_s = ""
-    log = stat.with_suffix(".log")
+    counts, enabled, scope = {}, NA, NA
+    stat = run.with_suffix(".stat")
+    if stat.exists():
+        scope = "all"
+        for line in stat.read_text().splitlines():
+            f = line.split(",")
+            if line.startswith("#") or len(f) < 4:
+                continue
+            event = f[2]
+            if event.endswith(":u"):
+                event, scope = event[:-2], "user"
+            if event in EVENTS:
+                counts[event] = f[0] if f[0][:1].isdigit() else NA
+                if event == "cycles" and f[3][:1].isdigit():
+                    enabled = f"{float(f[3]) / 1e9:.6f}"
+    n = time_s = NA
+    log = run.with_suffix(".log")
     if log.exists():
         for line in log.read_text().splitlines():
             if line.startswith("n: "):
@@ -46,11 +54,10 @@ for stat in sorted(Path("logs/perf_cache").glob("*/*/*.stat")):
             m = re.fullmatch(rf"{region} (\S+)", line.strip())
             if m:
                 time_s = m.group(1)
-    if not counts or not time_s:
-        print(f"skipped {stat}: no counts or no time", file=sys.stderr)
-        continue
+    if not counts or time_s == NA:
+        print(f"{run}: no counts or no time (N.A.)", file=sys.stderr)
     rows.append([region, TREES[tree], dis, n]
-                + [counts.get(e, "") for e in EVENTS]
+                + [counts.get(e, NA) for e in EVENTS]
                 + [time_s, enabled, scope])
 
 order = {"uni": 0, "norm": 1, "seg": 2}

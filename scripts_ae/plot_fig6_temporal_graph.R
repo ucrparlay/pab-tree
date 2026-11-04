@@ -58,7 +58,8 @@ osm_path <- ifelse(length(args) >= 2, args[2],
 )
 
 read_bench <- function(path) {
-  read.csv(path, stringsAsFactors = FALSE, check.names = FALSE) %>%
+  read.csv(path, stringsAsFactors = FALSE, check.names = FALSE,
+           na.strings = c("NA", "N.A.")) %>%
     select(benchmark, tree, operation, sum_t)
 }
 

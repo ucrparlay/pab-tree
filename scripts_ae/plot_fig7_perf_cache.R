@@ -61,7 +61,7 @@ csv_path <- ifelse(length(args) >= 1, args[1],
 # the counters are profiled for several distributions; this figure plots one
 DIS <- ifelse(length(args) >= 2, args[2], "norm")
 
-raw <- read.csv(csv_path, stringsAsFactors = FALSE)
+raw <- read.csv(csv_path, stringsAsFactors = FALSE, na.strings = c("NA", "N.A."))
 
 # the raw counters are normalized rather than the *_per_elem ones: within a
 # region every tree processes the same region_n, so the two give the same ratio.

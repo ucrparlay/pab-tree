@@ -41,7 +41,7 @@ data_dir <- ifelse(length(args) >= 1, args[1], "data/osm")
 
 read_csv_op <- function(op) {
   path <- file.path(data_dir, paste0(input_type, "_", op, "_by_year.csv"))
-  read.csv(path, stringsAsFactors = FALSE)
+  read.csv(path, stringsAsFactors = FALSE, na.strings = c("NA", "N.A."))
 }
 
 # plot one subplot: lines for solver times

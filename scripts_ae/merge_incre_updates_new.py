@@ -63,8 +63,9 @@ Three log quirks are handled.  "-" is a legal value (older masstree logs print
 it for the range counts it did not implement).  A message the allocator writes
 to stderr can be spliced into the middle of a row by `2>&1 | tee`, splitting it
 across lines -- so values are accumulated until the next header rather than
-being read one row per line.  And a run whose values end short (a killed
-process) is padded to keep the CSV columns aligned, and reported on stderr.
+being read one row per line.  And a run whose values end short (a crashed or
+timed-out process) gets N.A. for the rest, reported on stderr; a log with no
+values gives a row of N.A., named by its path when it has no header either.
 """
 import csv
 import sys
@@ -120,8 +121,20 @@ kLegacyFieldNum = 1 + len(block_seq) * (1 + len(query_seq_full) - 1)  # 73
 # a value masstree writes for the queries it does not implement
 kMissingValue = "-"
 
-# stderr messages that get interleaved into a result row by `2>&1 | tee`
-kNoisePhrases = ("madvise superpage: Cannot allocate memory",)
+# a value the run did not print
+kNA = "N.A."
+
+# a log with no header names its run only by its path,
+# logs/<folder>/<tree id>/<dis>/<leaf>.log, with common.sh's tree ids; only
+# these trees report the leaf size as Buf, the others report 1
+kTreeIds = {"0": "BTree", "1": "CPAM", "2": "PAM", "3": "PMA", "5": "MassTree",
+            "6": "BwTree"}
+kLeafTrees = {"BTree", "CPAM"}
+
+# stderr messages that get interleaved into a result row by `2>&1 | tee`;
+# timeout(1) writes the second when a Mass-tree or Bw-tree run crashes
+kNoisePhrases = ("madvise superpage: Cannot allocate memory",
+                 "timeout: the monitored command dumped core")
 
 # rows carry the display name, so sort on that
 bench_order = [display_bench(b) for b in kWantBench]
@@ -182,6 +195,14 @@ def is_value(tok) -> bool:
     return tok == kMissingValue or is_number(tok)
 
 
+def path_context(path: Path):
+    """(benchmark, tree, leaf_wrap) from a log's path, or None."""
+    tree = kTreeIds.get(path.parent.parent.name)
+    if tree is None or not path.stem.isdigit():
+        return None
+    return (path.parent.name, tree, int(path.stem) if tree in kLeafTrees else 1)
+
+
 def combine(paths: List[Path], field_num: int) -> List[Tuple[Tuple, List[str]]]:
     """Parse one source into [((benchmark, tree, leaf_wrap), values), ...]."""
     all_data = []
@@ -190,7 +211,8 @@ def combine(paths: List[Path], field_num: int) -> List[Tuple[Tuple, List[str]]]:
 
     def flush():
         # one run ends where the next header begins, not at a line break
-        if context is None or len(values) == 0:
+        nonlocal context
+        if context is None:
             return
         benchmark, tree, buf_value = context
         row = list(values)
@@ -201,18 +223,22 @@ def combine(paths: List[Path], field_num: int) -> List[Tuple[Tuple, List[str]]]:
                 f"the pre-MIX layout -- no MIX column to project, rerun it",
                 file=sys.stderr,
             )
+            context = None
             return
         if len(row) != field_num:
             print(
                 f"warn: {benchmark}/{tree}/{buf_value} has {len(row)} values, "
                 f"expected {field_num}"
-                + (" (padded)" if len(row) < field_num else " (kept as is)"),
+                + (" (N.A. for the rest)" if len(row) < field_num
+                   else " (kept as is)"),
                 file=sys.stderr,
             )
-            row += [""] * (field_num - len(row))  # no-op when the row is long
+            row += [kNA] * (field_num - len(row))  # no-op when the row is long
         all_data.append((context, row))
+        context = None
 
     for path in paths:
+        saw_header = False
         for line in path.open("r").readlines():
             for phrase in kNoisePhrases:
                 line = line.replace(phrase, " ")
@@ -234,6 +260,7 @@ def combine(paths: List[Path], field_num: int) -> List[Tuple[Tuple, List[str]]]:
                     str(lin_sep[1].strip(";")),  # tree
                     int(lin_sep[3].strip(";")),  # leaf wrap
                 )
+                saw_header = True
                 continue
 
             # parse result - the values of one run, possibly split over lines
@@ -248,6 +275,12 @@ def combine(paths: List[Path], field_num: int) -> List[Tuple[Tuple, List[str]]]:
             values.extend(lin_sep)
 
         flush()  # the last run in a file has no header after it
+        if not saw_header:
+            # the run printed nothing: it died first, or never started
+            context = path_context(path)
+            if context is not None:
+                print(f"warn: {path} has no header (all N.A.)", file=sys.stderr)
+                flush()
 
     return all_data
 
