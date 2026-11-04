@@ -804,7 +804,10 @@ failing TLS) plus a fontconfig alias (its family is "Linux Libertine O"). No
 the paper, uses it. No binaries in the image (CMake hard-codes
 `-march=native`): everything builds in the container. `docker-run.sh` runs
 as the caller (`-u`); `--perf` runs as root with `SYS_ADMIN`, then chowns
-`scripts_ae/` back. CI `.github/workflows/docker-build.yml`: build,
+`scripts_ae/` back. It mounts only `scripts_ae/{data,logs,plots}` and the
+data path: the scripts are the image's (`COPY . .`), so a host edit reaches
+a running container only by `docker cp`, or push, CI and `pull`. CI
+`.github/workflows/docker-build.yml`: build,
 `self_test` in the image, push `ghcr.io/ucrparlay/pab-tree`. `.gitignore`'s
 `*` ignores files with no extension: hence `!/Dockerfile`, `!/LICENSE`.
 
@@ -830,11 +833,31 @@ paper's column names (Find and Range Report are the 1% blocks' `MIX` and
 (user). Mass-tree and Bw-tree run only with `--with-masstree-bwtree`
 (`WITH_MASSTREE_BWTREE=1`, `trees` in `common.sh`; user). `run.sh
 --only-masstree-bwtree` (2026-11-03, user; `docker-run.sh` unchanged): only
-5 and 6, Fig 4, 5, 9; other trees' logs stay, so merges show all. `common.sh`: one
+5 and 6, Fig 4, 5, 9; other trees' logs stay, so merges show all. Rounds:
+`workload.cpp` (Mass-tree/Bw-tree) never reads `-r`: every number is one timed
+run, no warm-up. The parallel trees go through `time_loop`: one warm-up, then
+`-r` timed runs, averaged (`batch_insert`/`batch_delete` skip the warm-up at
+`-r 1`, so Fig 9 at 1 and 4 threads is one run). `common.sh`: one
 build tree per configuration under `build/ae/<leafN|osm|graph>`,
-configured once; `run_tree` retries a failed run (`RETRIES=2`, Bw-tree
-segfaults now and then: exit 139 at different points, same input) and
-keeps only the last attempt, since the merges drop a run logged twice.
+configured once; `run_tree` keeps only the last attempt, since the merges
+drop a run logged twice. Only Mass-tree and Bw-tree (5, 6) get retries
+(`RETRIES=2`) and a time limit (user, 2026-11-04): `timeout --foreground`
+right before the driver, `RUN_TIMEOUT` 2 h, Fig 9 ceil(8 / t) h unless set
+in the environment; the other trees run once, unlimited. Why: Bw-tree
+segfaults now and then (exit 139 at different points, same input), and on
+2026-11-04 livelocked in Fig 4 seg's 0.01% delete chain (12 threads in
+`Traverse` -> `FinishPartialSMO`/`FindLeftSibling`, 212 at the batch
+barrier; 6.5 h, the paper's run 62 s; a rerun passed in 52.7 s). On a core
+dump `timeout` writes "the monitored command dumped core" into the row
+(`core_pattern` pipes to systemd-coredump, so `ulimit -c 0` would not stop
+it); the Fig 4, 5, 9 merges drop it. Every merge writes N.A. for a value a
+run did not print; a log with no header is named by its path; Fig 8 fills
+levels 0..100; `table_fig4.py` gives a tree run anywhere a row everywhere.
+The plots read N.A. via `na.strings` (old Fig 7 and 8 plots failed on it).
+Tested with fake hanging/crashing drivers and with failures injected into
+copies of real logs; on complete logs the output is unchanged.
+That `--only-masstree-bwtree` run: generation 52 min; Fig 4 Mass-tree 28-29
+min per dis, Bw-tree 17-20 min.
 Data: `incre/` from `incre_data_generator` (uni; norm `0.5,0.1`; seg `2`);
 `single/` uni/norm from `data_generator`, seg cut from a seg stream by
 `make_single_batch.py` (insert stream over n + m keys, so the tree keeps
@@ -871,6 +894,13 @@ gazelle (2026-11-02): 224 threads, 1.5 TB. Docker CE 26.1.3, data-root
 been off since the 2026-09-17 reboot ("Cannot connect to the Docker
 daemon"; not a permissions problem). `sudo systemctl enable --now docker`
 starts it and keeps it across reboots. The journal is not kept across boots.
+2026-11-03: `docker` enabled and running. Full run that day (`9ec6c96`, `--perf`, no
+Mass-tree/Bw-tree, 1e9, data `/localdata/zmen002/pab-tree`; times from log
+birth times): 10 h 51 min. Generation 56 min (incre 52.6 min; single uni 63
+s, norm 66 s, seg 36 s); Fig 4 2 h 45, Fig 7 8.5 min, Fig 9 5 h 55 (about 2 h
+per dis), Fig 5 12 min, Fig 6 44 min, Fig 8 11 min. `--perf` left
+`synthetic/`, `real_world/` root-owned (755): a non-root container cannot
+create `synthetic/incre`.
 
 GitHub: the repository is `ucrparlay/pab-tree` (renamed from `pb-tree`,
 which redirects), so CI publishes `ghcr.io/ucrparlay/pab-tree`, public since
