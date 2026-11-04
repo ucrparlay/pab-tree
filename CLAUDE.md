@@ -928,7 +928,9 @@ Download only `real_world/`, generate the rest (user, 2026-11-02: downloading
 takes too long; keep the Hub's synthetic copy for now). `download_data.sh` holds
 `fetch` and reads `scripts_ae/datasets.sha256`, now the 46 `real_world/` lines
 (all 82: `a7d267c`'s). `--no-download` skips only that; `DOWNLOAD` is
-`docker-run.sh`'s, no longer `run.sh`'s. `run.sh` still drops each set after use.
+`docker-run.sh`'s, no longer `run.sh`'s. `run.sh` keeps every set (user,
+2026-11-04: `KEEP_DATA` defaults to 1); `KEEP_DATA=0` drops each after its
+last use, as it did by default before.
 `del` streams are hard links to `ins` (`cp` where links fail), half the time and
 disk. `stale` compares a file's size to its header: `write_binary_entries`
 writes in place and does not check `close`, so a killed run leaves a short file
