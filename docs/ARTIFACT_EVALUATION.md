@@ -1,69 +1,46 @@
 # Artifact Evaluation
 
-The artifact for *Parallel B+-trees: Theory and Practice* (PPoPP 2027).
+The artifact for *PaB-tree: Parallel B+-trees with Batch Updates* (PPoPP 2027).
 
 ## Hardware Requirements
 
-The paper's numbers were measured on four Intel Xeon Platinum 8176 CPUs (112
-cores, 224 hyper-threads) with 1.47 TB RAM, compiled with GCC 15.2.0 at `-O3`.
+The paper's numbers were measured on four Intel Xeon Platinum 8176 CPUs (112 cores, 224 hyper-threads) with 1.47 TB RAM, compiled with GCC 15.2.0 at `-O3`.
 
-- **Memory**: 110 GB free for as long as the data is generated at 10^9 entries
-  (106 GB at the peak); the experiments' own peak is to be measured.
-- **CPU**: all available cores. Fig. 9 sweeps the thread count.
-- **Disk**: about 190 GB at 10^9 entries (see [Datasets](#datasets)).
-- **Network**: the real-world datasets download from Hugging Face, 88 GB, about
-  27 minutes at the 55 MB/s we measured, checksums included.
+- **Memory**: At least 512GB RAM, preferable 1T.
+- **CPU**: all available cores, preferable > 128 cores.
+- **Disk**: At least 700GB needed, preferable 1T. Pass it using `--data-path` for commands.
 - **Docker**, and permission to run containers.
-- **Hardware counters** for Fig. 7: `perf` must be able to read them in a
-  container (`--perf` below). Most virtual machines cannot.
 
-**Before timing anything:** stop other jobs on the machine. Background load
-slows parallel runs far more than the CPU share it takes.
+**Before timing anything:** stop other jobs on the machine. Background load slows parallel runs far more than the CPU share it takes.
+**Warning**: The scripts for results merging and figures plotting may not execute properly if a baseline failed to generate the log and exit correctly, i.e., the resource requested exceeds the RAM. Please make sure the machine where the artifact is evaluated satisfied above requirements. Thanks.
 
-## Getting Started (about 30 minutes)
+## Getting Started Test (about 30 minutes)
 
-Every synthetic experiment, at 10^6 entries instead of 10^9. The numbers are
-too small to compare with the paper; this checks that everything builds and
-runs.
+The getting start test run every synthetic dataset with size $10^6$, instead of the $10^9$ used in the paper. This checks that everything builds and runs.
 
 ```bash
 ./docker-run.sh pull        # or: ./docker-run.sh build
-./docker-run.sh run --data-path /mnt/large-disk/pab-tree --input-size 1000000 --no-download --perf
+./docker-run.sh run --data-path [/mnt/large-disk/pab-tree] --input-size 1000000 --no-download --perf
 # in the container:
 cd scripts_ae && ./run.sh synthetic
 ```
 
-Expected: `scripts_ae/plots/` holds `fig4_synthetic.csv`, `fig7_perf_cache.pdf`
-and `fig9_scalability.pdf`, and the run ends with `done`. Without `--perf`,
-Fig. 7 is skipped and listed in `scripts_ae/logs/failed.txt`.
+Expected: `scripts_ae/plots/` holds `fig4_synthetic.csv`, `fig7_perf_cache.pdf` and `fig9_scalability.pdf`, and the run ends with `done`. Without `--perf`, Fig. 7 is skipped and listed in `scripts_ae/logs/failed.txt`.
 
 ## Full Evaluation
 
 ```bash
-./docker-run.sh full --data-path /mnt/large-disk/pab-tree --perf
+./docker-run.sh full --data-path [/mnt/large-disk/pab-tree] --perf
 ```
 
-This downloads the real-world datasets, then runs `scripts_ae/run.sh` at 10^9
-entries: it generates each synthetic dataset just before the experiments that
-read it, deletes it afterwards, runs every experiment, merges the logs into
-`scripts_ae/data/` and writes
-`scripts_ae/plots/`: each figure as a PDF, Fig. 4 as a csv table. A step that
-fails is listed in `scripts_ae/logs/failed.txt` and the rest go on;
-`scripts_ae/logs/env.txt` records the machine, compiler and commit. Run it
-inside `tmux` or `screen`: it takes many hours.
+This downloads the real-world datasets, then runs `scripts_ae/run.sh` at 10^9 entries: it generates each synthetic dataset just before the experiments that read it, deletes it afterwards, runs every experiment, merges the logs into `scripts_ae/data/` and writes `scripts_ae/plots/`: each figure as a PDF, Fig. 4 as a csv table. A step that fails is listed in `scripts_ae/logs/failed.txt` and the rest go on; `scripts_ae/logs/env.txt` records the machine, compiler and commit.
 
-The experiments are those of the paper's body, Fig. 4 to 9; Fig. 1 and the
-appendix (Fig. 10, Fig. 11, Table 1) are not part of the artifact.
+Please run it inside the `tmux` or other persistent session: it takes many hours.
 
-Mass-tree and Bw-tree (Fig. 4, 5 and 9) are left out by default: they are
-the slowest trees by far, and Bw-tree crashes now and then (a crashed run is
-retried twice). Add `--with-masstree-bwtree` to run them too.
-To run only these two, for example after a full run without them, use
-`./run.sh --only-masstree-bwtree` in the container: it runs Fig. 4, 5 and 9
-for Mass-tree and Bw-tree alone and keeps the other trees' logs, so the
-merged figures show every tree.
+NOTE: The Mass-tree and Bw-tree (Fig. 4, 5 and 9) are left out by default: they are the slowest trees by far, and the original implementation is fragile and contains flaws. Add `--with-masstree-bwtree` to run them too. For example after a full run without them, use `./run.sh --only-masstree-bwtree` in the container: it runs Fig. 4, 5 and 9 for Mass-tree and Bw-tree alone and keeps the other trees' logs, so the merged figures show every tree.
 
-One figure at a time, in the container:
+## Reading the Results
+The plot scripts and figures are listed below.
 
 ```bash
 cd scripts_ae
@@ -79,13 +56,9 @@ cd scripts_ae
 | Fig. 8 | `fig8` | `ae_run_randomness.sh` | `fig8_randomness.pdf` |
 | Fig. 9 | `fig9` | `ae_run_scalability.sh` | `fig9_scalability.pdf` |
 
-`./run.sh synthetic` runs Fig. 4, 7 and 9; `./run.sh real` runs Fig. 5, 6
-and 8, which need the real-world datasets.
+`./run.sh synthetic` runs Fig. 4, 7 and 9; `./run.sh real` runs Fig. 5, 6 and 8, which need the real-world datasets.
 
-**Reading the results.** Absolute times depend on the machine; compare the
-shape of each figure and the order of the trees with the paper. The titles,
-labels and legends are the paper's. Fig. 4 is a table, in seconds. Fig. 5's
-overflow and underflow shares come from numbers the paper's scripts hold.
+**Reading the results.** Times depend on the machine; please compare the shape of each figure and the order of the trees with the paper. The titles, labels and legends are the paper's. Fig. 4 is a table presented in a CSV. Fig. 5's overflow and underflow shares come from numbers the paper's scripts hold since their measurement needs to manually edit the source code.
 
 ## Parameters
 
@@ -93,12 +66,9 @@ overflow and underflow shares come from numbers the paper's scripts hold.
 
 - `--data-path PATH` - Host directory for the datasets (required)
 - `--input-size N` - Entries per synthetic dataset (default: 10^9)
-- `--no-download` - Do not download the real-world datasets; Fig. 5, 6 and 8
-  then run only if their data is already there
-- `--perf` - Allow hardware counters, for Fig. 7; the container runs as
-  root
-- `--with-masstree-bwtree` - Also run Mass-tree and Bw-tree
-- `--cpus NUM`, `--memory SIZE` - Limit the container; usually left unset
+- `--no-download` - Do not download the real-world datasets; Fig. 5, 6 and 8 will run only if their data is already there
+- `--perf` - Allow hardware counters, for Fig. 7; the container runs as root
+- `--with-masstree-bwtree` - Also run Mass-tree and Bw-tree `--cpus NUM`, `--memory SIZE` - Limit the container; usually left unset
 
 `run.sh` takes the steps, and `--with-masstree-bwtree` or
 `--only-masstree-bwtree` as well. It and the
