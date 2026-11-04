@@ -62,7 +62,7 @@ cd scripts_ae
 
 ## Parameters
 
-`docker-run.sh`:
+For `docker-run.sh`:
 
 - `--data-path PATH` - Host directory for the datasets (required)
 - `--input-size N` - Entries per synthetic dataset (default: 10^9)
@@ -70,9 +70,10 @@ cd scripts_ae
 - `--perf` - Allow hardware counters, for Fig. 7; the container runs as root
 - `--with-masstree-bwtree` - Also run Mass-tree and Bw-tree `--cpus NUM`, `--memory SIZE` - Limit the container; usually left unset
 
-`run.sh` takes the steps, and `--with-masstree-bwtree` or
-`--only-masstree-bwtree` as well. It and the
-`ae_*.sh` scripts read these from the environment:
+`run.sh` will run the experiments one-by-one. 
+
+In default it will not run the concurrent indexes, use `--with-masstree-bwtree` or `--only-masstree-bwtree` to include or only run for them.
+It run the `ae_*.sh` scripts read these from the environment:
 
 | Variable | Meaning | Default |
 |---|---|---|
@@ -89,54 +90,25 @@ See the [Docker reference](DOCKER_QUICK_REFERENCE.md) for the rest.
 
 ## Datasets
 
-`scripts_ae/ae_data_generate.sh` generates the synthetic data under
-`<data-path>/synthetic`, with distinct 32-bit keys and values:
+`scripts_ae/ae_data_generate.sh` generates the synthetic data under `<data-path>/synthetic`, with distinct 32-bit keys and values:
 
 | Paper | Name | Each batch is drawn |
 |---|---|---|
 | Uniform | `uni` | uniformly from the keys not yet used |
 | Skewed | `norm` | from normal(0.5, 0.1) over the keys not yet used |
-| Adversarial | `seg` | uniformly from the leading 2m keys not yet used, for batches of m |
+| Adversarial | `seg` | uniformly from the leading $2m$ keys not yet used, for batches of $m$ |
 
 | Set | Used by | Size at 10^9 |
 |---|---|---|
-| `incre`: one stream per batch size, sliced into batches | Fig. 4, 7 | 96 GB |
 | `single`: a tree and one batch of n/100 | Fig. 9 | 16 GB per distribution |
+| `incre`: a single dataset sliced into batches | Fig. 4, 7 | 96 GB |
 
-`run.sh` keeps every set, 144 GB in all; with `KEEP_DATA=0` it keeps one at a
-time, about 100 GB. All of it takes about an hour on 64 threads, 47 minutes of
-that for `norm` at x = 10000. A run that is killed can simply be run again:
-finished files are kept, and a file shorter than its header says is made again.
 
-`incre/norm`, `incre/seg` and `single/uni` come out as the bytes the paper used.
-`incre/uni` is another permutation of the same distribution, as the paper's
-files predate the generator's last change, and `single/norm` is a new sample of
-its distribution on every run.
-
-The real-world datasets go under `<data-path>/real_world`.
-`scripts_ae/download_data.sh` fetches them from
-[romaLzhih/pab-tree-data](https://huggingface.co/datasets/romaLzhih/pab-tree-data)
-and checks them against `scripts_ae/datasets.sha256` (`docker-run.sh` runs it).
-No account is needed.
+The real-world datasets go under `<data-path>/real_world`. `scripts_ae/download_data.sh` fetches them from [romaLzhih/pab-tree-data](https://huggingface.co/datasets/romaLzhih/pab-tree-data) and checks them against `scripts_ae/datasets.sha256` (`docker-run.sh` runs it). No account is needed.
 
 | Dataset | Used by | Size |
 |---|---|---|
 | OpenStreetMap | Fig. 5 | 28 GB |
 | RED, REF, SEM, PLANET (GraphTide) | Fig. 6, 8 | 61 GB |
 
-## Running on Other Data and Settings
 
-- **Other sizes**: `--input-size` (or `INPUT_SIZE`) scales every synthetic
-  dataset; `ROUNDS` and `THREADS` change the repetitions and the thread sweep.
-- **Other keys**: the drivers read a binary file of entries: a `uint64`
-  header `{N, 2, width}` (`width` 4 or 8 bytes), then `N` key-value pairs
-  (`tests/binary_io.h`). `make_single_batch.py` shows the layout in a few
-  lines. Point `-p` at your file, laid out as `<dir>/ins/<x>/1.base.bin` and
-  `1.batch.bin` for an `x`-th of the tree per batch.
-- **Other trees or leaf sizes**: `ae_run_*.sh` call one driver per tree
-  (`b_test` is PaB-tree; `-T` picks the baseline); `run_tree` in
-  `scripts_ae/common.sh` builds and runs one, and the build configuration
-  `leaf<N>` compiles PaB-tree with leaves of N entries.
-- **Other counters**: `EVENTS` in `ae_run_perf.sh` lists the perf events;
-  `tests/perf_cache.cpp` holds the counted regions.
-- **The library itself**: see the [manual](MANUAL.md).
