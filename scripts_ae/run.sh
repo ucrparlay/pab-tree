@@ -8,12 +8,12 @@
 #   ./run.sh --with-masstree-bwtree fig4     # add Mass-tree and Bw-tree
 #   ./run.sh --only-masstree-bwtree          # only Mass-tree and Bw-tree
 #   INPUT_SIZE=1000000 ./run.sh synthetic    # a quick check
-#   KEEP_DATA=1 ./run.sh                     # keep the generated datasets
+#   KEEP_DATA=0 ./run.sh                     # delete each dataset after use
 #
 # Steps: fig4 fig5 fig6 fig7 fig8 fig9 merge plot, the paper's experiments
 # outside the appendix but Fig. 1; fig7 needs perf (docker-run.sh --perf).
-# A step that needs synthetic data generates it first, and data no later
-# step needs is deleted unless KEEP_DATA=1. Mass-tree and Bw-tree (Fig. 4,
+# A step that needs synthetic data generates it first and keeps it;
+# KEEP_DATA=0 deletes data no later step needs. Mass-tree and Bw-tree (Fig. 4,
 # 5, 9) run only with --with-masstree-bwtree; --only-masstree-bwtree runs
 # just them (Fig. 4, 5, 9) and keeps the other trees' logs, so merge and
 # plot show every tree. Results: logs/, data/ (csv), plots/ (pdf; Fig. 4 is
@@ -64,7 +64,7 @@ try() {
 }
 
 drop() {
-	if [ "${KEEP_DATA:-0}" != 1 ]; then
+	if [ "${KEEP_DATA:-1}" = 0 ]; then
 		./ae_data_generate.sh clean "$@"
 	fi
 }

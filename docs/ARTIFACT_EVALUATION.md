@@ -33,7 +33,7 @@ Expected: `scripts_ae/plots/` holds `fig4_synthetic.csv`, `fig7_perf_cache.pdf` 
 ./docker-run.sh full --data-path [/mnt/large-disk/pab-tree] --perf
 ```
 
-This downloads the real-world datasets, then runs `scripts_ae/run.sh` at 10^9 entries: it generates each synthetic dataset just before the experiments that read it, deletes it afterwards, runs every experiment, merges the logs into `scripts_ae/data/` and writes `scripts_ae/plots/`: each figure as a PDF, Fig. 4 as a csv table. A step that fails is listed in `scripts_ae/logs/failed.txt` and the rest go on; `scripts_ae/logs/env.txt` records the machine, compiler and commit.
+This downloads the real-world datasets, then runs `scripts_ae/run.sh` at 10^9 entries: it generates each synthetic dataset just before the experiments that read it, runs every experiment, merges the logs into `scripts_ae/data/` and writes `scripts_ae/plots/`: each figure as a PDF, Fig. 4 as a csv table. A step that fails is listed in `scripts_ae/logs/failed.txt` and the rest go on; `scripts_ae/logs/env.txt` records the machine, compiler and commit.
 
 Please run it inside the `tmux` or other persistent session: it takes many hours.
 
@@ -81,7 +81,7 @@ cd scripts_ae
 | `THREADS` | Thread counts of Fig. 9 | 1, 4, 16, 32, 64 up to the cores, the cores, all hyper-threads |
 | `WITH_MASSTREE_BWTREE` | `1` also runs Mass-tree and Bw-tree | `0` |
 | `ONLY_MASSTREE_BWTREE` | `1` runs only Mass-tree and Bw-tree | `0` |
-| `KEEP_DATA` | `1` keeps the generated datasets | delete |
+| `KEEP_DATA` | `0` deletes each generated dataset after the last step that reads it | keep |
 | `RETRIES` | Reruns of a Mass-tree or Bw-tree run that fails or times out | `2` |
 | `RUN_TIMEOUT` | Time limit of a Mass-tree or Bw-tree run (`timeout` duration; `0` for none) | `2h`; Fig. 9: 8 h / threads, at least 1 h |
 
@@ -103,10 +103,10 @@ See the [Docker reference](DOCKER_QUICK_REFERENCE.md) for the rest.
 | `incre`: one stream per batch size, sliced into batches | Fig. 4, 7 | 96 GB |
 | `single`: a tree and one batch of n/100 | Fig. 9 | 16 GB per distribution |
 
-`run.sh` keeps one set at a time, so about 100 GB at once. All of it takes about
-an hour on 64 threads, 47 minutes of that for `norm` at x = 10000. A run that
-is killed can simply be run again: finished files are kept, and a file shorter
-than its header says is made again.
+`run.sh` keeps every set, 144 GB in all; with `KEEP_DATA=0` it keeps one at a
+time, about 100 GB. All of it takes about an hour on 64 threads, 47 minutes of
+that for `norm` at x = 10000. A run that is killed can simply be run again:
+finished files are kept, and a file shorter than its header says is made again.
 
 `incre/norm`, `incre/seg` and `single/uni` come out as the bytes the paper used.
 `incre/uni` is another permutation of the same distribution, as the paper's
