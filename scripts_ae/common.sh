@@ -35,25 +35,24 @@ declare -A TREE_TARGET=(
 	[6]=index_microbench_workload # Bw-tree
 )
 
-# Mass-tree and Bw-tree run only when asked: run.sh --with-masstree-bwtree
+# Mass-tree and Bw-tree run only when asked: 1 adds them (run.sh
+# --with-masstree-bwtree), only runs them alone (--only-masstree-bwtree)
 WITH_MASSTREE_BWTREE="${WITH_MASSTREE_BWTREE:-0}"
-# only them: run.sh --only-masstree-bwtree
-ONLY_MASSTREE_BWTREE="${ONLY_MASSTREE_BWTREE:-0}"
-export WITH_MASSTREE_BWTREE ONLY_MASSTREE_BWTREE
+export WITH_MASSTREE_BWTREE
 
 # trees ID...: the ids, less Mass-tree (5) and Bw-tree (6) unless asked for;
-# only those two with ONLY_MASSTREE_BWTREE=1
+# only those two with WITH_MASSTREE_BWTREE=only
 trees() {
 	local id
 	for id; do
 		case $id in
 		5 | 6)
-			if [ "$WITH_MASSTREE_BWTREE" = 1 ]; then
-				echo "$id"
-			fi
+			case $WITH_MASSTREE_BWTREE in
+			1 | only) echo "$id" ;;
+			esac
 			;;
 		*)
-			if [ "$ONLY_MASSTREE_BWTREE" != 1 ]; then
+			if [ "$WITH_MASSTREE_BWTREE" != only ]; then
 				echo "$id"
 			fi
 			;;

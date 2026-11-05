@@ -833,7 +833,9 @@ paper's column names (Find and Range Report are the 1% blocks' `MIX` and
 (user). Mass-tree and Bw-tree run only with `--with-masstree-bwtree`
 (`WITH_MASSTREE_BWTREE=1`, `trees` in `common.sh`; user). `run.sh
 --only-masstree-bwtree` (2026-11-03, user; `docker-run.sh` unchanged): only
-5 and 6, Fig 4, 5, 9; other trees' logs stay, so merges show all. Rounds:
+5 and 6, Fig 4, 5, 9; other trees' logs stay, so merges show all. It sets
+`WITH_MASSTREE_BWTREE=only`; no `ONLY_MASSTREE_BWTREE` (user, 2026-11-04: set
+alone it ran no tree). Both flags: the last wins. Rounds:
 `workload.cpp` (Mass-tree/Bw-tree) never reads `-r`: every number is one timed
 run, no warm-up. The parallel trees go through `time_loop`: one warm-up, then
 `-r` timed runs, averaged (`batch_insert`/`batch_delete` skip the warm-up at
@@ -979,8 +981,46 @@ signal `<g>.bin`, `all_batch.bin`; `planet.bin`; `planet/`, 10 batches, while
 the paper's runner reads `planet_year/`; `europe`, `north_america`),
 `kv_pair` (1,026 GB), `kv_pair_incre/{exp,seg_10}`.
 
-Open: Zenodo DOI; BibTeX; a full 1e9 run on gazelle for the time and memory
-in `ARTIFACT_EVALUATION.md`.
+Open: Zenodo DOI (the AE doc's `[Zenodo]()` link is empty, user fills it);
+BibTeX; peak memory of a 1e9 run for
+`ARTIFACT_EVALUATION.md`; Mass-tree/Bw-tree Fig 5 and 9 timed on gazelle.
+Doc review (2026-11-04, on swan-office: Ryzen 5 1600, 12 threads, 30 GB, no
+Docker; code read, `run.sh` with stub runners, `merge plot` on a copy of
+`scripts/logs`). `ONLY_MASSTREE_BWTREE=1` alone ran no tree; removed, see
+above. `docker-run.sh full` passes only `INPUT_SIZE`, `DOWNLOAD`,
+`WITH_MASSTREE_BWTREE`; the other variables work only in a `run` shell.
+`run.sh` ran nothing for unknown steps (`fig10`, `fig 9`) and said `done`;
+now it prints its usage and exits 1 before writing `logs/` (user).
+The doc's redraw command was `run.sh fig9 merge plot` (a 6 h rerun); now
+`merge plot`. Every `run.sh` start deletes `logs/failed.txt` and rewrites
+`logs/env.txt`, so `merge plot` after a full run loses both (stub run).
+Disk at 1e9 under the data path (Hub sizes, code read): 232.6 GB at the end
+(real 88.1, incre 96.0, single 48.5), peak 240.7 while Fig 9 makes
+`single/seg` (its 8.1 GB insert stream waits in `synthetic/tmp`); 336.7
+without hard links; `KEEP_DATA=0` 184.1 / 280.1. The doc said 700; now 250 /
+350 (user). Doc times: the 2026-11-03 gazelle run per step; download 30 min
+= 88 GB at the 55 MB/s seen from the Hub. Mass-tree/Bw-tree "15 more hours":
+Fig 4 measured (2.35 h), Fig 9 estimated from the paper's logs as 3 builds +
+insert + delete per run (`workload.cpp` rebuilds before each op): Mass-tree
+1.2 h, Bw-tree 2.7 h per distribution, 11.7 h; Fig 5 ~0.25 h from
+`scripts/logs/osm/{5,6}`. Editing `ARTIFACT_EVALUATION.md`: add no line
+breaks (user). Its Cleanup (user): datasets deleted from a container (root's
+after `--perf`; the image runs as root, no entrypoint), then `docker-run.sh
+clean` (container, results, image; never `--data-path`). Test logs mix into
+a full run only where it never rewrites them (runners empty a log just
+before writing it; paths carry no size): Fig 7's perf check exits first, a
+run stopped partway, a tree or thread count only the test ran. The doc now
+says `rm -rf scripts_ae/{data,logs,plots}` on the host between them.
+`run.sh synthetic` builds only `leaf64`: the `osm` and
+`graph` builds and `index_microbench_workload` first compile in the full run.
+Replay: Fig 4, 5, 6, 8, 9 render. `plot_fig9_scalability.R` stops when a
+distribution has no PaB-tree 1-thread run. `plot_fig8_randomness.R` stops
+without Fig 6's `data/temp_osm/temp_osm.csv`. Fig 9 assigns colours and shapes
+per panel by position, and its legend comes from panel 1, so a tree with no
+finite value in one panel shifts the trees after it there. After `--perf`, a
+non-root container's `ae_data_generate.sh incre` stops at `rm -f "$del"` in
+the root-owned directory (read from the code). Bash passes the doc's
+`[/path]` placeholder through literally; zsh aborts with "no matches found".
 Paper text vs. files: the OSM run keeps 2015-2024, 1.67 B records (text:
 1.35 B, 2014-2023); PLANET has 21 year files (text: 20 batches); `seg` is
 multiplier 2 (text: consecutive ranges, which is 1). Measured by replaying the

@@ -28,8 +28,13 @@ steps=()
 for arg; do
 	case $arg in
 	--with-masstree-bwtree) export WITH_MASSTREE_BWTREE=1 ;;
-	--only-masstree-bwtree) export WITH_MASSTREE_BWTREE=1 ONLY_MASSTREE_BWTREE=1 ;;
-	*) steps+=("$arg") ;;
+	--only-masstree-bwtree) export WITH_MASSTREE_BWTREE=only ;;
+	all | synthetic | real | fig[4-9] | merge | plot) steps+=("$arg") ;;
+	*)
+		echo "unknown step: $arg" >&2
+		sed -n '3,14p' "$0" >&2
+		exit 1
+		;;
 	esac
 done
 if [ ${#steps[@]} -eq 0 ]; then
@@ -45,7 +50,7 @@ case " ${steps[*]} " in
 *" real "*) steps+=(fig5 fig6 fig8 merge plot) ;;
 esac
 # Fig. 6, 7, 8 have no Mass-tree or Bw-tree
-if [ "${ONLY_MASSTREE_BWTREE:-0}" = 1 ]; then
+if [ "$WITH_MASSTREE_BWTREE" = only ]; then
 	for i in "${!steps[@]}"; do
 		case ${steps[$i]} in
 		fig6 | fig7 | fig8) unset 'steps[i]' ;;
@@ -77,7 +82,7 @@ rm -f "$LOG_DIR/failed.txt"
 	echo "commit: ${PAB_TREE_COMMIT:-$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 	echo "steps: ${steps[*]}"
 	echo "INPUT_SIZE=$INPUT_SIZE ROUNDS=$ROUNDS DATA_PREFIX=$DATA_PREFIX"
-	echo "WITH_MASSTREE_BWTREE=$WITH_MASSTREE_BWTREE ONLY_MASSTREE_BWTREE=$ONLY_MASSTREE_BWTREE"
+	echo "WITH_MASSTREE_BWTREE=$WITH_MASSTREE_BWTREE"
 	echo "numactl: ${NUMA[*]:-not available}"
 	g++ --version | head -1
 	cmake --version | head -1
