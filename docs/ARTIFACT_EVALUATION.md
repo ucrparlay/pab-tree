@@ -1,6 +1,6 @@
 # Artifact Evaluation
 
-The artifact for *PaB-tree: Parallel B+-trees with Batch Updates* (PPoPP 2027).
+The artifact for *PaB-tree: Parallel B+-tree with Batch Updates* (PPoPP 2027).
 
 ## Hardware Requirements
 
@@ -21,7 +21,9 @@ The paper's numbers were measured on four Intel Xeon Platinum 8176 CPUs (112 cor
 git clone --recursive https://github.com/ucrparlay/pab-tree.git && cd pab-tree
 ```
 
-`--recursive` fetches the submodules under `external/`, which `./docker-run.sh build` needs; after a plain clone, run `git submodule update --init --recursive`. The artifact is also archived on [Zenodo]().
+`--recursive` fetches the submodules under `external/`, which `./docker-run.sh build` needs; after a plain clone, run `git submodule update --init --recursive`.
+
+This artifact is archived on [Zenodo](https://zenodo.org/records/24044003) with doi `10.5281/zenodo.24044003`.
 
 ## Getting Started Test (about 30 minutes)
 
