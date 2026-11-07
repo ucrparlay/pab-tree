@@ -904,6 +904,21 @@ per dis), Fig 5 12 min, Fig 6 44 min, Fig 8 11 min. `--perf` left
 `synthetic/`, `real_world/` root-owned (755): a non-root container cannot
 create `synthetic/incre`.
 
+dynamic (`dynamic.cs.ucr.edu`, read 2026-11-06): 4x Xeon Gold 6252, 96
+cores, 192 threads, 1.5 TB; Docker, local `ghcr.io/ucrparlay/pab-tree:latest`
+is `7ef8f02`'s (CI's `d3124c7` run started 2026-11-05 15:52 PST and passed;
+only the Mass-tree/Bw-tree flags differ). Full run in `scripts_ae/{data,logs,plots}`:
+2026-11-05 17:16 to 11-06 03:56 PST, 10 h 40, that image, `--perf`, no
+Mass-tree/Bw-tree, 1e9, no failures. Log birth times: generation incre 50
+min, single ~1 min per dis; Fig 4 2 h 31, Fig 7 10 min, Fig 9 6 h 1 (threads
+1 4 16 32 64 96 192), Fig 5 11 min, Fig 6 44 min, Fig 8 13 min.
+
+Driver flags: `-t` is the tag (which experiment), not threads; threads are
+`PARLAY_NUM_THREADS` (Fig 9 only) or every CPU. Fig 7's `perf_btree` and
+`perf_cpam` link no jemalloc (CMake's `JEMA` covers `b_test`, `cpam`);
+`measure-cache`'s `scripts/perf_cache.sh` counted inside `b_test`/`cpam`,
+configured without `-DJEMA` (default ON).
+
 GitHub: the repository is `ucrparlay/pab-tree` (renamed from `pb-tree`,
 which redirects), so CI publishes `ghcr.io/ucrparlay/pab-tree`, public since
 2026-10-30; anonymous pulls work. Check runs without `gh` (not installed):

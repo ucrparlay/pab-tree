@@ -36,10 +36,12 @@ cd scripts_ae && ./run.sh synthetic
 
 Expected: `scripts_ae/plots/` holds `fig4_synthetic.csv`, `fig7_perf_cache.pdf` and `fig9_scalability.pdf`, and the run ends with `done`. Without `--perf`, Fig. 7 is skipped and listed in `scripts_ae/logs/failed.txt`.
 
-Before the full evaluation, remove the test's results on the host, so none of them reach the full run's figures: `rm -rf scripts_ae/{data,logs,plots}`.
+Before the full evaluation, remove the test's results on the host, so none of them reach the full run's figures (not in the docker, in the server console): `rm -rf scripts_ae/{data,logs,plots}`.
 
 ## Full Evaluation
+The baselines in the paper evaluated are in two categorizes. The first one are the parallel baselines, including the CPAM, PAM, PMA. Our PaB-tree is a parallel baseline as well. The second group are concurrent baselines, such as the Mass-tree and Bw-tree.
 
+### Running Parallel Baselines
 ```bash
 ./docker-run.sh full --data-path /path-to-disk --perf
 ```
@@ -48,7 +50,15 @@ This downloads the real-world datasets, then runs `scripts_ae/run.sh` at 10^9 en
 
 Please run it inside the `tmux` or other persistent session: it takes about 11 hours on the paper's machine, plus the 88 GB download (about 30 minutes at 55 MB/s).
 
-NOTE: The Mass-tree and Bw-tree (Fig. 4, 5 and 9) are left out by default: they are the slowest trees by far (about 15 more hours, 12 of them in Fig. 9), and the original implementation is fragile and contains flaws. Add `--with-masstree-bwtree` to run them too. For example after a full run without them, use `./run.sh --only-masstree-bwtree` in the container: it runs Fig. 4, 5 and 9 for Mass-tree and Bw-tree alone and keeps the other trees' logs, so the merged figures show every tree.
+### Running the Concurrent Baselines
+The Mass-tree and Bw-tree (Fig. 4, 5 and 9) are left out by default in above commands: they are the slowest trees by far (about 15 more hours, 12 of them in Fig. 9). The original implementation is fragile and contains flaws, we try to make it work on our servers but cannot guarantee it work on all machines.
+
+To run them, add `--with-masstree-bwtree` in the `run.sh`. For example, after a full run of parallel baselines,
+```bash
+./docker-run.sh run --data-path /path-to-disk --perf
+./run.sh --only-masstree-bwtree
+```
+It runs Fig. 4, 5 and 9 for Mass-tree and Bw-tree alone and keeps the other trees' logs, so the merged figures show every tree.
 
 ## Reading the Results
 
@@ -73,6 +83,15 @@ The experiment scripts and figures are listed below, with each step's time in a 
 `./run.sh synthetic` runs Fig. 4, 7 and 9; `./run.sh real` runs Fig. 5, 6 and 8, which need the real-world datasets. `./run.sh fig9 merge plot` reruns Fig. 9 alone.
 
 **Reading the results.** Times depend on the machine; please compare the shape of each figure and the order of the trees with the paper. The titles, labels and legends are the paper's. Fig. 4 is a table presented in a CSV. Fig. 5's overflow and underflow shares come from numbers the paper's scripts hold since their measurement needs to manually edit the source code. N.A. in a csv or table is a number a run did not print: it failed (listed in `logs/failed.txt`), or was stopped.
+
+## Cleanup
+In the host:
+```bash
+docker run --rm -v [/mnt/large-disk/pab-tree]:/data ghcr.io/ucrparlay/pab-tree rm -rf /data/real_world /data/synthetic
+./docker-run.sh clean
+```
+
+The first command deletes the datasets under `--data-path`, downloaded and generated; it runs in a container because a `--perf` run leaves them owned by root. The second stops the container and removes the image and the results in `scripts_ae/{data,logs,plots}`: copy what you want to keep first.
 
 ## Parameters
 
@@ -124,11 +143,4 @@ The real-world datasets go under `<data-path>/real_world`. `scripts_ae/download_
 | OpenStreetMap | Fig. 5 | 28 GB |
 | RED, REF, SEM, PLANET (GraphTide) | Fig. 6, 8 | 61 GB |
 
-## Cleanup
 
-```bash
-docker run --rm -v [/mnt/large-disk/pab-tree]:/data ghcr.io/ucrparlay/pab-tree rm -rf /data/real_world /data/synthetic
-./docker-run.sh clean
-```
-
-The first command deletes the datasets under `--data-path`, downloaded and generated; it runs in a container because a `--perf` run leaves them owned by root. The second stops the container and removes the image and the results in `scripts_ae/{data,logs,plots}`: copy what you want to keep first.
