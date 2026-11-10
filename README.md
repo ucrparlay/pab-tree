@@ -17,7 +17,17 @@ PaB-tree is a parallel, in-memory B+-tree built for batch updates, which is:
 - [Artifact Evaluation](docs/ARTIFACT_EVALUATION.md)
 
 ## Citation
-
+```{tex}
+@misc{men2026pabtreeparallelbtreebatch,
+      title={PaB-tree: Parallel B+-tree with Batch Updates}, 
+      author={Ziyang Men and Yan Gu and Yihan Sun and Helen Xu},
+      year={2026},
+      eprint={2611.09172},
+      archivePrefix={arXiv},
+      primaryClass={cs.DS},
+      url={https://arxiv.org/abs/2611.09172}, 
+}
+```
 ## License
 
 PaB-tree is MIT licensed — see [LICENSE](LICENSE).
